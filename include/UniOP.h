@@ -325,8 +325,6 @@ class UniExecute :public Execute {
     Tensor2D drop_mask;
 
     inline void  forward() {
-        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-        profiler.BeginEvent("UniExecute forward");
         int count = batch.size();
         ty.init(outDim, count);
         x.init(inDim, count);
@@ -349,7 +347,7 @@ class UniExecute :public Execute {
             ys.push_back(n->val.value);
         }
 
-        n3ldg_cuda::CopyForUniNodeForward(graph_info, param->b.val.value,
+        n3ldg_cuda::CopyForUniNodeForward(xs, param->b.val.value,
                 x.value, ty.value, count, inDim, outDim, param->bUseB);
 
         n3ldg_cuda::MatrixMultiplyMatrix(param->W.val.value, x.value,
@@ -443,7 +441,6 @@ class UniExecute :public Execute {
             batch[i]->forward_drop(bTrain, drop_factor);
         }
 #endif
-        profiler.EndCudaEvent();
     }
 
     void backward() {
@@ -615,8 +612,6 @@ public:
     UniParams* param;
 
     void  forward() {
-        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-        profiler.BeginEvent("LinearExecute forward");
         int count = batch.size();
 
         x.init(inDim, count);
@@ -635,14 +630,19 @@ public:
             ys.push_back(n->val.value);
         }
 
-        n3ldg_cuda::CopyForUniNodeForward(graph_info, param->b.val.value,
+        n3ldg_cuda::CopyForUniNodeForward(xs, param->b.val.value,
                 x.value, y.value, count, inDim, outDim, param->bUseB);
 
         n3ldg_cuda::MatrixMultiplyMatrix(param->W.val.value, x.value, y.value,
                 outDim, inDim, count, false);
 
-        n3ldg_cuda::CopyFromOneVectorToMultiVals(graph_info, y.value, count,
-                outDim);
+        std::vector<dtype*> vals;
+        vals.reserve(count);
+        for (Node *node : batch) {
+            vals.push_back(node->val.value);
+        }
+
+        n3ldg_cuda::CopyFromOneVectorToMultiVals(y.value, vals, count, outDim);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
@@ -664,7 +664,6 @@ public:
         }
 #endif
 
-        profiler.EndCudaEvent();
     }
 
     void backward() {

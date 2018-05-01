@@ -161,6 +161,10 @@ class TanhExecute :public Execute {
   public:
     Tensor2D drop_mask;
     int dim;
+public:
+    Tensor1D y, x;
+    int sumDim;
+    bool bTrain;
 
 #if USE_GPU
     void forward() {
@@ -179,7 +183,7 @@ class TanhExecute :public Execute {
         }
 
         CalculateDropMask(count, dim, drop_mask);
-        n3ldg_cuda::TanhForward(xs, count, dim, drop_mask.value,
+        n3ldg_cuda::TanhForward(n3ldg_cuda::ActivatedEnum::TANH, xs, count, dim, drop_mask.value,
                 this->dynamicDropValue(), ys);
 #if TEST_CUDA
         drop_mask.copyFromDeviceToHost();
@@ -199,10 +203,34 @@ class TanhExecute :public Execute {
 #else
     void  forward() {
         int count = batch.size();
-        //#pragma omp parallel for
+        //#pragma omp parallel for  
+        sumDim = 0;
         for (int idx = 0; idx < count; idx++) {
-            batch[idx]->compute();
-            batch[idx]->forward_drop(bTrain, drop_factor);
+            sumDim += batch[idx]->dim;
+        }
+
+        x.init(sumDim);
+        y.init(sumDim);
+
+        int offset = 0;
+        for (int idx = 0; idx < count; idx++) {
+            TanhNode* ptr = (TanhNode*)batch[idx];
+            for (int idy = 0; idy < ptr->dim; idy++) {
+                x[offset + idy] = ptr->in->val[idy];
+            }
+            offset += ptr->dim;
+        }
+
+        y.vec() = x.vec().unaryExpr(ptr_fun(ftanh));
+
+        offset = 0;
+        for (int idx = 0; idx < count; idx++) {
+            TanhNode* ptr = (TanhNode*)batch[idx];
+            for (int idy = 0; idy < ptr->dim; idy++) {
+                ptr->val[idy] = y[offset + idy];
+            }
+            offset += ptr->dim;
+            ptr->forward_drop(bTrain,drop_factor);
         }
     }
 #endif
@@ -224,7 +252,7 @@ class TanhExecute :public Execute {
             losses.push_back(tanh->loss.value);
             in_losses.push_back(tanh->in->loss.value);
         }
-        n3ldg_cuda::TanhBackward(losses, vals, count, dim, drop_mask.value,
+        n3ldg_cuda::TanhBackward(n3ldg_cuda::ActivatedEnum::TANH, losses, vals, count, dim, drop_mask.value,
                 dynamicDropValue(), in_losses);
 #if TEST_CUDA
         for (Node *n : batch) {
@@ -241,9 +269,29 @@ class TanhExecute :public Execute {
     void backward() {
         int count = batch.size();
         //#pragma omp parallel for
+        Tensor1D lx, ly;
+        lx.init(sumDim);
+        ly.init(sumDim);
+
+        int offset = 0;
         for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward_drop();
-            batch[idx]->backward();
+            TanhNode* ptr = (TanhNode*)batch[idx];
+            ptr->backward_drop();
+            for (int idy = 0; idy < ptr->dim; idy++) {
+                ly[offset + idy] = ptr->loss[idy];
+            }
+            offset += ptr->dim;
+        }
+
+        lx.vec() = ly.vec() * x.vec().binaryExpr(y.vec(), ptr_fun(dtanh));
+
+        offset = 0;
+        for (int idx = 0; idx < count; idx++) {
+            TanhNode* ptr = (TanhNode*)batch[idx];
+            for (int idy = 0; idy < ptr->dim; idy++) {
+                ptr->in->loss[idy] += lx[offset + idy];
+            }
+            offset += ptr->dim;
         }
     }
 #endif
@@ -305,25 +353,168 @@ class SigmoidNode :public Node {
     }
 };
 
+
 class SigmoidExecute :public Execute {
   public:
-    inline void  forward() {
+    Tensor2D drop_mask;
+    int dim;
+public:
+    Tensor1D x, y;
+    int sumDim;
+    bool bTrain;
+
+#if USE_GPU
+    void forward() {
         int count = batch.size();
-        //#pragma omp parallel for
+        std::vector<dtype*> xs, ys;
+        xs.reserve(count);
+        ys.reserve(count);
+        drop_mask.init(dim, count);
+        for (Node *n : batch) {
+            SigmoidNode *tanh = static_cast<SigmoidNode*>(n);
+#if TEST_CUDA
+            tanh->in->val.copyFromHostToDevice();
+#endif
+            xs.push_back(tanh->in->val.value);
+            ys.push_back(tanh->val.value);
+        }
+
+        CalculateDropMask(count, dim, drop_mask);
+        n3ldg_cuda::TanhForward(n3ldg_cuda::ActivatedEnum::SIGMOID, xs, count, dim, drop_mask.value,
+                this->dynamicDropValue(), ys);
+#if TEST_CUDA
+        drop_mask.copyFromDeviceToHost();
+        for (int i = 0; i < count; ++i) {
+            for (int j = 0; j < dim; ++j) {
+                dtype v = drop_mask[j][i];
+                batch[i]->drop_mask[j] = v <= dynamicDropValue() ? 0 : 1;
+            }
+        }
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
             batch[idx]->forward_drop(bTrain, drop_factor);
+            n3ldg_cuda::Assert(batch.at(idx)->val.verify("Sigmoid forward"));
         }
+#endif
     }
-
-    inline void backward() {
+#else
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
+        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
+        profiler.BeginEvent("Sigmoid no-batch backward");
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward_drop();
             batch[idx]->backward();
         }
+        profiler.EndEvent();
+
+        profiler.BeginEvent("Sigmoid batch backward");
+
+        sumDim = 0;
+        for (int idx = 0; idx < count; idx++) {
+            sumDim += batch[idx]->dim;
+        }
+
+        x.init(sumDim);
+        y.init(sumDim);
+
+        int offset = 0;
+        for (int idx = 0; idx < count; idx++) {
+            SigmoidNode* ptr = (SigmoidNode*)batch[idx];
+            for (int idy = 0; idy < ptr->dim; idy++) {
+                x[offset + idy] = ptr->in->val[idy];
+            }
+            offset += ptr->dim;
+        }
+
+        y.vec() = x.vec().unaryExpr(ptr_fun(fsigmoid));
+
+        offset = 0;
+        for (int idx = 0; idx < count; idx++) {
+            SigmoidNode* ptr = (SigmoidNode*)batch[idx];
+            for (int idy = 0; idy < ptr->dim; idy++) {
+                ptr->val[idy] = y[offset + idy];
+            }
+            offset += ptr->dim;
+            ptr->forward_drop(bTrain, drop_factor);
+        }
+        profiler.EndEvent();
     }
+#endif
+
+#if USE_GPU
+    void backward() {
+        int count = batch.size();
+        std::vector<dtype*> vals, losses, in_losses;
+        vals.reserve(count);
+        losses.reserve(count);
+        in_losses.reserve(count);
+        for (Node *n : batch) {
+            SigmoidNode *tanh = static_cast<SigmoidNode*>(n);
+#if TEST_CUDA
+            tanh->loss.copyFromHostToDevice();
+            tanh->in->loss.copyFromHostToDevice();
+#endif
+            vals.push_back(tanh->val.value);
+            losses.push_back(tanh->loss.value);
+            in_losses.push_back(tanh->in->loss.value);
+        }
+        n3ldg_cuda::TanhBackward(n3ldg_cuda::ActivatedEnum::SIGMOID, losses, vals, count, dim, drop_mask.value,
+                dynamicDropValue(), in_losses);
+#if TEST_CUDA
+        for (Node *n : batch) {
+            n->backward_drop();
+            n->backward();
+        }
+        for (Node *n : batch) {
+            SigmoidNode *tanh = static_cast<SigmoidNode*>(n);
+            n3ldg_cuda::Assert(tanh->in->loss.verify("SigmoidExecute backward"));
+        }
+#endif
+    }
+#else
+    void backward() {
+        int count = batch.size();
+        //#pragma omp parallel for
+        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
+        profiler.BeginEvent("Sigmoid no-batch backward");
+        for (int idx = 0; idx < count; idx++) {
+            batch[idx]->backward_drop();
+            batch[idx]->backward();
+        }
+        profiler.EndEvent();
+
+        profiler.BeginEvent("Sigmoid batch backward");
+
+        Tensor1D lx, ly;
+        lx.init(sumDim);
+        ly.init(sumDim);
+
+        int offset = 0;
+        for (int idx = 0; idx < count; idx++) {
+            SigmoidNode* ptr = (SigmoidNode*)batch[idx];
+            ptr->backward_drop();
+            for (int idy = 0; idy < ptr->dim; idy++) {
+                ly[offset + idy] = ptr->loss[idy];
+            }
+            offset += ptr->dim;
+        }
+
+        lx.vec() = ly.vec() * x.vec().binaryExpr(y.vec(), ptr_fun(dsigmoid));
+
+        offset = 0;
+        for (int idx = 0; idx < count; idx++) {
+            SigmoidNode* ptr = (SigmoidNode*)batch[idx];
+            for (int idy = 0; idy < ptr->dim; idy++) {
+                ptr->in->loss[idy] += lx[offset + idy];
+            }
+            offset += ptr->dim;
+        }
+        profiler.EndEvent();
+
+    }
+#endif
 };
 
 inline PExecute SigmoidNode::generate(bool bTrain, dtype cur_drop_factor) {
@@ -331,6 +522,7 @@ inline PExecute SigmoidNode::generate(bool bTrain, dtype cur_drop_factor) {
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
     exec->drop_factor = cur_drop_factor;
+    exec->dim = dim;
     return exec;
 };
 
@@ -663,5 +855,109 @@ inline PExecute PDotNode::generate(bool bTrain, dtype cur_drop_factor) {
     exec->drop_factor = cur_drop_factor;
     return exec;
 }
+
+class DropoutNode : public Node {
+public:
+    PNode in = NULL;
+
+    DropoutNode() {
+        node_type = "dropout";
+    }
+
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
+};
+
+class DropoutExecute :public Execute {
+  public:
+    Tensor2D drop_mask;
+    int dim;
+
+#if USE_GPU
+    void forward() {
+        int count = batch.size();
+        std::vector<dtype*> xs, ys;
+        xs.reserve(count);
+        ys.reserve(count);
+        drop_mask.init(dim, count);
+        for (Node *n : batch) {
+            DropoutNode *tanh = static_cast<DropoutNode*>(n);
+#if TEST_CUDA
+            tanh->in->val.copyFromHostToDevice();
+#endif
+            xs.push_back(tanh->in->val.value);
+            ys.push_back(tanh->val.value);
+        }
+
+        CalculateDropMask(count, dim, drop_mask);
+        n3ldg_cuda::DropoutForward(xs, count, dim, drop_mask.value,
+                this->dynamicDropValue(), ys);
+#if TEST_CUDA
+        drop_mask.copyFromDeviceToHost();
+        for (int i = 0; i < count; ++i) {
+            for (int j = 0; j < dim; ++j) {
+                dtype v = drop_mask[j][i];
+                batch[i]->drop_mask[j] = v <= dynamicDropValue() ? 0 : 1;
+            }
+        }
+        for (int idx = 0; idx < count; idx++) {
+            batch[idx]->compute();
+            batch[idx]->forward_drop(bTrain, drop_factor);
+            n3ldg_cuda::Assert(batch.at(idx)->val.verify("Dropout forward"));
+        }
+#endif
+    }
+#else
+    void  forward() {
+        int count = batch.size();
+        //#pragma omp parallel for
+        for (int idx = 0; idx < count; idx++) {
+            batch[idx]->compute();
+            batch[idx]->forward_drop(bTrain, drop_factor);
+        }
+    }
+#endif
+
+#if USE_GPU
+    void backward() {
+        int count = batch.size();
+        std::vector<dtype*> vals, losses, in_losses;
+        vals.reserve(count);
+        losses.reserve(count);
+        in_losses.reserve(count);
+        for (Node *n : batch) {
+            DropoutNode *tanh = static_cast<DropoutNode*>(n);
+#if TEST_CUDA
+            tanh->loss.copyFromHostToDevice();
+            tanh->in->loss.copyFromHostToDevice();
+#endif
+            vals.push_back(tanh->val.value);
+            losses.push_back(tanh->loss.value);
+            in_losses.push_back(tanh->in->loss.value);
+        }
+        n3ldg_cuda::DropoutBackward(losses, vals, count, dim, drop_mask.value,
+                dynamicDropValue(), in_losses);
+#if TEST_CUDA
+        for (Node *n : batch) {
+            n->backward_drop();
+            n->backward();
+        }
+        for (Node *n : batch) {
+            DropoutNode *tanh = static_cast<DropoutNode*>(n);
+            n3ldg_cuda::Assert(tanh->in->loss.verify("DropoutExecute backward"));
+        }
+#endif
+    }
+#else
+    void backward() {
+        int count = batch.size();
+        //#pragma omp parallel for
+        for (int idx = 0; idx < count; idx++) {
+            batch[idx]->backward_drop();
+            batch[idx]->backward();
+        }
+    }
+#endif
+};
+
 
 #endif

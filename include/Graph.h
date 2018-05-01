@@ -108,39 +108,48 @@ class Graph {
     }
 
   public:
-    inline void clearValue(const bool& bTrain = false) {
+    void clearValue(const bool& bTrain = false) {
+        NodeMap node_map;
+        for (Node *node : nodes) {
+            Insert(node, node_map);
+        }
+        for (auto it : node_map) {
+            PExecute new_exec = it.second.at(0)->generate(train,
+                    drop_factor);
+            new_exec->batch = it.second;
+            new_exec->clearValue();
+            delete new_exec;
+        }
+
+
         int count = execs.size();
-        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-        profiler.BeginEvent("clearValue delete");
         for (int idx = 0; idx < count; idx++) {
             delete execs.at(idx);
         }
-        profiler.EndEvent();
         execs.clear();
 
-        std::set<PNode> uncleared_nodes;
-        for (PNode p : nodes) {
-            uncleared_nodes.insert(p);
-        }
-        while (!uncleared_nodes.empty()) {
-            PNode p = NULL;
-            PExecute cur_exec;
-            for (PNode pp : nodes) {
-                auto find = uncleared_nodes.find(pp);
-                if (p == NULL && find != uncleared_nodes.end()) {
-                    p = pp;
-                    cur_exec = p->generate(bTrain, -1);
-                    cur_exec->addNode(*find);
-                    uncleared_nodes.erase(find);
-                } else if (p != NULL && find != uncleared_nodes.end()) {
-                    if (p->typeEqual(*find)) {
-                        cur_exec->addNode(*find);
-                        uncleared_nodes.erase(find);
-                    }
-                }
-            }
-            cur_exec->clearValue();
-        }
+        //std::set<PNode> uncleared_nodes;
+        //for (PNode p : nodes) {
+        //    uncleared_nodes.insert(p);
+        //}
+        //while (!uncleared_nodes.empty()) {
+        //    PNode p = NULL;
+        //    PExecute cur_exec;
+        //    for (PNode pp : nodes) {
+        //        auto find = uncleared_nodes.find(pp);
+        //        if (p == NULL && find != uncleared_nodes.end()) {
+        //            p = pp;
+        //            cur_exec = p->generate(bTrain, -1);
+        //            uncleared_nodes.erase(find);
+        //        } else if (p != NULL && find != uncleared_nodes.end()) {
+        //            if (p->typeEqual(*find)) {
+        //                cur_exec->addNode(*find);
+        //                uncleared_nodes.erase(find);
+        //            }
+        //        }
+        //    }
+        //    cur_exec->clearValue();
+        //}
 
         nodes.clear();
         free_nodes.clear();
@@ -168,42 +177,20 @@ class Graph {
     //real executation
     void compute() {
         n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-#if USE_GPU
-        if (host_memory == NULL) {
-            host_memory = n3ldg_cuda::GraphHostAlloc();
-        }
-        if (device_memory == NULL) {
-            device_memory = n3ldg_cuda::Malloc(10000000);
-        }
-        profiler.BeginEvent("computeNodeInfo");
-        profiler.BeginEvent("construct graph_node_info");
-        std::vector<std::vector<NodeInfo>> graph_node_info;
-        profiler.EndEvent();
-        computeNodeInfo(graph_node_info);
-        profiler.EndEvent();
-        std::vector<int> offsets;
-        int actual_size = GraphToMemory(graph_node_info, host_memory, offsets,
-                10000000);
-        n3ldg_cuda::Memcpy(device_memory, host_memory, actual_size,
-                cudaMemcpyHostToDevice);
-#endif
-        int step = 0;
 
         while (Size(free_nodes) > 0) {
             vector<PExecute> cur_execs;
             for (auto it : free_nodes) {
                 PExecute new_exec = it.second.at(0)->generate(train,
                         drop_factor);
-#if USE_GPU
-                new_exec->graph_info = (char*)device_memory +
-                    offsets.at(step++);
-#endif
                 new_exec->batch = it.second;
                 cur_execs.push_back(new_exec);
             }
 
             for (PExecute e : cur_execs) {
+                //profiler.BeginEvent("forward");
                 e->forward();
+                //profiler.EndEvent();
                 execs.push_back(e);
             }
 
@@ -246,31 +233,25 @@ class Graph {
 
 #if USE_GPU
     void computeNodeInfo(std::vector<std::vector<NodeInfo>> &graph_node_info) const {
-        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
         if (!graph_node_info.empty()) {
             abort();
         }
 
-        profiler.BeginEvent("before while");
         std::map<void *, int> degree_map;
         NodeMap copied_free_nodes = free_nodes;
         std::vector<PNode> copied_finished_nodes = finish_nodes;
         int free_count = Size(copied_free_nodes);
-        profiler.EndEvent();
 
         while (Size(copied_free_nodes) > 0) {
             vector<PExecute> cur_execs;
 
-            profiler.BeginEvent("new exec");
             for (auto it : copied_free_nodes) {
                 PExecute new_exec = it.second.at(0)->generate(train,
                         drop_factor);
                 new_exec->batch = it.second;
                 cur_execs.push_back(new_exec);
             }
-            profiler.EndEvent();
 
-            profiler.BeginEvent("to node info");
             for (PExecute e : cur_execs) {
                 std::vector<NodeInfo> node_info_vec;
                 for (PNode p : e->batch) {
@@ -280,15 +261,11 @@ class Graph {
                 }
                 graph_node_info.push_back(node_info_vec);
             }
-            profiler.EndEvent();
 
-            profiler.BeginEvent("delete");
             for (PExecute e : cur_execs) {
                 delete e;
             }
-            profiler.EndEvent();
 
-            profiler.BeginEvent("finished nodes");
             //finished nodes
             NodeMap new_free_nodes;
             for (auto vec_it : copied_free_nodes) {
@@ -306,7 +283,6 @@ class Graph {
                     }
                 }
             }
-            profiler.EndEvent();
 
             copied_free_nodes = std::move(new_free_nodes);
         }

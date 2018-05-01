@@ -436,8 +436,9 @@ void PrintInts(const int* p, int len);
 void InitCuda();
 void EndCuda();
 
-void CopyFromOneVectorToMultiVals(const void *graph, const dtype *src,
-        int count, int len);
+void CopyFromOneVectorToMultiVals(const dtype *src, std::vector<dtype*> &vals,
+        int count,
+        int len);
 
 enum ActivatedEnum {
     TANH,
@@ -461,19 +462,37 @@ void Activated(ActivatedEnum activated, const dtype *src,
         bool is_being_trained,
         dtype drop_factor,
         const dtype *drop_mask);
-void TanhForward(const std::vector<dtype*> &xs, int count, int dim,
+void TanhForward(ActivatedEnum activated, const std::vector<dtype*> &xs,
+        int count,
+        int dim,
         const dtype *drop_mask,
         dtype drop_factor,
         std::vector<dtype*> &ys);
-void TanhBackward(const std::vector<dtype*> &losses,
+void TanhBackward(ActivatedEnum activated, const std::vector<dtype*> &losses,
         const std::vector<dtype*> &vals,
         int count,
         int dim,
         const dtype *drop_mask,
         dtype drop_factor,
         std::vector<dtype*> &in_losses);
-void CopyForUniNodeForward(const void *graph, const dtype* b, dtype* xs_dest,
-        dtype* b_dest, int count, int x_len, int b_len, bool use_b);
+void DropoutForward(const std::vector<dtype*> &xs, int count, int dim,
+        const dtype *drop_mask,
+        dtype drop_factor,
+        std::vector<dtype*> &ys);
+void DropoutBackward(const std::vector<dtype*> &losses,
+        const std::vector<dtype*> &vals,
+        int count,
+        int dim,
+        const dtype *drop_mask,
+        dtype drop_factor,
+        std::vector<dtype*> &in_losses);
+void CopyForUniNodeForward(const std::vector<dtype*> &xs, const dtype* b,
+        dtype* xs_dest,
+        dtype* b_dest,
+        int count,
+        int x_len,
+        int b_len,
+        bool use_b);
 void CopyForBiNodeForward(const std::vector<dtype*>& x1s,
         const std::vector<dtype *>& x2s,
         const dtype *b,
@@ -515,10 +534,23 @@ void AddLtyToParamBiasAndAddLxToInputLossesForBiBackward(const dtype *lty,
         int in_dim2);
 void CalculateDropoutMask(dtype dropout_ratio, int count, int dim,
         dtype *mask);
-void ConcatForward(const void *graph, bool on_training, const dtype *drop_mask,
-        dtype drop_factor, int count, int in_count, int out_dim);
-void ConcatBackward(const void *graph, const dtype *drop_mask,
-        dtype drop_factor, int count, int in_count, int out_dim);
+void ConcatForward(const std::vector<dtype*> &in_vals,
+        const std::vector<int> &in_dims,
+        std::vector<dtype*> &vals,
+        bool on_training,
+        const dtype *drop_mask,
+        dtype drop_factor,
+        int count,
+        int in_count,
+        int out_dim);
+void ConcatBackward(const std::vector<dtype*> &in_losses,
+        const std::vector<int> &in_dims,
+        std::vector<dtype*> &losses,
+        const dtype *drop_mask,
+        dtype drop_factor,
+        int count,
+        int in_count,
+        int out_dim);
 void LookupForward(const std::vector<int> &xids, const dtype *vocabulary,
         bool on_training,
         const dtype *drop_mask,
@@ -535,10 +567,17 @@ void LookupBackward(const std::vector<int> &xids, int unknown_id,
         int dim,
         dtype *grad,
         bool *indexers);
-void PoolForward(PoolingEnum pooling, const void *graph, int count,
-        const std::vector<int> &in_counts, int dim, int *hit_inputs);
-void PoolBackward(const void *graph,
-        const std::vector<int> &in_counts, const int *hit_inputs, int count,
+void PoolForward(PoolingEnum pooling, const std::vector<dtype*> &in_vals,
+        std::vector<dtype*> &vals,
+        int count,
+        const std::vector<int> &in_counts,
+        int dim,
+        int *hit_inputs);
+void PoolBackward(const std::vector<dtype*> &losses,
+        std::vector<dtype*> &in_losses,
+        const std::vector<int> &in_counts,
+        const int *hit_inputs,
+        int count,
         int dim);
 void SumPoolForward(PoolingEnum pooling, const std::vector<dtype*> &in_vals,
         int count,
@@ -610,6 +649,7 @@ void SoftMaxLoss(const std::vector<dtype*> &vals, std::vector<dtype*> &losses,
         int batchsize,
         int count,
         int dim);
+int Predict(const dtype* val, int dim);
 dtype SquareSum(const dtype *v, int len);
 dtype SquareSum(const dtype *v, const bool *indexers, int count, int dim);
 void Rescale(dtype *v, int len, dtype scale);

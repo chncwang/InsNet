@@ -15,13 +15,13 @@
 #include "Graph.h"
 
 class PAddNode : public Node {
-  public:
+public:
     vector<PNode> ins;
 
     ~PAddNode() {
         ins.clear();
     }
-  public:
+public:
     PAddNode() : Node() {
         ins.clear();
         node_type = "point-add";
@@ -32,7 +32,7 @@ class PAddNode : public Node {
         Node::clearValue();
     }
 
-  public:
+public:
     void forward(Graph *cg, const vector<PNode>& x) {
         if (x.size() == 0) {
             std::cout << "empty inputs for add" << std::endl;
@@ -43,7 +43,8 @@ class PAddNode : public Node {
         for (int i = 0; i < x.size(); i++) {
             if (x[i]->val.dim == dim) {
                 ins.push_back(x[i]);
-            } else {
+            }
+            else {
                 std::cout << "dim does not match" << std::endl;
             }
         }
@@ -61,7 +62,8 @@ class PAddNode : public Node {
         ins.clear();
         if (x1->dim == dim) {
             ins.push_back(x1);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
 
@@ -78,12 +80,14 @@ class PAddNode : public Node {
         ins.clear();
         if (x1->dim == dim) {
             ins.push_back(x1);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
         if (x2->dim == dim) {
             ins.push_back(x2);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
 
@@ -100,17 +104,20 @@ class PAddNode : public Node {
         ins.clear();
         if (x1->dim == dim) {
             ins.push_back(x1);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
         if (x2->dim == dim) {
             ins.push_back(x2);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
         if (x3->dim == dim) {
             ins.push_back(x3);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
 
@@ -127,22 +134,26 @@ class PAddNode : public Node {
         ins.clear();
         if (x1->dim == dim) {
             ins.push_back(x1);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
         if (x2->dim == dim) {
             ins.push_back(x2);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
         if (x3->dim == dim) {
             ins.push_back(x3);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
         if (x4->dim == dim) {
             ins.push_back(x4);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
 
@@ -159,27 +170,32 @@ class PAddNode : public Node {
         ins.clear();
         if (x1->dim == dim) {
             ins.push_back(x1);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
         if (x2->dim == dim) {
             ins.push_back(x2);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
         if (x3->dim == dim) {
             ins.push_back(x3);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
         if (x4->dim == dim) {
             ins.push_back(x4);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
         if (x5->dim == dim) {
             ins.push_back(x5);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
 
@@ -196,32 +212,38 @@ class PAddNode : public Node {
         ins.clear();
         if (x1->dim == dim) {
             ins.push_back(x1);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
         if (x2->dim == dim) {
             ins.push_back(x2);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
         if (x3->dim == dim) {
             ins.push_back(x3);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
         if (x4->dim == dim) {
             ins.push_back(x4);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
         if (x5->dim == dim) {
             ins.push_back(x5);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
         if (x6->dim == dim) {
             ins.push_back(x6);
-        } else {
+        }
+        else {
             std::cout << "dim does not match" << std::endl;
         }
 
@@ -234,7 +256,7 @@ class PAddNode : public Node {
         cg->addNode(this);
     }
 
-  public:
+public:
     inline void compute() {
         int nSize = ins.size();
         val.zero();
@@ -256,7 +278,7 @@ class PAddNode : public Node {
     }
 
 
-  public:
+public:
     inline PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
@@ -279,6 +301,12 @@ public:
     int in_count;
     int dim;
     Tensor2D drop_mask;
+
+public:
+    Tensor1D x, y;
+    int sumDim;
+    bool bTrain;
+
 
 #if USE_GPU
     void  forward() {
@@ -305,7 +333,7 @@ public:
             outs.push_back(padd->val.value);
         }
         n3ldg_cuda::PAddForward(in_vals, count, dim, in_count, drop_mask.value,
-                drop_factor, outs);
+            drop_factor, outs);
 #if TEST_CUDA
         drop_mask.copyFromDeviceToHost();
         for (int i = 0; i < count; ++i) {
@@ -355,7 +383,7 @@ public:
             out_losses.push_back(padd->loss.value);
         }
         n3ldg_cuda::PAddBackward(out_losses, count, dim, in_count,
-                drop_mask.value, drop_factor, in_losses);
+            drop_mask.value, drop_factor, in_losses);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward_drop();

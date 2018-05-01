@@ -161,13 +161,24 @@ class ConcatExecute : public Execute {
     Tensor2D drop_mask;
 
     void  forward() {
-        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-        profiler.BeginEvent("ConcatNode forward");
         int count = batch.size();
         drop_mask.init(outDim, count);
         CalculateDropMask(count, outDim, drop_mask);
-        n3ldg_cuda::ConcatForward(graph_info, bTrain, drop_mask.value,
-            dynamicDropValue(), count, inCount, outDim);
+
+        std::vector<dtype*> in_vals, vals;
+        in_vals.reserve(inCount * count);
+        vals.reserve(count);
+        for (Node *node : batch) {
+            ConcatNode *concat = static_cast<ConcatNode*>(node);
+            for (Node *in : concat->ins) {
+                in_vals.push_back(in->val.value);
+            }
+            vals.push_back(node->val.value);
+        }
+
+        n3ldg_cuda::ConcatForward(in_vals,
+                static_cast<ConcatNode*>(batch.at(0))->inDims, vals, bTrain,
+                drop_mask.value, dynamicDropValue(), count, inCount, outDim);
 #if TEST_CUDA
         if (initialDropValue() > 0) {
             drop_mask.copyFromDeviceToHost();
@@ -186,22 +197,24 @@ class ConcatExecute : public Execute {
             n3ldg_cuda::Assert(batch[idx]->val.verify("concat forward"));
         }
 #endif
-        profiler.EndCudaEvent();
     }
 
     void backward() {
         int count = batch.size();
-        std::vector<dtype**> in_losses;
-        in_losses.reserve(count);
-        std::vector<dtype*> out_losses;
-        out_losses.reserve(count);
-        for (int i = 0; i < count; ++i) {
-            ConcatNode *n = static_cast<ConcatNode*>(batch[i]);
-            out_losses.push_back(n->loss.value);
+        std::vector<dtype*> in_losses, losses;
+        in_losses.reserve(inCount * count);
+        losses.reserve(count);
+        for (Node *node : batch) {
+            ConcatNode *concat = static_cast<ConcatNode*>(node);
+            for (Node *in : concat->ins) {
+                in_losses.push_back(in->loss.value);
+            }
+            losses.push_back(node->loss.value);
         }
 
-        n3ldg_cuda::ConcatBackward(this->graph_info, drop_mask.value,
-                dynamicDropValue(), count, inCount, outDim);
+        n3ldg_cuda::ConcatBackward(in_losses,
+                static_cast<ConcatNode*>(batch.at(0))->inDims, losses,
+                drop_mask.value, dynamicDropValue(), count, inCount, outDim);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             if (initialDropValue() > 0) {

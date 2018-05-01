@@ -294,8 +294,6 @@ public:
     std::vector<int> xids;
 
     inline void  forward() {
-        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-        profiler.BeginEvent("LookupNode forward");
         int count = batch.size();
         drop_mask.init(dim, count);
         CalculateDropMask(count, dim, drop_mask);
@@ -328,7 +326,6 @@ public:
             n3ldg_cuda::Assert(batch[idx]->val.verify("lookup forward"));
         }
 #endif
-        profiler.EndCudaEvent();
     }
 
     inline void backward() {

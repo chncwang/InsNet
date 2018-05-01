@@ -67,6 +67,11 @@ public:
     std::vector<dtype*> vals;
     int dim;
 public:
+    Tensor1D y, x1, x2;
+    int sumDim;
+    bool bTrain;
+
+public:
 #if USE_GPU
     void  forward() {
         int count = batch.size();
@@ -100,9 +105,32 @@ public:
     void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
+        sumDim = 0;
         for (int idx = 0; idx < count; idx++) {
-            batch[idx]->compute();
-            batch[idx]->forward_drop(bTrain, drop_factor);
+            sumDim += batch[idx]->dim;
+        }
+        y.init(sumDim);
+        x1.init(sumDim);
+        x2.init(sumDim);
+        int offset = 0;
+        for (int idx = 0; idx < count; idx++) {
+            PMultiNode* ptr = (PMultiNode*)batch[idx];
+            for (int idy = 0; idy < ptr->dim; idy++) {
+                x1[offset + idy] = ptr->in1->val[idy];
+                x2[offset + idy] = ptr->in2->val[idy];
+            }
+            offset += ptr->dim;
+        }
+        y.vec() = x1.vec() * x2.vec();
+
+        offset = 0;
+        for (int idx = 0; idx < count; idx++) {
+            PMultiNode* ptr = (PMultiNode*)batch[idx];
+            for (int idy = 0; idy < ptr->dim; idy++) {
+                ptr->val[idy] = y[offset + idy];
+            }
+            offset += ptr->dim;
+            ptr->forward_drop(bTrain,1);
         }
     }
 #endif
@@ -144,9 +172,29 @@ public:
     void backward() {
         int count = batch.size();
         //#pragma omp parallel for
+        Tensor1D ly, lx1, lx2;
+        ly.init(sumDim);
+        lx1.init(sumDim);
+        lx2.init(sumDim);
+        int offset = 0;
         for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward_drop();
-            batch[idx]->backward();
+            PMultiNode* ptr = (PMultiNode*)batch[idx];
+            ptr->backward_drop();
+            for (int idy = 0; idy < ptr->dim; idy++) {
+                ly[offset + idy] = ptr->loss[idy];
+            }
+            offset += ptr->dim;
+        }
+        lx1.vec() = ly.vec() * x2.vec();
+        lx2.vec() = ly.vec() * x1.vec();
+        offset = 0;
+        for (int idx = 0; idx < count; idx++) {
+            PMultiNode* ptr = (PMultiNode*)batch[idx];
+            for (int idy = 0; idy < ptr->dim; idy++) {
+                ptr->in1->loss[idy] += lx1[offset + idy];
+                ptr->in2->loss[idy] += lx2[offset + idy];
+            }
+            offset += ptr->dim;
         }
     }
 #endif

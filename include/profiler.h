@@ -110,8 +110,8 @@ public:
 
         for (Event &event : events) {
             std::cout << "name:" << event.name << " count:" << event.count <<
-                " total time:" << event.total_time_in_nanoseconds / 1000000.0
-                << "avg:" << event.total_time_in_nanoseconds / event.count /
+                " total time:" << event.total_time_in_nanoseconds / 1000000000.0
+                << " avg:" << event.total_time_in_nanoseconds / event.count /
                 1000000 << " ratio:" << event.total_time_in_nanoseconds /
                 root_->total_time_in_nanoseconds << std::endl;
         }
