@@ -488,7 +488,7 @@ void InitCuda() {
     device.device = 0;
     cnmemInit(1, &device, CNMEM_FLAGS_DEFAULT);
 #else
-    CallCuda(cudaSetDevice(0));
+    CallCuda(cudaSetDevice(1));
 #endif
     CallCuda(cudaDeviceSetCacheConfig(cudaFuncCachePreferL1));
     CallCuda(cudaPrintfInit());
@@ -2554,9 +2554,8 @@ __global__ void Predict(const dtype *val, int dim, int *result) {
     __shared__ volatile dtype shared_vals[TPB];
     __shared__ volatile dtype shared_indexes[TPB];
 
-    int index = DeviceDefaultIndex();
     shared_indexes[threadIdx.x] = threadIdx.x;
-    if (index < threadIdx.x) {
+    if (threadIdx.x < dim) {
         shared_vals[threadIdx.x] = val[threadIdx.x];
     } else {
         shared_vals[threadIdx.x] = -10000000.0f;
@@ -2564,9 +2563,9 @@ __global__ void Predict(const dtype *val, int dim, int *result) {
     __syncthreads();
 
     for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-        if (shared_vals[threadIdx.x] > shared_vals[threadIdx.x + i]) {
+        if (shared_vals[threadIdx.x] < shared_vals[threadIdx.x + i]) {
             shared_vals[threadIdx.x] = shared_vals[threadIdx.x + i];
-            shared_indexes[threadIdx.x] = threadIdx.x + i;
+            shared_indexes[threadIdx.x] = shared_indexes[threadIdx.x + i];
         }
         __syncthreads();
     }

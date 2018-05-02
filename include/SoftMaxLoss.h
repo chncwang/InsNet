@@ -69,7 +69,7 @@ dtype softMaxLoss(const std::vector<PNode> &x, const std::vector<int> &answers,
 
 #if USE_GPU
 void softMaxPredict(PNode x, int &y) {
-    y = n3ldg_cuda::Predict(x->va.value, dim);
+    y = n3ldg_cuda::Predict(x->val.value, x->dim);
 }
 #else
 dtype predict(PNode x, int& y) {

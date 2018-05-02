@@ -359,11 +359,6 @@ public:
             if (!n3ldg_cuda::Verify(n->masks.data(),
                         hit_inputs.value + idx * dim, dim,
                         "max pooling forward mask")) {
-                for (int i = 0; i < 2; ++i) {
-                    std::cout << "i:" << i << std::endl;
-                    Node *p = n->ins.at(i);
-                    std::cout << n->ins.at(i)->val[37] << std::endl;
-                }
                 abort();
             }
         }
@@ -454,13 +449,7 @@ public:
             MinPoolNode *n = static_cast<MinPoolNode*>(batch[idx]);
             if (!n3ldg_cuda::Verify(n->masks.data(),
                         hit_inputs.value + idx * dim, dim,
-                        "mix pooling forward mask")) {
-                for (int i = 0; i < 2; ++i) {
-                    std::cout << "i:" << i << std::endl;
-                    Node *p = n->ins.at(i);
-                    std::cout << n->ins.at(i)->val[37] << std::endl;
-                }
-                abort();
+                        "min pooling forward mask")) {
             }
         }
 #endif
