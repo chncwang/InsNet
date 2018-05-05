@@ -69,7 +69,6 @@ public:
 public:
     Tensor1D y, x1, x2;
     int sumDim;
-    bool bTrain;
 
 public:
 #if USE_GPU

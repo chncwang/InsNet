@@ -826,9 +826,76 @@ class PDotNode : public Node {
     inline PExecute generate(bool bTrain, dtype cur_drop_factor);
 };
 
+#if USE_GPU
+class PDotExecute :public Execute {
+public:
+    void  forward() {
+        int count = batch.size();
+        std::vector<dtype*> vals;
+        ins1.reserve(count);
+        ins2.reserve(count);
+        vals.reserve(count);
+        for (Node *node : batch) {
+            PDotNode *dot = static_cast<PDotNode*>(node);
+            ins1.push_back(dot->in1->val.value);
+            ins2.push_back(dot->in2->val.value);
+            vals.push_back(dot->val.value);
+        }
+
+        n3ldg_cuda::PDotForward(ins1, ins2, count,
+                static_cast<PDotNode*>(batch.at(0))->in1->dim, vals);
+#if TEST_CUDA
+        for (Node *node : batch) {
+            PDotNode *dot = static_cast<PDotNode*>(node);
+            n3ldg_cuda::Assert(dot->in1->val.verify("PDot in1"));
+            n3ldg_cuda::Assert(dot->in2->val.verify("PDot in2"));
+            node->compute();
+            n3ldg_cuda::Assert(node->val.verify("PDot forward"));
+        }
+#endif
+    }
+
+    void backward() {
+        int count = batch.size();
+        std::vector<dtype*> losses, in_losses1, in_losses2;
+        losses.reserve(count);
+        in_losses1.reserve(count);
+        in_losses2.reserve(count);
+        for (Node *node : batch) {
+            PDotNode *dot = static_cast<PDotNode*>(node);
+            losses.push_back(dot->loss.value);
+            in_losses1.push_back(dot->in1->loss.value);
+            in_losses2.push_back(dot->in2->loss.value);
+        }
+        n3ldg_cuda::PDotBackward(losses, ins1, ins2, count,
+                static_cast<PDotNode*>(batch.at(0))->in1->dim, in_losses1,
+                in_losses2);
+
+#if TEST_CUDA
+        for (int idx = 0; idx < count; idx++) {
+            batch[idx]->backward();
+            n3ldg_cuda::Assert(batch[idx]->loss.verify(
+                        "PDotExecute backward"));
+        }
+
+        for (Node *node : batch) {
+            PDotNode *dot = static_cast<PDotNode*>(node);
+            n3ldg_cuda::Assert(dot->in1->loss.verify(
+                        "PDotExecute backward in1"));
+            n3ldg_cuda::Assert(dot->in2->loss.verify(
+                        "PDotExecute backward in2"));
+        }
+#endif
+    }
+
+private:
+    std::vector<dtype*> ins1;
+    std::vector<dtype*> ins2;
+};
+#else
 class PDotExecute :public Execute {
   public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -837,7 +904,7 @@ class PDotExecute :public Execute {
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -846,6 +913,7 @@ class PDotExecute :public Execute {
         }
     }
 };
+#endif
 
 
 inline PExecute PDotNode::generate(bool bTrain, dtype cur_drop_factor) {

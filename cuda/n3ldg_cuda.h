@@ -260,6 +260,9 @@ struct Tensor1D {
         for (int i = 0; i < dim; i++) {
             v[i] =  (dtype(rand()) / RAND_MAX) * (max - min) + min;
         }
+#if USE_GPU
+        copyFromHostToDevice();
+#endif
     }
 
     bool verify(const char *message) {
@@ -390,6 +393,9 @@ struct Tensor2D {
         for (int i = 0; i < size; i++) {
             v[i] =  (dtype(rand()) / RAND_MAX) * (max - min) + min;
         }
+#if USE_GPU
+        copyFromHostToDevice();
+#endif
     }
 
     // for embeddings only, embedding matrix: dim  * vocabulary
@@ -439,6 +445,8 @@ void EndCuda();
 void CopyFromOneVectorToMultiVals(const dtype *src, std::vector<dtype*> &vals,
         int count,
         int len);
+void CopyFromHostToDevice(const std::vector<dtype*> &src,
+        std::vector<dtype*> &dest, int count, int dim);
 
 enum ActivatedEnum {
     TANH,
@@ -628,6 +636,18 @@ void PMultiBackward(const std::vector<dtype*> &losses,
         int dim,
         const dtype* drop_mask,
         dtype drop_factor,
+        std::vector<dtype*> &in_losses1,
+        std::vector<dtype*> &in_losses2);
+void PDotForward(const std::vector<dtype*> &ins1,
+        const std::vector<dtype*> &ins2,
+        int count,
+        int dim,
+        std::vector<dtype*> &vals);
+void PDotBackward(const std::vector<dtype*> &losses,
+        const std::vector<dtype*> &in_vals1,
+        const std::vector<dtype*> &in_vals2,
+        int count,
+        int dim,
         std::vector<dtype*> &in_losses1,
         std::vector<dtype*> &in_losses2);
 void PAddForward(const std::vector<std::vector<dtype*>> &ins, int count,

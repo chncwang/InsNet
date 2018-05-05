@@ -141,9 +141,6 @@ public:
 
         if (count == 0) {
             E.val.random(sqrt(3.0 / nDim));
-#if USE_GPU
-            E.val.copyFromHostToDevice();
-#endif
             std::cout << "find no overlapped lexicons in the embedding file" << std::endl;
             return false;
         }
@@ -312,13 +309,11 @@ public:
         drop_mask.copyFromDeviceToHost();
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
-            if (batch.at(0) > 0) {
-                for (int i = 0; i < count; ++i) {
-                    for (int j = 0; j < dim; ++j) {
-                        dtype v = drop_mask[j][i];
-                        batch[i]->drop_mask[j] = v <= dynamicDropValue() ?
-                            0 : 1;
-                    }
+            for (int i = 0; i < count; ++i) {
+                for (int j = 0; j < dim; ++j) {
+                    dtype v = drop_mask[j][i];
+                    batch[i]->drop_mask[j] = v <= dynamicDropValue() ?
+                        0 : 1;
                 }
             }
             batch[idx]->forward_drop(bTrain, drop_factor);

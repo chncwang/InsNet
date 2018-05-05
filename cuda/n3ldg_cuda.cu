@@ -1,5 +1,4 @@
 #include "n3ldg_cuda.h"
-
 #include <array>
 #include <cstdlib>
 #include <vector>
@@ -110,6 +109,13 @@ void Memcpy(dtype *dest, dtype*src, int size, cudaMemcpyKind kind) {
     CallCuda(MyCudaMemcpy(dest, src, size, kind));
 }
 
+int NextTwoIntegerPowerNumber(int number) {
+    int result = 1;
+    while (number > result) {
+        result <<= 1;
+    }
+    return result;
+}
 
 void NumberPointerPointerArray::init(dtype ***host_arr, int len) {
     if (value != NULL) {
@@ -488,7 +494,7 @@ void InitCuda() {
     device.device = 0;
     cnmemInit(1, &device, CNMEM_FLAGS_DEFAULT);
 #else
-    CallCuda(cudaSetDevice(1));
+    CallCuda(cudaSetDevice(0));
 #endif
     CallCuda(cudaDeviceSetCacheConfig(cudaFuncCachePreferL1));
     CallCuda(cudaPrintfInit());
@@ -520,6 +526,50 @@ void CopyFromOneVectorToMultiVals(const dtype *src, std::vector<dtype*> &vals,
     KernelCopyFromOneVectorToMultiVectors<<<block_count, TPB>>>(src,
             val_arr.value, count, len);
 }
+
+__global__ void KernelCopyFromOneVectorToMultiVectorsInColumns(const dtype *src,
+        dtype **dest, int count, int len) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * len; i += step) {
+        int count_i = i % count;
+        int len_i = i / count;
+        dest[count_i][len_i] = src[i];
+    }
+}
+
+void CopyFromOneVectorToMultiValsInColumns( const dtype *src,
+        std::vector<dtype*> &vals,
+        int count,
+        int len) {
+    NumberPointerArray val_arr;
+    val_arr.init((dtype**)vals.data(), vals.size());
+    int block_count = DefaultBlockCount(len * count);
+
+    KernelCopyFromOneVectorToMultiVectorsInColumns<<<block_count, TPB>>>(src,
+            val_arr.value, count, len);
+}
+
+void CopyFromHostToDevice(const std::vector<dtype*> &src,
+        std::vector<dtype*> &dest, int count, int dim) {
+    dtype *long_src = (dtype*)malloc(count * dim * sizeof(dtype));
+    if (long_src == NULL) {
+        std::cout << "out of memory!" << std::endl;
+        abort();
+    }
+    for (int i = 0; i < count; ++i) {
+        memcpy(long_src + i * dim, src.at(i), dim * sizeof(dtype));
+    }
+    dtype *long_dest = NULL;
+    CallCuda(MemoryPool::Ins().Malloc((void**)&long_dest,
+                count * dim * sizeof(dtype*)));
+    CallCuda(cudaMemcpy(long_dest, long_src, count * dim * sizeof(dtype*),
+                cudaMemcpyHostToDevice));
+    CopyFromOneVectorToMultiValsInColumns(long_dest, dest, count, dim);
+    free(long_src);
+    CallCuda(MemoryPool::Ins().Free(long_dest));
+}
+
 
 __global__ void KernelActivated(ActivatedEnum activated, const dtype *src,
         dtype**dest,
@@ -2385,6 +2435,87 @@ __global__ void KernelPAddForward(const dtype*** ins, int count, int dim,
     }
 }
 
+__global__ void KernelPDotForward(const dtype **in_vals1,
+        const dtype **in_vals2,
+        int count,
+        int dim,
+        dtype** vals) {
+    volatile __shared__ extern dtype shared_val[];
+    if (threadIdx.x < dim) {
+        shared_val[threadIdx.x] = in_vals1[blockIdx.x][threadIdx.x] *
+            in_vals2[blockIdx.x][threadIdx.x];
+    } else {
+        shared_val[threadIdx.x] = 0.0f;
+    }
+    __syncthreads();
+
+    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+        if (threadIdx.x < i) {
+            shared_val[threadIdx.x] += shared_val[threadIdx.x + i];
+        }
+        __syncthreads();
+    }
+
+    if (threadIdx.x == 0) {
+        vals[blockIdx.x][0] = shared_val[0];
+    }
+}
+
+void PDotForward(const std::vector<dtype*> &ins1,
+        const std::vector<dtype*> &ins2,
+        int count,
+        int dim,
+        std::vector<dtype*> &vals) {
+    NumberPointerArray in1_arr, in2_arr, val_arr;
+    in1_arr.init((dtype**)ins1.data(), ins1.size());
+    in2_arr.init((dtype**)ins2.data(), ins2.size());
+    val_arr.init((dtype**)vals.data(), vals.size());
+    int thread_count = NextTwoIntegerPowerNumber(dim);
+    KernelPDotForward<<<count, thread_count, thread_count * sizeof(dtype)>>>((
+                const dtype**)in1_arr.value, (const dtype**)in2_arr.value,
+            count, dim, val_arr.value);
+}
+
+__global__ void KernelPDotBackward(const dtype **losses,
+        const dtype **in_vals1,
+        const dtype **in_vals2,
+        int count,
+        int dim,
+        dtype **in_losses1,
+        dtype **in_losses2) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+
+    for (int i = index; i < count * dim; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        atomicAdd(in_losses1[count_i] + dim_i,
+                losses[count_i][0] * in_vals2[count_i][dim_i]);
+        atomicAdd(in_losses2[count_i] + dim_i,
+                losses[count_i][0] * in_vals1[count_i][dim_i]);
+    }
+}
+
+void PDotBackward(const std::vector<dtype*> &losses,
+        const std::vector<dtype*> &in_vals1,
+        const std::vector<dtype*> &in_vals2,
+        int count,
+        int dim,
+        std::vector<dtype*> &in_losses1,
+        std::vector<dtype*> &in_losses2) {
+    NumberPointerArray in1_loss_arr, in2_loss_arr, loss_arr, in_val1_arr,
+    in_val2_arr;
+    in1_loss_arr.init((dtype**)in_losses1.data(), in_losses1.size());
+    in2_loss_arr.init((dtype**)in_losses2.data(), in_losses2.size());
+    loss_arr.init((dtype**)losses.data(), losses.size());
+    in_val1_arr.init((dtype**)in_vals1.data(), in_vals1.size());
+    in_val2_arr.init((dtype**)in_vals2.data(), in_vals2.size());
+    int block_count = DefaultBlockCount(count * dim);
+    KernelPDotBackward<<<block_count, TPB>>>((const dtype**)loss_arr.value,
+            (const dtype**)in_val1_arr.value, (const dtype**)in_val2_arr.value,
+            count, dim, in1_loss_arr.value, in2_loss_arr.value);
+}
+
 void PAddForward(const std::vector<std::vector<dtype*>> &ins, int count,
         int dim,
         int in_count,
@@ -2464,14 +2595,6 @@ void PAddBackward(const std::vector<dtype*> &losses, int count, int dim,
     int block_count = DefaultBlockCount(in_count * count * dim);
     KernelPAddBackward<<<block_count, TPB>>>((const dtype**)out_loss_arr.value,
             count, dim, in_count, drop_mask, drop_factor, in_loss_arr.value);
-}
-
-int NextTwoIntegerPowerNumber(int number) {
-    int result = 1;
-    while (number > result) {
-        result <<= 1;
-    }
-    return result;
 }
 
 __global__ void KernelSoftMaxLoss(const dtype **vals, dtype **losses,
