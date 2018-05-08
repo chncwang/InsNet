@@ -273,6 +273,12 @@ void Tensor1D::init(int dim) {
 #endif
 }
 
+void Tensor1D::initOnMemoryAndDevice(int dim) {
+    initOnDevice(dim);
+    v = new dtype[dim];
+    zero();
+}
+
 void Tensor1D::initOnDevice(int dim) {
     CallCuda(MemoryPool::Ins().Malloc((void**)&value, dim * sizeof(dtype)));
     this->dim = dim;
@@ -494,7 +500,7 @@ void InitCuda() {
     device.device = 0;
     cnmemInit(1, &device, CNMEM_FLAGS_DEFAULT);
 #else
-    CallCuda(cudaSetDevice(0));
+    CallCuda(cudaSetDevice(1));
 #endif
     CallCuda(cudaDeviceSetCacheConfig(cudaFuncCachePreferL1));
     CallCuda(cudaPrintfInit());

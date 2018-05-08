@@ -175,15 +175,6 @@ public:
         cg->addNode(this);
     }
 
-    void toNodeInfo(NodeInfo &info) const override {
-        Node::toNodeInfo(info);
-        info.input_count = ins.size();
-        for (PNode p : ins) {
-            info.input_vals.push_back(p->val.value);
-            info.input_losses.push_back(p->loss.value);
-        }
-    }
-
     PExecute generate(bool bTrain, dtype cur_drop_factor) override;
 };
 #else
@@ -279,15 +270,6 @@ public:
         }
 
         cg->addNode(this);
-    }
-
-    void toNodeInfo(NodeInfo &info) const override {
-        Node::toNodeInfo(info);
-        info.input_count = ins.size();
-        for (PNode p : ins) {
-            info.input_vals.push_back(p->val.value);
-            info.input_losses.push_back(p->loss.value);
-        }
     }
 
     PExecute generate(bool bTrain, dtype cur_drop_factor) override;

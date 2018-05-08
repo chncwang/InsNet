@@ -172,16 +172,6 @@ class BiNode : public Node {
         return Node::typeHashCode() ^ ::typeHashCode(param) ^
             ::typeHashCode(act) ^ (::typeHashCode(de) << 1);
     }
-
-#if USE_GPU
-    void toNodeInfo(NodeInfo &info) const override {
-        Node::toNodeInfo(info);
-        info.input_vals.push_back(in1->val.value);
-        info.input_vals.push_back(in2->val.value);
-        info.input_losses.push_back(in1->loss.value);
-        info.input_losses.push_back(in2->loss.value);
-    }
-#endif
 };
 
 

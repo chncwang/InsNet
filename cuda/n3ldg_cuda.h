@@ -186,6 +186,7 @@ struct Tensor1D {
         abort();
     }
     void init(int len);
+    void initOnMemoryAndDevice(int len);
     ~Tensor1D();
 
     void save(std::ofstream &s) const {

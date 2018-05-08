@@ -29,17 +29,6 @@ public:
         node_type = "concat";
     }
 
-#if USE_GPU
-    void toNodeInfo(NodeInfo &info) const override {
-        Node::toNodeInfo(info);
-        for (PNode p : ins) {
-            info.input_vals.push_back(p->val.value);
-            info.input_losses.push_back(p->loss.value);
-            info.input_dims.push_back(p->dim);
-        }
-    }
-#endif
-
     void forward(Graph *cg, const vector<PNode>& x) {
         if (x.size() == 0) {
             std::cout << "empty inputs for concat" << std::endl;
@@ -55,6 +44,7 @@ public:
         int nSize = ins.size();
         for (int i = 0; i < nSize; ++i) {
             ins[i]->addParent(this);
+            std::cout << "ConcatNode forward this->degree:" << this->degree << std::endl;
         }
         inDims.clear();
         int curDim = 0;

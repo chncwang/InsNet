@@ -160,14 +160,6 @@ class UniNode : public Node {
         return Node::typeHashCode() ^ ::typeHashCode(param) ^ ::typeHashCode(act) ^
             (::typeHashCode(de) << 1);
     }
-
-#if USE_GPU
-    void toNodeInfo(NodeInfo &info) const override {
-        Node::toNodeInfo(info);
-        info.input_vals.push_back(in->val.value);
-        info.input_losses.push_back(in->loss.value);
-    }
-#endif
 };
 
 // non-linear feed-forward node
@@ -304,14 +296,6 @@ class LinearNode : public Node {
     size_t typeHashCode() const override {
         return Node::typeHashCode() ^ ::typeHashCode(param);
     }
-
-#if USE_GPU
-    void toNodeInfo(NodeInfo &info) const override {
-        Node::toNodeInfo(info);
-        info.input_vals.push_back(in->val.value);
-        info.input_losses.push_back(in->loss.value);
-    }
-#endif
 };
 
 

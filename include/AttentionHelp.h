@@ -36,23 +36,6 @@ public:
         unnormeds.clear();
     }
 
-#if USE_GPU
-    void toNodeInfo(NodeInfo &info) const override {
-        Node::toNodeInfo(info);
-        info.input_count = ins.size();
-        info.input_vals.reserve(ins.size() * 2);
-        info.input_losses.reserve(ins.size() * 2);
-        for (PNode p : ins) {
-            info.input_vals.push_back(p->val.value);
-            info.input_losses.push_back(p->loss.value);
-        }
-        for (PNode p : unnormeds) {
-            info.input_vals.push_back(p->val.value);
-            info.input_losses.push_back(p->loss.value);
-        }
-    }
-#endif
-
     inline void clearValue() {
         Node::clearValue();
         ins.clear();
