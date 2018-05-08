@@ -142,7 +142,6 @@ class Graph {
         static int index;
         x->node_index = index++;
         nodes.push_back(x);
-        std::cout << "addNode node_type:" << x->node_type << " index:" << x->node_index << " degree:" << x->degree << std::endl;
         if (x->degree == 0) {
             Insert(x, free_nodes);
         }
@@ -154,7 +153,6 @@ class Graph {
         n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
 
         while (Size(free_nodes) > 0) {
-            std::cout << "free size:" << Size(free_nodes) << std::endl;
             vector<PExecute> cur_execs;
             for (auto it : free_nodes) {
                 PExecute new_exec = it.second.at(0)->generate(train,
@@ -165,11 +163,6 @@ class Graph {
 
             for (PExecute e : cur_execs) {
                 //profiler.BeginEvent("forward");
-                std::cout << "type:" << e->batch.at(0)->node_type << " count:" << e->batch.size() << std::endl;
-                for (Node *node : e->batch) {
-                    std::cout << " node index:" << node->node_index;
-                }
-                std::cout << std::endl;
                 e->forwardFully();
                 //profiler.EndEvent();
                 execs.push_back(e);
@@ -185,7 +178,6 @@ class Graph {
                             abort();
                         }
                         parent_it->degree--;
-                        std::cout << "degree decreased parent node:" << parent_it->node_type << " index:" << parent_it->node_index << " degree:" << parent_it->degree << std::endl;
                         if (parent_it->degree == 0) {
                             Insert(parent_it, new_free_nodes);
                         }

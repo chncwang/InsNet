@@ -55,7 +55,7 @@ constexpr int BLOCK_COUNT = 56;
 
 void CallCuda(cudaError_t status) {
     if (status != cudaSuccess) {
-        cout << cudaGetErrorString(status) << endl;
+        cout << "cuda error:" << cudaGetErrorString(status) << endl;
         abort();
     }
 }
@@ -500,7 +500,7 @@ void InitCuda() {
     device.device = 0;
     cnmemInit(1, &device, CNMEM_FLAGS_DEFAULT);
 #else
-    CallCuda(cudaSetDevice(1));
+    CallCuda(cudaSetDevice(0));
 #endif
     CallCuda(cudaDeviceSetCacheConfig(cudaFuncCachePreferL1));
     CallCuda(cudaPrintfInit());
@@ -576,6 +576,49 @@ void CopyFromHostToDevice(const std::vector<dtype*> &src,
     CallCuda(MemoryPool::Ins().Free(long_dest));
 }
 
+__global__ void KernelCopyFromMultiVectorsToOneVector(const dtype **src,
+        dtype *dest,
+        int count,
+        int len) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * len; i += step) {
+        int count_i = i % count;
+        int len_i = i / count;
+        dest[i] = src[count_i][len_i];
+    }
+}
+
+void CopyFromMultiVectorsToOneVector(const std::vector<dtype*> &src,
+        dtype *dest,
+        int count,
+        int len) {
+    NumberPointerArray src_arr;
+    src_arr.init((dtype**)src.data(), src.size());
+    int block_count = DefaultBlockCount(len * count);
+    KernelCopyFromMultiVectorsToOneVector<<<block_count, TPB>>>(
+            (const dtype**)src_arr.value, dest, count, len);
+}
+
+void CopyFromDeviceToHost(const std::vector<dtype*> &src,
+        std::vector<dtype*> &dest, int count, int dim) {
+    dtype *long_src = NULL;
+    CallCuda(MemoryPool::Ins().Malloc((void**)&long_src,
+                count * dim * sizeof(dtype*)));
+    CopyFromMultiVectorsToOneVector(src, long_src, count, dim);
+    dtype *long_dest = (dtype*)malloc(count * dim * sizeof(dtype));
+    if (long_dest == NULL) {
+        std::cout << "out of memory!" << std::endl;
+        abort();
+    }
+    CallCuda(cudaMemcpy(long_dest, long_src, count * dim * sizeof(dtype),
+                cudaMemcpyDeviceToHost));
+    for (int i = 0; i < count; ++i) {
+        memcpy(dest.at(i), long_dest + i * dim, dim * sizeof(dtype));
+    }
+    CallCuda(MemoryPool::Ins().Free(long_src));
+    free(long_dest);
+}
 
 __global__ void KernelActivated(ActivatedEnum activated, const dtype *src,
         dtype**dest,

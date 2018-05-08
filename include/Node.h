@@ -88,7 +88,7 @@ class Node {
     virtual void initOnHostAndDevice(int ndim, dtype dropout) {
         dim = ndim;
         val.initOnMemoryAndDevice(ndim);
-        loss.initOnMemoryAndDevice(ndim)
+        loss.initOnMemoryAndDevice(ndim);
         drop_mask.init(dim);
         n3ldg_cuda::Memset(val.value, dim, 0.0f);
         n3ldg_cuda::Memset(loss.value, dim, 0.0f);

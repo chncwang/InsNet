@@ -448,6 +448,8 @@ void CopyFromOneVectorToMultiVals(const dtype *src, std::vector<dtype*> &vals,
         int len);
 void CopyFromHostToDevice(const std::vector<dtype*> &src,
         std::vector<dtype*> &dest, int count, int dim);
+void CopyFromDeviceToHost(const std::vector<dtype*> &src,
+        std::vector<dtype*> &dest, int count, int dim);
 
 enum ActivatedEnum {
     TANH,

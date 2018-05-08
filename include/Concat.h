@@ -44,7 +44,6 @@ public:
         int nSize = ins.size();
         for (int i = 0; i < nSize; ++i) {
             ins[i]->addParent(this);
-            std::cout << "ConcatNode forward this->degree:" << this->degree << std::endl;
         }
         inDims.clear();
         int curDim = 0;
