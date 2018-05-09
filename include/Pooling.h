@@ -13,7 +13,7 @@
 #include "Node.h"
 #include "Graph.h"
 #if USE_GPU
-#include "n3ldg_cuda.h"
+#include "N3LDG_cuda.h"
 #endif
 #include "profiler.h"
 
