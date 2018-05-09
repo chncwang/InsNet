@@ -1,4 +1,4 @@
-#include "n3ldg_cuda.h"
+#include "N3LDG_cuda.h"
 #include <array>
 #include <cstdlib>
 #include <vector>
@@ -8,7 +8,7 @@
 #include <cublas_v2.h>
 #include "cuPrintf.cuh"
 #include "cuPrintf.cu"
-#include "memory_pool.h"
+#include "Memory_cuda.h"
 #include <curand.h>
 #include <curand_kernel.h>
 #include "cnmem.h"

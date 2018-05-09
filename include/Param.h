@@ -11,7 +11,7 @@
 #include "Eigen/Dense"
 #include "BaseParam.h"
 #if USE_GPU
-#include "n3ldg_cuda.h"
+#include "N3LDG_cuda.h"
 #endif
 
 // Notice: aux is an auxiliary variable to help parameter updating
