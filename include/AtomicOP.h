@@ -164,7 +164,6 @@ class TanhExecute :public Execute {
 public:
     Tensor1D y, x;
     int sumDim;
-    bool bTrain;
 
 #if USE_GPU
     void forward() {
@@ -361,7 +360,6 @@ class SigmoidExecute :public Execute {
 public:
     Tensor1D x, y;
     int sumDim;
-    bool bTrain;
 
 #if USE_GPU
     void forward() {

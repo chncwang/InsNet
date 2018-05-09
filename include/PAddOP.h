@@ -305,8 +305,6 @@ public:
 public:
     Tensor1D x, y;
     int sumDim;
-    bool bTrain;
-
 
 #if USE_GPU
     void  forward() {
