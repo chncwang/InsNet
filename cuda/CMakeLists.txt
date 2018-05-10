@@ -9,7 +9,7 @@ endif()
 
 SET(CUDA_PROPAGATE_HOST_FLAGS OFF)
 
-CUDA_ADD_LIBRARY(n3ldg_cuda n3ldg_cuda.cu)
+CUDA_ADD_LIBRARY(n3ldg_cuda N3LDG_cuda.cu)
 CUDA_ADD_CUBLAS_TO_TARGET(n3ldg_cuda)
 
 TARGET_LINK_LIBRARIES(n3ldg_cuda cnmem)

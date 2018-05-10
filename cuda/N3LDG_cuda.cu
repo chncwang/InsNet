@@ -6,8 +6,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cublas_v2.h>
-#include "cuPrintf.cuh"
-#include "cuPrintf.cu"
+#include "Printf_cuda.cuh"
+#include "Printf_cuda.cu"
 #include "Memory_cuda.h"
 #include <curand.h>
 #include <curand_kernel.h>
