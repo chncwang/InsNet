@@ -58,9 +58,13 @@ class Node {
 
   public:
     virtual void clearValue() {
+        if (val.v != NULL) {
+            val = 0;
+        }
+        if (loss.v != NULL) {
+            loss = 0;
+        }
 #if !USE_GPU || TEST_CUDA
-        val = 0;
-        loss = 0;
         if (drop_value > 0) drop_mask = 1;
 #endif
         degree = 0;
