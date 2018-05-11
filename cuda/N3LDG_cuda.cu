@@ -491,16 +491,16 @@ void PrintInts(const int* p, int len) {
     cudaDeviceSynchronize();
 }
 
-void InitCuda() {
+void InitCuda(int device_id) {
     CallCuda(cudaSetDeviceFlags(cudaDeviceMapHost));
 
 #if DEVICE_MEMORY == 0
     cnmemDevice_t device;
     device.size = 2000000000;
-    device.device = 0;
+    device.device = device_id;
     cnmemInit(1, &device, CNMEM_FLAGS_DEFAULT);
 #else
-    CallCuda(cudaSetDevice(1));
+    CallCuda(cudaSetDevice(device_id));
 #endif
     CallCuda(cudaDeviceSetCacheConfig(cudaFuncCachePreferL1));
     CallCuda(cudaPrintfInit());

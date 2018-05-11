@@ -440,7 +440,7 @@ void BatchMemset(const std::vector<dtype*> &vec, int count, int dim,
 void PrintNums(const dtype* p, int len);
 void PrintInts(const int* p, int len);
 
-void InitCuda();
+void InitCuda(int device_id = 0);
 void EndCuda();
 
 void CopyFromOneVectorToMultiVals(const dtype *src, std::vector<dtype*> &vals,
