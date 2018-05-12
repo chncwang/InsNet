@@ -23,9 +23,9 @@ struct APParam : BaseParam {
     // allow sparse and dense parameters have different parameter initialization methods
     inline void initial(int outDim, int inDim) {
         //not in the aligned memory pool
-        val.init(inDim, outDim);
-        grad.init(inDim, outDim);
-        aux.init(inDim, outDim);
+        val.init(outDim, inDim);
+        grad.init(outDim, inDim);
+        aux.init(outDim, inDim);
         indexers.resize(inDim);
         indexers = false;
         max_update = 0;
@@ -37,7 +37,7 @@ struct APParam : BaseParam {
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
             if (!indexers[index]) continue;
-            for (int idx = 0; idx < val.col; idx++) {
+            for (int idx = 0; idx < val.row; idx++) {
                 grad[index][idx] = 0;
             }
         }
@@ -57,7 +57,7 @@ struct APParam : BaseParam {
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
             if (!indexers[index]) continue;
-            for (int idx = 0; idx < val.col; idx++) {
+            for (int idx = 0; idx < val.row; idx++) {
                 aux[index][idx] += (max_update - last_update[index]) * val[index][idx] - grad[index][idx];
                 val[index][idx] = val[index][idx] - grad[index][idx];
             }
@@ -70,7 +70,7 @@ struct APParam : BaseParam {
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
             if (!indexers[index]) continue;
-            for (int idx = 0; idx < val.col; idx++) {
+            for (int idx = 0; idx < val.row; idx++) {
                 aux[index][idx] += (max_update - last_update[index]) * val[index][idx] - grad[index][idx];
                 val[index][idx] = val[index][idx] - grad[index][idx];
             }
@@ -105,7 +105,7 @@ struct APParam : BaseParam {
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
             if (!indexers[index]) continue;
-            for (int idx = 0; idx < val.col; idx++) {
+            for (int idx = 0; idx < val.row; idx++) {
                 sumNorm += grad[index][idx] * grad[index][idx];
             }
         }
@@ -117,7 +117,7 @@ struct APParam : BaseParam {
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
             if (!indexers[index]) continue;
-            for (int idx = 0; idx < val.col; idx++) {
+            for (int idx = 0; idx < val.row; idx++) {
                 grad[index][idx] = grad[index][idx] * scale;
             }
         }
@@ -126,7 +126,7 @@ struct APParam : BaseParam {
     inline void sumWeight(int featId) {
         if (last_update[featId] < max_update) {
             int times = max_update - last_update[featId];
-            for (int idx = 0; idx < val.col; idx++) {
+            for (int idx = 0; idx < val.row; idx++) {
                 aux[featId][idx] += val[featId][idx] * times;
                 last_update[featId] = max_update;
             }
@@ -138,12 +138,12 @@ struct APParam : BaseParam {
             std::cout << "warning: output dim not equal lookup param dim." << std::endl;
         }
         if (bTrain) {
-            for (int idx = 0; idx < val.col; idx++) {
+            for (int idx = 0; idx < val.row; idx++) {
                 out[idx] = val[featId][idx];
             }
         } else {
             sumWeight(featId);
-            for (int idx = 0; idx < val.col; idx++) {
+            for (int idx = 0; idx < val.row; idx++) {
                 out[idx] = aux[featId][idx];
             }
         }
@@ -158,7 +158,7 @@ struct APParam : BaseParam {
         if (bTrain) {
             for (int i = 0; i < featNum; i++) {
                 featId = featIds[i];
-                for (int idx = 0; idx < val.col; idx++) {
+                for (int idx = 0; idx < val.row; idx++) {
                     out[idx] += val[featId][idx];
                 }
             }
@@ -166,7 +166,7 @@ struct APParam : BaseParam {
             for (int i = 0; i < featNum; i++) {
                 featId = featIds[i];
                 sumWeight(featId);
-                for (int idx = 0; idx < val.col; idx++) {
+                for (int idx = 0; idx < val.row; idx++) {
                     out[idx] += aux[featId][idx];
                 }
             }
@@ -178,7 +178,7 @@ struct APParam : BaseParam {
             std::cout << "warning: loss dim not equal lookup param dim." << std::endl;
         }
         indexers[featId] = true;
-        for (int idx = 0; idx < val.col; idx++) {
+        for (int idx = 0; idx < val.row; idx++) {
             grad[featId][idx] += loss[idx];
         }
     }
@@ -192,7 +192,7 @@ struct APParam : BaseParam {
         for (int i = 0; i < featNum; i++) {
             featId = featIds[i];
             indexers[featId] = true;
-            for (int idx = 0; idx < val.col; idx++) {
+            for (int idx = 0; idx < val.row; idx++) {
                 grad[featId][idx] += loss[idx];
             }
         }

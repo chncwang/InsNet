@@ -12,14 +12,11 @@ using namespace Eigen;
 namespace n3ldg_cpu {
 
 struct Tensor1D {
-  private:
-    size_t memsize;
-  public:
+public:
     dtype *v;
     int dim;
 
     Tensor1D() {
-        memsize = 0;
         dim = 0;
         v = NULL;
     }
@@ -29,7 +26,6 @@ struct Tensor1D {
             delete[] v;
         }
         v = NULL;
-        memsize = 0;
         dim = 0;
     }
 
@@ -38,12 +34,14 @@ struct Tensor1D {
     inline void init(int ndim) {
         dim = ndim;
         v = new dtype[dim];
-        memsize = dim * sizeof(dtype);
         zero();
     }
 
     inline void zero() {
-        if(v)memset((void*)v, 0, memsize);;
+        assert(v != NULL);
+        for (int i = 0; i < dim; ++i) {
+            v[i] = 0;
+        }
     }
 
     const Mat mat() const {
@@ -133,14 +131,11 @@ struct Tensor1D {
 
 
 struct Tensor2D {
-  private:
-    size_t memsize;
-  public:
+public:
     dtype *v;
     int col, row, size;
 
     Tensor2D() {
-        memsize = 0;
         col = row = 0;
         size = 0;
         v = NULL;
@@ -151,7 +146,6 @@ struct Tensor2D {
             delete[] v;
         }
         v = NULL;
-        memsize = 0;
         col = row = 0;
         size = 0;
     }
@@ -163,12 +157,14 @@ struct Tensor2D {
         col = ncol;
         size = col * row;
         v = new dtype[size];
-        memsize = size * sizeof(dtype);
         zero();
     }
 
     inline void zero() {
-        if(v)memset((void*)v, 0, memsize);
+        assert(v != NULL);
+        for (int i = 0; i < size; ++i) {
+            v[i] = 0;
+        }
     }
 
     const Mat mat() const {
@@ -189,14 +185,14 @@ struct Tensor2D {
 
 
     //use it carefully, first col, then row, because rows are allocated successively
-    inline dtype* operator[](const int irow) {
-        assert(irow < row);
-        return &(v[irow*col]);  // no boundary check?
+    inline dtype* operator[](const int icol) {
+        assert(icol < col);
+        return &(v[icol*row]);  // no boundary check?
     }
 
-    inline const dtype* operator[](const int irow) const {
-        assert(irow < row);
-        return &(v[irow*col]);  // no boundary check?
+    inline const dtype* operator[](const int icol) const {
+        assert(icol < col);
+        return &(v[icol*row]);  // no boundary check?
     }
 
     //use it carefully
@@ -251,13 +247,13 @@ struct Tensor2D {
     // each word's embedding is notmalized
     inline void norm2one(dtype norm = 1.0) {
         dtype sum;
-        for (int idx = 0; idx < row; idx++) {
+        for (int idx = 0; idx < col; idx++) {
             sum = 0.000001;
-            for (int idy = 0; idy < col; idy++) {
+            for (int idy = 0; idy < row; idy++) {
                 sum += (*this)[idx][idy] * (*this)[idx][idy];
             }
             dtype scale = sqrt(norm / sum);
-            for (int idy = 0; idy < col; idy++) {
+            for (int idy = 0; idy < row; idy++) {
                 (*this)[idx][idy] *= scale;
             }
         }
