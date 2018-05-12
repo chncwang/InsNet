@@ -72,6 +72,9 @@ class Node {
     }
 
     virtual void init(int ndim, dtype dropout) {
+        if (ndim <= 0) {
+            abort();
+        }
         dim = ndim;
         val.init(dim);
         loss.init(dim);

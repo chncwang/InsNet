@@ -295,20 +295,20 @@ public:
         for (int idx = 0; idx < count; idx++) {
             FourNode* ptr = (FourNode*)batch[idx];
             for (int idy = 0; idy < inDim1; idy++) {
-                x1[idy][idx] = ptr->in1->val[idy];
+                x1[idx][idy] = ptr->in1->val[idy];
             }
             for (int idy = 0; idy < inDim2; idy++) {
-                x2[idy][idx] = ptr->in2->val[idy];
+                x2[idx][idy] = ptr->in2->val[idy];
             }
             for (int idy = 0; idy < inDim3; idy++) {
-                x3[idy][idx] = ptr->in3->val[idy];
+                x3[idx][idy] = ptr->in3->val[idy];
             }
             for (int idy = 0; idy < inDim4; idy++) {
-                x4[idy][idx] = ptr->in4->val[idy];
+                x4[idx][idy] = ptr->in4->val[idy];
             }
             if (param->bUseB) {
                 for (int idy = 0; idy < outDim; idy++) {
-                    b[idy][idx] = param->b.val.v[idy];
+                    b[idx][idy] = param->b.val.v[idy];
                 }
             }
         }
@@ -320,7 +320,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             FourNode* ptr = (FourNode*)batch[idx];
             for (int idy = 0; idy < outDim; idy++) {
-                ptr->val[idy] = y[idy][idx];
+                ptr->val[idy] = y[idx][idy];
             }
             ptr->forward_drop(bTrain, drop_factor / batch.at(0)->drop_value);
         }
@@ -339,7 +339,7 @@ public:
             FourNode* ptr = (FourNode*)batch[idx];
             ptr->backward_drop();
             for (int idy = 0; idy < outDim; idy++) {
-                ly[idy][idx] = ptr->loss[idy];
+                ly[idx][idy] = ptr->loss[idy];
             }
         }
         lty.vec() = ly.vec() * ty.vec().binaryExpr(y.vec(), ptr_fun(derivate));
@@ -350,7 +350,7 @@ public:
         if (param->bUseB) {
             for (int idx = 0; idx < count; idx++) {
                 for (int idy = 0; idy < outDim; idy++) {
-                    param->b.grad.v[idy] += lty[idy][idx];
+                    param->b.grad.v[idy] += lty[idx][idy];
                 }
             }
         }
@@ -361,16 +361,16 @@ public:
         for (int idx = 0; idx < count; idx++) {
             FourNode* ptr = (FourNode*)batch[idx];
             for (int idy = 0; idy < inDim1; idy++) {
-                ptr->in1->loss[idy] += lx1[idy][idx];
+                ptr->in1->loss[idy] += lx1[idx][idy];
             }
             for (int idy = 0; idy < inDim2; idy++) {
-                ptr->in2->loss[idy] += lx2[idy][idx];
+                ptr->in2->loss[idy] += lx2[idx][idy];
             }
             for (int idy = 0; idy < inDim3; idy++) {
-                ptr->in3->loss[idy] += lx3[idy][idx];
+                ptr->in3->loss[idy] += lx3[idx][idy];
             }
             for (int idy = 0; idy < inDim4; idy++) {
-                ptr->in4->loss[idy] += lx4[idy][idx];
+                ptr->in4->loss[idy] += lx4[idx][idy];
             }
         }
     }
@@ -412,20 +412,20 @@ public:
         for (int idx = 0; idx < count; idx++) {
             LinearFourNode* ptr = (LinearFourNode*)batch[idx];
             for (int idy = 0; idy < inDim1; idy++) {
-                x1[idy][idx] = ptr->in1->val[idy];
+                x1[idx][idy] = ptr->in1->val[idy];
             }
             for (int idy = 0; idy < inDim2; idy++) {
-                x2[idy][idx] = ptr->in2->val[idy];
+                x2[idx][idy] = ptr->in2->val[idy];
             }
             for (int idy = 0; idy < inDim3; idy++) {
-                x3[idy][idx] = ptr->in3->val[idy];
+                x3[idx][idy] = ptr->in3->val[idy];
             }
             for (int idy = 0; idy < inDim4; idy++) {
-                x4[idy][idx] = ptr->in4->val[idy];
+                x4[idx][idy] = ptr->in4->val[idy];
             }
             if (param->bUseB) {
                 for (int idy = 0; idy < outDim; idy++) {
-                    b[idy][idx] = param->b.val.v[idy];
+                    b[idx][idy] = param->b.val.v[idy];
                 }
             }
         }
@@ -439,7 +439,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             LinearFourNode* ptr = (LinearFourNode*)batch[idx];
             for (int idy = 0; idy < outDim; idy++) {
-                ptr->val[idy] = y[idy][idx];
+                ptr->val[idy] = y[idx][idy];
             }
             ptr->forward_drop(bTrain, drop_factor);
         }
@@ -457,7 +457,7 @@ public:
             LinearFourNode* ptr = (LinearFourNode*)batch[idx];
             ptr->backward_drop();
             for (int idy = 0; idy < outDim; idy++) {
-                ly[idy][idx] = ptr->loss[idy];
+                ly[idx][idy] = ptr->loss[idy];
             }
         }
 
@@ -469,7 +469,7 @@ public:
         if (param->bUseB) {
             for (int idx = 0; idx < count; idx++) {
                 for (int idy = 0; idy < outDim; idy++) {
-                    param->b.grad.v[idy] += ly[idy][idx];
+                    param->b.grad.v[idy] += ly[idx][idy];
                 }
             }
         }
@@ -482,16 +482,16 @@ public:
         for (int idx = 0; idx < count; idx++) {
             LinearFourNode* ptr = (LinearFourNode*)batch[idx];
             for (int idy = 0; idy < inDim1; idy++) {
-                ptr->in1->loss[idy] += lx1[idy][idx];
+                ptr->in1->loss[idy] += lx1[idx][idy];
             }
             for (int idy = 0; idy < inDim2; idy++) {
-                ptr->in2->loss[idy] += lx2[idy][idx];
+                ptr->in2->loss[idy] += lx2[idx][idy];
             }
             for (int idy = 0; idy < inDim3; idy++) {
-                ptr->in3->loss[idy] += lx3[idy][idx];
+                ptr->in3->loss[idy] += lx3[idx][idy];
             }
             for (int idy = 0; idy < inDim4; idy++) {
-                ptr->in4->loss[idy] += lx4[idy][idx];
+                ptr->in4->loss[idy] += lx4[idx][idy];
             }
         }
 

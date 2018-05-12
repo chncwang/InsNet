@@ -393,17 +393,21 @@ class UniExecute :public Execute {
         n3ldg_cuda::Assert(y.verify("forward y"));
 #endif
 #else
+        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
+        profiler.BeginEvent("uni forward");
+        profiler.BeginEvent("uni merge");
         for (int idx = 0; idx < count; idx++) {
             UniNode* ptr = (UniNode*)batch[idx];
             for (int idy = 0; idy < inDim; idy++) {
-                x[idy][idx] = ptr->in->val[idy];
+                x[idx][idy] = ptr->in->val[idy];
             }
             if (param->bUseB) {
                 for (int idy = 0; idy < outDim; idy++) {
-                    b[idy][idx] = param->b.val.v[idy];
+                    b[idx][idy] = param->b.val.v[idy];
                 }
             }
         }
+        profiler.EndEvent();
 
         ty.mat() = param->W.val.mat() * x.mat();
 
@@ -413,17 +417,20 @@ class UniExecute :public Execute {
 
         y.vec() = ty.vec().unaryExpr(ptr_fun(activate));
 
+        profiler.BeginEvent("uni split");
         for (int idx = 0; idx < count; idx++) {
             UniNode* ptr = (UniNode*)batch[idx];
             for (int idy = 0; idy < outDim; idy++) {
-                ptr->val[idy] = y[idy][idx];
+                ptr->val[idy] = y[idx][idy];
             }
         }
+        profiler.EndEvent();
 
         for (int i = 0; i < count; ++i) {
             dtype drop_value = batch[0]->drop_value;
             batch[i]->forward_drop(bTrain, drop_factor);
         }
+        profiler.EndEvent();
 #endif
     }
 
@@ -519,7 +526,7 @@ class UniExecute :public Execute {
             UniNode* ptr = (UniNode*)batch[idx];
             ptr->backward_drop();
             for (int idy = 0; idy < outDim; idy++) {
-                ly[idy][idx] = ptr->loss[idy];
+                ly[idx][idy] = ptr->loss[idy];
             }
         }
 
@@ -529,7 +536,7 @@ class UniExecute :public Execute {
         if (param->bUseB) {
             for (int idx = 0; idx < count; idx++) {
                 for (int idy = 0; idy < outDim; idy++) {
-                    param->b.grad.v[idy] += lty[idy][idx];
+                    param->b.grad.v[idy] += lty[idx][idy];
                 }
             }
         }
@@ -539,7 +546,7 @@ class UniExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             UniNode* ptr = (UniNode*)batch[idx];
             for (int idy = 0; idy < inDim; idy++) {
-                ptr->in->loss[idy] += lx[idy][idx];
+                ptr->in->loss[idy] += lx[idx][idy];
             }
         }
 #endif
@@ -734,7 +741,7 @@ class LinearExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
             for (int idy = 0; idy < inDim; idy++) {
-                x[idy][idx] = ptr->in->val[idy];
+                x[idx][idy] = ptr->in->val[idy];
             }
         }
 
@@ -743,7 +750,7 @@ class LinearExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
             for (int idy = 0; idy < outDim; idy++) {
-                ptr->val[idy] = y[idy][idx];
+                ptr->val[idy] = y[idx][idy];
             }
             ptr->forward_drop(bTrain, drop_factor);
         }
@@ -758,7 +765,7 @@ class LinearExecute :public Execute {
             LinearNode* ptr = (LinearNode*)batch[idx];
             ptr->backward_drop();
             for (int idy = 0; idy < outDim; idy++) {
-                ly[idy][idx] = ptr->loss[idy];
+                ly[idx][idy] = ptr->loss[idy];
             }
         }
 
@@ -769,7 +776,7 @@ class LinearExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
             for (int idy = 0; idy < inDim; idy++) {
-                ptr->in->loss[idy] += lx[idy][idx];
+                ptr->in->loss[idy] += lx[idx][idy];
             }
         }
     }

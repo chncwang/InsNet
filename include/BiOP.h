@@ -288,14 +288,14 @@ class BiExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             BiNode* ptr = (BiNode*)batch[idx];
             for (int idy = 0; idy < inDim1; idy++) {
-                x1[idy][idx] = ptr->in1->val[idy];
+                x1[idx][idy] = ptr->in1->val[idy];
             }
             for (int idy = 0; idy < inDim2; idy++) {
-                x2[idy][idx] = ptr->in2->val[idy];
+                x2[idx][idy] = ptr->in2->val[idy];
             }
             if (param->bUseB) {
                 for (int idy = 0; idy < outDim; idy++) {
-                    b[idy][idx] = param->b.val.v[idy];
+                    b[idx][idy] = param->b.val.v[idy];
                 }
             }
         }
@@ -327,7 +327,7 @@ class BiExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             BiNode* ptr = (BiNode*)batch[idx];
             for (int idy = 0; idy < outDim; idy++) {
-                ptr->val[idy] = y[idy][idx];
+                ptr->val[idy] = y[idx][idy];
             }
         }
 
@@ -359,14 +359,14 @@ class BiExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             BiNode* ptr = (BiNode*)batch[idx];
             for (int idy = 0; idy < inDim1; idy++) {
-                x1[idy][idx] = ptr->in1->val[idy];
+                x1[idx][idy] = ptr->in1->val[idy];
             }
             for (int idy = 0; idy < inDim2; idy++) {
-                x2[idy][idx] = ptr->in2->val[idy];
+                x2[idx][idx] = ptr->in2->val[idy];
             }
             if (param->bUseB) {
                 for (int idy = 0; idy < outDim; idy++) {
-                    b[idy][idx] = param->b.val.v[idy];
+                    b[idx][idy] = param->b.val.v[idy];
                 }
             }
         }
@@ -382,7 +382,7 @@ class BiExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             BiNode* ptr = (BiNode*)batch[idx];
             for (int idy = 0; idy < outDim; idy++) {
-                ptr->val[idy] = y[idy][idx];
+                ptr->val[idy] = y[idx][idy];
             }
             ptr->forward_drop(bTrain, drop_factor);
         }
@@ -496,7 +496,7 @@ class BiExecute :public Execute {
             BiNode* ptr = (BiNode*)batch[idx];
             ptr->backward_drop();
             for (int idy = 0; idy < outDim; idy++) {
-                ly[idy][idx] = ptr->loss[idy];
+                ly[idx][idy] = ptr->loss[idy];
             }
         }
 
@@ -508,7 +508,7 @@ class BiExecute :public Execute {
         if (param->bUseB) {
             for (int idx = 0; idx < count; idx++) {
                 for (int idy = 0; idy < outDim; idy++) {
-                    param->b.grad.v[idy] += lty[idy][idx];
+                    param->b.grad.v[idy] += lty[idx][idy];
                 }
             }
         }
@@ -519,10 +519,10 @@ class BiExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             BiNode* ptr = (BiNode*)batch[idx];
             for (int idy = 0; idy < inDim1; idy++) {
-                ptr->in1->loss[idy] += lx1[idy][idx];
+                ptr->in1->loss[idy] += lx1[idx][idy];
             }
             for (int idy = 0; idy < inDim2; idy++) {
-                ptr->in2->loss[idy] += lx2[idy][idx];
+                ptr->in2->loss[idy] += lx2[idx][idy];
             }
         }
     }

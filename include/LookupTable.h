@@ -51,7 +51,7 @@ public:
     }
 
     inline void initialWeights(int dim, bool tune) {
-        if (nVSize == 0 || (nVSize == 1 && nUNKId >= 0)) {
+        if (dim <=0 || nVSize == 0 || (nVSize == 1 && nUNKId >= 0)) {
             std::cout << "please check the alphabet" << std::endl;
             return;
         }
