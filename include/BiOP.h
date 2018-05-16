@@ -334,7 +334,7 @@ class BiExecute :public Execute {
         drop_mask.copyFromDeviceToHost();
         for (int i = 0; i < count; ++i) {
             for (int j = 0; j < outDim; ++j) {
-                dtype v = drop_mask[j][i];
+                dtype v = drop_mask[i][j];
                 batch[i]->drop_mask[j] = v <= dynamicDropValue() ? 0 : 1;
             }
         }
@@ -418,7 +418,7 @@ class BiExecute :public Execute {
             BiNode* ptr = (BiNode*)batch[idx];
             ptr->backward_drop();
             for (int idy = 0; idy < outDim; idy++) {
-                ly[idy][idx] = ptr->loss[idy];
+                ly[idx][idy] = ptr->loss[idy];
             }
         }
 
@@ -469,7 +469,7 @@ class BiExecute :public Execute {
         if (param->bUseB) {
             for (int idx = 0; idx < count; idx++) {
                 for (int idy = 0; idy < outDim; idy++) {
-                    param->b.grad.v[idy] += lty[idy][idx];
+                    param->b.grad.v[idy] += lty[idx][idy];
                 }
             }
         }
@@ -480,10 +480,10 @@ class BiExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             BiNode* ptr = (BiNode*)batch[idx];
             for (int idy = 0; idy < inDim1; idy++) {
-                ptr->in1->loss[idy] += lx1[idy][idx];
+                ptr->in1->loss[idy] += lx1[idx][idy];
             }
             for (int idy = 0; idy < inDim2; idy++) {
-                ptr->in2->loss[idy] += lx2[idy][idx];
+                ptr->in2->loss[idy] += lx2[idx][idy];
             }
         }
 #endif

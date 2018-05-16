@@ -88,7 +88,7 @@ public:
         drop_mask.copyFromDeviceToHost();
         for (int i = 0; i < count; ++i) {
             for (int j = 0; j < dim; ++j) {
-                dtype v = drop_mask[j][i];
+                dtype v = drop_mask[i][j];
                 batch[i]->drop_mask[j] = v <= dynamicDropValue() ? 0 : 1;
             }
         }

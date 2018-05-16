@@ -68,7 +68,7 @@ class SparseParam : public BaseParam {
 #if TEST_CUDA
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
-            for (int idx = 0; idx < grad.col; idx++) {
+            for (int idx = 0; idx < grad.row; idx++) {
                 grad[index][idx] = 0;
             }
         }
@@ -105,7 +105,7 @@ class SparseParam : public BaseParam {
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
             if (!indexers[index]) continue;
-            for (int idx = 0; idx < grad.col; idx++) {
+            for (int idx = 0; idx < grad.row; idx++) {
                 grad[index][idx] = grad[index][idx] + val[index][idx] * reg;
                 aux_square[index][idx] = aux_square[index][idx] + grad[index][idx] * grad[index][idx];
                 val[index][idx] = val[index][idx] - grad[index][idx] * alpha / sqrt(aux_square[index][idx] + eps);
@@ -145,7 +145,7 @@ class SparseParam : public BaseParam {
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
             if (!indexers[index]) continue;
-            for (int idx = 0; idx < grad.col; idx++) {
+            for (int idx = 0; idx < grad.row; idx++) {
                 grad[index][idx] = grad[index][idx] + val[index][idx] * reg;
                 aux_mean[index][idx] = belta1 * aux_mean[index][idx] + (1 - belta1) * grad[index][idx];
                 aux_square[index][idx] = belta2 * aux_square[index][idx] + (1 - belta2) * grad[index][idx] * grad[index][idx];
@@ -204,7 +204,7 @@ class SparseParam : public BaseParam {
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
             if (!indexers[index]) continue;
-            for (int idx = 0; idx < val.col; idx++) {
+            for (int idx = 0; idx < val.row; idx++) {
                 sumNorm += grad[index][idx] * grad[index][idx];
             }
         }
@@ -238,7 +238,7 @@ class SparseParam : public BaseParam {
 #if TEST_CUDA
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
-            for (int idx = 0; idx < val.col; idx++) {
+            for (int idx = 0; idx < val.row; idx++) {
                 grad[index][idx] = grad[index][idx] * scale;
             }
         }

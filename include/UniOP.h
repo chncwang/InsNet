@@ -352,11 +352,11 @@ class UniExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             UniNode* ptr = (UniNode*)batch[idx];
             for (int idy = 0; idy < inDim; idy++) {
-                x[idy][idx] = ptr->in->val[idy];
+                x[idx][idy] = ptr->in->val[idy];
             }
             if (param->bUseB) {
                 for (int idy = 0; idy < outDim; idy++) {
-                    b[idy][idx] = param->b.val.v[idy];
+                    b[idx][idy] = param->b.val.v[idy];
                 }
             }
         }
@@ -373,14 +373,14 @@ class UniExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             UniNode* ptr = (UniNode*)batch[idx];
             for (int idy = 0; idy < outDim; idy++) {
-                ptr->val[idy] = y[idy][idx];
+                ptr->val[idy] = y[idx][idy];
             }
         }
 
         drop_mask.copyFromDeviceToHost();
         for (int i = 0; i < count; ++i) {
             for (int j = 0; j < outDim; ++j) {
-                dtype v = drop_mask[j][i];
+                dtype v = drop_mask[i][j];
                 batch[i]->drop_mask[j] = v <= dynamicDropValue() ? 0 : 1;
             }
         }
@@ -484,7 +484,7 @@ class UniExecute :public Execute {
             UniNode* ptr = (UniNode*)batch[idx];
             ptr->backward_drop();
             for (int idy = 0; idy < outDim; idy++) {
-                ly[idy][idx] = ptr->loss[idy];
+                ly[idx][idy] = ptr->loss[idy];
             }
         }
 
@@ -498,7 +498,7 @@ class UniExecute :public Execute {
         if (param->bUseB) {
             for (int idx = 0; idx < count; idx++) {
                 for (int idy = 0; idy < outDim; idy++) {
-                    param->b.grad.v[idy] += lty[idy][idx];
+                    param->b.grad.v[idy] += lty[idx][idy];
                 }
             }
         }
@@ -510,7 +510,7 @@ class UniExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             UniNode* ptr = (UniNode*)batch[idx];
             for (int idy = 0; idy < inDim; idy++) {
-                ptr->in->loss[idy] += lx[idy][idx];
+                ptr->in->loss[idx] += lx[idx][idy];
             }
         }
 
@@ -639,7 +639,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
             for (int idy = 0; idy < inDim; idy++) {
-                x[idy][idx] = ptr->in->val[idy];
+                x[idx][idy] = ptr->in->val[idy];
             }
         }
 
@@ -650,7 +650,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
             for (int idy = 0; idy < outDim; idy++) {
-                ptr->val[idy] = y[idy][idx];
+                ptr->val[idy] = y[idx][idy];
             }
             n3ldg_cuda::Assert(ptr->val.verify("linear forward val"));
         }
@@ -692,7 +692,7 @@ public:
             UniNode* ptr = (UniNode*)batch[idx];
             ptr->backward_drop();
             for (int idy = 0; idy < outDim; idy++) {
-                ly[idy][idx] = ptr->loss[idy];
+                ly[idx][idy] = ptr->loss[idy];
             }
         }
 
@@ -704,7 +704,7 @@ public:
         if (param->bUseB) {
             for (int idx = 0; idx < count; idx++) {
                 for (int idy = 0; idy < outDim; idy++) {
-                    param->b.grad.v[idy] += ly[idy][idx];
+                    param->b.grad.v[idy] += ly[idx][idy];
                 }
             }
         }
@@ -716,7 +716,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             UniNode* ptr = (UniNode*)batch[idx];
             for (int idy = 0; idy < inDim; idy++) {
-                ptr->in->loss[idy] += lx[idy][idx];
+                ptr->in->loss[idy] += lx[idx][idy];
             }
         }
 
