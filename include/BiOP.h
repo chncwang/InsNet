@@ -347,8 +347,13 @@ class BiExecute :public Execute {
         }
 #endif
     }
+
 #else
     void  forward() {
+        for (Node *node : batch) {
+            node->compute();
+            node->forward_drop(bTrain, drop_factor);
+        }
         int count = batch.size();
         x1.init(inDim1, count);
         x2.init(inDim2, count);
@@ -362,7 +367,7 @@ class BiExecute :public Execute {
                 x1[idx][idy] = ptr->in1->val[idy];
             }
             for (int idy = 0; idy < inDim2; idy++) {
-                x2[idx][idx] = ptr->in2->val[idy];
+                x2[idx][idy] = ptr->in2->val[idy];
             }
             if (param->bUseB) {
                 for (int idy = 0; idy < outDim; idy++) {

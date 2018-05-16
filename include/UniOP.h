@@ -1,4 +1,5 @@
 #ifndef UNIOP_H_
+
 #define UNIOP_H_
 
 /*
@@ -734,6 +735,10 @@ class LinearExecute :public Execute {
     UniParams* param;
 
     inline void  forward() {
+//        for (Node * node : batch) {
+//            node->compute();
+//            node->forward_drop(bTrain, drop_factor);
+//        }
         count = batch.size();
         x.init(inDim, count);
         y.init(outDim, count);
@@ -757,6 +762,10 @@ class LinearExecute :public Execute {
     }
 
     inline void backward() {
+//        for (Node *node : batch) {
+//            node->backward_drop();
+//            node->backward();
+//        }
         Tensor2D lx, ly;
         lx.init(inDim, count);
         ly.init(outDim, count);
@@ -771,7 +780,7 @@ class LinearExecute :public Execute {
 
         param->W.grad.mat() += ly.mat() * x.mat().transpose();
 
-        lx.mat() += param->W.val.mat().transpose() * ly.mat();
+        lx.mat() = param->W.val.mat().transpose() * ly.mat();
 
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];

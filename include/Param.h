@@ -127,8 +127,8 @@ class Param : public BaseParam {
         random_shuffle(idRows.begin(), idRows.end());
         random_shuffle(idCols.begin(), idCols.end());
 
-        idx = idRows[0];
-        idy = idCols[0];
+        idy = idRows[0];
+        idx = idCols[0];
     }
 
     inline dtype squareGradNorm() {
