@@ -879,16 +879,16 @@ __global__ void KernelCopyForBiNodeForward(const dtype **x1s,
 
     for (int i = index; i < total_len; i += step) {
         if (i < x2_total_len) {
-            int len_i = i / count;
-            int count_i = i % count;
+            int len_i = i % x2_len;
+            int count_i = i / x2_len;
             x2s_dest[i] = x2s[count_i][len_i];
         } else if (i >= x2_total_len && i < x1_total_len + x2_total_len) {
-            int len_i = (i - x2_total_len) / count;
-            int count_i = (i - x2_total_len) % count;
+            int len_i = (i - x2_total_len) % x1_len;
+            int count_i = (i - x2_total_len) / x1_len;
             x1s_dest[i - x2_total_len] = x1s[count_i][len_i];
         } else {
             int b_i = (i - x1_total_len - x2_total_len);
-            int len_i = b_i / count;
+            int len_i = b_i % b_len;
             b_dest[b_i] = b[len_i];
         }
     }
@@ -1300,7 +1300,8 @@ __global__ void KernelAddLtyToParamBiasAndAddLxToInputLossesForBiBackward(
         if (threadIdx.x == 0 && blockIdx.y == 0) {
             global_block_count[dim_i] = 0;
         }
-        int lty_index = dim_i * count + count_i;
+        //int lty_index = dim_i * count + count_i;
+        int lty_index = dim_i + count_i * out_dim;
         shared_arr[threadIdx.x] = count_i < count ? lty[lty_index] : 0.0f;
         __syncthreads();
 
@@ -1324,13 +1325,13 @@ __global__ void KernelAddLtyToParamBiasAndAddLxToInputLossesForBiBackward(
     } else if (dim_i < out_dim + in_dim1) {
         if (count_i < count) {
             dim_i -= out_dim;
-            int lx_index = dim_i * count + count_i;
+            int lx_index = dim_i + count_i * in_dim1;
             DeviceAtomicAdd(losses1[count_i] + dim_i, lx1[lx_index]);
         }
     } else {
         if (count_i < count) {
             dim_i -= (out_dim + in_dim1);
-            int lx_index = dim_i * count + count_i;
+            int lx_index = dim_i + count_i * in_dim2;
             DeviceAtomicAdd(losses2[count_i] + dim_i, lx2[lx_index]);
         }
     }

@@ -217,7 +217,6 @@ class SparseParam : public BaseParam {
         n3ldg_cuda::Assert(grad.verify("squareGradNorm grad"));
         dtype cuda = n3ldg_cuda::SquareSum(grad.value, dIndexers.value, inDim,
                 val.row);
-        std::cout << "cuda:" << cuda << " sumNorm:" << sumNorm << std::endl;
         n3ldg_cuda::Assert(isEqual(cuda, sumNorm));
 
         return sumNorm;

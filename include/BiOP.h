@@ -445,8 +445,8 @@ class BiExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             BiNode* ptr = (BiNode*)batch[idx];
 #if TEST_CUDA
-            n3ldg_cuda::Assert(ptr->in1->loss.verify("uni backward in loss"));
-            n3ldg_cuda::Assert(ptr->in2->loss.verify("uni backward in loss"));
+            n3ldg_cuda::Assert(ptr->in1->loss.verify("bi backward in loss"));
+            n3ldg_cuda::Assert(ptr->in2->loss.verify("bi backward in loss"));
 #endif
             losses1.push_back(ptr->in1->loss.value);
             losses2.push_back(ptr->in2->loss.value);
@@ -481,6 +481,11 @@ class BiExecute :public Execute {
             for (int idy = 0; idy < inDim2; idy++) {
                 ptr->in2->loss[idy] += lx2[idx][idy];
             }
+        }
+        for (int idx = 0; idx < count; idx++) {
+            BiNode* ptr = (BiNode*)batch[idx];
+            n3ldg_cuda::Assert(ptr->in1->loss.verify("bi in1 loss"));
+            n3ldg_cuda::Assert(ptr->in2->loss.verify("bi in2 loss"));
         }
 #endif
     }
