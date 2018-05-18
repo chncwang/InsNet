@@ -258,9 +258,7 @@ class SparseParam : public BaseParam {
 
     inline void value(const int& featId, Tensor1D& out) {
         assert(out.dim == val.row);
-        for (int idx = 0; idx < val.row; idx++) {
-            out[idx] = val[featId][idx];
-        }
+        memcpy(out.v, val[featId], val.row * sizeof(dtype));
     }
 
     inline void value(const vector<int>& featIds, Tensor1D& out) {

@@ -522,17 +522,15 @@ class UniExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             UniNode* ptr = (UniNode*)batch[idx];
             ptr->backward_drop();
-            for (int idy = 0; idy < outDim; idy++) {
-                ly[idx][idy] = ptr->loss[idy];
-            }
+            memcpy(ly.v + idx * outDim, ptr->loss.v, outDim * sizeof(dtype));
         }
 
         lty.vec() = ly.vec() * ty.vec().binaryExpr(y.vec(), ptr_fun(derivate));
         param->W.grad.mat() += lty.mat() * x.mat().transpose();
 
         if (param->bUseB) {
-            for (int idx = 0; idx < count; idx++) {
-                for (int idy = 0; idy < outDim; idy++) {
+            for (int idy = 0; idy < outDim; idy++) {
+                for (int idx = 0; idx < count; idx++) {
                     param->b.grad.v[idy] += lty[idx][idy];
                 }
             }
@@ -726,42 +724,38 @@ public:
 #else
 class LinearExecute :public Execute {
   public:
-    Tensor2D x, y;
+    Tensor2D x, y, b;
     int inDim, outDim, count;
     UniParams* param;
 
     inline void  forward() {
-//        for (Node * node : batch) {
-//            node->compute();
-//            node->forward_drop(bTrain, drop_factor);
-//        }
         count = batch.size();
         x.init(inDim, count);
         y.init(outDim, count);
+        b.init(outDim, count);
 
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
-            for (int idy = 0; idy < inDim; idy++) {
-                x[idx][idy] = ptr->in->val[idy];
+            memcpy(x.v + idx * inDim, ptr->in->val.v, inDim * sizeof(dtype));
+            if (param->bUseB) {
+                memcpy(b.v + idx * outDim, param->b.val.v,
+                        outDim * sizeof(dtype));
             }
         }
 
         y.mat() = param->W.val.mat() * x.mat();
+        if (param->bUseB) {
+            y.vec() = y.vec() + b.vec();
+        }
 
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
-            for (int idy = 0; idy < outDim; idy++) {
-                ptr->val[idy] = y[idx][idy];
-            }
+            memcpy(ptr->val.v, y.v + idx * outDim, outDim * sizeof(dtype));
             ptr->forward_drop(bTrain, drop_factor);
         }
     }
 
     inline void backward() {
-//        for (Node *node : batch) {
-//            node->backward_drop();
-//            node->backward();
-//        }
         Tensor2D lx, ly;
         lx.init(inDim, count);
         ly.init(outDim, count);
@@ -769,12 +763,18 @@ class LinearExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
             ptr->backward_drop();
-            for (int idy = 0; idy < outDim; idy++) {
-                ly[idx][idy] = ptr->loss[idy];
-            }
+            memcpy(ly.v + idx * outDim, ptr->loss.v, outDim * sizeof(dtype));
         }
 
         param->W.grad.mat() += ly.mat() * x.mat().transpose();
+
+        if (param->bUseB) {
+            for (int idy = 0; idy < outDim; idy++) {
+                for (int idx = 0; idx < count; idx++) {
+                    param->b.grad.v[idy] += ly[idx][idy];
+                }
+            }
+        }
 
         lx.mat() = param->W.val.mat().transpose() * ly.mat();
 

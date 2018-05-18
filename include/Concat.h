@@ -121,9 +121,8 @@ public:
         int nSize = ins.size();
         int offset = 0;
         for (int i = 0; i < nSize; ++i) {
-            for (int idx = 0; idx < inDims.at(i); idx++) {
-                val[offset + idx] = ins[i]->val[idx];
-            }
+            memcpy(val.v + offset, ins.at(i)->val.v,
+                    inDims.at(i) * sizeof(dtype));
             offset += inDims[i];
         }
     }
