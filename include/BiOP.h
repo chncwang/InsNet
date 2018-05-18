@@ -350,10 +350,6 @@ class BiExecute :public Execute {
 
 #else
     void  forward() {
-        for (Node *node : batch) {
-            node->compute();
-            node->forward_drop(bTrain, drop_factor);
-        }
         int count = batch.size();
         x1.init(inDim1, count);
         x2.init(inDim2, count);
