@@ -178,7 +178,6 @@ class SparseParam : public BaseParam {
         //select indexes randomly
         std::vector<int> idRows, idCols;
         int inDim = indexers.size();
-        std::cout << "inDim:" << inDim << " val.row:" << val.row << std::endl;
         for (int index = 0; index < inDim; index++) {
             if (!indexers[index]) continue;
             idCols.push_back(index);

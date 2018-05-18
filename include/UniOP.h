@@ -400,13 +400,10 @@ class UniExecute :public Execute {
         profiler.BeginEvent("uni merge");
         for (int idx = 0; idx < count; idx++) {
             UniNode* ptr = (UniNode*)batch[idx];
-            for (int idy = 0; idy < inDim; idy++) {
-                x[idx][idy] = ptr->in->val[idy];
-            }
+            memcpy(x.v + idx * inDim, ptr->in->val.v, inDim * sizeof(dtype));
             if (param->bUseB) {
-                for (int idy = 0; idy < outDim; idy++) {
-                    b[idx][idy] = param->b.val.v[idy];
-                }
+                memcpy(b.v + idx * outDim, param->b.val.v,
+                        outDim * sizeof(dtype));
             }
         }
         profiler.EndEvent();
@@ -422,9 +419,7 @@ class UniExecute :public Execute {
         profiler.BeginEvent("uni split");
         for (int idx = 0; idx < count; idx++) {
             UniNode* ptr = (UniNode*)batch[idx];
-            for (int idy = 0; idy < outDim; idy++) {
-                ptr->val[idy] = y[idx][idy];
-            }
+            memcpy(ptr->val.v, y.v + idx * outDim, outDim * sizeof(dtype));
         }
         profiler.EndEvent();
 
