@@ -492,6 +492,7 @@ void PrintInts(const int* p, int len) {
 }
 
 void InitCuda(int device_id) {
+    std::cout << "device_id:" << device_id << std::endl;
     CallCuda(cudaSetDeviceFlags(cudaDeviceMapHost));
 
 #if DEVICE_MEMORY == 0
@@ -516,8 +517,8 @@ __global__ void KernelCopyFromOneVectorToMultiVectors(const dtype *src,
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
     for (int i = index; i < count * len; i += step) {
-        int count_i = i % count;
-        int len_i = i / count;
+        int count_i = i / len;
+        int len_i = i % len;
         dest[count_i][len_i] = src[i];
     }
 }
@@ -530,29 +531,6 @@ void CopyFromOneVectorToMultiVals(const dtype *src, std::vector<dtype*> &vals,
     int block_count = (len * count - 1 + TPB) / TPB;
     block_count = std::min(block_count, BLOCK_COUNT);
     KernelCopyFromOneVectorToMultiVectors<<<block_count, TPB>>>(src,
-            val_arr.value, count, len);
-}
-
-__global__ void KernelCopyFromOneVectorToMultiVectorsInColumns(const dtype *src,
-        dtype **dest, int count, int len) {
-    int index = DeviceDefaultIndex();
-    int step = DeviceDefaultStep();
-    for (int i = index; i < count * len; i += step) {
-        int count_i = i % count;
-        int len_i = i / count;
-        dest[count_i][len_i] = src[i];
-    }
-}
-
-void CopyFromOneVectorToMultiValsInColumns( const dtype *src,
-        std::vector<dtype*> &vals,
-        int count,
-        int len) {
-    NumberPointerArray val_arr;
-    val_arr.init((dtype**)vals.data(), vals.size());
-    int block_count = DefaultBlockCount(len * count);
-
-    KernelCopyFromOneVectorToMultiVectorsInColumns<<<block_count, TPB>>>(src,
             val_arr.value, count, len);
 }
 
@@ -571,7 +549,7 @@ void CopyFromHostToDevice(const std::vector<dtype*> &src,
                 count * dim * sizeof(dtype*)));
     CallCuda(cudaMemcpy(long_dest, long_src, count * dim * sizeof(dtype*),
                 cudaMemcpyHostToDevice));
-    CopyFromOneVectorToMultiValsInColumns(long_dest, dest, count, dim);
+    CopyFromOneVectorToMultiVals(long_dest, dest, count, dim);
     free(long_src);
     CallCuda(MemoryPool::Ins().Free(long_dest));
 }
@@ -632,8 +610,8 @@ __global__ void KernelActivated(ActivatedEnum activated, const dtype *src,
     int step = blockDim.x * gridDim.x;
 
     for (int i = index; i < len * count; i += step) {
-        int count_i = i % count;
-        int len_i = i / count;
+        int count_i = i / len;
+        int len_i = i % len;
         dtype result;
         if (activated == ActivatedEnum::TANH) {
             result = cuda_tanh(src[i]);
@@ -854,12 +832,12 @@ __global__ void KernelCopyForUniNodeForward(const dtype** xs, const dtype* b,
     int b_total_len = count * b_len;
     for (int i = index; i < x_total_len + b_total_len; i += step) {
         if (i < x_total_len) {
-            int len_i = i / count;
-            int count_i = i % count;
+            int count_i = i / x_len;
+            int len_i = i % x_len;
             xs_dest[i] = xs[count_i][len_i];
         } else if (use_b) {
             int b_i = i - x_total_len;
-            int len_i = b_i / count;
+            int len_i = b_i % b_len;
             b_dest[b_i] = b[len_i];
         }
     }
@@ -952,15 +930,15 @@ void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y, int row, int col,
     float alpha = 1;
     float beta = useb? 1 : 0;
     cublasOperation_t x_op = should_x_transpose ? CUBLAS_OP_T : CUBLAS_OP_N;
-    int ldx = should_x_transpose ? col : count;
+    int ldx = should_x_transpose ? count : col;
     cublasOperation_t W_op = should_W_transpose ? CUBLAS_OP_T : CUBLAS_OP_N;
-    int ldw = should_W_transpose ? row : col;
+    int ldw = should_W_transpose ? col : row;
 #if USE_FLOAT
-    CallCublas(cublasSgemm(handle, x_op, W_op, count, row, col,
-                &alpha, x, ldx, W, ldw, &beta, y, count));
+    CallCublas(cublasSgemm(handle, W_op, x_op, row, count, col,
+                &alpha, W, ldw, x, ldx, &beta, y, row));
 #else
-    CallCublas(cublasDgemm(handle, x_op, W_op, count, row, col,
-                &alpha, x, ldx, W, ldw, &beta, y, count));
+    CallCublas(cublasDgemm(handle, W_op, x_op, row, count, col,
+                &alpha, W, ldw, x, ldx, &beta, y, row));
 #endif
 }
 
@@ -1167,8 +1145,8 @@ __global__ void KernelCalculateLtyForUniBackward(ActivatedEnum activated,
     int step = DeviceDefaultStep();
     int len = count * dim;
     for (int i = index; i < len; i += step) {
-        int count_i = i % count;
-        int dim_i = i / count;
+        int count_i = i / dim;
+        int dim_i = i % dim;
         dtype yi = y[i];
         if (drop_factor > 0.0f && drop_mask[i] < drop_factor) {
             lty[i] = 0.0f;
@@ -1217,8 +1195,8 @@ __global__ void KernelCalculateLyForLinearBackward(const dtype *const*ly_vec,
     int step = DeviceDefaultStep();
     int len = count * dim;
     for (int i = index; i < len; i += step) {
-        int count_i = i % count;
-        int dim_i = i / count;
+        int count_i = i / dim;
+        int dim_i = i % dim;
         ly[i] = ly_vec[count_i][dim_i];
     }
 }
@@ -1252,7 +1230,7 @@ __global__ void KernelAddLtyToParamBiasAndAddLxToInputLossesForUniBackward(
             if (threadIdx.x == 0 && blockIdx.y == 0) {
                 global_block_count[dim_i] = 0;
             }
-            int lty_index = dim_i * count + count_i;
+            int lty_index = count_i * out_dim + dim_i;
             shared_arr[threadIdx.x] = count_i < count ? lty[lty_index] : 0.0f;
             __syncthreads();
 
@@ -1279,7 +1257,7 @@ __global__ void KernelAddLtyToParamBiasAndAddLxToInputLossesForUniBackward(
     } else {
         if (count_i < count) {
             dim_i -= out_dim;
-            int lx_index = dim_i * count + count_i;
+            int lx_index = dim_i + count_i * in_dim;
             DeviceAtomicAdd(losses[count_i] + dim_i, lx[lx_index]);
         }
     }

@@ -351,6 +351,7 @@ class UniExecute :public Execute {
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             UniNode* ptr = (UniNode*)batch[idx];
+            n3ldg_cuda::Assert(ptr->in->val.verify("Uni forward in"));
             for (int idy = 0; idy < inDim; idy++) {
                 x[idx][idy] = ptr->in->val[idy];
             }
@@ -510,7 +511,7 @@ class UniExecute :public Execute {
         for (int idx = 0; idx < count; idx++) {
             UniNode* ptr = (UniNode*)batch[idx];
             for (int idy = 0; idy < inDim; idy++) {
-                ptr->in->loss[idx] += lx[idx][idy];
+                ptr->in->loss[idy] += lx[idx][idy];
             }
         }
 
@@ -696,10 +697,10 @@ public:
             }
         }
 
-        assert(x.verify("backward x"));
+        n3ldg_cuda::Assert(x.verify("backward x"));
 
         param->W.grad.mat() += ly.mat() * x.mat().transpose();
-        param->W.grad.verify("backward W grad");
+        n3ldg_cuda::Assert(param->W.grad.verify("LinearExecute backward W grad"));
 
         if (param->bUseB) {
             for (int idx = 0; idx < count; idx++) {
@@ -711,7 +712,7 @@ public:
         n3ldg_cuda::Assert(param->b.grad.verify("backward b grad"));
 
         lx.mat() += param->W.val.mat().transpose() * ly.mat();
-        lx.verify("backward lx");
+        n3ldg_cuda::Assert(lx.verify("linear execute backward lx"));
 
         for (int idx = 0; idx < count; idx++) {
             UniNode* ptr = (UniNode*)batch[idx];

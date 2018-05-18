@@ -37,7 +37,7 @@ class SparseParam : public BaseParam {
     inline void initial(int outDim, int inDim) {
         //not in the aligned memory pool
 #if USE_GPU
-        val.initOnMemoryAndDevice(inDim, outDim);
+        val.initOnMemoryAndDevice(outDim, inDim);
 #else
         val.init(outDim, inDim);
 #endif
@@ -197,7 +197,7 @@ class SparseParam : public BaseParam {
     dtype squareGradNorm() override {
 #if USE_GPU && !TEST_CUDA
         dtype result = n3ldg_cuda::SquareSum(grad.value, dIndexers.value,
-                indexers.size(), val.col);
+                indexers.size(), val.row);
         return result;
 #elif USE_GPU && TEST_CUDA
         dtype sumNorm = 0.0;
@@ -213,8 +213,10 @@ class SparseParam : public BaseParam {
                     dIndexers.value,
                     indexers.size(),
                     "sparse squareGradNorm"));
+        n3ldg_cuda::Assert(grad.verify("squareGradNorm grad"));
         dtype cuda = n3ldg_cuda::SquareSum(grad.value, dIndexers.value, inDim,
-                val.col);
+                val.row);
+        std::cout << "cuda:" << cuda << " sumNorm:" << sumNorm << std::endl;
         n3ldg_cuda::Assert(isEqual(cuda, sumNorm));
 
         return sumNorm;
