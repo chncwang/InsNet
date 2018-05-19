@@ -35,25 +35,25 @@ class ModelUpdate {
 
   public:
 
-    inline void addParam(BaseParam* param) {
+    void addParam(BaseParam* param) {
         _params.push_back(param);
     }
 
-    inline void addParam(const vector<BaseParam*>& params) {
+    void addParam(const vector<BaseParam*>& params) {
         for (int idx = 0; idx < params.size(); idx++) {
             _params.push_back(params[idx]);
         }
     }
 
 
-    inline void update() {
+    void update() {
         for (int idx = 0; idx < _params.size(); idx++) {
             _params[idx]->updateAdagrad(_alpha, _reg, _eps);
             _params[idx]->clearGrad();
         }
     }
 
-    inline void update(dtype maxScale) {
+    void update(dtype maxScale) {
         dtype sumNorm = 0.0;
         for (int idx = 0; idx < _params.size(); idx++) {
             sumNorm += _params[idx]->squareGradNorm();
@@ -76,14 +76,14 @@ class ModelUpdate {
         update();
     }
 
-    inline void updateAdam() {
+    void updateAdam() {
         for (int idx = 0; idx < _params.size(); idx++) {
             _params[idx]->updateAdam(_belta1, _belta2, _alpha, _reg, _eps);
             _params[idx]->clearGrad();
         }
     }
 
-    inline void updateAdam(dtype maxScale) {
+    void updateAdam(dtype maxScale) {
 #if TEST_CUDA
         maxScale = 0.1;
 #endif
@@ -114,19 +114,19 @@ class ModelUpdate {
 #endif
     }
 
-    inline void rescaleGrad(dtype scale) {
+    void rescaleGrad(dtype scale) {
         for (int idx = 0; idx < _params.size(); idx++) {
             _params[idx]->rescaleGrad(scale);
         }
     }
 
-    inline void clearGrad() {
+    void clearGrad() {
         for (int idx = 0; idx < _params.size(); idx++) {
             _params[idx]->clearGrad();
         }
     }
 
-    inline void gradClip(dtype maxScale) {
+    void gradClip(dtype maxScale) {
         dtype sumNorm = 0.0;
         for (int idx = 0; idx < _params.size(); idx++) {
             sumNorm += _params[idx]->squareGradNorm();
@@ -144,7 +144,7 @@ class ModelUpdate {
         }
     }
 
-    inline void clear() {
+    void clear() {
         _params.clear();
     }
 };

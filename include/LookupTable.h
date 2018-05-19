@@ -35,7 +35,7 @@ public:
     }
 
     //random initialization
-    inline void initial(PAlphabet alpha, int dim, bool fineTune = true) {
+    void initial(PAlphabet alpha, int dim, bool fineTune = true) {
         elems = alpha;
         nVSize = elems->size();
         nUNKId = elems->from_string(unknownkey);
@@ -43,14 +43,14 @@ public:
     }
 
     //initialization by pre-trained embeddings
-    inline bool initial(PAlphabet alpha, const string& inFile, bool fineTune = true, dtype norm = -1) {
+    bool initial(PAlphabet alpha, const string& inFile, bool fineTune = true, dtype norm = -1) {
         elems = alpha;
         nVSize = elems->size();
         nUNKId = elems->from_string(unknownkey);
         return initialWeights(inFile, fineTune, norm);
     }
 
-    inline void initialWeights(int dim, bool tune) {
+    void initialWeights(int dim, bool tune) {
         if (dim <=0 || nVSize == 0 || (nVSize == 1 && nUNKId >= 0)) {
             std::cout << "please check the alphabet" << std::endl;
             return;
@@ -66,7 +66,7 @@ public:
     }
 
     // default should be fineTune, just for initialization
-    inline bool initialWeights(const string& inFile, bool tune, dtype norm = -1) {
+    bool initialWeights(const string& inFile, bool tune, dtype norm = -1) {
         if (nVSize == 0 || !elems->is_fixed() || (nVSize == 1 && nUNKId >= 0)) {
             std::cout << "please check the alphabet" << std::endl;
             return false;
@@ -178,18 +178,18 @@ public:
         return true;
     }
 
-    inline void exportAdaParams(ModelUpdate& ada) {
+    void exportAdaParams(ModelUpdate& ada) {
         if (bFineTune) {
             ada.addParam(&E);
         }
     }
 
 
-    inline int getElemId(const string& strFeat) {
+    int getElemId(const string& strFeat) {
         return elems->from_string(strFeat);
     }
 
-    inline void save(std::ofstream &os) const {
+    void save(std::ofstream &os) const {
         E.save(os);
         os << bFineTune << std::endl;
         os << nDim << std::endl;
@@ -198,7 +198,7 @@ public:
     }
 
     //set alpha directly
-    inline void load(std::ifstream &is, PAlphabet alpha) {
+    void load(std::ifstream &is, PAlphabet alpha) {
         E.load(is);
         is >> bFineTune;
         is >> nDim;
@@ -221,11 +221,11 @@ public:
         node_type = "lookup";
     }
 
-    inline void setParam(LookupTable* paramInit) {
+    void setParam(LookupTable* paramInit) {
         param = paramInit;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         xid = -1;
     }
@@ -245,7 +245,7 @@ public:
         cg->addNode(this);
     }
 
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
     bool typeEqual(PNode other) override {
@@ -290,7 +290,7 @@ public:
     LookupTable *table;
     std::vector<int> xids;
 
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         drop_mask.init(dim, count);
         CalculateDropMask(count, dim, drop_mask);
@@ -323,7 +323,7 @@ public:
 #endif
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         std::vector<dtype*> losses;
         losses.reserve(count);
@@ -355,7 +355,7 @@ public:
 #else
 class LookupExecute :public Execute {
     public:
-        inline void  forward() {
+        void  forward() {
             int count = batch.size();
             //#pragma omp parallel for
             for (int idx = 0; idx < count; idx++) {
@@ -364,7 +364,7 @@ class LookupExecute :public Execute {
             }
         }
 
-        inline void backward() {
+        void backward() {
             int count = batch.size();
             //#pragma omp parallel for
             for (int idx = 0; idx < count; idx++) {

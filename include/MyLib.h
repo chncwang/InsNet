@@ -112,7 +112,7 @@ class CSentenceTemplate : public std::vector<CSentenceNode> {
 //==============================================================
 
 template<typename CSentenceNode>
-inline std::istream & operator >> (std::istream &is, CSentenceTemplate<CSentenceNode> &sent) {
+std::istream & operator >> (std::istream &is, CSentenceTemplate<CSentenceNode> &sent) {
     sent.clear();
     std::string line;
     while (is && line.empty())
@@ -131,28 +131,28 @@ inline std::istream & operator >> (std::istream &is, CSentenceTemplate<CSentence
 }
 
 template<typename CSentenceNode>
-inline std::ostream & operator <<(std::ostream &os, const CSentenceTemplate<CSentenceNode> &sent) {
+std::ostream & operator <<(std::ostream &os, const CSentenceTemplate<CSentenceNode> &sent) {
     for (unsigned i = 0; i < sent.size(); ++i)
         os << sent.at(i) << std::endl;
     os << std::endl;
     return os;
 }
 
-inline void print_time() {
+void print_time() {
 
     time_t lt = time(NULL);
     cout << ctime(&lt) << endl;
 
 }
 
-inline char* mystrcat(char *dst, const char *src) {
+char* mystrcat(char *dst, const char *src) {
     int n = (dst != 0 ? strlen(dst) : 0);
     dst = (char*)realloc(dst, n + strlen(src) + 1);
     strcat(dst, src);
     return dst;
 }
 
-inline char* mystrdup(const char *src) {
+char* mystrdup(const char *src) {
     char *dst = (char*)malloc(strlen(src) + 1);
     if (dst != NULL) {
         strcpy(dst, src);
@@ -160,7 +160,7 @@ inline char* mystrdup(const char *src) {
     return dst;
 }
 
-inline int message_callback(void *instance, const char *format, va_list args) {
+int message_callback(void *instance, const char *format, va_list args) {
     vfprintf(stdout, format, args);
     fflush(stdout);
     return 0;
@@ -168,13 +168,13 @@ inline int message_callback(void *instance, const char *format, va_list args) {
 
 
 
-inline void Free(dtype** p) {
+void Free(dtype** p) {
     if (*p != NULL)
         free(*p);
     *p = NULL;
 }
 
-inline int mod(int v1, int v2) {
+int mod(int v1, int v2) {
     if (v1 < 0 || v2 <= 0)
         return -1;
     else {
@@ -182,19 +182,19 @@ inline int mod(int v1, int v2) {
     }
 }
 
-inline void ones(dtype* p, int length) {
+void ones(dtype* p, int length) {
     for (int idx = 0; idx < length; idx++) {
         p[idx] = 1.0;
     }
 }
 
-inline void zeros(dtype* p, int length) {
+void zeros(dtype* p, int length) {
     for (int idx = 0; idx < length; idx++) {
         p[idx] = 0.0;
     }
 }
 
-inline dtype logsumexp(dtype a[], int length) {
+dtype logsumexp(dtype a[], int length) {
     dtype max = a[0];
     for (int idx = 1; idx < length; idx++) {
         if (a[idx] > max)
@@ -209,7 +209,7 @@ inline dtype logsumexp(dtype a[], int length) {
     return max + log(sum);
 }
 
-inline dtype logsumexp(const vector<dtype>& a) {
+dtype logsumexp(const vector<dtype>& a) {
     int length = a.size();
     dtype max = a[0];
     for (int idx = 1; idx < length; idx++) {
@@ -225,7 +225,7 @@ inline dtype logsumexp(const vector<dtype>& a) {
     return max + log(sum);
 }
 
-inline bool isPunc(std::string thePostag) {
+bool isPunc(std::string thePostag) {
 
     if (thePostag.compare("PU") == 0 || thePostag.compare("``") == 0 || thePostag.compare("''") == 0 || thePostag.compare(",") == 0 || thePostag.compare(".") == 0
             || thePostag.compare(":") == 0 || thePostag.compare("-LRB-") == 0 || thePostag.compare("-RRB-") == 0 || thePostag.compare("$") == 0
@@ -237,7 +237,7 @@ inline bool isPunc(std::string thePostag) {
 }
 
 // start some assumptions, "-*-" is a invalid label.
-inline bool validlabels(const string& curLabel) {
+bool validlabels(const string& curLabel) {
     if (curLabel[0] == '-' && curLabel[curLabel.length() - 1] == '-') {
         return false;
     }
@@ -245,7 +245,7 @@ inline bool validlabels(const string& curLabel) {
     return true;
 }
 
-inline string cleanLabel(const string& curLabel) {
+string cleanLabel(const string& curLabel) {
     if (curLabel.length() > 2 && curLabel[1] == '-') {
         if (curLabel[0] == 'B' || curLabel[0] == 'b' || curLabel[0] == 'M' || curLabel[0] == 'm' || curLabel[0] == 'E' || curLabel[0] == 'e' || curLabel[0] == 'S'
                 || curLabel[0] == 's' || curLabel[0] == 'I' || curLabel[0] == 'i') {
@@ -256,13 +256,13 @@ inline string cleanLabel(const string& curLabel) {
     return curLabel;
 }
 
-inline bool is_start_label(const string& label) {
+bool is_start_label(const string& label) {
     if (label.length() < 3)
         return false;
     return (label[0] == 'b' || label[0] == 'B' || label[0] == 's' || label[0] == 'S') && label[1] == '-';
 }
 
-inline bool is_continue_label(const string& label, const string& startlabel, int distance) {
+bool is_continue_label(const string& label, const string& startlabel, int distance) {
     if (distance == 0) return true;
     if (label.length() < 3)
         return false;
@@ -280,11 +280,11 @@ inline bool is_continue_label(const string& label, const string& startlabel, int
 
 // end some assumptions
 
-inline int cmpIntIntPairByValue(const pair<int, int> &x, const pair<int, int> &y) {
+int cmpIntIntPairByValue(const pair<int, int> &x, const pair<int, int> &y) {
     return x.second > y.second;
 }
 
-inline void sortMapbyValue(const unordered_map<int, int> &t_map, vector<pair<int, int> > &t_vec) {
+void sortMapbyValue(const unordered_map<int, int> &t_map, vector<pair<int, int> > &t_vec) {
     t_vec.clear();
 
     for (unordered_map<int, int>::const_iterator iter = t_map.begin(); iter != t_map.end(); iter++) {
@@ -293,7 +293,7 @@ inline void sortMapbyValue(const unordered_map<int, int> &t_map, vector<pair<int
     std::sort(t_vec.begin(), t_vec.end(), cmpIntIntPairByValue);
 }
 
-inline void replace_char_by_char(string &str, char c1, char c2) {
+void replace_char_by_char(string &str, char c1, char c2) {
     string::size_type pos = 0;
     for (; pos < str.size(); ++pos) {
         if (str[pos] == c1) {
@@ -302,7 +302,7 @@ inline void replace_char_by_char(string &str, char c1, char c2) {
     }
 }
 
-inline void split_bychars(const string& str, vector<string> & vec, const char *sep = " ") { //assert(vec.empty());
+void split_bychars(const string& str, vector<string> & vec, const char *sep = " ") { //assert(vec.empty());
     vec.clear();
     string::size_type pos1 = 0, pos2 = 0;
     string word;
@@ -318,7 +318,7 @@ inline void split_bychars(const string& str, vector<string> & vec, const char *s
 }
 
 // remove the blanks at the begin and end of string
-inline void clean_str(string &str) {
+void clean_str(string &str) {
     string blank = " \t\r\n";
     string::size_type pos1 = str.find_first_not_of(blank);
     string::size_type pos2 = str.find_last_not_of(blank);
@@ -329,7 +329,7 @@ inline void clean_str(string &str) {
     }
 }
 
-inline bool my_getline(ifstream &inf, string &line) {
+bool my_getline(ifstream &inf, string &line) {
     if (!getline(inf, line))
         return false;
     int end = line.size() - 1;
@@ -340,7 +340,7 @@ inline bool my_getline(ifstream &inf, string &line) {
     return true;
 }
 
-inline void str2uint_vec(const vector<string> &vecStr, vector<unsigned int> &vecInt) {
+void str2uint_vec(const vector<string> &vecStr, vector<unsigned int> &vecInt) {
     vecInt.resize(vecStr.size());
     int i = 0;
     for (; i < vecStr.size(); ++i) {
@@ -348,7 +348,7 @@ inline void str2uint_vec(const vector<string> &vecStr, vector<unsigned int> &vec
     }
 }
 
-inline void str2int_vec(const vector<string> &vecStr, vector<int> &vecInt) {
+void str2int_vec(const vector<string> &vecStr, vector<int> &vecInt) {
     vecInt.resize(vecStr.size());
     int i = 0;
     for (; i < vecStr.size(); ++i) {
@@ -357,13 +357,13 @@ inline void str2int_vec(const vector<string> &vecStr, vector<int> &vecInt) {
 }
 
 template<typename A>
-inline string obj2string(const A& a) {
+string obj2string(const A& a) {
     ostringstream out;
     out << a;
     return out.str();
 }
 
-inline void int2str_vec(const vector<int> &vecInt, vector<string> &vecStr) {
+void int2str_vec(const vector<int> &vecInt, vector<string> &vecStr) {
     vecStr.resize(vecInt.size());
     int i = 0;
     for (; i < vecInt.size(); ++i) {
@@ -373,7 +373,7 @@ inline void int2str_vec(const vector<int> &vecInt, vector<string> &vecStr) {
     }
 }
 
-inline void join_bystr(const vector<string> &vec, string &str, const string &sep) {
+void join_bystr(const vector<string> &vec, string &str, const string &sep) {
     str = "";
     if (vec.empty())
         return;
@@ -384,7 +384,7 @@ inline void join_bystr(const vector<string> &vec, string &str, const string &sep
     }
 }
 
-inline void split_bystr(const string &str, vector<string> &vec, const string &sep) {
+void split_bystr(const string &str, vector<string> &vec, const string &sep) {
     vec.clear();
     string::size_type pos1 = 0, pos2 = 0;
     string word;
@@ -399,7 +399,7 @@ inline void split_bystr(const string &str, vector<string> &vec, const string &se
         vec.push_back(word);
 }
 
-inline void split_pair_vector(const vector<pair<int, string> > &vecPair, vector<int> &vecInt, vector<string> &vecStr) {
+void split_pair_vector(const vector<pair<int, string> > &vecPair, vector<int> &vecInt, vector<string> &vecStr) {
     int i = 0;
     vecInt.resize(vecPair.size());
     vecStr.resize(vecPair.size());
@@ -409,7 +409,7 @@ inline void split_pair_vector(const vector<pair<int, string> > &vecPair, vector<
     }
 }
 
-inline void split_bychar(const string& str, vector<string>& vec, const char separator = ' ') {
+void split_bychar(const string& str, vector<string>& vec, const char separator = ' ') {
     //assert(vec.empty());
     vec.clear();
     string::size_type pos1 = 0, pos2 = 0;
@@ -425,7 +425,7 @@ inline void split_bychar(const string& str, vector<string>& vec, const char sepa
         vec.push_back(word);
 }
 
-inline void string2pair(const string& str, pair<string, string>& pairStr, const char separator = '/') {
+void string2pair(const string& str, pair<string, string>& pairStr, const char separator = '/') {
     string::size_type pos = str.find_last_of(separator);
     if (pos == string::npos) {
         string tmp = str + "";
@@ -442,7 +442,7 @@ inline void string2pair(const string& str, pair<string, string>& pairStr, const 
     }
 }
 
-inline void convert_to_pair(vector<string>& vecString, vector<pair<string, string> >& vecPair) {
+void convert_to_pair(vector<string>& vecString, vector<pair<string, string> >& vecPair) {
     assert(vecPair.empty());
     int size = vecString.size();
     string::size_type cur;
@@ -465,14 +465,14 @@ inline void convert_to_pair(vector<string>& vecString, vector<pair<string, strin
     }
 }
 
-inline void split_to_pair(const string& str, vector<pair<string, string> >& vecPair) {
+void split_to_pair(const string& str, vector<pair<string, string> >& vecPair) {
     assert(vecPair.empty());
     vector<string> vec;
     split_bychar(str, vec);
     convert_to_pair(vec, vecPair);
 }
 
-inline void chomp(string& str) {
+void chomp(string& str) {
     string white = " \t\n";
     string::size_type pos1 = str.find_first_not_of(white);
     string::size_type pos2 = str.find_last_not_of(white);
@@ -483,7 +483,7 @@ inline void chomp(string& str) {
     }
 }
 
-inline int common_substr_len(string str1, string str2) {
+int common_substr_len(string str1, string str2) {
     string::size_type minLen;
     if (str1.length() < str2.length()) {
         minLen = str1.length();
@@ -513,12 +513,12 @@ inline int common_substr_len(string str1, string str2) {
     return 0;
 }
 
-inline int get_char_index(string& str) {
+int get_char_index(string& str) {
     assert(str.size() == 2);
     return ((unsigned char)str[0] - 176) * 94 + (unsigned char)str[1] - 161;
 }
 
-inline bool is_chinese_char(string& str) {
+bool is_chinese_char(string& str) {
     if (str.size() != 2) {
         return false;
     }
@@ -530,7 +530,7 @@ inline bool is_chinese_char(string& str) {
     }
 }
 
-inline int find_GB_char(const string& str, string wideChar, int begPos) {
+int find_GB_char(const string& str, string wideChar, int begPos) {
     assert(wideChar.size() == 2 && wideChar[0] < 0); //is a GB char
     int strLen = str.size();
 
@@ -551,7 +551,7 @@ inline int find_GB_char(const string& str, string wideChar, int begPos) {
     return -1;
 }
 
-inline void split_by_separator(const string& str, vector<string>& vec, const string separator) {
+void split_by_separator(const string& str, vector<string>& vec, const string separator) {
     assert(vec.empty());
     string::size_type pos1 = 0, pos2 = 0;
     string word;
@@ -567,18 +567,18 @@ inline void split_by_separator(const string& str, vector<string>& vec, const str
         vec.push_back(word);
 }
 
-//inline void compute_time()
+//void compute_time()
 //{
 //  clock_t tick = clock();
 //  dtype t = (dtype)tick / CLK_TCK;
 //  cout << endl << "The time used: " << t << " seconds." << endl;
 //}
 
-inline string word(string& word_pos) {
+string word(string& word_pos) {
     return word_pos.substr(0, word_pos.find("/"));
 }
 
-inline bool is_ascii_string(string& word) {
+bool is_ascii_string(string& word) {
     for (unsigned int i = 0; i < word.size(); i++) {
         if (word[i] < 0) {
             return false;
@@ -587,7 +587,7 @@ inline bool is_ascii_string(string& word) {
     return true;
 }
 
-inline bool is_startwith(const string& word, const string& prefix) {
+bool is_startwith(const string& word, const string& prefix) {
     if (word.size() < prefix.size())
         return false;
     for (unsigned int i = 0; i < prefix.size(); i++) {
@@ -599,15 +599,15 @@ inline bool is_startwith(const string& word, const string& prefix) {
 }
 
 
-inline void remove_beg_end_spaces(string &str) {
+void remove_beg_end_spaces(string &str) {
     clean_str(str);
 }
 
-inline void split_bystr(const string &str, vector<string> &vec, const char *sep) {
+void split_bystr(const string &str, vector<string> &vec, const char *sep) {
     split_bystr(str, vec, string(sep));
 }
 
-inline string tolowcase(const string& word) {
+string tolowcase(const string& word) {
     string newword;
     for (unsigned int i = 0; i < word.size(); i++) {
         if (word[i] > 'A' && word[i] < 'Z') {
@@ -629,7 +629,7 @@ struct segIndex {
 };
 
 
-inline void getSegs(const vector<string>& labels, vector<segIndex>& segs) {
+void getSegs(const vector<string>& labels, vector<segIndex>& segs) {
     int idx, idy, endpos;
     segIndex seg;
     // segmentation should be agree in both layers, usually, the first layer defines segmentation
@@ -659,7 +659,7 @@ inline void getSegs(const vector<string>& labels, vector<segIndex>& segs) {
 
 // vector operations
 template<typename A>
-inline void clearVec(vector<vector<A> >& bivec) {
+void clearVec(vector<vector<A> >& bivec) {
     int count = bivec.size();
     for (int idx = 0; idx < count; idx++) {
         bivec[idx].clear();
@@ -668,7 +668,7 @@ inline void clearVec(vector<vector<A> >& bivec) {
 }
 
 template<typename A>
-inline void clearVec(vector<vector<vector<A> > >& trivec) {
+void clearVec(vector<vector<vector<A> > >& trivec) {
     int count1, count2;
     count1 = trivec.size();
     for (int idx = 0; idx < count1; idx++) {
@@ -682,7 +682,7 @@ inline void clearVec(vector<vector<vector<A> > >& trivec) {
 }
 
 template<typename A>
-inline void resizeVec(vector<vector<A> >& bivec, const int& size1, const int& size2) {
+void resizeVec(vector<vector<A> >& bivec, const int& size1, const int& size2) {
     bivec.resize(size1);
     for (int idx = 0; idx < size1; idx++) {
         bivec[idx].resize(size2);
@@ -690,7 +690,7 @@ inline void resizeVec(vector<vector<A> >& bivec, const int& size1, const int& si
 }
 
 template<typename A>
-inline void resizeVec(vector<vector<vector<A> > >& trivec, const int& size1, const int& size2, const int& size3) {
+void resizeVec(vector<vector<vector<A> > >& trivec, const int& size1, const int& size2, const int& size3) {
     trivec.resize(size1);
     for (int idx = 0; idx < size1; idx++) {
         trivec[idx].resize(size2);
@@ -701,7 +701,7 @@ inline void resizeVec(vector<vector<vector<A> > >& trivec, const int& size1, con
 }
 
 template<typename A>
-inline void assignVec(vector<A>& univec, const A& a) {
+void assignVec(vector<A>& univec, const A& a) {
     int count = univec.size();
     for (int idx = 0; idx < count; idx++) {
         univec[idx] = a;
@@ -709,7 +709,7 @@ inline void assignVec(vector<A>& univec, const A& a) {
 }
 
 template<typename A>
-inline void assignVec(vector<vector<A> >& bivec, const A& a) {
+void assignVec(vector<vector<A> >& bivec, const A& a) {
     int count1, count2;
     count1 = bivec.size();
     for (int idx = 0; idx < bivec.size(); idx++) {
@@ -721,7 +721,7 @@ inline void assignVec(vector<vector<A> >& bivec, const A& a) {
 }
 
 template<typename A>
-inline void assignVec(vector<vector<vector<A> > >& trivec, const A& a) {
+void assignVec(vector<vector<vector<A> > >& trivec, const A& a) {
     int count1, count2, count3;
     count1 = trivec.size();
     for (int idx = 0; idx < count1; idx++) {
@@ -737,7 +737,7 @@ inline void assignVec(vector<vector<vector<A> > >& trivec, const A& a) {
 
 
 template<typename A>
-inline void addAllItems(vector<A>& target, const vector<A>& sources) {
+void addAllItems(vector<A>& target, const vector<A>& sources) {
     int count = sources.size();
     for (int idx = 0; idx < count; idx++) {
         target.push_back(sources[idx]);
@@ -745,7 +745,7 @@ inline void addAllItems(vector<A>& target, const vector<A>& sources) {
 }
 
 
-inline int cmpStringIntPairByValue(const pair<string, int> &x, const pair<string, int> &y) {
+int cmpStringIntPairByValue(const pair<string, int> &x, const pair<string, int> &y) {
     return x.second > y.second;
 }
 

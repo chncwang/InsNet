@@ -43,13 +43,13 @@ class ActivateNode :public Node {
         in = NULL;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         in = NULL;
     }
 
     // define the activate function and its derivation form
-    inline void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
+    void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
         activate = f;
         derivate = f_deri;
     }
@@ -63,7 +63,7 @@ class ActivateNode :public Node {
     }
 
   public:
-    inline void compute() {
+    void compute() {
         val.vec() = in->val.vec().unaryExpr(ptr_fun(activate));
     }
 
@@ -72,10 +72,10 @@ class ActivateNode :public Node {
     }
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         return result;
     }
@@ -84,7 +84,7 @@ class ActivateNode :public Node {
 
 class ActivateExecute :public Execute {
   public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -93,7 +93,7 @@ class ActivateExecute :public Execute {
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -103,7 +103,7 @@ class ActivateExecute :public Execute {
     }
 };
 
-inline PExecute ActivateNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute ActivateNode::generate(bool bTrain, dtype cur_drop_factor) {
     ActivateExecute* exec = new ActivateExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
@@ -125,7 +125,7 @@ class TanhNode :public Node {
         in = NULL;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         in = NULL;
     }
@@ -139,7 +139,7 @@ class TanhNode :public Node {
     }
 
   public:
-    inline void compute() {
+    void compute() {
         val.vec() = in->val.vec().unaryExpr(ptr_fun(ftanh));
     }
 
@@ -148,7 +148,7 @@ class TanhNode :public Node {
     }
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
     bool typeEqual(PNode other) {
@@ -296,7 +296,7 @@ public:
 #endif
 };
 
-inline PExecute TanhNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute TanhNode::generate(bool bTrain, dtype cur_drop_factor) {
     TanhExecute* exec = new TanhExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
@@ -320,7 +320,7 @@ class SigmoidNode :public Node {
         in = NULL;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         in = NULL;
     }
@@ -334,7 +334,7 @@ class SigmoidNode :public Node {
     }
 
   public:
-    inline void compute() {
+    void compute() {
         val.vec() = in->val.vec().unaryExpr(ptr_fun(fsigmoid));
     }
 
@@ -343,10 +343,10 @@ class SigmoidNode :public Node {
     }
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         return result;
     }
@@ -515,7 +515,7 @@ public:
 #endif
 };
 
-inline PExecute SigmoidNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute SigmoidNode::generate(bool bTrain, dtype cur_drop_factor) {
     SigmoidExecute* exec = new SigmoidExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
@@ -539,7 +539,7 @@ class ReluNode :public Node {
         in = NULL;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         in = NULL;
     }
@@ -554,7 +554,7 @@ class ReluNode :public Node {
     }
 
   public:
-    inline void compute() {
+    void compute() {
         val.vec() = in->val.vec().unaryExpr(ptr_fun(frelu));
     }
 
@@ -563,10 +563,10 @@ class ReluNode :public Node {
     }
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         return result;
     }
@@ -574,7 +574,7 @@ class ReluNode :public Node {
 
 class ReluExecute :public Execute {
   public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -583,7 +583,7 @@ class ReluExecute :public Execute {
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -593,7 +593,7 @@ class ReluExecute :public Execute {
     }
 };
 
-inline PExecute ReluNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute ReluNode::generate(bool bTrain, dtype cur_drop_factor) {
     ReluExecute* exec = new ReluExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
@@ -619,14 +619,14 @@ class IndexNode :public Node {
         in = NULL;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         in = NULL;
         index_id = -1;
     }
 
     //can not be dropped since the output is a scalar
-    inline void init(int ndim, dtype dropout) {
+    void init(int ndim, dtype dropout) {
         dim = 1;
         Node::init(dim, -1);
     }
@@ -650,10 +650,10 @@ class IndexNode :public Node {
     }
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         return result;
     }
@@ -661,7 +661,7 @@ class IndexNode :public Node {
 
 class IndexExecute : public Execute {
   public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -670,7 +670,7 @@ class IndexExecute : public Execute {
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -680,7 +680,7 @@ class IndexExecute : public Execute {
     }
 };
 
-inline PExecute IndexNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute IndexNode::generate(bool bTrain, dtype cur_drop_factor) {
     IndexExecute* exec = new IndexExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
@@ -700,7 +700,7 @@ class PSubNode : public Node {
         node_type = "point-subtraction";
     }
   public:
-    virtual inline void clearValue() {
+    virtual void clearValue() {
         Node::clearValue();
         in1 = NULL;
         in2 = NULL;
@@ -718,7 +718,7 @@ class PSubNode : public Node {
     }
 
   public:
-    inline void compute() {
+    void compute() {
         val.vec() = in1->val.vec() - in2->val.vec();
     }
 
@@ -729,17 +729,17 @@ class PSubNode : public Node {
 
   public:
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         return Node::typeEqual(other);
     }
 
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 };
 
 
 class PSubExecute :public Execute {
   public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -748,7 +748,7 @@ class PSubExecute :public Execute {
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -758,7 +758,7 @@ class PSubExecute :public Execute {
     }
 };
 
-inline PExecute PSubNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute PSubNode::generate(bool bTrain, dtype cur_drop_factor) {
     PSubExecute* exec = new PSubExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
@@ -778,14 +778,14 @@ class PDotNode : public Node {
         node_type = "point-dot";
     }
   public:
-    virtual inline void clearValue() {
+    virtual void clearValue() {
         Node::clearValue();
         in1 = NULL;
         in2 = NULL;
     }
 
     //can not be dropped since the output is a scalar
-    inline void init(int ndim, dtype dropout) {
+    void init(int ndim, dtype dropout) {
         dim = 1;
         Node::init(dim, -1);
     }
@@ -801,7 +801,7 @@ class PDotNode : public Node {
     }
 
   public:
-    inline void compute() {
+    void compute() {
         val[0] = 0.0;
         for (int idx = 0; idx < in1->dim; idx++) {
             val[0] += in1->val[idx] * in2->val[idx];
@@ -817,11 +817,11 @@ class PDotNode : public Node {
 
   public:
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         return Node::typeEqual(other);
     }
 
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 };
 
 #if USE_GPU
@@ -914,7 +914,7 @@ class PDotExecute :public Execute {
 #endif
 
 
-inline PExecute PDotNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute PDotNode::generate(bool bTrain, dtype cur_drop_factor) {
     PDotExecute* exec = new PDotExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;

@@ -36,11 +36,11 @@ class WindowBuilder {
     }
 
 
-    inline void resize(int maxsize) {
+    void resize(int maxsize) {
         _outputs.resize(maxsize);
     }
 
-    inline void clear() {
+    void clear() {
         _outputs.clear();
         _context = 0;
         _window = 0;
@@ -50,7 +50,7 @@ class WindowBuilder {
     }
 
 
-    inline void init(int inDim, int context) {
+    void init(int inDim, int context) {
         _context = context;
         _window = 2 * _context + 1;
         _inDim = inDim;
@@ -65,7 +65,7 @@ class WindowBuilder {
 
 
   public:
-    inline void forward(Graph *cg, const vector<PNode>& x) {
+    void forward(Graph *cg, const vector<PNode>& x) {
         if (x.size() == 0) {
             std::cout << "empty inputs for windowlized operation" << std::endl;
             return;

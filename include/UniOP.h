@@ -30,14 +30,14 @@ class UniParams {
         bUseB = true;
     }
 
-    inline void exportAdaParams(ModelUpdate& ada) {
+    void exportAdaParams(ModelUpdate& ada) {
         ada.addParam(&W);
         if (bUseB) {
             ada.addParam(&b);
         }
     }
 
-    inline void initial(int nOSize, int nISize, bool useB = true) {
+    void initial(int nOSize, int nISize, bool useB = true) {
         W.initial(nOSize, nISize);
 
         bUseB = useB;
@@ -46,7 +46,7 @@ class UniParams {
         }
     }
 
-    inline void save(std::ofstream &os) const {
+    void save(std::ofstream &os) const {
         os << bUseB << std::endl;
         W.save(os);
         if (bUseB) {
@@ -54,7 +54,7 @@ class UniParams {
         }
     }
 
-    inline void load(std::ifstream &is) {
+    void load(std::ifstream &is) {
         is >> bUseB;
         W.load(is);
         if (bUseB) {
@@ -91,24 +91,24 @@ class UniNode : public Node {
         in = NULL;
     }
 
-    inline void init(int ndim, dtype dropout) {
+    void init(int ndim, dtype dropout) {
         Node::init(ndim, dropout);
         ty.init(ndim);
         lty.init(ndim);
     }
 
 
-    inline void setParam(UniParams* paramInit) {
+    void setParam(UniParams* paramInit) {
         param = paramInit;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         in = NULL;
     }
 
     // define the activate function and its derivation form
-    inline void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
+    void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
         activate = f;
         derivate = f_deri;
     }
@@ -120,7 +120,7 @@ class UniNode : public Node {
         cg->addNode(this);
     }
 
-    inline void compute() {
+    void compute() {
         ty.mat() = param->W.val.mat() * in->val.mat();
         if (param->bUseB) {
             ty.vec() += param->b.val.vec();
@@ -128,7 +128,7 @@ class UniNode : public Node {
         val.vec() = ty.vec().unaryExpr(ptr_fun(activate));
     }
 
-    inline void backward() {
+    void backward() {
         lty.vec() = loss.vec() * ty.vec().binaryExpr(val.vec(), ptr_fun(derivate));
         param->W.grad.mat() += lty.mat() * in->val.tmat();
         if (param->bUseB) {
@@ -137,7 +137,7 @@ class UniNode : public Node {
         in->loss.mat() += param->W.val.mat().transpose() * lty.mat();
     }
 
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
     bool typeEqual(PNode other) override {
@@ -180,11 +180,11 @@ class LinearUniNode : public Node {
     }
 
 
-    inline void setParam(UniParams* paramInit) {
+    void setParam(UniParams* paramInit) {
         param = paramInit;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         in = NULL;
     }
@@ -199,14 +199,14 @@ class LinearUniNode : public Node {
     }
 
   public:
-    inline void compute() {
+    void compute() {
         val.mat() = param->W.val.mat() * in->val.mat();
         if (param->bUseB) {
             val.vec() += param->b.val.vec();
         }
     }
 
-    inline void backward() {
+    void backward() {
         param->W.grad.mat() += loss.mat() * in->val.tmat();
         if (param->bUseB) {
             param->b.grad.vec() += loss.vec();
@@ -215,10 +215,10 @@ class LinearUniNode : public Node {
     }
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         if (!result) return false;
 
@@ -251,11 +251,11 @@ class LinearNode : public Node {
     }
 
 
-    inline void setParam(UniParams* paramInit) {
+    void setParam(UniParams* paramInit) {
         param = paramInit;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         in = NULL;
     }
@@ -270,11 +270,11 @@ class LinearNode : public Node {
     }
 
   public:
-    inline void compute() {
+    void compute() {
         val.mat() = param->W.val.mat() * in->val.mat();
     }
 
-    inline void backward() {
+    void backward() {
         param->W.grad.mat() += loss.mat() * in->val.tmat();
         in->loss.mat() += param->W.val.mat().transpose() * loss.mat();
     }
@@ -309,7 +309,7 @@ class UniExecute :public Execute {
     dtype(*derivate)(const dtype&, const dtype&);  // derivation function of activation function
     Tensor2D drop_mask;
 
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         ty.init(outDim, count);
         x.init(inDim, count);
@@ -548,7 +548,7 @@ class UniExecute :public Execute {
     }
 };
 
-inline PExecute UniNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute UniNode::generate(bool bTrain, dtype cur_drop_factor) {
     UniExecute* exec = new UniExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
@@ -563,7 +563,7 @@ inline PExecute UniNode::generate(bool bTrain, dtype cur_drop_factor) {
 
 class LinearUniExecute :public Execute {
   public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -572,7 +572,7 @@ class LinearUniExecute :public Execute {
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -582,7 +582,7 @@ class LinearUniExecute :public Execute {
     }
 };
 
-inline PExecute LinearUniNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute LinearUniNode::generate(bool bTrain, dtype cur_drop_factor) {
     LinearUniExecute* exec = new LinearUniExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
@@ -728,7 +728,7 @@ class LinearExecute :public Execute {
     int inDim, outDim, count;
     UniParams* param;
 
-    inline void  forward() {
+    void  forward() {
         count = batch.size();
         x.init(inDim, count);
         y.init(outDim, count);
@@ -755,7 +755,7 @@ class LinearExecute :public Execute {
         }
     }
 
-    inline void backward() {
+    void backward() {
         Tensor2D lx, ly;
         lx.init(inDim, count);
         ly.init(outDim, count);
@@ -788,7 +788,7 @@ class LinearExecute :public Execute {
 };
 #endif
 
-inline PExecute LinearNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute LinearNode::generate(bool bTrain, dtype cur_drop_factor) {
     LinearExecute* exec = new LinearExecute();
     exec->batch.push_back(this);
     exec->inDim = param->W.inDim();

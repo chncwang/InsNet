@@ -24,7 +24,7 @@ class PMultiNode : public Node {
         node_type = "point-multiply";
     }
   public:
-    virtual inline void clearValue() {
+    virtual void clearValue() {
         Node::clearValue();
         in1 = NULL;
         in2 = NULL;
@@ -41,7 +41,7 @@ class PMultiNode : public Node {
     }
 
   public:
-    inline void compute() {
+    void compute() {
         val.vec() = in1->val.vec() * in2->val.vec();
     }
 
@@ -52,11 +52,11 @@ class PMultiNode : public Node {
 
   public:
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         return Node::typeEqual(other);
     }
 
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 };
 
 class PMultiExecute :public Execute {
@@ -205,7 +205,7 @@ public:
 #endif
 };
 
-inline PExecute PMultiNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute PMultiNode::generate(bool bTrain, dtype cur_drop_factor) {
     PMultiExecute* exec = new PMultiExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;

@@ -22,7 +22,7 @@ class Param : public BaseParam {
     int iter;
 
     // allow sparse and dense parameters have different parameter initialization methods
-    inline void initial(int outDim, int inDim) {
+    void initial(int outDim, int inDim) {
 #if USE_GPU
         val.initOnMemoryAndDevice(outDim, inDim);
 #else
@@ -42,15 +42,15 @@ class Param : public BaseParam {
 #endif
     }
 
-    inline int outDim() {
+    int outDim() {
         return val.row;
     }
 
-    inline int inDim() {
+    int inDim() {
         return val.col;
     }
 
-    inline void clearGrad() {
+    void clearGrad() {
 #if USE_GPU
         n3ldg_cuda::Memset(grad.value, grad.size, 0.0f);
 #if TEST_CUDA
@@ -114,7 +114,7 @@ class Param : public BaseParam {
         iter++;
     }
 
-    inline void randpoint(int& idx, int &idy) {
+    void randpoint(int& idx, int &idy) {
         //select indexes randomly
         std::vector<int> idRows, idCols;
         idRows.clear();
@@ -131,7 +131,7 @@ class Param : public BaseParam {
         idx = idCols[0];
     }
 
-    inline dtype squareGradNorm() {
+    dtype squareGradNorm() {
 #if USE_GPU && !TEST_CUDA
         return n3ldg_cuda::SquareSum(grad.value, grad.size);
 #elif USE_GPU && TEST_CUDA
@@ -154,7 +154,7 @@ class Param : public BaseParam {
 #endif
     }
 
-    inline void rescaleGrad(dtype scale) {
+    void rescaleGrad(dtype scale) {
 #if USE_GPU
         n3ldg_cuda::Rescale(grad.value, grad.size, scale);
 #if TEST_CUDA
@@ -166,14 +166,14 @@ class Param : public BaseParam {
 #endif
     }
 
-    inline void save(std::ofstream &os)const {
+    void save(std::ofstream &os)const {
         val.save(os);
         aux_square.save(os);
         aux_mean.save(os);
         os << iter << endl;
     }
 
-    inline void load(std::ifstream &is) {
+    void load(std::ifstream &is) {
         val.load(is);
         aux_square.load(is);
         aux_mean.load(is);

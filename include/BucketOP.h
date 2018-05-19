@@ -25,7 +25,7 @@ class BucketNode : public Node {
         node_type = "bucket";
     }
   public:
-    virtual inline void clearValue() {
+    virtual void clearValue() {
         //Node::clearValue();
 #if !USE_GPU || TEST_CUDA
         loss = 0;
@@ -35,7 +35,7 @@ class BucketNode : public Node {
         parents.clear();
     }
 
-    virtual inline void init(int ndim, dtype dropout) {
+    virtual void init(int ndim, dtype dropout) {
         Node::init(ndim, -1);
     }
 
@@ -71,19 +71,19 @@ class BucketNode : public Node {
         cg->addNode(this);
     }
 
-    inline void compute() {
+    void compute() {
 
     }
 
-    inline void backward() {
+    void backward() {
 
     }
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         return Node::typeEqual(other);
     }
 
@@ -100,7 +100,7 @@ class BucketExecute : public Execute {
 #else
 class BucketExecute : public Execute {
   public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -108,7 +108,7 @@ class BucketExecute : public Execute {
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -118,7 +118,7 @@ class BucketExecute : public Execute {
 };
 #endif
 
-inline PExecute BucketNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute BucketNode::generate(bool bTrain, dtype cur_drop_factor) {
     BucketExecute* exec = new BucketExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;

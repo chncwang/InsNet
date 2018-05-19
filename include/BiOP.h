@@ -29,7 +29,7 @@ class BiParams {
         bUseB = true;
     }
 
-    inline void exportAdaParams(ModelUpdate& ada) {
+    void exportAdaParams(ModelUpdate& ada) {
         ada.addParam(&W1);
         ada.addParam(&W2);
         if (bUseB) {
@@ -37,7 +37,7 @@ class BiParams {
         }
     }
 
-    inline void initial(int nOSize, int nISize1, int nISize2, bool useB = true) {
+    void initial(int nOSize, int nISize1, int nISize2, bool useB = true) {
         W1.initial(nOSize, nISize1);
         W2.initial(nOSize, nISize2);
         bUseB = useB;
@@ -46,7 +46,7 @@ class BiParams {
         }
     }
 
-    inline void save(std::ofstream &os) const {
+    void save(std::ofstream &os) const {
         os << bUseB << std::endl;
         W1.save(os);
         W2.save(os);
@@ -55,7 +55,7 @@ class BiParams {
         }
     }
 
-    inline void load(std::ifstream &is) {
+    void load(std::ifstream &is) {
         is >> bUseB;
         W1.load(is);
         W2.load(is);
@@ -92,23 +92,23 @@ class BiNode : public Node {
         in1 = in2 = NULL;
     }
 
-    inline void init(int ndim, dtype dropout) {
+    void init(int ndim, dtype dropout) {
         Node::init(ndim, dropout);
         ty.init(ndim);
         lty.init(ndim);
     }
 
-    inline void setParam(BiParams* paramInit) {
+    void setParam(BiParams* paramInit) {
         param = paramInit;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         in1 = in2 = NULL;
     }
 
     // define the activate function and its derivation form
-    inline void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
+    void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
         activate = f;
         derivate = f_deri;
     }
@@ -125,7 +125,7 @@ class BiNode : public Node {
     }
 
   public:
-    inline void compute() {
+    void compute() {
         ty.mat() = param->W1.val.mat() * in1->val.mat() + param->W2.val.mat() * in2->val.mat();
         if (param->bUseB) {
             ty.vec() += param->b.val.vec();
@@ -133,7 +133,7 @@ class BiNode : public Node {
         val.vec() = ty.vec().unaryExpr(ptr_fun(activate));
     }
 
-    inline void backward() {
+    void backward() {
         lty.vec() = loss.vec() * ty.vec().binaryExpr(val.vec(), ptr_fun(derivate));
 
         param->W1.grad.mat() += lty.mat() * in1->val.tmat();
@@ -148,7 +148,7 @@ class BiNode : public Node {
     }
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
     bool typeEqual(PNode other) override {
@@ -191,11 +191,11 @@ class LinearBiNode : public Node {
         node_type = "linear_bi";
     }
 
-    inline void setParam(BiParams* paramInit) {
+    void setParam(BiParams* paramInit) {
         param = paramInit;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         in1 = in2 = NULL;
     }
@@ -212,7 +212,7 @@ class LinearBiNode : public Node {
     }
 
   public:
-    inline void compute() {
+    void compute() {
         val.mat() = param->W1.val.mat() * in1->val.mat() + param->W2.val.mat() * in2->val.mat();
 
         if (param->bUseB) {
@@ -220,7 +220,7 @@ class LinearBiNode : public Node {
         }
     }
 
-    inline void backward() {
+    void backward() {
         param->W1.grad.mat() += loss.mat() * in1->val.tmat();
         param->W2.grad.mat() += loss.mat() * in2->val.tmat();
 
@@ -233,10 +233,10 @@ class LinearBiNode : public Node {
     }
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         if (!result) return false;
 
@@ -535,7 +535,7 @@ class BiExecute :public Execute {
 #endif
 };
 
-inline PExecute BiNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute BiNode::generate(bool bTrain, dtype cur_drop_factor) {
     BiExecute* exec = new BiExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
@@ -551,7 +551,7 @@ inline PExecute BiNode::generate(bool bTrain, dtype cur_drop_factor) {
 
 class LinearBiExecute :public Execute {
   public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -560,7 +560,7 @@ class LinearBiExecute :public Execute {
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -570,7 +570,7 @@ class LinearBiExecute :public Execute {
     }
 };
 
-inline PExecute LinearBiNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute LinearBiNode::generate(bool bTrain, dtype cur_drop_factor) {
     LinearBiExecute* exec = new LinearBiExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;

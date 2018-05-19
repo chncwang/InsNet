@@ -222,7 +222,7 @@ class ConcatExecute : public Execute {
 #else
 class ConcatExecute : public Execute {
   public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -231,7 +231,7 @@ class ConcatExecute : public Execute {
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -242,7 +242,7 @@ class ConcatExecute : public Execute {
 };
 #endif
 
-inline PExecute ConcatNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute ConcatNode::generate(bool bTrain, dtype cur_drop_factor) {
     ConcatExecute* exec = new ConcatExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;

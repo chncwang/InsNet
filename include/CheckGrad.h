@@ -17,19 +17,19 @@ class CheckGrad {
         clear();
     }
 
-    inline void clear() {
+    void clear() {
         _params.clear();
         _names.clear();
     }
 
-    inline void add(BaseParam* param, const string& name) {
+    void add(BaseParam* param, const string& name) {
         _params.push_back(param);
         _names.push_back(name);
     }
 
   public:
     template<typename Example, typename Classifier>
-    inline void check(Classifier* classifier, const vector<Example>& examples, const string& description) {
+    void check(Classifier* classifier, const vector<Example>& examples, const string& description) {
         dtype orginValue, lossAdd, lossPlus;
         int idx, idy;
         dtype mockGrad, computeGrad;

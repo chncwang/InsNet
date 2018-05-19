@@ -21,7 +21,7 @@ struct APParam : BaseParam {
     NRVec<int> last_update;
 
     // allow sparse and dense parameters have different parameter initialization methods
-    inline void initial(int outDim, int inDim) {
+    void initial(int outDim, int inDim) {
         //not in the aligned memory pool
         val.init(outDim, inDim);
         grad.init(outDim, inDim);
@@ -33,7 +33,7 @@ struct APParam : BaseParam {
         last_update = 0;
     }
 
-    inline void clearGrad() {
+    void clearGrad() {
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
             if (!indexers[index]) continue;
@@ -44,15 +44,15 @@ struct APParam : BaseParam {
         indexers = false;
     }
 
-    inline int outDim() {
+    int outDim() {
         return val.col;
     }
 
-    inline int inDim() {
+    int inDim() {
         return val.row;
     }
 
-    inline void updateAdagrad(dtype alpha, dtype reg, dtype eps) {
+    void updateAdagrad(dtype alpha, dtype reg, dtype eps) {
         max_update++;
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
@@ -65,7 +65,7 @@ struct APParam : BaseParam {
         }
     }
 
-    inline void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) {
+    void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) {
         max_update++;
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
@@ -78,7 +78,7 @@ struct APParam : BaseParam {
         }
     }
 
-    inline void randpoint(int& idx, int &idy) {
+    void randpoint(int& idx, int &idy) {
         //select indexes randomly
         std::vector<int> idRows, idCols;
         idRows.clear();
@@ -100,7 +100,7 @@ struct APParam : BaseParam {
         idy = idCols[0];
     }
 
-    inline dtype squareGradNorm() {
+    dtype squareGradNorm() {
         dtype sumNorm = 0.0;
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
@@ -113,7 +113,7 @@ struct APParam : BaseParam {
         return sumNorm;
     }
 
-    inline void rescaleGrad(dtype scale) {
+    void rescaleGrad(dtype scale) {
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
             if (!indexers[index]) continue;
@@ -123,7 +123,7 @@ struct APParam : BaseParam {
         }
     }
 
-    inline void sumWeight(int featId) {
+    void sumWeight(int featId) {
         if (last_update[featId] < max_update) {
             int times = max_update - last_update[featId];
             for (int idx = 0; idx < val.row; idx++) {
@@ -133,7 +133,7 @@ struct APParam : BaseParam {
         }
     }
 
-    inline void value(const int& featId, Tensor1D& out, const bool& bTrain) {
+    void value(const int& featId, Tensor1D& out, const bool& bTrain) {
         if (out.dim != val.col) {
             std::cout << "warning: output dim not equal lookup param dim." << std::endl;
         }
@@ -149,7 +149,7 @@ struct APParam : BaseParam {
         }
     }
 
-    inline void value(const vector<int>& featIds, Tensor1D& out, const bool& bTrain) {
+    void value(const vector<int>& featIds, Tensor1D& out, const bool& bTrain) {
         if (out.dim != val.col) {
             std::cout << "warning: output dim not equal lookup param dim." << std::endl;
         }
@@ -173,7 +173,7 @@ struct APParam : BaseParam {
         }
     }
 
-    inline void loss(const int& featId, const Tensor1D& loss) {
+    void loss(const int& featId, const Tensor1D& loss) {
         if (loss.dim != val.col) {
             std::cout << "warning: loss dim not equal lookup param dim." << std::endl;
         }
@@ -183,7 +183,7 @@ struct APParam : BaseParam {
         }
     }
 
-    inline void loss(const vector<int>& featIds, const Tensor1D& loss) {
+    void loss(const vector<int>& featIds, const Tensor1D& loss) {
         if (loss.dim != val.col) {
             std::cout << "warning: loss dim not equal lookup param dim." << std::endl;
         }
@@ -198,7 +198,7 @@ struct APParam : BaseParam {
         }
     }
 
-    inline void save(std::ofstream &os)const {
+    void save(std::ofstream &os)const {
         val.save(os);
         aux.save(os);
         os << max_update << std::endl;
@@ -211,7 +211,7 @@ struct APParam : BaseParam {
     }
 
 
-    inline void load(std::ifstream &is) {
+    void load(std::ifstream &is) {
         val.load(is);
         aux.load(is);
         is >> max_update;

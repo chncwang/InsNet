@@ -29,11 +29,11 @@ class SparseParams {
         elems = NULL;
     }
 
-    inline void exportAdaParams(ModelUpdate& ada) {
+    void exportAdaParams(ModelUpdate& ada) {
         ada.addParam(&W);
     }
 
-    inline void initialWeights(int nOSize) {
+    void initialWeights(int nOSize) {
         if (nVSize == 0) {
             std::cout << "please check the alphabet" << std::endl;
             return;
@@ -44,7 +44,7 @@ class SparseParams {
 
 
     //random initialization
-    inline void initial(PAlphabet alpha, int nOSize, int base = 1) {
+    void initial(PAlphabet alpha, int nOSize, int base = 1) {
         assert(base >= 1);
         elems = alpha;
         nVSize = base * elems->size();
@@ -55,7 +55,7 @@ class SparseParams {
         initialWeights(nOSize);
     }
 
-    inline int getFeatureId(const string& strFeat) {
+    int getFeatureId(const string& strFeat) {
         int idx = elems->from_string(strFeat);
         if(!elems->m_b_fixed && elems->m_size >= nVSize) {
             std::cout << "Sparse Alphabet stopped collecting features" << std::endl;
@@ -81,11 +81,11 @@ class SparseNode : public Node {
         node_type = "sparsenode";
     }
 
-    inline void setParam(SparseParams* paramInit) {
+    void setParam(SparseParams* paramInit) {
         param = paramInit;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         ins.clear();
     }
@@ -106,7 +106,7 @@ class SparseNode : public Node {
     }
 
   public:
-    inline void compute() {
+    void compute() {
         param->W.value(ins, val);
     }
 
@@ -117,10 +117,10 @@ class SparseNode : public Node {
     }
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         if (!result) return false;
 
@@ -137,7 +137,7 @@ class SparseNode : public Node {
 
 class SparseExecute :public Execute {
   public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -146,7 +146,7 @@ class SparseExecute :public Execute {
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -157,7 +157,7 @@ class SparseExecute :public Execute {
 };
 
 
-inline PExecute SparseNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute SparseNode::generate(bool bTrain, dtype cur_drop_factor) {
     SparseExecute* exec = new SparseExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;

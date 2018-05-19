@@ -27,14 +27,14 @@ struct LSTM1Params {
     LSTM1Params() {
     }
 
-    inline void exportAdaParams(ModelUpdate& ada) {
+    void exportAdaParams(ModelUpdate& ada) {
         input.exportAdaParams(ada);
         output.exportAdaParams(ada);
         forget.exportAdaParams(ada);
         cell.exportAdaParams(ada);
     }
 
-    inline void initial(int nOSize, int nISize) {
+    void initial(int nOSize, int nISize) {
         input.initial(nOSize, nOSize, nISize, true);
         output.initial(nOSize, nOSize, nISize, true);
         forget.initial(nOSize, nOSize, nISize, true);
@@ -42,22 +42,22 @@ struct LSTM1Params {
 
     }
 
-    inline int inDim() {
+    int inDim() {
         return input.W2.inDim();
     }
 
-    inline int outDim() {
+    int outDim() {
         return input.W2.outDim();
     }
 
-    inline void save(std::ofstream &os) const {
+    void save(std::ofstream &os) const {
         input.save(os);
         output.save(os);
         forget.save(os);
         cell.save(os);
     }
 
-    inline void load(std::ifstream &is) {
+    void load(std::ifstream &is) {
         input.load(is);
         output.load(is);
         forget.load(is);
@@ -102,7 +102,7 @@ class LSTM1Builder {
     }
 
   public:
-    inline void init(LSTM1Params* paramInit, dtype dropout, bool left2right = true) {
+    void init(LSTM1Params* paramInit, dtype dropout, bool left2right = true) {
         _param = paramInit;
         _inDim = _param->input.W2.inDim();
         _outDim = _param->input.W2.outDim();
@@ -135,7 +135,7 @@ class LSTM1Builder {
 
     }
 
-    inline void resize(int maxsize) {
+    void resize(int maxsize) {
         _inputgates.resize(maxsize);
         _forgetgates.resize(maxsize);
         _halfcells.resize(maxsize);
@@ -148,11 +148,11 @@ class LSTM1Builder {
     }
 
     //whether vectors have been allocated
-    inline bool empty() {
+    bool empty() {
         return _hiddens.empty();
     }
 
-    inline void clear() {
+    void clear() {
         _inputgates.clear();
         _forgetgates.clear();
         _halfcells.clear();
@@ -171,7 +171,7 @@ class LSTM1Builder {
     }
 
   public:
-    inline void forward(Graph *cg, const vector<PNode>& x) {
+    void forward(Graph *cg, const vector<PNode>& x) {
         if (x.size() == 0) {
             std::cout << "empty inputs for lstm operation" << std::endl;
             return;
@@ -190,7 +190,7 @@ class LSTM1Builder {
     }
 
   protected:
-    inline void left2right_forward(Graph *cg, const vector<PNode>& x) {
+    void left2right_forward(Graph *cg, const vector<PNode>& x) {
         for (int idx = 0; idx < _nSize; idx++) {
             if (idx == 0) {
                 _bucket.forward(cg, 0);
@@ -231,7 +231,7 @@ class LSTM1Builder {
         }
     }
 
-    inline void right2left_forward(Graph *cg, const vector<PNode>& x) {
+    void right2left_forward(Graph *cg, const vector<PNode>& x) {
         for (int idx = _nSize - 1; idx >= 0; idx--) {
             if (idx == _nSize - 1) {
                 _bucket.forward(cg, 0);
@@ -319,7 +319,7 @@ class IncLSTM1Builder {
     }
 
   public:
-    inline void init(LSTM1Params* paramInit, dtype dropout) {
+    void init(LSTM1Params* paramInit, dtype dropout) {
         _param = paramInit;
         _inDim = _param->input.W2.inDim();
         _outDim = _param->input.W2.outDim();
@@ -348,7 +348,7 @@ class IncLSTM1Builder {
 
 
   public:
-    inline void forward(Graph *cg, PNode x, IncLSTM1Builder* prev = NULL) {
+    void forward(Graph *cg, PNode x, IncLSTM1Builder* prev = NULL) {
         if (prev == NULL) {
             _bucket.forward(cg, 0);
 

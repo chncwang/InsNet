@@ -6,7 +6,7 @@
 #include "Node.h"
 
 
-inline dtype loss(PNode x, const vector<dtype> &answer, Metric& eval, int batchsize = 1) {
+dtype loss(PNode x, const vector<dtype> &answer, Metric& eval, int batchsize = 1) {
     int nDim = x->dim;
     int labelsize = answer.size();
     if (labelsize != nDim) {
@@ -95,7 +95,7 @@ dtype predict(PNode x, int& y) {
 }
 #endif
 
-inline dtype cost(PNode x, const vector<dtype> &answer, int batchsize = 1) {
+dtype cost(PNode x, const vector<dtype> &answer, int batchsize = 1) {
     int nDim = x->dim;
     int labelsize = answer.size();
     if (labelsize != nDim) {

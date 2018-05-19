@@ -27,7 +27,7 @@ public:
         node_type = "point-add";
     }
 
-    inline void clearValue() {
+    void clearValue() {
         ins.clear();
         Node::clearValue();
     }
@@ -257,7 +257,7 @@ public:
     }
 
 public:
-    inline void compute() {
+    void compute() {
         int nSize = ins.size();
         val.zero();
         for (int i = 0; i < nSize; ++i) {
@@ -279,7 +279,7 @@ public:
 
 
 public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
     bool typeEqual(PNode other) {
@@ -409,7 +409,7 @@ public:
 };
 
 
-inline PExecute PAddNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute PAddNode::generate(bool bTrain, dtype cur_drop_factor) {
     PAddExecute* exec = new PAddExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;

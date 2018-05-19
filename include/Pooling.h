@@ -33,7 +33,7 @@ class PoolNode : public Node {
         ins.clear();
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         ins.clear();
         for(int idx = 0; idx < dim; idx++) {
@@ -42,7 +42,7 @@ class PoolNode : public Node {
     }
 
 
-    inline void init(int ndim, dtype dropout) {
+    void init(int ndim, dtype dropout) {
         Node::init(ndim, dropout);
         masks.resize(ndim);
         for(int idx = 0; idx < ndim; idx++) {
@@ -77,17 +77,17 @@ class PoolNode : public Node {
 
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         return Node::typeEqual(other);
     }
 
   public:
-    virtual inline void setMask() = 0;
+    virtual void setMask() = 0;
 
-    inline void compute() {
+    void compute() {
         int nSize = ins.size();
         setMask();
         for(int i = 0; i < dim; i++) {
@@ -501,7 +501,7 @@ class PoolExecute : public Execute {
     }
 };
 
-inline PExecute PoolNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute PoolNode::generate(bool bTrain, dtype cur_drop_factor) {
     PoolExecute* exec = new PoolExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
@@ -524,7 +524,7 @@ class SumPoolNode : public Node {
         node_type = "sum-pool";
     }
 
-    inline void clearValue() {
+    void clearValue() {
         ins.clear();
         Node::clearValue();
     }
@@ -732,7 +732,7 @@ class SumPoolNode : public Node {
     }
 
   public:
-    inline void compute() {
+    void compute() {
         int nSize = ins.size();
         val.zero();
         for (int i = 0; i < nSize; ++i) {
@@ -754,10 +754,10 @@ class SumPoolNode : public Node {
 
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         return Node::typeEqual(other);
     }
 
@@ -848,7 +848,7 @@ public:
 #else
 class SumPoolExecute : public Execute {
   public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -857,7 +857,7 @@ class SumPoolExecute : public Execute {
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -894,7 +894,7 @@ class AvgPoolNode : public Node {
         node_type = "avg-pool";
     }
 
-    inline void clearValue() {
+    void clearValue() {
         ins.clear();
         Node::clearValue();
     }
@@ -1102,7 +1102,7 @@ class AvgPoolNode : public Node {
     }
 
   public:
-    inline void compute() {
+    void compute() {
         int nSize = ins.size();
         val.zero();
         for (int i = 0; i < nSize; ++i) {
@@ -1125,10 +1125,10 @@ class AvgPoolNode : public Node {
 
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         return Node::typeEqual(other);
     }
 
@@ -1219,7 +1219,7 @@ public:
 #else
 class AvgPoolExecute : public Execute {
   public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -1228,7 +1228,7 @@ class AvgPoolExecute : public Execute {
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -1239,7 +1239,7 @@ class AvgPoolExecute : public Execute {
 };
 #endif
 
-inline PExecute AvgPoolNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute AvgPoolNode::generate(bool bTrain, dtype cur_drop_factor) {
     AvgPoolExecute* exec = new AvgPoolExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;

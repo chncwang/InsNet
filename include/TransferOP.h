@@ -26,13 +26,13 @@ class TransferParams {
         nVSize = 0;
     }
 
-    inline void exportAdaParams(ModelUpdate& ada) {
+    void exportAdaParams(ModelUpdate& ada) {
         for(int idx = 0; idx < nVSize; idx++) {
             ada.addParam(&(W[idx]));
         }
     }
 
-    inline void initial(PAlphabet alpha, int nOSize, int nISize) {
+    void initial(PAlphabet alpha, int nOSize, int nISize) {
         elems = alpha;
         nVSize = elems->size();
         nInSize = nISize;
@@ -43,17 +43,17 @@ class TransferParams {
         }
     }
 
-    inline int getElemId(const string& strFeat) {
+    int getElemId(const string& strFeat) {
         return elems->from_string(strFeat);
     }
 
     // will add it
-    inline void save(std::ofstream &os) const {
+    void save(std::ofstream &os) const {
 
     }
 
     // will add it
-    inline void load(std::ifstream &is) {
+    void load(std::ifstream &is) {
 
     }
 
@@ -76,11 +76,11 @@ class TransferNode : public Node {
     }
 
 
-    inline void setParam(TransferParams* paramInit) {
+    void setParam(TransferParams* paramInit) {
         param = paramInit;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         in = NULL;
         xid = -1;
@@ -112,10 +112,10 @@ class TransferNode : public Node {
     }
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         if (!result) return false;
 
@@ -135,7 +135,7 @@ class TransferNode : public Node {
 
 class TransferExecute :public Execute {
   public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -144,7 +144,7 @@ class TransferExecute :public Execute {
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -154,7 +154,7 @@ class TransferExecute :public Execute {
     }
 };
 
-inline PExecute TransferNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute TransferNode::generate(bool bTrain, dtype cur_drop_factor) {
     TransferExecute* exec = new TransferExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;

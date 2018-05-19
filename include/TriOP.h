@@ -29,7 +29,7 @@ public:
         bUseB = true;
     }
 
-    inline void exportAdaParams(ModelUpdate& ada) {
+    void exportAdaParams(ModelUpdate& ada) {
         ada.addParam(&W1);
         ada.addParam(&W2);
         ada.addParam(&W3);
@@ -38,7 +38,7 @@ public:
         }
     }
 
-    inline void initial(int nOSize, int nISize1, int nISize2, int nISize3, bool useB = true) {
+    void initial(int nOSize, int nISize1, int nISize2, int nISize3, bool useB = true) {
         W1.initial(nOSize, nISize1);
         W2.initial(nOSize, nISize2);
         W3.initial(nOSize, nISize3);
@@ -49,7 +49,7 @@ public:
         }
     }
 
-    inline void save(std::ofstream &os) const {
+    void save(std::ofstream &os) const {
         os << bUseB << std::endl;
         W1.save(os);
         W2.save(os);
@@ -59,7 +59,7 @@ public:
         }
     }
 
-    inline void load(std::ifstream &is) {
+    void load(std::ifstream &is) {
         is >> bUseB;
         W1.load(is);
         W2.load(is);
@@ -97,17 +97,17 @@ public:
     }
 
 
-    inline void setParam(TriParams* paramInit) {
+    void setParam(TriParams* paramInit) {
         param = paramInit;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         in1 = in2 = in3 = NULL;
     }
 
     // define the activate function and its derivation form
-    inline void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
+    void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
         activate = f;
         derivate = f_deri;
     }
@@ -125,7 +125,7 @@ public:
     }
 
 public:
-    inline void compute(Tensor1D& ty) {
+    void compute(Tensor1D& ty) {
         ty.mat() = param->W1.val.mat() * in1->val.mat() + param->W2.val.mat() * in2->val.mat() + param->W3.val.mat() * in3->val.mat();
         if (param->bUseB) {
             ty.vec() += param->b.val.vec();
@@ -133,7 +133,7 @@ public:
         val.vec() = ty.vec().unaryExpr(ptr_fun(activate));
     }
 
-    inline void backward(Tensor1D& ty, Tensor1D& lty) {
+    void backward(Tensor1D& ty, Tensor1D& lty) {
         lty.vec() = loss.vec() * ty.vec().binaryExpr(val.vec(), ptr_fun(derivate));
 
         param->W1.grad.mat() += lty.mat() * in1->val.tmat();
@@ -153,7 +153,7 @@ public:
     PExecute generate(bool bTrain, dtype drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         if (!result) return false;
 
@@ -187,11 +187,11 @@ public:
         node_type = "linear_tri";
     }
 
-    inline void setParam(TriParams* paramInit) {
+    void setParam(TriParams* paramInit) {
         param = paramInit;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         in1 = in2 = in3 = NULL;
     }
@@ -209,7 +209,7 @@ public:
     }
 
 public:
-    inline void compute() {
+    void compute() {
         val.mat() = param->W1.val.mat() * in1->val.mat() + param->W2.val.mat() * in2->val.mat() + param->W3.val.mat() * in3->val.mat();
 
         if (param->bUseB) {
@@ -217,7 +217,7 @@ public:
         }
     }
 
-    inline void backward() {
+    void backward() {
         param->W1.grad.mat() += loss.mat() * in1->val.tmat();
         param->W2.grad.mat() += loss.mat() * in2->val.tmat();
         param->W3.grad.mat() += loss.mat() * in3->val.tmat();
@@ -235,7 +235,7 @@ public:
     PExecute generate(bool bTrain, dtype drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         if (!result) return false;
 
@@ -269,7 +269,7 @@ public:
 
 
 public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         x1.init(inDim1, count);
         x2.init(inDim2, count);
@@ -313,7 +313,7 @@ public:
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         Tensor2D lx1, lx2, lx3, lty, ly;
         lx1.init(inDim1, count);
@@ -370,7 +370,7 @@ public:
     TriParams* param;
 
 public:
-    inline void  forward() {
+    void  forward() {
         count = batch.size();
         x1.init(inDim1, count);
         x2.init(inDim2, count);
@@ -412,7 +412,7 @@ public:
         }
     }
 
-    inline void backward() {
+    void backward() {
         Tensor2D lx1, lx2, lx3, ly;
         lx1.init(inDim1, count);
         lx2.init(inDim2, count);
@@ -460,7 +460,7 @@ public:
 };
 
 
-inline PExecute TriNode::generate(bool bTrain, dtype drop_factor) {
+PExecute TriNode::generate(bool bTrain, dtype drop_factor) {
     TriExecute* exec = new TriExecute();
     exec->batch.push_back(this);
     exec->inDim1 = param->W1.inDim();
@@ -476,7 +476,7 @@ inline PExecute TriNode::generate(bool bTrain, dtype drop_factor) {
 }
 
 
-inline PExecute LinearTriNode::generate(bool bTrain, dtype drop_factor) {
+PExecute LinearTriNode::generate(bool bTrain, dtype drop_factor) {
     LinearTriExecute* exec = new LinearTriExecute();
     exec->batch.push_back(this);
     exec->inDim1 = param->W1.inDim();
@@ -494,7 +494,7 @@ public:
     int dim;
     vector<Tensor1D> tys, ltys;
 public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         tys.resize(count);
         for (int idx = 0; idx < count; idx++) {
@@ -508,7 +508,7 @@ public:
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         ltys.resize(count);
         for (int idx = 0; idx < count; idx++) {
@@ -523,7 +523,7 @@ public:
     }
 };
 
-inline PExecute TriNode::generate(bool bTrain, dtype drop_factor) {
+PExecute TriNode::generate(bool bTrain, dtype drop_factor) {
     TriExecute* exec = new TriExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
@@ -534,7 +534,7 @@ inline PExecute TriNode::generate(bool bTrain, dtype drop_factor) {
 
 class LinearTriExecute :public Execute {
 public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for schedule(static,1)
         for (int idx = 0; idx < count; idx++) {
@@ -544,7 +544,7 @@ public:
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         //#pragma omp parallel for schedule(static,1)
         for (int idx = 0; idx < count; idx++) {
@@ -555,7 +555,7 @@ public:
     }
 };
 
-inline PExecute LinearTriNode::generate(bool bTrain, dtype drop_factor) {
+PExecute LinearTriNode::generate(bool bTrain, dtype drop_factor) {
     LinearTriExecute* exec = new LinearTriExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
@@ -581,7 +581,7 @@ public:
 
 
 public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         x1.init(inDim1, count);
         x2.init(inDim2, count);
@@ -625,7 +625,7 @@ public:
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         Tensor2D lx1, lx2, lx3, lty, ly;
         lx1.init(inDim1, count);
@@ -682,7 +682,7 @@ public:
     TriParams* param;
 
 public:
-    inline void  forward() {
+    void  forward() {
         count = batch.size();
         x1.init(inDim1, count);
         x2.init(inDim2, count);
@@ -724,7 +724,7 @@ public:
         }
     }
 
-    inline void backward() {
+    void backward() {
         Tensor2D lx1, lx2, lx3, ly;
         lx1.init(inDim1, count);
         lx2.init(inDim2, count);
@@ -772,7 +772,7 @@ public:
 };
 
 
-inline PExecute TriNode::generate(bool bTrain, dtype drop_factor) {
+PExecute TriNode::generate(bool bTrain, dtype drop_factor) {
     TriExecute* exec = new TriExecute();
     exec->batch.push_back(this);
     exec->inDim1 = param->W1.inDim();
@@ -788,7 +788,7 @@ inline PExecute TriNode::generate(bool bTrain, dtype drop_factor) {
 }
 
 
-inline PExecute LinearTriNode::generate(bool bTrain, dtype drop_factor) {
+PExecute LinearTriNode::generate(bool bTrain, dtype drop_factor) {
     LinearTriExecute* exec = new LinearTriExecute();
     exec->batch.push_back(this);
     exec->inDim1 = param->W1.inDim();

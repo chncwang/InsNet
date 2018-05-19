@@ -97,7 +97,7 @@ class Graph {
     }
 
 
-    inline void setDropFactor(dtype cur_drop_factor) {
+    void setDropFactor(dtype cur_drop_factor) {
         drop_factor = cur_drop_factor;
         if (drop_factor <= 0) drop_factor = 0;
         if (drop_factor >= 1.0) drop_factor = 1.0;
@@ -131,14 +131,14 @@ class Graph {
         train = bTrain;
     }
 
-    inline void backward() {
+    void backward() {
         int count = execs.size();
         for (int idx = count - 1; idx >= 0; idx--) {
             execs.at(idx)->backward();
         }
     }
 
-    inline void addNode(PNode x) {
+    void addNode(PNode x) {
         static int index;
         x->node_index = index++;
         nodes.push_back(x);
@@ -209,7 +209,7 @@ class Graph {
 
 // one very useful function to collect pointers of derived nodes
 template<typename DerivedNode>
-inline vector<PNode> getPNodes(vector<DerivedNode>& inputs, int size) {
+vector<PNode> getPNodes(vector<DerivedNode>& inputs, int size) {
     int usedSize = inputs.size();
     if (size >= 0 && size < usedSize) usedSize = size;
     vector<PNode> pnodes;
@@ -221,7 +221,7 @@ inline vector<PNode> getPNodes(vector<DerivedNode>& inputs, int size) {
 }
 
 template<typename DerivedNode>
-inline vector<PNode> getPNodes(DerivedNode inputs[], int size) {
+vector<PNode> getPNodes(DerivedNode inputs[], int size) {
     //int usedSize = inputs.;
     //if (size >= 0 && size < usedSize) usedSize = size;
     int usedSize = size;
@@ -234,7 +234,7 @@ inline vector<PNode> getPNodes(DerivedNode inputs[], int size) {
 }
 
 template<typename DerivedNode>
-inline vector<PNode> getPNodes(vector<DerivedNode>& inputs, int start, int length) {
+vector<PNode> getPNodes(vector<DerivedNode>& inputs, int start, int length) {
     int end, tmp_end = start + length;
     if (tmp_end > inputs.size())
         end = inputs.size();
@@ -250,7 +250,7 @@ inline vector<PNode> getPNodes(vector<DerivedNode>& inputs, int start, int lengt
 }
 
 template<typename DerivedNode>
-inline vector<PNode> getPNodes(DerivedNode inputs[], int size, int start, int length) {
+vector<PNode> getPNodes(DerivedNode inputs[], int size, int start, int length) {
     int end, tmp_end = start + length;
     if (tmp_end > size)
         end = size;

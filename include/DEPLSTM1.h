@@ -21,7 +21,7 @@ struct TreeLSTM1Params {
     TreeLSTM1Params() {
     }
 
-    inline void exportAdaParams(ModelUpdate& ada) {
+    void exportAdaParams(ModelUpdate& ada) {
         input_l.exportAdaParams(ada);
         output_l.exportAdaParams(ada);
         forget_l.exportAdaParams(ada);
@@ -32,7 +32,7 @@ struct TreeLSTM1Params {
         cell_r.exportAdaParams(ada);
     }
 
-    inline void initial(int nOSize, int nISize, PAlphabet label) {
+    void initial(int nOSize, int nISize, PAlphabet label) {
         input_l.initial(nOSize, nISize, true);
         output_l.initial(nOSize, nISize, true);
         forget_l.initial(nOSize, nISize, true);
@@ -44,19 +44,19 @@ struct TreeLSTM1Params {
         cell_r.initial(nOSize, nOSize);
     }
 
-    inline int inDim() {
+    int inDim() {
         return input_l.W.inDim();
     }
 
-    inline int outDim() {
+    int outDim() {
         return input_l.W.outDim();
     }
 
-    inline void save(std::ofstream &os) const {
+    void save(std::ofstream &os) const {
 
     }
 
-    inline void load(std::ifstream &is) {
+    void load(std::ifstream &is) {
 
     }
 
@@ -113,7 +113,7 @@ class TreeLSTM1Builder {
     }
 
   public:
-    inline void init(TreeLSTM1Params* paramInit, dtype dropout, bool bottom2top = true) {
+    void init(TreeLSTM1Params* paramInit, dtype dropout, bool bottom2top = true) {
         _param = paramInit;
         _inDim = _param->input_l.W.inDim();
         _outDim = _param->input_l.W.outDim();
@@ -162,7 +162,7 @@ class TreeLSTM1Builder {
         _bottom2top = bottom2top;
     }
 
-    inline void resize(int maxsize) {
+    void resize(int maxsize) {
         _inputgates_l.resize(maxsize);
         _forgetgates_l.resize(maxsize);
         _halfcells_l.resize(maxsize);
@@ -191,7 +191,7 @@ class TreeLSTM1Builder {
     }
 
 
-    inline void clear() {
+    void clear() {
         _inputgates_l.clear();
         _forgetgates_l.clear();
         _halfcells_l.clear();
@@ -226,7 +226,7 @@ class TreeLSTM1Builder {
     }
 
   public:
-    inline void forward(Graph *cg, const vector<PNode>& x, const vector<int>& heads) {
+    void forward(Graph *cg, const vector<PNode>& x, const vector<int>& heads) {
         if (x.size() == 0) {
             std::cout << "empty inputs for lstm operation" << std::endl;
             return;
@@ -242,7 +242,7 @@ class TreeLSTM1Builder {
     }
 
   protected:
-    inline void btforward(Graph *cg, const vector<PNode>& x, const vector<int>& heads) {
+    void btforward(Graph *cg, const vector<PNode>& x, const vector<int>& heads) {
         vector<vector<int> > children;
         vector<bool> computed;
         children.resize(_nSize);
@@ -334,7 +334,7 @@ class TreeLSTM1Builder {
         }
     }
 
-    inline void tbforward(Graph *cg, const vector<PNode>& x, const vector<int>& heads) {
+    void tbforward(Graph *cg, const vector<PNode>& x, const vector<int>& heads) {
         if (x.size() == 0) {
             std::cout << "empty inputs for lstm operation" << std::endl;
             return;

@@ -36,21 +36,21 @@ public:
         unnormeds.clear();
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         ins.clear();
         unnormeds.clear();
         sum = 0;
     }
 
-    inline void setParam(int maxsize) {
+    void setParam(int maxsize) {
         masks.resize(maxsize);
         mask_losses.resize(maxsize);
         unnormed_masks.resize(maxsize);
     }
 
 
-    inline void init(int ndim, dtype dropout) {
+    void init(int ndim, dtype dropout) {
         Node::init(ndim, dropout);
     }
 
@@ -88,16 +88,16 @@ public:
 
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         return Node::typeEqual(other);
     }
 
   public:
 
-    inline void compute() {
+    void compute() {
         int nSize = ins.size();
 
         sum = 0;
@@ -249,7 +249,7 @@ public:
 #else
 class AttentionSoftMaxExecute : public Execute {
   public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -258,7 +258,7 @@ class AttentionSoftMaxExecute : public Execute {
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -269,7 +269,7 @@ class AttentionSoftMaxExecute : public Execute {
 };
 #endif
 
-inline PExecute AttentionSoftMaxNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute AttentionSoftMaxNode::generate(bool bTrain, dtype cur_drop_factor) {
     AttentionSoftMaxExecute* exec = new AttentionSoftMaxExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
@@ -304,7 +304,7 @@ class AttentionSoftMaxVNode : public Node {
         unnormeds.clear();
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         ins.clear();
         unnormeds.clear();
@@ -313,14 +313,14 @@ class AttentionSoftMaxVNode : public Node {
 #endif
     }
 
-    inline void setParam(int maxsize) {
+    void setParam(int maxsize) {
         masks.resize(maxsize);
         mask_losses.resize(maxsize);
         unnormed_masks.resize(maxsize);
     }
 
 
-    inline void init(int ndim, dtype dropout) {
+    void init(int ndim, dtype dropout) {
         Node::init(ndim, dropout);
         int count = masks.size();
         for (int idx = 0; idx < count; idx++) {
@@ -368,16 +368,16 @@ class AttentionSoftMaxVNode : public Node {
 
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         return Node::typeEqual(other);
     }
 
   public:
 
-    inline void compute() {
+    void compute() {
         int nSize = ins.size();
 
         sum.zero();
@@ -535,7 +535,7 @@ public:
 #else
 class AttentionSoftMaxVExecute : public Execute {
   public:
-    inline void  forward() {
+    void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -544,7 +544,7 @@ class AttentionSoftMaxVExecute : public Execute {
         }
     }
 
-    inline void backward() {
+    void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -555,7 +555,7 @@ class AttentionSoftMaxVExecute : public Execute {
 };
 #endif
 
-inline PExecute AttentionSoftMaxVNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute AttentionSoftMaxVNode::generate(bool bTrain, dtype cur_drop_factor) {
     AttentionSoftMaxVExecute* exec = new AttentionSoftMaxVExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;

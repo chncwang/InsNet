@@ -24,22 +24,22 @@ struct AttentionParams {
     AttentionParams() {
     }
 
-    inline void exportAdaParams(ModelUpdate& ada) {
+    void exportAdaParams(ModelUpdate& ada) {
         bi_atten.exportAdaParams(ada);
     }
 
-    inline void initial(int nHidden, int nGuide) {
+    void initial(int nHidden, int nGuide) {
         bi_atten.initial(1, nHidden, nGuide, false);
         hidden_dim = nHidden;
         guide_dim = nGuide;
     }
 
 
-    inline void save(std::ofstream &os) const {
+    void save(std::ofstream &os) const {
         bi_atten.save(os);
     }
 
-    inline void load(std::ifstream &is) {
+    void load(std::ifstream &is) {
         bi_atten.load(is);
     }
 
@@ -66,17 +66,17 @@ class AttentionBuilder {
     }
 
   public:
-    inline void resize(int maxsize) {
+    void resize(int maxsize) {
         _weights.resize(maxsize);
         _hidden.setParam(maxsize);
     }
 
-    inline void clear() {
+    void clear() {
         _weights.clear();
     }
 
   public:
-    inline void init(AttentionParams* paramInit) {
+    void init(AttentionParams* paramInit) {
         _param = paramInit;
         _nHiddenDim = _param->hidden_dim;
         _nGuideDim = _param->guide_dim;
@@ -90,7 +90,7 @@ class AttentionBuilder {
     }
 
   public:
-    inline void forward(Graph *cg, const vector<PNode>& x, PNode guide) {
+    void forward(Graph *cg, const vector<PNode>& x, PNode guide) {
         if (x.size() == 0) {
             std::cout << "empty inputs for lstm operation" << std::endl;
             return;
@@ -122,22 +122,22 @@ struct AttentionVParams {
     AttentionVParams() {
     }
 
-    inline void exportAdaParams(ModelUpdate& ada) {
+    void exportAdaParams(ModelUpdate& ada) {
         bi_atten.exportAdaParams(ada);
     }
 
-    inline void initial(int nHidden, int nGuide) {
+    void initial(int nHidden, int nGuide) {
         bi_atten.initial(nHidden, nHidden, nGuide, false);
         hidden_dim = nHidden;
         guide_dim = nGuide;
     }
 
 
-    inline void save(std::ofstream &os) const {
+    void save(std::ofstream &os) const {
         bi_atten.save(os);
     }
 
-    inline void load(std::ifstream &is) {
+    void load(std::ifstream &is) {
         bi_atten.load(is);
     }
 
@@ -163,17 +163,17 @@ class AttentionVBuilder {
     }
 
   public:
-    inline void resize(int maxsize) {
+    void resize(int maxsize) {
         _weights.resize(maxsize);
         _hidden.setParam(maxsize);
     }
 
-    inline void clear() {
+    void clear() {
         _weights.clear();
     }
 
   public:
-    inline void init(AttentionVParams* paramInit) {
+    void init(AttentionVParams* paramInit) {
         _param = paramInit;
         _nHiddenDim = _param->hidden_dim;
         _nGuideDim = _param->guide_dim;
@@ -187,7 +187,7 @@ class AttentionVBuilder {
     }
 
   public:
-    inline void forward(Graph *cg, const vector<PNode>& x, PNode guide) {
+    void forward(Graph *cg, const vector<PNode>& x, PNode guide) {
         if (x.size() == 0) {
             std::cout << "empty inputs for lstm operation" << std::endl;
             return;
@@ -215,21 +215,21 @@ struct SelfAttentionParams {
     SelfAttentionParams() {
     }
 
-    inline void exportAdaParams(ModelUpdate& ada) {
+    void exportAdaParams(ModelUpdate& ada) {
         uni_atten.exportAdaParams(ada);
     }
 
-    inline void initial(int nHidden) {
+    void initial(int nHidden) {
         uni_atten.initial(1, nHidden, false);
         hidden_dim = nHidden;
     }
 
 
-    inline void save(std::ofstream &os) const {
+    void save(std::ofstream &os) const {
         uni_atten.save(os);
     }
 
-    inline void load(std::ifstream &is) {
+    void load(std::ifstream &is) {
         uni_atten.load(is);
     }
 
@@ -255,17 +255,17 @@ class SelfAttentionBuilder {
     }
 
   public:
-    inline void resize(int maxsize) {
+    void resize(int maxsize) {
         _weights.resize(maxsize);
         _hidden.setParam(maxsize);
     }
 
-    inline void clear() {
+    void clear() {
         _weights.clear();
     }
 
   public:
-    inline void init(SelfAttentionParams* paramInit) {
+    void init(SelfAttentionParams* paramInit) {
         _param = paramInit;
         _nHiddenDim = _param->hidden_dim;
 
@@ -278,7 +278,7 @@ class SelfAttentionBuilder {
     }
 
   public:
-    inline void forward(Graph *cg, const vector<PNode>& x) {
+    void forward(Graph *cg, const vector<PNode>& x) {
         if (x.size() == 0) {
             std::cout << "empty inputs for lstm operation" << std::endl;
             return;
@@ -309,21 +309,21 @@ struct SelfAttentionVParams {
     SelfAttentionVParams() {
     }
 
-    inline void exportAdaParams(ModelUpdate& ada) {
+    void exportAdaParams(ModelUpdate& ada) {
         uni_atten.exportAdaParams(ada);
     }
 
-    inline void initial(int nHidden) {
+    void initial(int nHidden) {
         uni_atten.initial(nHidden, nHidden, false);
         hidden_dim = nHidden;
     }
 
 
-    inline void save(std::ofstream &os) const {
+    void save(std::ofstream &os) const {
         uni_atten.save(os);
     }
 
-    inline void load(std::ifstream &is) {
+    void load(std::ifstream &is) {
         uni_atten.load(is);
     }
 
@@ -348,17 +348,17 @@ class SelfAttentionVBuilder {
     }
 
   public:
-    inline void resize(int maxsize) {
+    void resize(int maxsize) {
         _weights.resize(maxsize);
         _hidden.setParam(maxsize);
     }
 
-    inline void clear() {
+    void clear() {
         _weights.clear();
     }
 
   public:
-    inline void init(SelfAttentionVParams* paramInit) {
+    void init(SelfAttentionVParams* paramInit) {
         _param = paramInit;
         _nHiddenDim = _param->hidden_dim;
 
@@ -371,7 +371,7 @@ class SelfAttentionVBuilder {
     }
 
   public:
-    inline void forward(Graph *cg, const vector<PNode>& x) {
+    void forward(Graph *cg, const vector<PNode>& x) {
         if (x.size() == 0) {
             std::cout << "empty inputs for lstm operation" << std::endl;
             return;

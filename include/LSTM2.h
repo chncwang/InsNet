@@ -38,7 +38,7 @@ struct LSTM2Params {
     LSTM2Params() {
     }
 
-    inline void exportAdaParams(ModelUpdate& ada) {
+    void exportAdaParams(ModelUpdate& ada) {
         input_hidden.exportAdaParams(ada);
         input_input.exportAdaParams(ada);
         output_hidden.exportAdaParams(ada);
@@ -49,7 +49,7 @@ struct LSTM2Params {
         cell_input.exportAdaParams(ada);
     }
 
-    inline void initial(int nOSize, int nISize) {
+    void initial(int nOSize, int nISize) {
         input_hidden.initial(nOSize, nOSize, nISize);
         input_input.initial(nOSize, nOSize, nISize);
         output_hidden.initial(nOSize, nOSize, nISize);
@@ -60,15 +60,15 @@ struct LSTM2Params {
         cell_input.initial(nOSize, nOSize, nISize);
     }
 
-    inline int inDim() {
+    int inDim() {
         return input_input.W.inDim();
     }
 
-    inline int outDim() {
+    int outDim() {
         return input_input.W.outDim();
     }
 
-    inline void save(std::ofstream &os) const {
+    void save(std::ofstream &os) const {
         input_hidden.save(os);
         input_input.save(os);
         output_hidden.save(os);
@@ -80,7 +80,7 @@ struct LSTM2Params {
 
     }
 
-    inline void load(std::ifstream &is) {
+    void load(std::ifstream &is) {
         input_hidden.load(is);
         input_input.load(is);
         output_hidden.load(is);
@@ -145,7 +145,7 @@ public:
     }
 
 public:
-    inline void init(LSTM2Params* paramInit, dtype dropout, bool left2right = true) {
+    void init(LSTM2Params* paramInit, dtype dropout, bool left2right = true) {
         _param = paramInit;
         _inDim = _param->input_input.W.inDim();
         _outDim = _param->input_input.W.outDim();
@@ -195,7 +195,7 @@ public:
 
     }
 
-    inline void resize(int maxsize) {
+    void resize(int maxsize) {
         _inputgates_hidden.resize(maxsize);
         _inputgates_input.resize(maxsize);
         _inputgates_add.resize(maxsize);
@@ -221,11 +221,11 @@ public:
     }
 
     //whether vectors have been allocated
-    inline bool empty() {
+    bool empty() {
         return _hiddens.empty();
     }
 
-    inline void clear() {
+    void clear() {
         _inputgates_hidden.clear();
         _inputgates_input.clear();
         _inputgates_add.clear();
@@ -257,7 +257,7 @@ public:
     }
 
 public:
-    inline void forward(Graph *cg, const vector<PNode>& x) {
+    void forward(Graph *cg, const vector<PNode>& x) {
         if (x.size() == 0) {
             std::cout << "empty inputs for lstm operation" << std::endl;
             return;
@@ -277,7 +277,7 @@ public:
     }
 
 protected:
-    inline void left2right_forward(Graph *cg, const vector<PNode>& x) {
+    void left2right_forward(Graph *cg, const vector<PNode>& x) {
         for (int idx = 0; idx < _nSize; idx++) {
             if (idx == 0) {
                 _bucket.forward(cg, 0);
@@ -368,7 +368,7 @@ protected:
         }
     }
 
-    inline void right2left_forward(Graph *cg, const vector<PNode>& x) {
+    void right2left_forward(Graph *cg, const vector<PNode>& x) {
         for (int idx = _nSize - 1; idx >= 0; idx--) {
             if (idx == _nSize - 1) {
                 _bucket.forward(cg, 0);
@@ -506,7 +506,7 @@ protected:
 //    }
 //
 //  public:
-//    inline void init(LSTM2Params* paramInit, dtype dropout) {
+//    void init(LSTM2Params* paramInit, dtype dropout) {
 //        _param = paramInit;
 //        _inDim = _param->input.W2.inDim();
 //        _outDim = _param->input.W2.outDim();
@@ -535,7 +535,7 @@ protected:
 //
 //
 //  public:
-//    inline void forward(Graph *cg, PNode x, IncLSTM2Builder* prev = NULL) {
+//    void forward(Graph *cg, PNode x, IncLSTM2Builder* prev = NULL) {
 //        if (prev == NULL) {
 //            _bucket.forward(cg, 0);
 //

@@ -25,12 +25,12 @@ class NRVec {
     NRVec & operator=(const NRVec &rhs); // assignment
     NRVec & operator=(const T &a); // assign a to every element
     NRVec & operator=(const std::vector<T> &a);
-    inline T & operator[](const int i); // i'th element
-    inline const T & operator[](const int i) const;
-    inline int size() const;
-    inline void dealloc();
-    inline T * c_buf();
-    inline void randu();
+    T & operator[](const int i); // i'th element
+    const T & operator[](const int i) const;
+    int size() const;
+    void dealloc();
+    T * c_buf();
+    void randu();
 
     ~NRVec();
 };
@@ -119,17 +119,17 @@ NRVec<T> & NRVec<T>::operator=(const T &a) { // assign a to every element
 }
 
 template<typename T>
-inline T & NRVec<T>::operator[](const int i) { // subscripting
+T & NRVec<T>::operator[](const int i) { // subscripting
     return v[i];  // no boundary check?
 }
 
 template<typename T>
-inline const T & NRVec<T>::operator[](const int i) const { // subscripting
+const T & NRVec<T>::operator[](const int i) const { // subscripting
     return v[i];  // no boundary check?
 }
 
 template<typename T>
-inline int NRVec<T>::size() const {
+int NRVec<T>::size() const {
     return nn;
 }
 
@@ -139,7 +139,7 @@ NRVec<T>::~NRVec() {
 }
 
 template<typename T>
-inline void NRVec<T>::dealloc() {
+void NRVec<T>::dealloc() {
     if (v != 0) {
         delete[](v);
         v = 0;
@@ -148,12 +148,12 @@ inline void NRVec<T>::dealloc() {
 }
 
 template<typename T>
-inline T * NRVec<T>::c_buf() {
+T * NRVec<T>::c_buf() {
     return v;
 }
 
 template<typename T>
-inline void NRVec<T>::randu() {
+void NRVec<T>::randu() {
     for (int i = 0; i < nn; i++) {
         v[i] = (T)(1.0 * rand() / RAND_MAX);
     }
@@ -174,14 +174,14 @@ class NRHeap {
     explicit NRHeap(const int n); // zero-based array
     NRHeap(const NRHeap &rhs); // copy constructor
     //NRHeap & operator=(const NRHeap &rhs); // assignment
-    inline T & operator[](const int i); // i'th element
-    inline const T & operator[](const int i) const;
-    inline int size() const;
-    inline int elemsize() const;
-    inline int heapsize() const;
-    inline void dealloc();
-    inline T * c_buf();
-    inline void randu();
+    T & operator[](const int i); // i'th element
+    const T & operator[](const int i) const;
+    int size() const;
+    int elemsize() const;
+    int heapsize() const;
+    void dealloc();
+    T * c_buf();
+    void randu();
 
     ~NRHeap();
 
@@ -219,22 +219,22 @@ class NRHeap {
     }
 
   protected:
-    inline int left(int i) {
+    int left(int i) {
         return 2 * i + 1;
     }
-    inline int right(int i) {
+    int right(int i) {
         return 2 * i + 2;
     }
-    inline int parent(int i) {
+    int parent(int i) {
         return (i - 1) / 2;
     }
-    inline void swap(int i, int j) {
+    void swap(int i, int j) {
         T tmp = v[i];
         v[i] = v[j];
         v[j] = tmp;
     }
 
-    inline void bubble_up(int i) {
+    void bubble_up(int i) {
         int p = parent(i);
         while (i > 0 && compare()(v[i], v[p]) < 0) {
             swap(i, p);
@@ -243,7 +243,7 @@ class NRHeap {
         }
     }
 
-    inline void trickleDown(int i) {
+    void trickleDown(int i) {
         do {
             int j = -1;
             int r = right(i);
@@ -301,27 +301,27 @@ NRHeap<T, compare>::NRHeap(const NRHeap<T, compare> &rhs) :
 }
 
 template<typename T, typename compare>
-inline T & NRHeap<T, compare>::operator[](const int i) { // subscripting
+T & NRHeap<T, compare>::operator[](const int i) { // subscripting
     return v[i];  // no boundary check?
 }
 
 template<typename T, typename compare>
-inline const T & NRHeap<T, compare>::operator[](const int i) const { // subscripting
+const T & NRHeap<T, compare>::operator[](const int i) const { // subscripting
     return v[i];  // no boundary check?
 }
 
 template<typename T, typename compare>
-inline int NRHeap<T, compare>::heapsize() const {
+int NRHeap<T, compare>::heapsize() const {
     return nn;
 }
 
 template<typename T, typename compare>
-inline int NRHeap<T, compare>::size() const {
+int NRHeap<T, compare>::size() const {
     return maxsize;
 }
 
 template<typename T, typename compare>
-inline int NRHeap<T, compare>::elemsize() const {
+int NRHeap<T, compare>::elemsize() const {
     return ne;
 }
 
@@ -331,7 +331,7 @@ NRHeap<T, compare>::~NRHeap() {
 }
 
 template<typename T, typename compare>
-inline void NRHeap<T, compare>::dealloc() {
+void NRHeap<T, compare>::dealloc() {
     if (v != 0) {
         delete[](v);
         v = 0;
@@ -342,12 +342,12 @@ inline void NRHeap<T, compare>::dealloc() {
 }
 
 template<typename T, typename compare>
-inline T * NRHeap<T, compare>::c_buf() {
+T * NRHeap<T, compare>::c_buf() {
     return v;
 }
 
 template<typename T, typename compare>
-inline void NRHeap<T, compare>::randu() {
+void NRHeap<T, compare>::randu() {
     for (int i = 0; i < nn; i++) {
         v[i] = (T)(1.0 * rand() / RAND_MAX);
     }
@@ -373,14 +373,14 @@ class NRMat {
     NRMat & operator=(const NRMat &rhs); // assignment
     NRMat & operator=(const T &a); // assign a to every element
 
-    inline T* operator[](const int i); // subscripting: pointer to row i
-    inline const T* operator[](const int i) const;
-    inline int nrows() const;
-    inline int ncols() const;
-    inline int total_size() const;
-    inline T * c_buf();
-    inline void randu();
-    inline void dealloc();
+    T* operator[](const int i); // subscripting: pointer to row i
+    const T* operator[](const int i) const;
+    int nrows() const;
+    int ncols() const;
+    int total_size() const;
+    T * c_buf();
+    void randu();
+    void dealloc();
     ~NRMat();
 };
 
@@ -485,32 +485,32 @@ NRMat<T> & NRMat<T>::operator=(const T &a) { // assign a to every element
 }
 
 template<typename T>
-inline T* NRMat<T>::operator[](const int i) { // subscripting: pointer to row i
+T* NRMat<T>::operator[](const int i) { // subscripting: pointer to row i
     return v[i];  // no boundary check?
 }
 
 template<typename T>
-inline const T* NRMat<T>::operator[](const int i) const { // subscripting: pointer to row i
+const T* NRMat<T>::operator[](const int i) const { // subscripting: pointer to row i
     return v[i];  // no boundary check?
 }
 
 template<typename T>
-inline int NRMat<T>::nrows() const {
+int NRMat<T>::nrows() const {
     return nn;
 }
 
 template<typename T>
-inline int NRMat<T>::ncols() const {
+int NRMat<T>::ncols() const {
     return mm;
 }
 
 template<typename T>
-inline int NRMat<T>::total_size() const {
+int NRMat<T>::total_size() const {
     return tot_sz;
 }
 
 template<typename T>
-inline void NRMat<T>::randu() {
+void NRMat<T>::randu() {
     for (int i = 0; i < nn; i++)
         for (int j = 0; j < mm; j++)
             v[i][j] = (T)(1.0 * rand() / RAND_MAX);
@@ -533,15 +533,15 @@ class NRMat3d {
     NRMat3d(const NRMat3d &rhs); // copy constructor
     NRMat3d & operator=(const NRMat3d &rhs); // assignment
     NRMat3d & operator=(const T &a); // assign a to every element
-    inline T**operator[](const int i); // subscripting: pointer to row i. should not it be: T* const *?? (i think the pointers should not change).
-    inline const T* const * operator[](const int i) const;
-    inline int dim1() const;
-    inline int dim2() const;
-    inline int dim3() const;
-    inline int total_size() const;
-    inline void dealloc();
-    inline T* c_buf();
-    inline void randu();
+    T**operator[](const int i); // subscripting: pointer to row i. should not it be: T* const *?? (i think the pointers should not change).
+    const T* const * operator[](const int i) const;
+    int dim1() const;
+    int dim2() const;
+    int dim3() const;
+    int total_size() const;
+    void dealloc();
+    T* c_buf();
+    void randu();
     ~NRMat3d();
 
 };
@@ -647,37 +647,37 @@ NRMat3d<T> & NRMat3d<T>::operator=(const T &a) { // assign a to every element
 }
 
 template<typename T>
-inline T** NRMat3d<T>::operator[](const int i) { // subscripting: pointer to row i
+T** NRMat3d<T>::operator[](const int i) { // subscripting: pointer to row i
     return v[i];  // no boundary check?
 }
 
 template<typename T>
-inline const T* const * NRMat3d<T>::operator[](const int i) const { // subscripting: pointer to row i
+const T* const * NRMat3d<T>::operator[](const int i) const { // subscripting: pointer to row i
     return v[i];  // no boundary check?
 }
 
 template<typename T>
-inline int NRMat3d<T>::dim1() const {
+int NRMat3d<T>::dim1() const {
     return nn;
 }
 
 template<typename T>
-inline int NRMat3d<T>::dim2() const {
+int NRMat3d<T>::dim2() const {
     return mm;
 }
 
 template<typename T>
-inline int NRMat3d<T>::dim3() const {
+int NRMat3d<T>::dim3() const {
     return kk;
 }
 
 template<typename T>
-inline int NRMat3d<T>::total_size() const {
+int NRMat3d<T>::total_size() const {
     return tot_sz;
 }
 
 template<typename T>
-inline void NRMat3d<T>::randu() {
+void NRMat3d<T>::randu() {
     for (int i = 0; i < nn; i++)
         for (int j = 0; j < mm; j++)
             for (int k = 0; k < kk; k++)
@@ -700,17 +700,17 @@ class NRMat4d {
     NRMat4d & resize(const int n, const int m, const int k, const int l);
     explicit NRMat4d(const int n, const int m, const int k, const int l); // zero-based array
     NRMat4d & operator=(const T &a); // assign a to every element
-    inline T***operator[](const int i); // subscripting: pointer to row i. should not it be: T* const *?? (i think the pointers should not change).
-    inline const T* const * const * operator[](const int i) const;
-    inline int dim1() const;
-    inline int dim2() const;
-    inline int dim3() const;
-    inline int dim4() const;
-    inline int total_size() const;
+    T***operator[](const int i); // subscripting: pointer to row i. should not it be: T* const *?? (i think the pointers should not change).
+    const T* const * const * operator[](const int i) const;
+    int dim1() const;
+    int dim2() const;
+    int dim3() const;
+    int dim4() const;
+    int total_size() const;
 
-    inline void dealloc();
-    inline T * c_buf();
-    inline void randu();
+    void dealloc();
+    T * c_buf();
+    void randu();
     ~NRMat4d();
 
   private:
@@ -837,42 +837,42 @@ NRMat4d<T> & NRMat4d<T>::operator=(const T &a) { // assign a to every element
 }
 
 template<typename T>
-inline T*** NRMat4d<T>::operator[](const int i) { // subscripting: pointer to row i
+T*** NRMat4d<T>::operator[](const int i) { // subscripting: pointer to row i
     return v[i];  // no boundary check?
 }
 
 template<typename T>
-inline const T* const * const * NRMat4d<T>::operator[](const int i) const { // subscripting: pointer to row i
+const T* const * const * NRMat4d<T>::operator[](const int i) const { // subscripting: pointer to row i
     return v[i];  // no boundary check?
 }
 
 template<typename T>
-inline int NRMat4d<T>::dim1() const {
+int NRMat4d<T>::dim1() const {
     return nn;
 }
 
 template<typename T>
-inline int NRMat4d<T>::dim2() const {
+int NRMat4d<T>::dim2() const {
     return mm;
 }
 
 template<typename T>
-inline int NRMat4d<T>::dim3() const {
+int NRMat4d<T>::dim3() const {
     return kk;
 }
 
 template<typename T>
-inline int NRMat4d<T>::dim4() const {
+int NRMat4d<T>::dim4() const {
     return ll;
 }
 
 template<typename T>
-inline int NRMat4d<T>::total_size() const {
+int NRMat4d<T>::total_size() const {
     return tot_sz;
 }
 
 template<typename T>
-inline void NRMat4d<T>::randu() {
+void NRMat4d<T>::randu() {
     for (int i = 0; i < nn; i++)
         for (int j = 0; j < mm; j++)
             for (int k = 0; k < kk; k++)

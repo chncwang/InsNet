@@ -29,7 +29,7 @@ class FourParams {
         bUseB = true;
     }
 
-    inline void exportAdaParams(ModelUpdate& ada) {
+    void exportAdaParams(ModelUpdate& ada) {
         ada.addParam(&W1);
         ada.addParam(&W2);
         ada.addParam(&W3);
@@ -39,7 +39,7 @@ class FourParams {
         }
     }
 
-    inline void initial(int nOSize, int nISize1, int nISize2, int nISize3, int nISize4, bool useB = true) {
+    void initial(int nOSize, int nISize1, int nISize2, int nISize3, int nISize4, bool useB = true) {
         W1.initial(nOSize, nISize1);
         W2.initial(nOSize, nISize2);
         W3.initial(nOSize, nISize3);
@@ -51,7 +51,7 @@ class FourParams {
         }
     }
 
-    inline void save(std::ofstream &os) const {
+    void save(std::ofstream &os) const {
         os << bUseB << std::endl;
         W1.save(os);
         W2.save(os);
@@ -62,7 +62,7 @@ class FourParams {
         }
     }
 
-    inline void load(std::ifstream &is) {
+    void load(std::ifstream &is) {
         is >> bUseB;
         W1.load(is);
         W2.load(is);
@@ -101,17 +101,17 @@ class FourNode : public Node {
         in1 = in2 = in3 = in4 = NULL;
     }
 
-    inline void init(int ndim, dtype dropout) {
+    void init(int ndim, dtype dropout) {
         Node::init(ndim, dropout);
         ty.init(ndim);
         lty.init(ndim);
     }
 
-    inline void setParam(FourParams* paramInit) {
+    void setParam(FourParams* paramInit) {
         param = paramInit;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         in1 = in2 = in3 = in4 = NULL;
         ty = 0;
@@ -119,7 +119,7 @@ class FourNode : public Node {
     }
 
     // define the activate function and its derivation form
-    inline void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
+    void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
         activate = f;
         derivate = f_deri;
     }
@@ -139,7 +139,7 @@ class FourNode : public Node {
     }
 
   public:
-    inline void compute() {
+    void compute() {
         ty.mat() = param->W1.val.mat() * in1->val.mat() + param->W2.val.mat() * in2->val.mat()
                    + param->W3.val.mat() * in3->val.mat() + param->W4.val.mat() * in4->val.mat();
         if (param->bUseB) {
@@ -148,7 +148,7 @@ class FourNode : public Node {
         val.vec() = ty.vec().unaryExpr(ptr_fun(activate));
     }
 
-    inline void backward() {
+    void backward() {
         lty.vec() = loss.vec() * ty.vec().binaryExpr(val.vec(), ptr_fun(derivate));
 
         param->W1.grad.mat() += lty.mat() * in1->val.tmat();
@@ -166,10 +166,10 @@ class FourNode : public Node {
         in4->loss.mat() += param->W4.val.mat().transpose() * lty.mat();
     }
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         if (!result) return false;
 
@@ -203,11 +203,11 @@ class LinearFourNode : public Node {
         node_type = "linear_four";
     }
 
-    inline void setParam(FourParams* paramInit) {
+    void setParam(FourParams* paramInit) {
         param = paramInit;
     }
 
-    inline void clearValue() {
+    void clearValue() {
         Node::clearValue();
         in1 = in2 = in3 = in4 = NULL;
     }
@@ -227,7 +227,7 @@ class LinearFourNode : public Node {
     }
 
   public:
-    inline void compute() {
+    void compute() {
         val.mat() = param->W1.val.mat() * in1->val.mat() + param->W2.val.mat() * in2->val.mat()
                     + param->W3.val.mat() * in3->val.mat() + param->W4.val.mat() * in4->val.mat();
 
@@ -236,7 +236,7 @@ class LinearFourNode : public Node {
         }
     }
 
-    inline void backward() {
+    void backward() {
         param->W1.grad.mat() += loss.mat() * in1->val.tmat();
         param->W2.grad.mat() += loss.mat() * in2->val.tmat();
         param->W3.grad.mat() += loss.mat() * in3->val.tmat();
@@ -253,10 +253,10 @@ class LinearFourNode : public Node {
     }
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         if (!result) return false;
 
@@ -376,7 +376,7 @@ public:
     }
 };
 
-inline PExecute FourNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute FourNode::generate(bool bTrain, dtype cur_drop_factor) {
     FourExecute* exec = new FourExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
@@ -399,7 +399,7 @@ public:
     FourParams* param;
 
 public:
-    inline void  forward() {
+    void  forward() {
         count = batch.size();
         x1.init(inDim1, count);
         x2.init(inDim2, count);
@@ -445,7 +445,7 @@ public:
         }
     }
 
-    inline void backward() {
+    void backward() {
         Tensor2D lx1, lx2, lx3, lx4, ly;
         lx1.init(inDim1, count);
         lx2.init(inDim2, count);
@@ -498,7 +498,7 @@ public:
     }
 };
 
-inline PExecute LinearFourNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute LinearFourNode::generate(bool bTrain, dtype cur_drop_factor) {
     LinearFourExecute* exec = new LinearFourExecute();
     exec->batch.push_back(this);
     exec->drop_factor = cur_drop_factor * drop_value;
