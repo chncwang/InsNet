@@ -45,11 +45,11 @@ struct APParam : BaseParam {
     }
 
     inline int outDim() {
-        return val.col;
+        return val.row;
     }
 
     inline int inDim() {
-        return val.row;
+        return val.col;
     }
 
     inline void updateAdagrad(dtype alpha, dtype reg, dtype eps) {
@@ -86,18 +86,18 @@ struct APParam : BaseParam {
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
             if (!indexers[index]) continue;
-            idRows.push_back(index);
+            idCols.push_back(index);
         }
 
-        for (int i = 0; i < val.col; i++) {
-            idCols.push_back(i);
+        for (int i = 0; i < val.row; i++) {
+            idRows.push_back(i);
         }
 
         random_shuffle(idRows.begin(), idRows.end());
         random_shuffle(idCols.begin(), idCols.end());
 
-        idx = idRows[0];
-        idy = idCols[0];
+        idx = idCols[0];
+        idy = idRows[0];
     }
 
     inline dtype squareGradNorm() {
@@ -134,7 +134,7 @@ struct APParam : BaseParam {
     }
 
     inline void value(const int& featId, Tensor1D& out, const bool& bTrain) {
-        if (out.dim != val.col) {
+        if (out.dim != val.row) {
             std::cout << "warning: output dim not equal lookup param dim." << std::endl;
         }
         if (bTrain) {
@@ -150,7 +150,7 @@ struct APParam : BaseParam {
     }
 
     inline void value(const vector<int>& featIds, Tensor1D& out, const bool& bTrain) {
-        if (out.dim != val.col) {
+        if (out.dim != val.row) {
             std::cout << "warning: output dim not equal lookup param dim." << std::endl;
         }
         int featNum = featIds.size();
@@ -174,7 +174,7 @@ struct APParam : BaseParam {
     }
 
     inline void loss(const int& featId, const Tensor1D& loss) {
-        if (loss.dim != val.col) {
+        if (loss.dim != val.row) {
             std::cout << "warning: loss dim not equal lookup param dim." << std::endl;
         }
         indexers[featId] = true;
@@ -184,7 +184,7 @@ struct APParam : BaseParam {
     }
 
     inline void loss(const vector<int>& featIds, const Tensor1D& loss) {
-        if (loss.dim != val.col) {
+        if (loss.dim != val.row) {
             std::cout << "warning: loss dim not equal lookup param dim." << std::endl;
         }
         int featNum = featIds.size();
@@ -202,9 +202,9 @@ struct APParam : BaseParam {
         val.save(os);
         aux.save(os);
         os << max_update << std::endl;
-        os << val.row << std::endl;
+        os << val.col << std::endl;
         os << last_update[0];
-        for (int idx = 1; idx < val.row; idx++) {
+        for (int idx = 1; idx < val.col; idx++) {
             os << " " << last_update[idx];
         }
         os << std::endl;

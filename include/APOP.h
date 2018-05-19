@@ -43,41 +43,29 @@ struct APParams {
     }
 
     //random initialization
-    inline void initial(PAlphabet alpha, int nOSize, int base = 1) {
-        assert(base >= 1);
+    inline void initial(PAlphabet alpha, int nOSize) {
         elems = alpha;
-        nVSize = base * elems->size();
-        if (base > 1) {
-            std::cout << "nVSize: " << nVSize << ", Alpha Size = " << elems->size()  << ", Require more Alpha."<< std::endl;
-            elems->set_fixed_flag(false);
-        }
+        nVSize = elems->size();
         initialWeights(nOSize);
     }
 
     inline int getFeatureId(const string& strFeat) {
-        int idx = elems->from_string(strFeat);
-        if(!elems->m_b_fixed && elems->m_size >= nVSize) {
-            std::cout << "AP Alphabet stopped collecting features" << std::endl;
-            elems->set_fixed_flag(true);
-        }
-        return idx;
+        return elems->from_string(strFeat);
     }
 
 };
 
 //only implemented sparse linear node.
 //non-linear transformations are not support,
-class APNode : public Node {
+struct APNode : Node {
   public:
     APParams* param;
-    vector<int> ins;
-    bool bTrain;
+    vector<int> tx;
 
   public:
     APNode() : Node() {
-        ins.clear();
+        tx.clear();
         param = NULL;
-        node_type = "apnode";
     }
 
     inline void setParam(APParams* paramInit) {
@@ -86,8 +74,7 @@ class APNode : public Node {
 
     inline void clearValue() {
         Node::clearValue();
-        ins.clear();
-        bTrain = false;
+        tx.clear();
     }
 
   public:
@@ -98,70 +85,19 @@ class APNode : public Node {
         for (int idx = 0; idx < featSize; idx++) {
             featId = param->getFeatureId(x[idx]);
             if (featId >= 0) {
-                ins.push_back(featId);
+                tx.push_back(featId);
             }
         }
-        degree = 0;
+        param->W.value(featId, val, cg->train);
         cg->addNode(this);
-        bTrain = cg->train;
-    }
-  public:
-    inline void compute() {
-        param->W.value(ins, val, bTrain);
     }
 
     //no output losses
     void backward() {
         //assert(param != NULL);
-        param->W.loss(ins, loss);
-    }
-
-  public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
-
-    // better to rewrite for deep understanding
-    inline bool typeEqual(PNode other) {
-        bool result = Node::typeEqual(other);
-        if (!result) return false;
-
-        APNode* conv_other = (APNode*)other;
-        if (param != conv_other->param) {
-            return false;
-        }
-
-        return true;
+        param->W.loss(tx, loss);
     }
 
 };
-
-class APExecute :public Execute {
-  public:
-    inline void  forward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->compute();
-            batch[idx]->forward_drop(bTrain, drop_factor);
-        }
-    }
-
-    inline void backward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward_drop();
-            batch[idx]->backward();
-        }
-    }
-};
-
-
-inline PExecute APNode::generate(bool bTrain, dtype cur_drop_factor) {
-    APExecute* exec = new APExecute();
-    exec->batch.push_back(this);
-    exec->bTrain = bTrain;
-    exec->drop_factor = cur_drop_factor;
-    return exec;
-}
 
 #endif /* APOP_H_ */

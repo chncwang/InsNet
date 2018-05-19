@@ -8,9 +8,6 @@
 *  Created on: June 11, 2017
 *      Author: yue zhang (suda)
 */
-/*
-   This file will be modified by meishan zhang, currently better not use it
-*/
 
 
 #include "Param.h"
@@ -142,7 +139,7 @@ class BiaffineNode : public Node {
     }
 
   public:
-    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
+    inline PExecute generate(bool bTrain);
 
     // better to rewrite for deep understanding
     inline bool typeEqual(PNode other) {
@@ -245,11 +242,9 @@ class BiaffineExecute :public Execute {
     }
 };
 
-inline PExecute BiaffineNode::generate(bool bTrain, dtype cur_drop_factor) {
+inline PExecute BiaffineNode::generate(bool bTrain) {
     BiaffineExecute* exec = new BiaffineExecute();
     exec->batch.push_back(this);
-    exec->bTrain = bTrain;
-    exec->drop_factor = cur_drop_factor;
     return exec;
 };
 

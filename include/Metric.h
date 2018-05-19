@@ -33,12 +33,6 @@ struct Metric {
         predicated_label_count = 0;
     }
 
-    void set(const Metric& other) {
-        overall_label_count = other.overall_label_count;
-        correct_label_count = other.correct_label_count;
-        predicated_label_count = other.predicated_label_count;
-    }
-
     bool bIdentical() {
         if (predicated_label_count == 0) {
             if (overall_label_count == correct_label_count) {
@@ -54,7 +48,6 @@ struct Metric {
     }
 
     double getAccuracy() {
-        if (overall_label_count + predicated_label_count == 0) return 1.0;
         if (predicated_label_count == 0) {
             return correct_label_count*1.0 / overall_label_count;
         } else {
@@ -72,15 +65,6 @@ struct Metric {
                       << ", " << "Accuracy:\tP=" << correct_label_count << "/" << predicated_label_count << "=" << correct_label_count*1.0 / predicated_label_count
                       << ", " << "Fmeasure:\t" << correct_label_count*2.0 / (overall_label_count + predicated_label_count) << std::endl;
         }
-    }
-
-  public:
-    bool operator == (const Metric &a1) const {
-        return correct_label_count == a1.correct_label_count && overall_label_count == a1.overall_label_count && predicated_label_count == a1.predicated_label_count;
-    }
-
-    bool operator != (const Metric &a1) const {
-        return correct_label_count != a1.correct_label_count || overall_label_count != a1.overall_label_count || predicated_label_count != a1.predicated_label_count;
     }
 
 

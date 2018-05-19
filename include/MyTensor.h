@@ -1,5 +1,4 @@
 #ifndef BasicTensor
-
 #define BasicTensor
 
 
@@ -9,14 +8,15 @@
 
 using namespace Eigen;
 
-namespace n3ldg_cpu {
-
 struct Tensor1D {
-public:
+  private:
+    size_t memsize;
+  public:
     dtype *v;
     int dim;
 
     Tensor1D() {
+        memsize = 0;
         dim = 0;
         v = NULL;
     }
@@ -26,6 +26,7 @@ public:
             delete[] v;
         }
         v = NULL;
+        memsize = 0;
         dim = 0;
     }
 
@@ -34,14 +35,12 @@ public:
     inline void init(int ndim) {
         dim = ndim;
         v = new dtype[dim];
+        memsize = dim * sizeof(dtype);
         zero();
     }
 
     inline void zero() {
-        assert(v != NULL);
-        for (int i = 0; i < dim; ++i) {
-            v[i] = 0;
-        }
+        if(v)memset((void*)v, 0, memsize);;
     }
 
     const Mat mat() const {
@@ -69,12 +68,10 @@ public:
     }
 
     inline dtype& operator[](const int i) {
-        assert(i < dim);
         return v[i];  // no boundary check?
     }
 
     inline const dtype& operator[](const int i) const {
-        assert(i < dim);
         return v[i];  // no boundary check?
     }
 
@@ -131,11 +128,14 @@ public:
 
 
 struct Tensor2D {
-public:
+  private:
+    size_t memsize;
+  public:
     dtype *v;
     int col, row, size;
 
     Tensor2D() {
+        memsize = 0;
         col = row = 0;
         size = 0;
         v = NULL;
@@ -146,6 +146,7 @@ public:
             delete[] v;
         }
         v = NULL;
+        memsize = 0;
         col = row = 0;
         size = 0;
     }
@@ -153,18 +154,16 @@ public:
     //please call this function before using it really. must! must! must!
     //only this function allocates memories
     inline void init(int nrow, int ncol) {
-        row = nrow;
         col = ncol;
+        row = nrow;
         size = col * row;
         v = new dtype[size];
+        memsize = size * sizeof(dtype);
         zero();
     }
 
     inline void zero() {
-        assert(v != NULL);
-        for (int i = 0; i < size; ++i) {
-            v[i] = 0;
-        }
+        if(v)memset((void*)v, 0, memsize);;
     }
 
     const Mat mat() const {
@@ -186,12 +185,10 @@ public:
 
     //use it carefully, first col, then row, because rows are allocated successively
     inline dtype* operator[](const int icol) {
-        assert(icol < col);
         return &(v[icol*row]);  // no boundary check?
     }
 
     inline const dtype* operator[](const int icol) const {
-        assert(icol < col);
         return &(v[icol*row]);  // no boundary check?
     }
 
@@ -243,18 +240,18 @@ public:
         }
     }
 
-    // for embeddings only, embedding matrix: vocabulary  * dim
+    // for embeddings only, embedding matrix: dim  * vocabulary
     // each word's embedding is notmalized
-    inline void norm2one(dtype norm = 1.0) {
+    inline void norm2one() {
         dtype sum;
         for (int idx = 0; idx < col; idx++) {
             sum = 0.000001;
             for (int idy = 0; idy < row; idy++) {
                 sum += (*this)[idx][idy] * (*this)[idx][idy];
             }
-            dtype scale = sqrt(norm / sum);
+            dtype scale = sqrt(sum);
             for (int idy = 0; idy < row; idy++) {
-                (*this)[idx][idy] *= scale;
+                (*this)[idx][idy] /= scale;
             }
         }
     }
@@ -281,7 +278,7 @@ public:
     }
 
 };
-}
+
 
 //useful functions
 inline dtype fequal(const dtype& x) {
@@ -307,20 +304,14 @@ inline dtype fleaky_relu(const dtype& x) {
 }
 
 inline dtype fselu(const dtype& x) {
-    dtype lambda = 1.0507009873554804934193349852946;
-    dtype alpha = 1.6732632423543772848170429916717;
+		dtype lambda = 1.0507009873554804934193349852946;
+		dtype alpha = 1.6732632423543772848170429916717;
     if (x <= 0) return lambda * alpha * (exp(x) - 1);
     return lambda * x;
 }
 
-
-
 inline dtype fexp(const dtype& x) {
     return exp(x);
-}
-
-inline dtype flog(const dtype& x) {
-    return log(x);
 }
 
 //derive function
@@ -338,8 +329,8 @@ inline dtype dleaky_relu(const dtype& x, const dtype& y) {
 }
 
 inline dtype dselu(const dtype& x, const dtype& y) {
-    dtype lambda = 1.0507009873554804934193349852946;
-    dtype alpha = 1.6732632423543772848170429916717;
+		dtype lambda = 1.0507009873554804934193349852946;
+		dtype alpha = 1.6732632423543772848170429916717;
     if (x <= 0) return lambda * alpha + y;
     return lambda;
 }
@@ -357,10 +348,6 @@ inline dtype dexp(const dtype& x, const dtype& y) {
     return y;
 }
 
-inline dtype dlog(const dtype& x, const dtype& y) {
-    if(x < 0.001) return 1000;
-    return 1.0 / x;
-}
 
 
 
