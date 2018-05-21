@@ -46,11 +46,10 @@ class Node {
     int node_index;
 
   public:
-    Node() {
+    Node() : node_type("interface") {
         dim = 0;
         degree = 0;
         parents.clear();
-        node_type = "interface";
         drop_value = -1;
     }
 

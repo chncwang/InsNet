@@ -25,6 +25,10 @@ class LSTMActivatedNode : public Node {
     std::array<Node *, 2> ins;
     int quaterDim = 0;
 
+    LSTMActivatedNode() {
+        this->node_type = "LSTMActivated";
+    }
+
     void init(int ndim, dtype dropout) override {
         if ((ndim & 3) != 0) {
             abort();
@@ -120,8 +124,23 @@ class LSTMCellNode : public Node {
     Node *previousCell = NULL;
     Node *forgetAndInput = NULL;
 
+    LSTMCellNode() {
+        node_type = "LSTMCell";
+    }
+
     void forward(Graph *graph, Node *previouscell, Node *forgetandinput) {
-        if (dim != previousCell->dim || dim != (forgetAndInput->dim >> 2)) {
+        std::cout << "dim:" << dim << std::endl;
+        std::cout << "previousCell->dim:" << previousCell->dim << std::endl;
+        if (dim != previousCell->dim) {
+            std::cout << "dim:" << dim << " previousCell->dim:" <<
+                previouscell->dim << " forgetAndInput->dim:" <<
+                forgetandinput->dim << std::endl;
+            abort();
+        }
+        if (dim != (forgetAndInput->dim >> 2)) {
+            std::cout << "dim:" << dim << " previousCell->dim:" <<
+                previouscell->dim << " forgetAndInput->dim:" <<
+                forgetandinput->dim << std::endl;
             abort();
         }
         degree = 0;
@@ -194,6 +213,10 @@ class LSTMHiddenNode : public Node {
     Node *output = NULL;
     Node *cell = NULL;
     Tensor1D tanhCell;
+
+    LSTMHiddenNode() {
+        node_type = "LSTMHidden";
+    }
 
     void init(int ndim, dtype dropout) override {
         Node::init(ndim, dropout);
@@ -366,14 +389,22 @@ class LSTM1Builder {
             i_step = -1;
         }
 
+        std::cout << "_short_bucket.dim:" << _short_bucket.dim << " ptr:" << &_short_bucket << std::endl;
+
         for (int i = i_begin; _left2right ? i < xs.size() : i >= 0;
                 i += i_step) {
-            _linearTransformedXs.at(i).forward(graph, xs.at(i));
-            _linearTransformedHiddens.at(i).forward(graph, i == i_begin ? 
-                    static_cast<Node *>(&_long_bucket) : 
-                    static_cast<Node *>(&_hiddenNodes.at(i - i_step)));
-            _activatedNodes.at(i).forward(graph, &_linearTransformedXs.at(i),
-                    &_linearTransformedHiddens.at(i));
+            std::cout << "_left2right:" << _left2right <<" i:" << i <<
+                std::endl;
+            //_linearTransformedXs.at(i).forward(graph, xs.at(i));
+            //_linearTransformedHiddens.at(i).forward(graph, i == i_begin ? 
+            //        static_cast<Node *>(&_long_bucket) : 
+            //        static_cast<Node *>(&_hiddenNodes.at(i - i_step)));
+            //_activatedNodes.at(i).forward(graph, &_linearTransformedXs.at(i),
+            //        &_linearTransformedHiddens.at(i));
+            if (i == i_begin) {
+                _cellNodes.at(i).forward(graph, &_short_bucket,
+                        &_activatedNodes.at(i));
+            }
             _cellNodes.at(i).forward(graph, i == i_begin ?
                     static_cast<Node *>(&_short_bucket) :
                     static_cast<Node *>(&_cellNodes.at(i - i_step)),
