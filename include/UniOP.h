@@ -219,6 +219,7 @@ class LinearUniNode : public Node {
 
     // better to rewrite for deep understanding
     bool typeEqual(PNode other) {
+        abort(); // This method is deprecated, considering performance.
         bool result = Node::typeEqual(other);
         if (!result) return false;
 

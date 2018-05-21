@@ -206,7 +206,12 @@ public:
         }
     }
 
-    virtual void backward() = 0;
+    virtual void backward() {
+        for (Node *node : batch) {
+            node->backward_drop();
+            node->backward();
+        }
+    }
 
     virtual void clearValue() {
         for (PNode p : batch) {
@@ -249,7 +254,12 @@ public:
     }
 #endif
 protected:
-    virtual void forward() = 0;
+    virtual void forward() {
+        for (Node *node : batch) {
+            node->compute();
+            node->forward_drop(bTrain, drop_factor);
+        }
+    }
 };
 
 typedef  Execute* PExecute;
