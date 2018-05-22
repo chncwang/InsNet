@@ -9,8 +9,6 @@
 *      Author: mszhang
 */
 
-#include <functional>
-#include <array>
 #include "MyLib.h"
 #include "Node.h"
 #include "BiOP.h"
@@ -20,399 +18,301 @@
 #include "PAddOP.h"
 #include "BucketOP.h"
 
-class LSTMActivatedNode : public Node {
-  public:
-    std::array<Node *, 2> ins;
-    int quaterDim = 0;
-
-    LSTMActivatedNode() {
-        this->node_type = "LSTMActivated";
-    }
-
-    void init(int ndim, dtype dropout) override {
-        if ((ndim & 3) != 0) {
-            abort();
-        }
-        quaterDim = ndim >> 2;
-        Node::init(ndim, dropout);
-    }
-
-    void forward(Graph *graph, Node *in1, Node *in2) {
-        if (dim != in1->dim || dim != in2->dim) {
-            abort();
-        }
-        degree = 0;
-
-        ins.at(0) = in1;
-        ins.at(1) = in2;
-        for (Node *in : ins) {
-            in->addParent(this);
-        }
-        graph->addNode(in1);
-        graph->addNode(in2);
-    }
-
-    void compute() override {
-        sigmoidValue() = (sigmoidInValue(0) + sigmoidInValue(1)).sigmoid();
-        tanhValue() = (tanhInValue(0) + tanhInValue(1)).tanh();
-    }
-
-    void backward() override {
-        for (int i = 0; i < 2; ++i) {
-            sigmoidInLoss(i) += sigmoidLoss() *
-                sigmoidInValue(i).binaryExpr(sigmoidValue(), ptr_fun(dsigmoid));
-            tanhInLoss(i) += tanhLoss() *
-                tanhInValue(i).binaryExpr(tanhValue(), ptr_fun(dtanh));
-        }
-    }
-
-    size_t typeHashCode() const override {
-        return Node::typeHashCode();
-    }
-
-    Vec sigmoidValue() {
-        return Vec(val.v, 3 * quaterDim);
-    }
-
-    Vec sigmoidLoss() {
-        return Vec(loss.v, 3 * quaterDim);
-    }
-
-    Vec sigmoidInValue(int index) {
-        return Vec(ins.at(index)->val.v, 3 * quaterDim);
-    }
-
-    Vec sigmoidInLoss(int index) {
-        return Vec(ins.at(index)->loss.v, 3 * quaterDim);
-    }
-
-    Vec tanhValue() {
-        return Vec(val.v + 3 * quaterDim, quaterDim);
-    }
-
-    Vec tanhLoss() {
-        return Vec(loss.v + 3 * quaterDim, quaterDim);
-    }
-
-    Vec tanhInValue(int index) {
-        return Vec(ins.at(index)->val.v + 3 * quaterDim, quaterDim);
-    }
-
-    Vec tanhInLoss(int index) {
-        return Vec(ins.at(index)->loss.v + 3 * quaterDim, quaterDim);
-    }
-
-    Execute* generate(bool bTrain, dtype cur_drop_factor);
-};
-
-#if USE_GPU
-class LSTMActivatedExecute : public Execute {
-};
-#else
-class LSTMActivatedExecute : public Execute {};
-#endif
-
-Execute *LSTMActivatedNode::generate(bool bTrain, dtype cur_drop_factor) {
-    LSTMActivatedExecute *execute = new LSTMActivatedExecute;
-    execute->bTrain = bTrain;
-    execute->drop_factor = cur_drop_factor;
-    return execute;
-}
-
-class LSTMCellNode : public Node {
-  public:
-    Node *previousCell = NULL;
-    Node *forgetAndInput = NULL;
-
-    LSTMCellNode() {
-        node_type = "LSTMCell";
-    }
-
-    void forward(Graph *graph, Node *previouscell, Node *forgetandinput) {
-        std::cout << "dim:" << dim << std::endl;
-        std::cout << "previousCell->dim:" << previousCell->dim << std::endl;
-        if (dim != previousCell->dim) {
-            std::cout << "dim:" << dim << " previousCell->dim:" <<
-                previouscell->dim << " forgetAndInput->dim:" <<
-                forgetandinput->dim << std::endl;
-            abort();
-        }
-        if (dim != (forgetAndInput->dim >> 2)) {
-            std::cout << "dim:" << dim << " previousCell->dim:" <<
-                previouscell->dim << " forgetAndInput->dim:" <<
-                forgetandinput->dim << std::endl;
-            abort();
-        }
-        degree = 0;
-        previousCell = previouscell;
-        forgetAndInput = forgetandinput;
-        previousCell->addParent(this);
-        forgetAndInput->addParent(this);
-        graph->addNode(previouscell);
-        graph->addNode(forgetandinput);
-    }
-
-    void compute() override {
-        val.vec() = forgetValue() * previousCell->val.vec() +
-            inputValue() * newCellValue();
-    }
-
-    void backward() override {
-        forgetLoss() += loss.vec() * previousCell->val.vec();
-        previousCell->loss.vec() += loss.vec() * forgetValue();
-        inputLoss() += loss.vec() * newCellValue();
-        newCellLoss() += loss.vec() * inputValue();
-    }
-
-    size_t typeHashCode() const override {
-        return Node::typeHashCode();
-    }
-
-    Vec forgetValue() {
-        return Vec(forgetAndInput->val.v, dim);
-    }
-
-    Vec forgetLoss() {
-        return Vec(forgetAndInput->loss.v, dim);
-    }
-
-    Vec inputValue() {
-        return Vec(forgetAndInput->val.v + dim, dim);
-    }
-
-    Vec inputLoss() {
-        return Vec(forgetAndInput->loss.v + dim, dim);
-    }
-
-    Vec newCellValue() {
-        return Vec(forgetAndInput->val.v + 3 * dim, dim);
-    }
-
-    Vec newCellLoss() {
-        return Vec(forgetAndInput->loss.v + 3 * dim, dim);
-    }
-
-    Execute* generate(bool bTrain, dtype cur_drop_factor);
-};
-
-#if USE_GPU
-class LSTMCellExecute : public Execute {};
-#else
-class LSTMCellExecute : public Execute {};
-#endif
-
-Execute *LSTMCellNode::generate(bool bTrain, dtype cur_drop_factor) {
-    LSTMCellExecute *execute = new LSTMCellExecute;
-    execute->bTrain = bTrain;
-    execute->drop_factor = cur_drop_factor;
-    return execute;
-}
-
-class LSTMHiddenNode : public Node {
-  public:
-    Node *output = NULL;
-    Node *cell = NULL;
-    Tensor1D tanhCell;
-
-    LSTMHiddenNode() {
-        node_type = "LSTMHidden";
-    }
-
-    void init(int ndim, dtype dropout) override {
-        Node::init(ndim, dropout);
-        tanhCell.init(ndim);
-    }
-
-    void forward(Graph *graph, Node *outputte, Node *sell) {
-        if (dim != outputte->dim) {
-            abort();
-        }
-        degree = 0;
-        output = outputte;
-        cell = sell;
-        output->addParent(this);
-        cell->addParent(this);
-        graph->addNode(outputte);
-        graph->addNode(sell);
-    }
-
-    void compute() override {
-        tanhCell.vec() = cell->val.vec().tanh();
-        val.vec() = outputValue() * tanhCell.vec();
-    }
-
-    void backward() override {
-        outputLoss() += loss.vec() * tanhCell.vec();
-        cell->loss.vec() += loss.vec() * outputValue() *
-            cell->val.vec().binaryExpr(tanhCell.vec(), ptr_fun(dtanh));
-    }
-
-    size_t typeHashCode() const override {
-        return Node::typeHashCode();
-    }
-
-    Vec outputValue() {
-        return Vec(output->val.v + 2 * dim, dim);
-    }
-
-    Vec outputLoss() {
-        return Vec(output->loss.v + 2 * dim, dim);
-    }
-
-    Execute* generate(bool bTrain, dtype cur_drop_factor);
-};
-
-#if USE_GPU
-class LSTMHiddenExecute : public Execute {};
-#else
-class LSTMHiddenExecute : public Execute {};
-#endif
-
-Execute *LSTMHiddenNode::generate(bool bTrain, dtype cur_drop_factor) {
-    LSTMHiddenExecute *execute = new LSTMHiddenExecute;
-    execute->bTrain = bTrain;
-    execute->drop_factor = cur_drop_factor;
-    return execute;
-}
-
 struct LSTM1Params {
-    UniParams Wx;
-    UniParams Wh;
+    UniParams input_hidden;
+    UniParams input_input;
+    UniParams output_hidden;
+    UniParams output_input;
+    UniParams forget_hidden;
+    UniParams forget_input;
+    UniParams cell_hidden;
+    UniParams cell_input;
+
+    LSTM1Params() {
+    }
 
     void exportAdaParams(ModelUpdate& ada) {
-        Wx.exportAdaParams(ada);
-        Wh.exportAdaParams(ada);
+        input_hidden.exportAdaParams(ada);
+        input_input.exportAdaParams(ada);
+        output_hidden.exportAdaParams(ada);
+        output_input.exportAdaParams(ada);
+        forget_hidden.exportAdaParams(ada);
+        forget_input.exportAdaParams(ada);
+        cell_hidden.exportAdaParams(ada);
+        cell_input.exportAdaParams(ada);
     }
 
-    void initial(int outDim, int inDim) {
-        Wx.initial(4 * outDim, inDim, true);
-        Wh.initial(4 * outDim, outDim, false);
+    void initial(int nOSize, int nISize) {
+        input_hidden.initial(nOSize, nOSize, false);
+        input_input.initial(nOSize, nOSize, true);
+        output_hidden.initial(nOSize, nOSize, false);
+        output_input.initial(nOSize, nOSize, true);
+        forget_hidden.initial(nOSize, nOSize, false);
+        forget_input.initial(nOSize, nOSize, true);
+        cell_hidden.initial(nOSize, nOSize, false);
+        cell_input.initial(nOSize, nOSize, true);
     }
 
     int inDim() {
-        return Wx.W.inDim();
+        return input_input.W.inDim();
     }
 
     int outDim() {
-        return Wh.W.inDim();
+        return input_input.W.outDim();
     }
 
     void save(std::ofstream &os) const {
-        Wx.save(os);
-        Wh.save(os);
+        input_hidden.save(os);
+        input_input.save(os);
+        output_hidden.save(os);
+        output_input.save(os);
+        forget_hidden.save(os);
+        forget_input.save(os);
+        cell_hidden.save(os);
+        cell_input.save(os);
+
     }
 
     void load(std::ifstream &is) {
-        Wx.load(is);
-        Wh.load(is);
+        input_hidden.load(is);
+        input_input.load(is);
+        output_hidden.load(is);
+        output_input.load(is);
+        forget_hidden.load(is);
+        forget_input.load(is);
+        cell_hidden.load(is);
+        cell_input.load(is);
     }
+
 };
 
 // standard LSTM1 using tanh as activation function
 // other conditions are not implemented unless they are clear
 class LSTM1Builder {
-  public:
-    int _size;;
+public:
+    int _nSize;
     int _inDim;
     int _outDim;
 
-    std::vector<LinearNode> _linearTransformedXs;
-    std::vector<LinearNode> _linearTransformedHiddens;
-    std::vector<LSTMActivatedNode> _activatedNodes;
-    std::vector<LSTMCellNode> _cellNodes;
-    std::vector<LSTMHiddenNode> _hiddenNodes;
+    vector<LinearNode> _inputgates_hidden;
+    vector<LinearNode> _inputgates_input;
+    vector<PAddNode> _inputgates_add;
+    vector<SigmoidNode> _inputgates;
 
-    BucketNode _long_bucket;
-    BucketNode _short_bucket;
+    vector<LinearNode> _forgetgates_hidden;
+    vector<LinearNode> _forgetgates_input;
+    vector<PAddNode> _forgetgates_add;
+    vector<SigmoidNode> _forgetgates;
+
+    vector<LinearNode> _halfcells_hidden;
+    vector<LinearNode> _halfcells_input;
+    vector<PAddNode> _halfcells_add;
+    vector<TanhNode> _halfcells;
+
+    vector<LinearNode> _outputgates_hidden;
+    vector<LinearNode> _outputgates_input;
+    vector<PAddNode> _outputgates_add;
+    vector<SigmoidNode> _outputgates;
+
+    vector<PMultiNode> _inputfilters;
+    vector<PMultiNode> _forgetfilters;
+
+    vector<PAddNode> _cells;
+
+    vector<TanhNode> _halfhiddens;
+    vector<PMultiNode> _hiddens;  // intermediate result without dropout
+
+    BucketNode _bucket;
 
     LSTM1Params* _param;
 
     bool _left2right;
 
-    void init(LSTM1Params* paramInit, dtype dropout, bool left2right = true) {
-        _param = paramInit;
-        _inDim = paramInit->inDim();
-        _outDim = paramInit->outDim();
-        int size = _hiddenNodes.size();
-
-        for (int i = 0; i < size; ++i) {
-            _linearTransformedXs.at(i).setParam(&paramInit->Wx);
-            _linearTransformedHiddens.at(i).setParam(&paramInit->Wh);
-        }
-
-        _left2right = left2right;
-
-        int fourOutDim = _outDim << 2;
-        for (int i = 0; i < size; ++i) {
-            _linearTransformedXs.at(i).init(fourOutDim, -1);
-            _linearTransformedHiddens.at(i).init(fourOutDim, -1);
-            _activatedNodes.at(i).init(fourOutDim, -1);
-            _cellNodes.at(i).init(_outDim, -1);
-            _hiddenNodes.at(i).init(_outDim, dropout);
-        }
-
-        _long_bucket.init(fourOutDim, -1);
-        _short_bucket.init(_outDim, -1);
+public:
+    LSTM1Builder() {
+        clear();
     }
 
+    ~LSTM1Builder() {
+        clear();
+    }
+
+public:
+    void init(LSTM1Params* paramInit, dtype dropout, bool left2right = true) {
+        _param = paramInit;
+        _inDim = _param->input_input.W.inDim();
+        _outDim = _param->input_input.W.outDim();
+        int maxsize = _inputgates_hidden.size();
+
+        for (int idx = 0; idx < maxsize; idx++) {
+            _inputgates_input.at(idx).setParam(&_param->input_input);
+            _outputgates_input.at(idx).setParam(&_param->output_input);
+            _forgetgates_input.at(idx).setParam(&_param->forget_input);
+            _halfcells_input.at(idx).setParam(&_param->cell_input);
+
+            _inputgates_hidden.at(idx).setParam(&_param->input_hidden);
+            _outputgates_hidden.at(idx).setParam(&_param->output_hidden);
+            _forgetgates_hidden.at(idx).setParam(&_param->forget_hidden);
+            _halfcells_hidden.at(idx).setParam(&_param->cell_hidden);
+        }
+        _left2right = left2right;
+
+        for (int idx = 0; idx < maxsize; idx++) {
+            _inputgates_hidden.at(idx).init(_outDim, -1);
+            _inputgates_input.at(idx).init(_outDim, -1);
+            _forgetgates_hidden.at(idx).init(_outDim, -1);
+            _forgetgates_input.at(idx).init(_outDim, -1);
+            _halfcells_hidden.at(idx).init(_outDim, -1);
+            _halfcells_input.at(idx).init(_outDim, -1);
+            _outputgates_hidden.at(idx).init(_outDim, -1);
+            _outputgates_input.at(idx).init(_outDim, -1);
+
+            _inputfilters.at(idx).init(_outDim, -1);
+            _forgetfilters.at(idx).init(_outDim, -1);
+            _cells.at(idx).init(_outDim, -1);
+
+            _halfhiddens.at(idx).init(_outDim, -1);
+            _hiddens.at(idx).init(_outDim, dropout);
+
+            _inputgates_add.at(idx).init(_outDim, -1);
+            _inputgates.at(idx).init(_outDim, -1);
+            _forgetgates_add.at(idx).init(_outDim, -1);
+            _forgetgates.at(idx).init(_outDim, -1);
+            _halfcells_add.at(idx).init(_outDim, -1);
+            _halfcells.at(idx).init(_outDim, -1);
+            _outputgates_add.at(idx).init(_outDim, -1);
+            _outputgates.at(idx).init(_outDim, -1);
+        }
+        _bucket.init(_outDim, -1);
+
+    }
 
     void resize(int maxsize) {
-        _linearTransformedXs.resize(maxsize);
-        _linearTransformedHiddens.resize(maxsize);
-        _activatedNodes.resize(maxsize);
-        _cellNodes.resize(maxsize);
-        _hiddenNodes.resize(maxsize);
+        _inputgates_hidden.resize(maxsize);
+        _inputgates_input.resize(maxsize);
+        _inputgates_add.resize(maxsize);
+        _inputgates.resize(maxsize);
+        _forgetgates_hidden.resize(maxsize);
+        _forgetgates_input.resize(maxsize);
+        _forgetgates_add.resize(maxsize);
+        _forgetgates.resize(maxsize);
+        _halfcells_hidden.resize(maxsize);
+        _halfcells_input.resize(maxsize);
+        _halfcells_add.resize(maxsize);
+        _halfcells.resize(maxsize);
+        _outputgates_hidden.resize(maxsize);
+        _outputgates_input.resize(maxsize);
+        _outputgates_add.resize(maxsize);
+        _outputgates.resize(maxsize);
+
+        _inputfilters.resize(maxsize);
+        _forgetfilters.resize(maxsize);
+        _cells.resize(maxsize);
+        _halfhiddens.resize(maxsize);
+        _hiddens.resize(maxsize);
     }
 
     //whether vectors have been allocated
     bool empty() {
-        return _hiddenNodes.empty();
+        return _hiddens.empty();
     }
 
-    void forward(Graph *graph, const vector<PNode>& xs) {
-        if (xs.size() == 0) {
+    void clear() {
+        _inputgates_hidden.clear();
+        _inputgates_input.clear();
+        _inputgates_add.clear();
+        _inputgates.clear();
+        _forgetgates_hidden.clear();
+        _forgetgates_input.clear();
+        _forgetgates_add.clear();
+        _forgetgates.clear();
+        _halfcells_hidden.clear();
+        _halfcells_input.clear();
+        _halfcells_add.clear();
+        _halfcells.clear();
+        _outputgates_hidden.clear();
+        _outputgates_input.clear();
+        _outputgates_add.clear();
+        _outputgates.clear();
+
+        _inputfilters.clear();
+        _forgetfilters.clear();
+        _cells.clear();
+        _halfhiddens.clear();
+        _hiddens.clear();
+
+        _left2right = true;
+        _param = NULL;
+        _nSize = 0;
+        _inDim = 0;
+        _outDim = 0;
+    }
+
+public:
+    void forward(Graph *cg, const vector<PNode>& x) {
+        if (x.size() == 0) {
             std::cout << "empty inputs for lstm operation" << std::endl;
-            abort();
+            return;
         }
-        if (xs[0]->val.dim != _inDim) {
+        _nSize = x.size();
+        if (x[0]->val.dim != _inDim) {
             std::cout << "input dim does not match for lstm operation" << std::endl;
-            abort();
+            return;
         }
 
-        int i_begin, i_step;
+        int idx_begin = _left2right ? 0 : x.size() - 1;
+        int idx_step = _left2right ? 1 : -1;
 
-        if (_left2right) {
-            i_begin = 0;
-            i_step = 1;
-        } else {
-            i_begin = _size - 1;
-            i_step = -1;
-        }
+        for (int idx = idx_begin; _left2right ? idx < _nSize : idx >= 0; idx += idx_step) {
+            if (idx == idx_begin) {
+                _bucket.forward(cg, 0);
+                _inputgates_hidden[idx].forward(cg, &_bucket);
+                _inputgates_input[idx].forward(cg, x[idx]);
+                _inputgates_add[idx].forward(cg, &_inputgates_hidden[idx], &_inputgates_input[idx]);
+                _inputgates[idx].forward(cg, &_inputgates_add[idx]);
 
-        std::cout << "_short_bucket.dim:" << _short_bucket.dim << " ptr:" << &_short_bucket << std::endl;
+                _outputgates_hidden[idx].forward(cg, &_bucket);
+                _outputgates_input[idx].forward(cg, x[idx]);
+                _outputgates_add[idx].forward(cg, &_outputgates_hidden[idx], &_outputgates_input[idx]);
+                _outputgates[idx].forward(cg, &_outputgates_add[idx]);
 
-        for (int i = i_begin; _left2right ? i < xs.size() : i >= 0;
-                i += i_step) {
-            std::cout << "_left2right:" << _left2right <<" i:" << i <<
-                std::endl;
-            //_linearTransformedXs.at(i).forward(graph, xs.at(i));
-            //_linearTransformedHiddens.at(i).forward(graph, i == i_begin ? 
-            //        static_cast<Node *>(&_long_bucket) : 
-            //        static_cast<Node *>(&_hiddenNodes.at(i - i_step)));
-            //_activatedNodes.at(i).forward(graph, &_linearTransformedXs.at(i),
-            //        &_linearTransformedHiddens.at(i));
-            if (i == i_begin) {
-                _cellNodes.at(i).forward(graph, &_short_bucket,
-                        &_activatedNodes.at(i));
+                _halfcells_hidden[idx].forward(cg, &_bucket);
+                _halfcells_input[idx].forward(cg, x[idx]);
+                _halfcells_add[idx].forward(cg, &_halfcells_hidden[idx], &_halfcells_input[idx]);
+                _halfcells[idx].forward(cg, &_halfcells_add[idx]);
+
+                _inputfilters[idx].forward(cg, &_halfcells[idx], &_inputgates[idx]);
+                _cells[idx].forward(cg, &_inputfilters[idx], &_bucket);
+                _halfhiddens[idx].forward(cg, &_cells[idx]);
+                _hiddens[idx].forward(cg, &_halfhiddens[idx], &_outputgates[idx]);
+            } else {
+                _inputgates_hidden[idx].forward(cg, &_hiddens[idx - idx_step]);
+                _inputgates_input[idx].forward(cg, x[idx]);
+                _inputgates_add[idx].forward(cg, &_inputgates_hidden[idx], &_inputgates_input[idx]);
+                _inputgates[idx].forward(cg, &_inputgates_add[idx]);
+
+                _outputgates_hidden[idx].forward(cg, &_hiddens[idx - idx_step]);
+                _outputgates_input[idx].forward(cg, x[idx]);
+                _outputgates_add[idx].forward(cg, &_outputgates_hidden[idx], &_outputgates_input[idx]);
+                _outputgates[idx].forward(cg, &_outputgates_add[idx]);
+
+                _halfcells_hidden[idx].forward(cg, &_hiddens[idx - idx_step]);
+                _halfcells_input[idx].forward(cg, x[idx]);
+                _halfcells_add[idx].forward(cg, &_halfcells_hidden[idx], &_halfcells_input[idx]);
+                _halfcells[idx].forward(cg, &_halfcells_add[idx]);
+
+                _forgetgates_hidden[idx].forward(cg, &_hiddens[idx - idx_step]);
+                _forgetgates_input[idx].forward(cg, x[idx]);
+                _forgetgates_add[idx].forward(cg, &_forgetgates_hidden[idx], &_forgetgates_input[idx]);
+                _forgetgates[idx].forward(cg, &_forgetgates_add[idx]);
+
+                _inputfilters[idx].forward(cg, &_halfcells[idx], &_inputgates[idx]);
+                _forgetfilters[idx].forward(cg, &_cells[idx - idx_step], &_forgetgates[idx]);
+                _cells[idx].forward(cg, &_inputfilters[idx], &_forgetfilters[idx]);
+                _halfhiddens[idx].forward(cg, &_cells[idx]);
+                _hiddens[idx].forward(cg, &_halfhiddens[idx], &_outputgates[idx]);
             }
-            _cellNodes.at(i).forward(graph, i == i_begin ?
-                    static_cast<Node *>(&_short_bucket) :
-                    static_cast<Node *>(&_cellNodes.at(i - i_step)),
-                    &_activatedNodes.at(i));
-            _hiddenNodes.at(i).forward(graph, &_activatedNodes.at(i),
-                    &_cellNodes.at(i));
         }
     }
 };
-
 #endif
