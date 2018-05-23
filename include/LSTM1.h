@@ -315,4 +315,139 @@ public:
         }
     }
 };
+
+class IncLSTM1Builder {
+public:
+    int _nSize;
+    int _inDim;
+    int _outDim;
+
+    IncLSTM1Builder *pPrev;
+
+    LinearNode _inputgate_hidden;
+    LinearNode _inputgate_input;
+    PAddNode _inputgate_add;
+    SigmoidNode _inputgate;
+
+    LinearNode _forgetgate_hidden;
+    LinearNode _forgetgate_input;
+    PAddNode _forgetgate_add;
+    SigmoidNode _forgetgate;
+
+    LinearNode _halfcell_hidden;
+    LinearNode _halfcell_input;
+    PAddNode _halfcell_add;
+    TanhNode _halfcell;
+
+    LinearNode _outputgate_hidden;
+    LinearNode _outputgate_input;
+    PAddNode _outputgate_add;
+    SigmoidNode _outputgate;
+
+    PMultiNode _inputfilter;
+    PMultiNode _forgetfilter;
+
+    PAddNode _cells;
+
+    TanhNode _halfhidden;
+    PMultiNode _hidden;  // intermediate result without dropout
+
+    BucketNode _bucket;
+
+    LSTM1Params* _param;
+
+    void init(LSTM1Params* paramInit, dtype dropout, bool left2right = true) {
+        _param = paramInit;
+        _inDim = _param->input_input.W.inDim();
+        _outDim = _param->input_input.W.outDim();
+
+        _inputgate_input.setParam(&_param->input_input);
+        _outputgate_input.setParam(&_param->output_input);
+        _forgetgate_input.setParam(&_param->forget_input);
+        _halfcell_input.setParam(&_param->cell_input);
+
+        _inputgate_hidden.setParam(&_param->input_hidden);
+        _outputgate_hidden.setParam(&_param->output_hidden);
+        _forgetgate_hidden.setParam(&_param->forget_hidden);
+        _halfcell_hidden.setParam(&_param->cell_hidden);
+
+        _inputgate_hidden.init(_outDim, -1);
+        _inputgate_input.init(_outDim, -1);
+        _forgetgate_hidden.init(_outDim, -1);
+        _forgetgate_input.init(_outDim, -1);
+        _halfcell_hidden.init(_outDim, -1);
+        _halfcell_input.init(_outDim, -1);
+        _outputgate_hidden.init(_outDim, -1);
+        _outputgate_input.init(_outDim, -1);
+
+        _inputfilter.init(_outDim, -1);
+        _forgetfilter.init(_outDim, -1);
+        _cells.init(_outDim, -1);
+
+        _halfhidden.init(_outDim, -1);
+        _hidden.init(_outDim, dropout);
+
+        _inputgate_add.init(_outDim, -1);
+        _inputgate.init(_outDim, -1);
+        _forgetgate_add.init(_outDim, -1);
+        _forgetgate.init(_outDim, -1);
+        _halfcell_add.init(_outDim, -1);
+        _halfcell.init(_outDim, -1);
+        _outputgate_add.init(_outDim, -1);
+        _outputgate.init(_outDim, -1);
+        _bucket.init(_outDim, -1);
+
+    }
+
+    void forward(Graph *cg, PNode x, IncLSTM1Builder *prev = NULL) {
+        if (prev == NULL) {
+            _bucket.forward(cg, 0);
+            _inputgate_hidden.forward(cg, &_bucket);
+            _inputgate_input.forward(cg, x);
+            _inputgate_add.forward(cg, &_inputgate_hidden, &_inputgate_input);
+            _inputgate.forward(cg, &_inputgate_add);
+
+            _outputgate_hidden.forward(cg, &_bucket);
+            _outputgate_input.forward(cg, x);
+            _outputgate_add.forward(cg, &_outputgate_hidden, &_outputgate_input);
+            _outputgate.forward(cg, &_outputgate_add);
+
+            _halfcell_hidden.forward(cg, &_bucket);
+            _halfcell_input.forward(cg, x);
+            _halfcell_add.forward(cg, &_halfcell_hidden, &_halfcell_input);
+            _halfcell.forward(cg, &_halfcell_add);
+
+            _inputfilter.forward(cg, &_halfcell, &_inputgate);
+            _cells.forward(cg, &_inputfilter, &_bucket);
+            _halfhidden.forward(cg, &_cells);
+            _hidden.forward(cg, &_halfhidden, &_outputgate);
+        } else {
+            _inputgate_hidden.forward(cg, &prev->_hidden);
+            _inputgate_input.forward(cg, x);
+            _inputgate_add.forward(cg, &prev->_inputgate_hidden, &prev->_inputgate_input);
+            _inputgate.forward(cg, &prev->_inputgate_add);
+
+            _outputgate_hidden.forward(cg, &prev->_hidden);
+            _outputgate_input.forward(cg, x);
+            _outputgate_add.forward(cg, &_outputgate_hidden, &_outputgate_input);
+            _outputgate.forward(cg, &_outputgate_add);
+
+            _halfcell_hidden.forward(cg, &prev->_hidden);
+            _halfcell_input.forward(cg, x);
+            _halfcell_add.forward(cg, &_halfcell_hidden, &_halfcell_input);
+            _halfcell.forward(cg, &_halfcell_add);
+
+            _forgetgate_hidden.forward(cg, &prev->_hidden);
+            _forgetgate_input.forward(cg, x);
+            _forgetgate_add.forward(cg, &_forgetgate_hidden, &_forgetgate_input);
+            _forgetgate.forward(cg, &_forgetgate_add);
+
+            _inputfilter.forward(cg, &_halfcell, &_inputgate);
+            _forgetfilter.forward(cg, &prev->_cells, &_forgetgate);
+            _cells.forward(cg, &_inputfilter, &_forgetfilter);
+            _halfhidden.forward(cg, &_cells);
+            _hidden.forward(cg, &_halfhidden, &_outputgate);
+        }
+    }
+};
 #endif
