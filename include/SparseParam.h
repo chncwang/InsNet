@@ -75,7 +75,7 @@ class SparseParam : public BaseParam {
         indexers = false;
         n3ldg_cuda::Assert(grad.verify("SparseParam clearGrad"));
         n3ldg_cuda::Assert(n3ldg_cuda::Verify(indexers.c_buf(),
-                    dIndexers.value, grad.row, "SparseParam indexers"));
+                    dIndexers.value, grad.col, "SparseParam indexers"));
 #endif
 #else
         int inDim = indexers.size();
