@@ -253,6 +253,9 @@ class LinearNode : public Node {
 
 
     void setParam(UniParams* paramInit) {
+        if (paramInit->bUseB) {
+            assert(paramInit->W.outDim() == paramInit->b.outDim());
+        }
         param = paramInit;
     }
 
@@ -702,8 +705,8 @@ public:
                     param->b.grad.v[idy] += ly[idx][idy];
                 }
             }
+            n3ldg_cuda::Assert(param->b.grad.verify("backward b grad"));
         }
-        n3ldg_cuda::Assert(param->b.grad.verify("backward b grad"));
 
         lx.mat() += param->W.val.mat().transpose() * ly.mat();
         n3ldg_cuda::Assert(lx.verify("linear execute backward lx"));

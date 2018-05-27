@@ -64,7 +64,7 @@ class SparseParam : public BaseParam {
     void clearGrad() {
 #if USE_GPU
         n3ldg_cuda::Memset(grad.value, grad.size, 0.0f);
-        n3ldg_cuda::Memset(dIndexers.value, grad.row, false);
+        n3ldg_cuda::Memset(dIndexers.value, grad.col, false);
 #if TEST_CUDA
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {

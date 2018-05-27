@@ -13,14 +13,12 @@
 
 
 class ModelUpdate {
-
   public:
     vector<BaseParam*> _params;
 
     dtype _reg, _alpha, _eps;
     dtype _belta1, _belta2;
 
-  public:
     ModelUpdate() {
         _params.clear();
 
@@ -32,16 +30,15 @@ class ModelUpdate {
         _belta2 = 0.999;
     }
 
-
-  public:
-
     void addParam(BaseParam* param) {
+        static int index;
+        param->index = index++;
         _params.push_back(param);
     }
 
     void addParam(const vector<BaseParam*>& params) {
         for (int idx = 0; idx < params.size(); idx++) {
-            _params.push_back(params[idx]);
+            addParam(params.at(idx));
         }
     }
 

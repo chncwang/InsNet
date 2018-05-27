@@ -17,7 +17,8 @@
 struct BaseParam {
     Tensor2D val;
     Tensor2D grad;
-  public:
+    int index;
+
     virtual void initial(int outDim, int inDim) = 0;
     virtual void updateAdagrad(dtype alpha, dtype reg, dtype eps) = 0;
     virtual void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) = 0;
