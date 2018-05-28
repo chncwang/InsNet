@@ -31,8 +31,11 @@ class ModelUpdate {
     }
 
     void addParam(BaseParam* param) {
-        static int index;
-        param->index = index++;
+        for (BaseParam * p : _params) {
+            if (p == param) {
+                abort();
+            }
+        }
         _params.push_back(param);
     }
 

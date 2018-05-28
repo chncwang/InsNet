@@ -35,7 +35,6 @@ class Param : public BaseParam {
         val.random(bound);
         iter = 0;
 #if USE_GPU
-        val.copyFromHostToDevice();
         n3ldg_cuda::Memset(grad.value, outDim * inDim, 0.0f);
         n3ldg_cuda::Memset(aux_square.value, outDim * inDim, 0.0f);
         n3ldg_cuda::Memset(aux_mean.value, outDim * inDim, 0.0f);
@@ -80,6 +79,7 @@ class Param : public BaseParam {
     }
 
     void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) {
+        std::cout << "UpdateAdam index:" << index << std::endl;
 #if USE_GPU
 #if TEST_CUDA
         n3ldg_cuda::Assert(val.verify("Param adam begin val"));
@@ -103,6 +103,7 @@ class Param : public BaseParam {
         dtype lr_t = alpha * sqrt(1 - pow(belta2, iter + 1)) / (1 - pow(belta1, iter + 1));
         val.vec() = val.vec() - aux_mean.vec() * lr_t / (aux_square.vec() + eps).sqrt();
         n3ldg_cuda::Assert(val.verify("Param adam"));
+        std::cout << "updateAdam val asserted index:" << index << std::endl;
 #endif
 #else
         if (val.col > 1 && val.row > 1)grad.vec() = grad.vec() + val.vec() * reg;

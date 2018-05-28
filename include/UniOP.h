@@ -39,6 +39,7 @@ class UniParams {
 
     void initial(int nOSize, int nISize, bool useB = true) {
         W.initial(nOSize, nISize);
+        n3ldg_cuda::Assert(W.val.verify("UniParams initial"));
 
         bUseB = useB;
         if (bUseB) {
@@ -603,6 +604,10 @@ public:
 
     void  forward() {
         int count = batch.size();
+        if (param->W.index == 7) {
+            n3ldg_cuda::Assert(param->W.val.verify("index 7 euqal"));
+            std::cout << "index 7 W verified" << std::endl;
+        }
 
         x.init(inDim, count);
         y.init(outDim, count);

@@ -128,9 +128,14 @@ class SparseParam : public BaseParam {
     }
 
     void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) {
+        n3ldg_cuda::Assert(val.verify("SparseParam updateAdam begin"));
+        n3ldg_cuda::Assert(n3ldg_cuda::Verify(indexers.c_buf(), dIndexers.value,
+                    indexers.size(), "SparseParam UpdateAdam indexers"));
+        n3ldg_cuda::Assert(n3ldg_cuda::Verify(last_update.c_buf(), dIters.value,
+                    indexers.size(), "SparseParam UpdateAdam indexers"));
 #if USE_GPU
-        n3ldg_cuda::UpdateAdam(val.value, grad.value, indexers.size(),
-                grad.col,
+        n3ldg_cuda::UpdateAdam(val.value, grad.value, grad.row,
+                indexers.size(),
                 aux_mean.value,
                 aux_square.value,
                 dIndexers.value,
@@ -155,6 +160,7 @@ class SparseParam : public BaseParam {
             last_update[index]++;
         }
 
+        std::cout << "SparseParam assert begin" << std::endl;
         n3ldg_cuda::Assert(val.verify("SparseParam updateAdam"));
 #endif
 #else

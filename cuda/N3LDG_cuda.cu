@@ -379,13 +379,13 @@ void Assert(bool v) {
 #endif
 }
 
-__device__ void DeviceAtomicAdd(float* address, float value) {
+__device__ void DeviceAtomicAdd(dtype* address, dtype value) {
     float old = value;  
     float new_old;
     do {
-        new_old = atomicExch(address, 0.0f);
+        new_old = atomicExch(address, 0.0);
         new_old += old;
-    } while ((old = atomicExch(address, new_old))!=0.0f);
+    } while ((old = atomicExch(address, new_old))!=0.0);
 };
 
 __device__ dtype cuda_dtanh(dtype y) {
@@ -953,8 +953,8 @@ void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y, int row, int col,
         int count, bool useb, bool should_x_transpose,
         bool should_W_transpose) {
     cublasHandle_t &handle = GetCublasHandle();
-    float alpha = 1;
-    float beta = useb? 1 : 0;
+    dtype alpha = 1;
+    dtype beta = useb? 1 : 0;
     cublasOperation_t x_op = should_x_transpose ? CUBLAS_OP_T : CUBLAS_OP_N;
     int ldx = should_x_transpose ? count : col;
     cublasOperation_t W_op = should_W_transpose ? CUBLAS_OP_T : CUBLAS_OP_N;
@@ -3018,7 +3018,7 @@ __global__ void KernelUpdateAdam(dtype *val, dtype *grad, int row, int col,
     int step = DeviceDefaultStep();
     int len = row * col;
     for (int i = index; i < len; i += step) {
-        int count_i = i / col;
+        int count_i = i / row;
         if (indexers[count_i]) {
             if (row > 1 && col > 1) {
                 grad[i] += val[i] * reg;
@@ -3059,8 +3059,8 @@ void UpdateAdam(dtype *val, dtype *grad, int row, int col, dtype *aux_mean,
     KernelUpdateAdam<<<block_count, TPB>>>(val, grad, row, col, aux_mean,
             aux_square, indexers, iters, belta1, belta2, alpha, reg, eps);
     CheckCudaError();
-    block_count = DefaultBlockCount(row);
-    KernelSelfPlusIters<<<block_count, TPB>>>(indexers, iters, row);
+    block_count = DefaultBlockCount(col);
+    KernelSelfPlusIters<<<block_count, TPB>>>(indexers, iters, col);
     CheckCudaError();
 }
 
