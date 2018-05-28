@@ -79,7 +79,6 @@ class Param : public BaseParam {
     }
 
     void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) {
-        std::cout << "UpdateAdam index:" << index << std::endl;
 #if USE_GPU
 #if TEST_CUDA
         n3ldg_cuda::Assert(val.verify("Param adam begin val"));

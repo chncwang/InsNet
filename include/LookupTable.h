@@ -297,10 +297,8 @@ public:
         xids.reserve(count);
         std::vector<dtype*> vals;
         vals.reserve(count);
-        std::cout << "count:" << count << std::endl;
         for (int idx = 0; idx < count; idx++) {
             LookupNode *n = static_cast<LookupNode*>(batch[idx]);
-            std::cout << "n->node_index:" << n->node_index << std::endl;
             xids.push_back(n->xid);
             vals.push_back(n->val.value);
         }
