@@ -45,13 +45,13 @@ struct LSTM1Params {
     void initial(int nOSize, int nISize) {
         input_hidden.initial(nOSize, nOSize, false);
         std::cout << "input_hidden index:" << input_hidden.W.index << std::endl;
-        input_input.initial(nOSize, nOSize, true);
+        input_input.initial(nOSize, nISize, true);
         output_hidden.initial(nOSize, nOSize, false);
-        output_input.initial(nOSize, nOSize, true);
+        output_input.initial(nOSize, nISize, true);
         forget_hidden.initial(nOSize, nOSize, false);
-        forget_input.initial(nOSize, nOSize, true);
+        forget_input.initial(nOSize, nISize, true);
         cell_hidden.initial(nOSize, nOSize, false);
-        cell_input.initial(nOSize, nOSize, true);
+        cell_input.initial(nOSize, nISize, true);
     }
 
     int inDim() {
