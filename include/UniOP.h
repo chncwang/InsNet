@@ -39,7 +39,6 @@ class UniParams {
 
     void initial(int nOSize, int nISize, bool useB = true) {
         W.initial(nOSize, nISize);
-        n3ldg_cuda::Assert(W.val.verify("UniParams initial"));
 
         bUseB = useB;
         if (bUseB) {
