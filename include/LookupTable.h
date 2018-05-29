@@ -307,15 +307,15 @@ public:
                 drop_mask.value, dynamicDropValue(), count, dim, vals);
 #if TEST_CUDA
         drop_mask.copyFromDeviceToHost();
+        for (int i = 0; i < count; ++i) {
+            for (int j = 0; j < dim; ++j) {
+                dtype v = drop_mask[i][j];
+                batch[i]->drop_mask[j] = v <= dynamicDropValue() ?
+                    0 : 1;
+            }
+        }
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
-            for (int i = 0; i < count; ++i) {
-                for (int j = 0; j < dim; ++j) {
-                    dtype v = drop_mask[i][j];
-                    batch[i]->drop_mask[j] = v <= dynamicDropValue() ?
-                        0 : 1;
-                }
-            }
             batch[idx]->forward_drop(bTrain, drop_factor);
             int xid = static_cast<LookupNode*>(batch[idx])->xid;
             n3ldg_cuda::Assert(batch[idx]->val.verify("lookup forward"));

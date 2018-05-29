@@ -102,7 +102,6 @@ class Param : public BaseParam {
         dtype lr_t = alpha * sqrt(1 - pow(belta2, iter + 1)) / (1 - pow(belta1, iter + 1));
         val.vec() = val.vec() - aux_mean.vec() * lr_t / (aux_square.vec() + eps).sqrt();
         n3ldg_cuda::Assert(val.verify("Param adam"));
-        std::cout << "updateAdam val asserted index:" << index << std::endl;
 #endif
 #else
         if (val.col > 1 && val.row > 1)grad.vec() = grad.vec() + val.vec() * reg;

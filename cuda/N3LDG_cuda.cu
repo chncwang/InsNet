@@ -1449,7 +1449,7 @@ __global__ void KernelConcatForward(dtype **ins, int *in_dims,
         int out_dim_i = i % out_dim;
         int count_i = i / out_dim;
         if (on_training) {
-            if (drop_factor > 0.0f && drop_mask[out_dim_i * count + count_i] <
+            if (drop_factor > 0.0f && drop_mask[i] <
                     drop_factor) {
                 outs[count_i][out_dim_i] = 0.0f;
             } else {
@@ -1527,7 +1527,7 @@ __global__ void KernelConcatBackward(dtype** in_losses, int *in_dims,
         int out_dim_i = i % out_dim;
         int count_i = i / out_dim;
         dtype dropout = drop_factor > 0 ?
-            drop_mask[out_dim_i * count + count_i] : 1;
+            drop_mask[i] : 1;
         if (dropout > drop_factor) {
             int in_dim_sum = 0;
             int last_in_dim_sum;
@@ -1646,7 +1646,7 @@ __global__ void KernelLookupForward(const int *xids, const dtype *vocabulary,
         int dim_i = i % dim;
         if (on_training) {
             if (drop_factor > 0 &&
-                    drop_mask[dim_i * count + count_i] < drop_factor) {
+                    drop_mask[i] < drop_factor) {
                 vals[count_i][dim_i] = 0.0f;
             } else {
                 int xid = xids[count_i];
@@ -1710,8 +1710,7 @@ __global__ void KernelLookupBackward(const int *xids, int unknown_id,
             if (dim_i == 0) {
                 indexers[xid] = true;
             }
-            dtype dropout = drop_factor > 0 ?
-                drop_mask[dim_i * count + count_i] : 1;
+            dtype dropout = drop_factor > 0 ?  drop_mask[i] : 1;
             if (drop_factor < dropout) {
                 DeviceAtomicAdd(grad + xid * dim + dim_i,
                         losses[count_i][dim_i]);
@@ -2403,12 +2402,12 @@ __global__ void KernelPMultiForward(const dtype **ins1, const dtype **ins2,
         int count_i = i / dim;
         int dim_i = i % dim;
         dtype dropout = drop_factor > 0 ?
-            drop_mask[dim_i * count + count_i] : 1;
+            drop_mask[i] : 1;
         vals[count_i][dim_i] = drop_factor < dropout ?
             ins1[count_i][dim_i] * ins2[count_i][dim_i] : 0.0f;
         if (on_training) {
             if (drop_factor > 0.0f &&
-                    drop_mask[dim_i * count + count_i] < drop_factor) {
+                    drop_mask[i] < drop_factor) {
                 vals[count_i][dim_i] = 0.0f;
             } else {
                 vals[count_i][dim_i] = ins1[count_i][dim_i] *
@@ -2458,7 +2457,7 @@ __global__ void KernelPMultiBackward(const dtype **losses,
         int count_i = i / dim;
         int dim_i = i % dim;
         dtype dropout = drop_factor > 0 ?
-            drop_mask[dim_i * count + count_i] : 1;
+            drop_mask[i] : 1;
         if (drop_factor < dropout) {
             DeviceAtomicAdd(in_losses1[count_i] + dim_i,
                     losses[count_i][dim_i] * in_vals2[count_i][dim_i]);
@@ -2503,7 +2502,7 @@ __global__ void KernelPAddForward(const dtype*** ins, int count, int dim,
         int count_i = i / dim;
         int dim_i = i % dim;
         dtype dropout = drop_factor > 0 ?
-            drop_mask[dim_i * count + count_i] : 1;
+            drop_mask[i] : 1;
         if (drop_factor < dropout) {
             dtype sum = ins[0][count_i][dim_i];
             for (int j = 1; j < in_count; ++j) {
@@ -2644,7 +2643,7 @@ __global__ void KernelPAddBackward(const dtype **losses, int count, int dim,
         int count_i = dim_mul_count_i / dim;
         int dim_i = dim_mul_count_i % dim;
         dtype dropout = drop_factor > 0 ?
-            drop_mask[dim_i * count + count_i] : 1;
+            drop_mask[i] : 1;
         if (drop_factor < dropout) {
             DeviceAtomicAdd(in_losses[in_count_i][count_i] + dim_i,
                     losses[count_i][dim_i]);

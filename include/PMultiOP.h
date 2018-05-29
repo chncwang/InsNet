@@ -106,34 +106,6 @@ public:
             node->compute();
             node->forward_drop(bTrain, drop_factor);
         }
-//        int count = batch.size();
-//        sumDim = 0;
-//        for (int idx = 0; idx < count; idx++) {
-//            sumDim += batch[idx]->dim;
-//        }
-//        y.init(sumDim);
-//        x1.init(sumDim);
-//        x2.init(sumDim);
-//        int offset = 0;
-//        for (int idx = 0; idx < count; idx++) {
-//            PMultiNode* ptr = (PMultiNode*)batch[idx];
-//            for (int idy = 0; idy < ptr->dim; idy++) {
-//                x1[offset + idy] = ptr->in1->val[idy];
-//                x2[offset + idy] = ptr->in2->val[idy];
-//            }
-//            offset += ptr->dim;
-//        }
-//        y.vec() = x1.vec() * x2.vec();
-
-//        offset = 0;
-//        for (int idx = 0; idx < count; idx++) {
-//            PMultiNode* ptr = (PMultiNode*)batch[idx];
-//            for (int idy = 0; idy < ptr->dim; idy++) {
-//                ptr->val[idy] = y[offset + idy];
-//            }
-//            offset += ptr->dim;
-//            ptr->forward_drop(bTrain,1);
-//        }
     }
 #endif
 

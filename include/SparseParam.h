@@ -155,7 +155,6 @@ class SparseParam : public BaseParam {
             last_update[index]++;
         }
 
-        std::cout << "SparseParam assert begin" << std::endl;
         n3ldg_cuda::Assert(val.verify("SparseParam updateAdam"));
 #endif
 #else
