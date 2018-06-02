@@ -34,8 +34,5 @@
 #include "SparseOP.h"
 #include "ActionOP.h"
 #include "LogSoftMax.h"
-#if USE_GPU
-#include "N3LDG_cuda.h"
-#endif
 
 #endif

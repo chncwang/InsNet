@@ -35,7 +35,7 @@ class LogSoftMax {
     }
 
 
-    void clear() {
+    inline void clear() {
         _outputs.clear();
         _middles.clear();
         _expmiddles.clear();
@@ -43,7 +43,7 @@ class LogSoftMax {
     }
 
 
-    void init(int maxsize) {
+    inline void init(int maxsize) {
         _middles.resize(maxsize);
         _expmiddles.resize(maxsize);
         _outputs.resize(maxsize);
@@ -61,7 +61,7 @@ class LogSoftMax {
 
 
   public:
-    void forward(Graph *cg, const vector<PNode>& x) {
+    inline void forward(Graph *cg, const vector<PNode>& x) {
         if (x.size() == 0) {
             std::cout << "empty inputs for LOG_SOFT_MAX_DRIVER operation" << std::endl;
             return;

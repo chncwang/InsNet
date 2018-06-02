@@ -26,13 +26,13 @@ class TransferParams {
         nVSize = 0;
     }
 
-    void exportAdaParams(ModelUpdate& ada) {
+    inline void exportAdaParams(ModelUpdate& ada) {
         for(int idx = 0; idx < nVSize; idx++) {
             ada.addParam(&(W[idx]));
         }
     }
 
-    void initial(PAlphabet alpha, int nOSize, int nISize) {
+    inline void initial(PAlphabet alpha, int nOSize, int nISize) {
         elems = alpha;
         nVSize = elems->size();
         nInSize = nISize;
@@ -43,17 +43,17 @@ class TransferParams {
         }
     }
 
-    int getElemId(const string& strFeat) {
+    inline int getElemId(const string& strFeat) {
         return elems->from_string(strFeat);
     }
 
     // will add it
-    void save(std::ofstream &os) const {
+    inline void save(std::ofstream &os) const {
 
     }
 
     // will add it
-    void load(std::ifstream &is) {
+    inline void load(std::ifstream &is) {
 
     }
 
@@ -72,15 +72,15 @@ class TransferNode : public Node {
         in = NULL;
         xid = -1;
         param = NULL;
-
+		node_type = "transfer";
     }
 
 
-    void setParam(TransferParams* paramInit) {
+    inline void setParam(TransferParams* paramInit) {
         param = paramInit;
     }
 
-    void clearValue() {
+    inline void clearValue() {
         Node::clearValue();
         in = NULL;
         xid = -1;
@@ -95,6 +95,7 @@ class TransferNode : public Node {
         }
         degree = 0;
         in->addParent(this);
+				cg->addNode(this);
     }
 
   public:
@@ -112,10 +113,10 @@ class TransferNode : public Node {
     }
 
   public:
-    PExecute generate(bool bTrain, dtype cur_drop_factor);
+    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    bool typeEqual(PNode other) {
+    inline bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         if (!result) return false;
 
@@ -135,7 +136,9 @@ class TransferNode : public Node {
 
 class TransferExecute :public Execute {
   public:
-    void  forward() {
+    bool bTrain;
+  public:
+    inline void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -144,7 +147,7 @@ class TransferExecute :public Execute {
         }
     }
 
-    void backward() {
+    inline void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -154,7 +157,7 @@ class TransferExecute :public Execute {
     }
 };
 
-PExecute TransferNode::generate(bool bTrain, dtype cur_drop_factor) {
+inline PExecute TransferNode::generate(bool bTrain, dtype cur_drop_factor) {
     TransferExecute* exec = new TransferExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;

@@ -29,11 +29,11 @@ class ActionParams {
         elems = NULL;
     }
 
-    void exportAdaParams(ModelUpdate& ada) {
+    inline void exportAdaParams(ModelUpdate& ada) {
         ada.addParam(&W);
     }
 
-    void initialWeights(int nOSize) {
+    inline void initialWeights(int nOSize) {
         if (nVSize == 0) {
             std::cout << "please check the alphabet" << std::endl;
             return;
@@ -45,13 +45,13 @@ class ActionParams {
 
 
     //random initialization
-    void initial(PAlphabet alpha, int nOSize) {
+    inline void initial(PAlphabet alpha, int nOSize) {
         elems = alpha;
         nVSize =elems->size();
         initialWeights(nOSize);
     }
 
-    int getFeatureId(const string& strFeat) {
+    inline int getFeatureId(const string& strFeat) {
         int idx = elems->from_string(strFeat);
         return idx;
     }
@@ -74,17 +74,17 @@ class ActionNode : public Node {
         node_type = "actionnode";
     }
 
-    void setParam(ActionParams* paramInit) {
+    inline void setParam(ActionParams* paramInit) {
         param = paramInit;
     }
 
     //can not be dropped since the output is a scalar
-    void init(int ndim, dtype dropout) {
+    inline void init(int ndim, dtype dropout) {
         dim = 1;
         Node::init(dim, -1);
     }
 
-    void clearValue() {
+    inline void clearValue() {
         Node::clearValue();
         actid = -1;
     }
@@ -100,7 +100,7 @@ class ActionNode : public Node {
     }
 
   public:
-    void compute() {
+    inline void compute() {
         if (param->nDim != in->dim) {
             std::cout << "warning: action dim not equal ." << std::endl;
         }
@@ -126,10 +126,10 @@ class ActionNode : public Node {
     }
 
   public:
-    PExecute generate(bool bTrain, dtype cur_drop_factor);
+    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    bool typeEqual(PNode other) {
+    inline bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         if (!result) return false;
 
@@ -146,7 +146,9 @@ class ActionNode : public Node {
 
 class ActionExecute :public Execute {
   public:
-    void  forward() {
+    bool bTrain;
+  public:
+    inline void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -155,7 +157,7 @@ class ActionExecute :public Execute {
         }
     }
 
-    void backward() {
+    inline void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -166,7 +168,7 @@ class ActionExecute :public Execute {
 };
 
 
-PExecute ActionNode::generate(bool bTrain, dtype cur_drop_factor) {
+inline PExecute ActionNode::generate(bool bTrain, dtype cur_drop_factor) {
     ActionExecute* exec = new ActionExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;

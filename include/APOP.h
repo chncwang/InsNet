@@ -29,11 +29,11 @@ struct APParams {
         elems = NULL;
     }
 
-    void exportAdaParams(ModelUpdate& ada) {
+    inline void exportAdaParams(ModelUpdate& ada) {
         ada.addParam(&W);
     }
 
-    void initialWeights(int nOSize) {
+    inline void initialWeights(int nOSize) {
         if (nVSize == 0) {
             std::cout << "please check the alphabet" << std::endl;
             return;
@@ -43,7 +43,7 @@ struct APParams {
     }
 
     //random initialization
-    void initial(PAlphabet alpha, int nOSize, int base = 1) {
+    inline void initial(PAlphabet alpha, int nOSize, int base = 1) {
         assert(base >= 1);
         elems = alpha;
         nVSize = base * elems->size();
@@ -54,7 +54,7 @@ struct APParams {
         initialWeights(nOSize);
     }
 
-    int getFeatureId(const string& strFeat) {
+    inline int getFeatureId(const string& strFeat) {
         int idx = elems->from_string(strFeat);
         if(!elems->m_b_fixed && elems->m_size >= nVSize) {
             std::cout << "AP Alphabet stopped collecting features" << std::endl;
@@ -80,11 +80,11 @@ class APNode : public Node {
         node_type = "apnode";
     }
 
-    void setParam(APParams* paramInit) {
+    inline void setParam(APParams* paramInit) {
         param = paramInit;
     }
 
-    void clearValue() {
+    inline void clearValue() {
         Node::clearValue();
         ins.clear();
         bTrain = false;
@@ -106,7 +106,7 @@ class APNode : public Node {
         bTrain = cg->train;
     }
   public:
-    void compute() {
+    inline void compute() {
         param->W.value(ins, val, bTrain);
     }
 
@@ -117,10 +117,10 @@ class APNode : public Node {
     }
 
   public:
-    PExecute generate(bool bTrain, dtype cur_drop_factor);
+    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    bool typeEqual(PNode other) {
+    inline bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         if (!result) return false;
 
@@ -136,7 +136,9 @@ class APNode : public Node {
 
 class APExecute :public Execute {
   public:
-    void  forward() {
+    bool bTrain;
+  public:
+    inline void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -145,7 +147,7 @@ class APExecute :public Execute {
         }
     }
 
-    void backward() {
+    inline void backward() {
         int count = batch.size();
         //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
@@ -156,7 +158,7 @@ class APExecute :public Execute {
 };
 
 
-PExecute APNode::generate(bool bTrain, dtype cur_drop_factor) {
+inline PExecute APNode::generate(bool bTrain, dtype cur_drop_factor) {
     APExecute* exec = new APExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;

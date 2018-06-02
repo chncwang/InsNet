@@ -13,12 +13,14 @@
 
 
 class ModelUpdate {
+
   public:
     vector<BaseParam*> _params;
 
     dtype _reg, _alpha, _eps;
     dtype _belta1, _belta2;
 
+  public:
     ModelUpdate() {
         _params.clear();
 
@@ -30,38 +32,33 @@ class ModelUpdate {
         _belta2 = 0.999;
     }
 
-    void addParam(BaseParam* param) {
-        for (BaseParam * p : _params) {
-            if (p == param) {
-                abort();
-            }
-        }
+
+  public:
+
+    inline void addParam(BaseParam* param) {
         _params.push_back(param);
     }
 
-    void addParam(const vector<BaseParam*>& params) {
+    inline void addParam(const vector<BaseParam*>& params) {
         for (int idx = 0; idx < params.size(); idx++) {
-            addParam(params.at(idx));
+            _params.push_back(params[idx]);
         }
     }
 
 
-    void update() {
+    inline void update() {
         for (int idx = 0; idx < _params.size(); idx++) {
             _params[idx]->updateAdagrad(_alpha, _reg, _eps);
             _params[idx]->clearGrad();
         }
     }
 
-    void update(dtype maxScale) {
+    inline void update(dtype maxScale) {
         dtype sumNorm = 0.0;
         for (int idx = 0; idx < _params.size(); idx++) {
             sumNorm += _params[idx]->squareGradNorm();
         }
         if (std::isnan(double(sumNorm)) || sumNorm > 1e20) { //too large
-#if USE_GPU
-            abort();
-#endif
             clearGrad();
             return;
         }
@@ -76,25 +73,19 @@ class ModelUpdate {
         update();
     }
 
-    void updateAdam() {
+    inline void updateAdam() {
         for (int idx = 0; idx < _params.size(); idx++) {
             _params[idx]->updateAdam(_belta1, _belta2, _alpha, _reg, _eps);
             _params[idx]->clearGrad();
         }
     }
 
-    void updateAdam(dtype maxScale) {
-#if TEST_CUDA
-        maxScale = 0.1;
-#endif
+    inline void updateAdam(dtype maxScale) {
         dtype sumNorm = 0.0;
         for (int idx = 0; idx < _params.size(); idx++) {
             sumNorm += _params[idx]->squareGradNorm();
         }
         if (std::isnan(double(sumNorm)) || sumNorm > 1e20) { //too large
-#if USE_GPU
-            abort();
-#endif
             clearGrad();
             return;
         }
@@ -107,26 +98,21 @@ class ModelUpdate {
         }
 
         updateAdam();
-#if TEST_CUDA
-        for (BaseParam *p : _params) {
-            p->copyFromHostToDevice();
-        }
-#endif
     }
 
-    void rescaleGrad(dtype scale) {
+    inline void rescaleGrad(dtype scale) {
         for (int idx = 0; idx < _params.size(); idx++) {
             _params[idx]->rescaleGrad(scale);
         }
     }
 
-    void clearGrad() {
+    inline void clearGrad() {
         for (int idx = 0; idx < _params.size(); idx++) {
             _params[idx]->clearGrad();
         }
     }
 
-    void gradClip(dtype maxScale) {
+    inline void gradClip(dtype maxScale) {
         dtype sumNorm = 0.0;
         for (int idx = 0; idx < _params.size(); idx++) {
             sumNorm += _params[idx]->squareGradNorm();
@@ -144,9 +130,11 @@ class ModelUpdate {
         }
     }
 
-    void clear() {
+    inline void clear() {
         _params.clear();
     }
+
+
 };
 
 

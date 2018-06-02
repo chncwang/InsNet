@@ -32,7 +32,7 @@ class BiaffineParams {
         classDim = 0;
     }
 
-    void exportAdaParams(ModelUpdate& ada) {
+    inline void exportAdaParams(ModelUpdate& ada) {
         for (int i = 0; i < classDim; i++) {
             ada.addParam(&W[i]);
         }
@@ -41,7 +41,7 @@ class BiaffineParams {
         }
     }
 
-    void initial(int nISize1, int nISize2, bool useB = true, int classDims = 1) {
+    inline void initial(int nISize1, int nISize2, bool useB = true, int classDims = 1) {
         classDim = classDims;
         W.resize(classDim);
         for (int i = 0; i < classDim; i++) {
@@ -53,7 +53,7 @@ class BiaffineParams {
         }
     }
 
-    void save(std::ofstream &os) const {
+    inline void save(std::ofstream &os) const {
         os << bUseB << std::endl;
         for (int i = 0; i < classDim; i++)
             W[i].save(os);
@@ -62,7 +62,7 @@ class BiaffineParams {
         }
     }
 
-    void load(std::ifstream &is) {
+    inline void load(std::ifstream &is) {
         is >> bUseB;
         for (int i = 0; i < classDim; i++)
             W[i].load(is);
@@ -99,14 +99,14 @@ class BiaffineNode : public Node {
         node_type = "biaffine";
     }
 
-    void setParam(BiaffineParams* paramInit, bool expandIns1, bool expandIns2) {
+    inline void setParam(BiaffineParams* paramInit, bool expandIns1, bool expandIns2) {
         param = paramInit;
         classDim = paramInit->classDim;
         expandIn1 = expandIns1;
         expandIn2 = expandIns2;
     }
 
-    void clearValue() {
+    inline void clearValue() {
         Node::clearValue();
         in1.clear();
         in2.clear();
@@ -114,7 +114,7 @@ class BiaffineNode : public Node {
         losses.clear();
     }
 
-    void init(int dim) {
+    inline void init(int dim) {
         this->dim = dim;
         vals.resize(classDim);
         losses.resize(classDim);
@@ -142,10 +142,10 @@ class BiaffineNode : public Node {
     }
 
   public:
-    PExecute generate(bool bTrain, dtype cur_drop_factor);
+    inline PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
-    bool typeEqual(PNode other) {
+    inline bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         if (!result) return false;
         BiaffineNode* conv_other = (BiaffineNode*)other;
@@ -155,7 +155,7 @@ class BiaffineNode : public Node {
             return false;
     }
   public:
-    void compute() {
+    inline void compute() {
         inDim1 = in1[0]->dim;
         inDim2 = in2[0]->dim;
         x1.init(inDim1 + (expandIn1 ? 1 : 0), nSize);
@@ -186,7 +186,7 @@ class BiaffineNode : public Node {
         }
     }
 
-    void backward() {
+    inline void backward() {
         vector<Tensor2D> lx1, lx2, ly1;
         lx1.resize(classDim);
         lx2.resize(classDim);
@@ -227,7 +227,9 @@ class BiaffineNode : public Node {
 
 class BiaffineExecute :public Execute {
   public:
-    void  forward() {
+    bool bTrain;
+  public:
+    inline void  forward() {
         int count = batch.size();
 
         for (int idx = 0; idx < count; idx++) {
@@ -236,7 +238,7 @@ class BiaffineExecute :public Execute {
         }
     }
 
-    void backward() {
+    inline void backward() {
         int count = batch.size();
         for (int idx = 0; idx < count; idx++) {
             BiaffineNode* ptr = (BiaffineNode*)batch[idx];
@@ -245,7 +247,7 @@ class BiaffineExecute :public Execute {
     }
 };
 
-PExecute BiaffineNode::generate(bool bTrain, dtype cur_drop_factor) {
+inline PExecute BiaffineNode::generate(bool bTrain, dtype cur_drop_factor) {
     BiaffineExecute* exec = new BiaffineExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
