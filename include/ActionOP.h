@@ -66,8 +66,6 @@ class ActionNode : public Node {
     int actid;
     PNode in;
 
-
-  public:
     ActionNode() : Node() {
         actid = -1;
         param = NULL;
@@ -141,6 +139,9 @@ class ActionNode : public Node {
         return true;
     }
 
+    size_t typeHashCode() const override {
+        return Node::typeHashCode() ^ ::typeHashCode(param);
+    }
 };
 
 

@@ -149,12 +149,18 @@ class Graph {
     }
 
     //real executation
-    void compute() {
+    void compute(bool log = false) {
         n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
 
+        int i = 0;
         while (Size(free_nodes) > 0) {
             vector<PExecute> cur_execs;
+            if (log)
+            std::cout << "i:" << i++ << std::endl;
             for (auto it : free_nodes) {
+                if (log)
+                std::cout << "ndoe_type:" << it.second.at(0)->node_type <<
+                    " size:" << it.second.size() << std::endl;
                 PExecute new_exec = it.second.at(0)->generate(train,
                         drop_factor);
                 new_exec->batch = it.second;
