@@ -94,10 +94,14 @@ class Graph {
     }
 
     //real executation
-    inline void compute() {
+    inline void compute(bool log = false) {
         int free_count = free_nodes.size();
+        int i = 0;
 
         while (free_count > 0) {
+            if (log) {
+                std::cout << "i:" << i++ << std::endl;
+            }
             vector<PExecute> cur_execs;
             int cur_execs_size = 0;
 
@@ -121,6 +125,10 @@ class Graph {
             //execute
             //#pragma omp parallel for
             for (int idy = 0; idy < cur_execs_size; idy++) {
+                if (log)
+                std::cout << "node_type:" <<
+                    cur_execs.at(idy)->batch.at(0)->node_type << " size:" <<
+                    cur_execs.at(idy)->batch.size() << std::endl;
                 cur_execs[idy]->forward();
             }
 
