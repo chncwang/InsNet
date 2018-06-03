@@ -59,9 +59,6 @@ class ModelUpdate {
             sumNorm += _params[idx]->squareGradNorm();
         }
         if (std::isnan(double(sumNorm)) || sumNorm > 1e20) { //too large
-#if USE_GPU
-            abort();
-#endif
             clearGrad();
             return;
         }
@@ -84,17 +81,11 @@ class ModelUpdate {
     }
 
     inline void updateAdam(dtype maxScale) {
-#if TEST_CUDA
-        maxScale = 0.1;
-#endif
         dtype sumNorm = 0.0;
         for (int idx = 0; idx < _params.size(); idx++) {
             sumNorm += _params[idx]->squareGradNorm();
         }
         if (std::isnan(double(sumNorm)) || sumNorm > 1e20) { //too large
-#if USE_GPU
-            abort();
-#endif
             clearGrad();
             return;
         }
@@ -107,11 +98,6 @@ class ModelUpdate {
         }
 
         updateAdam();
-#if TEST_CUDA
-        for (BaseParam *p : _params) {
-            p->copyFromHostToDevice();
-        }
-#endif
     }
 
     inline void rescaleGrad(dtype scale) {
@@ -147,6 +133,8 @@ class ModelUpdate {
     inline void clear() {
         _params.clear();
     }
+
+
 };
 
 

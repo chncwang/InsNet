@@ -146,6 +146,8 @@ class ActionNode : public Node {
 
 class ActionExecute :public Execute {
   public:
+    bool bTrain;
+  public:
     inline void  forward() {
         int count = batch.size();
         //#pragma omp parallel for

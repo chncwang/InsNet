@@ -482,6 +482,7 @@ PExecute MinPoolNode::generate(bool bTrain, dtype cur_drop_factor) {
 
 class PoolExecute : public Execute {
   public:
+      bool bTrain;
     virtual void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
@@ -848,6 +849,7 @@ public:
 #else
 class SumPoolExecute : public Execute {
   public:
+      bool bTrain;
     inline void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
@@ -1219,6 +1221,7 @@ public:
 #else
 class AvgPoolExecute : public Execute {
   public:
+      bool bTrain;
     inline void  forward() {
         int count = batch.size();
         //#pragma omp parallel for

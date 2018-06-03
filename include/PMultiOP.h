@@ -61,6 +61,7 @@ class PMultiNode : public Node {
 
 class PMultiExecute :public Execute {
 public:
+    bool bTrain;
     Tensor2D drop_mask;
     std::vector<dtype*> in_vals1;
     std::vector<dtype*> in_vals2;

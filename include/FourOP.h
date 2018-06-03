@@ -165,6 +165,7 @@ class FourNode : public Node {
         in3->loss.mat() += param->W3.val.mat().transpose() * lty.mat();
         in4->loss.mat() += param->W4.val.mat().transpose() * lty.mat();
     }
+
   public:
     inline PExecute generate(bool bTrain, dtype cur_drop_factor);
 
@@ -272,106 +273,24 @@ class LinearFourNode : public Node {
 
 
 class FourExecute :public Execute {
-public:
-    Tensor2D x1, x2, x3, x4, ty, y, b;
-    Tensor2D drop_mask;
-    int inDim1, inDim2, inDim3, inDim4, outDim;
-    FourParams* param;
-    dtype(*activate)(const dtype&);   // activation function
-    dtype(*derivate)(const dtype&, const dtype&);  // derivation function of activation function
-public:
-
-    void  forward() {
+  public:
+    bool bTrain;
+  public:
+    inline void  forward() {
         int count = batch.size();
-        x1.init(inDim1, count);
-        x2.init(inDim2, count);
-        x3.init(inDim3, count);
-        x4.init(inDim4, count);
-        b.init(outDim, count);
-        ty.init(outDim, count);
-        y.init(outDim, count);
-        drop_mask.init(outDim, count);
-
+        //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
-            FourNode* ptr = (FourNode*)batch[idx];
-            for (int idy = 0; idy < inDim1; idy++) {
-                x1[idy][idx] = ptr->in1->val[idy];
-            }
-            for (int idy = 0; idy < inDim2; idy++) {
-                x2[idy][idx] = ptr->in2->val[idy];
-            }
-            for (int idy = 0; idy < inDim3; idy++) {
-                x3[idy][idx] = ptr->in3->val[idy];
-            }
-            for (int idy = 0; idy < inDim4; idy++) {
-                x4[idy][idx] = ptr->in4->val[idy];
-            }
-            if (param->bUseB) {
-                for (int idy = 0; idy < outDim; idy++) {
-                    b[idy][idx] = param->b.val.v[idy];
-                }
-            }
-        }
-        ty.mat() = param->W1.val.mat() * x1.mat() + param->W2.val.mat() * x2.mat() + param->W3.val.mat() * x3.mat() + param->W4.val.mat() * x4.mat();
-        if (param->bUseB) {
-            ty.vec() = ty.vec() + b.vec();
-        }
-        y.vec() = ty.vec().unaryExpr(ptr_fun(activate));
-        for (int idx = 0; idx < count; idx++) {
-            FourNode* ptr = (FourNode*)batch[idx];
-            for (int idy = 0; idy < outDim; idy++) {
-                ptr->val[idy] = y[idy][idx];
-            }
-            ptr->forward_drop(bTrain, drop_factor / batch.at(0)->drop_value);
+            batch[idx]->compute();
+            batch[idx]->forward_drop(bTrain, drop_factor);
         }
     }
 
-    void backward() {
+    inline void backward() {
         int count = batch.size();
-        Tensor2D lx1, lx2, lx3, lx4, lty, ly;
-        lx1.init(inDim1, count);
-        lx2.init(inDim2, count);
-        lx3.init(inDim3, count);
-        lx4.init(inDim4, count);
-        lty.init(outDim, count);
-        ly.init(outDim, count);
+        //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
-            FourNode* ptr = (FourNode*)batch[idx];
-            ptr->backward_drop();
-            for (int idy = 0; idy < outDim; idy++) {
-                ly[idy][idx] = ptr->loss[idy];
-            }
-        }
-        lty.vec() = ly.vec() * ty.vec().binaryExpr(y.vec(), ptr_fun(derivate));
-        param->W1.grad.mat() += lty.mat() * x1.mat().transpose();
-        param->W2.grad.mat() += lty.mat() * x2.mat().transpose();
-        param->W3.grad.mat() += lty.mat() * x3.mat().transpose();
-        param->W4.grad.mat() += lty.mat() * x4.mat().transpose();
-        if (param->bUseB) {
-            for (int idx = 0; idx < count; idx++) {
-                for (int idy = 0; idy < outDim; idy++) {
-                    param->b.grad.v[idy] += lty[idy][idx];
-                }
-            }
-        }
-        lx1.mat() += param->W1.val.mat().transpose() * lty.mat();
-        lx2.mat() += param->W2.val.mat().transpose() * lty.mat();
-        lx3.mat() += param->W3.val.mat().transpose() * lty.mat();
-        lx4.mat() += param->W4.val.mat().transpose() * lty.mat();
-        for (int idx = 0; idx < count; idx++) {
-            FourNode* ptr = (FourNode*)batch[idx];
-            for (int idy = 0; idy < inDim1; idy++) {
-                ptr->in1->loss[idy] += lx1[idy][idx];
-            }
-            for (int idy = 0; idy < inDim2; idy++) {
-                ptr->in2->loss[idy] += lx2[idy][idx];
-            }
-            for (int idy = 0; idy < inDim3; idy++) {
-                ptr->in3->loss[idy] += lx3[idy][idx];
-            }
-            for (int idy = 0; idy < inDim4; idy++) {
-                ptr->in4->loss[idy] += lx4[idy][idx];
-            }
+            batch[idx]->backward_drop();
+            batch[idx]->backward();
         }
     }
 };
@@ -380,135 +299,38 @@ inline PExecute FourNode::generate(bool bTrain, dtype cur_drop_factor) {
     FourExecute* exec = new FourExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
-    exec->drop_factor = cur_drop_factor * drop_value;
-    exec->inDim1 = param->W1.inDim();
-    exec->inDim2 = param->W2.inDim();
-    exec->inDim3 = param->W3.inDim();
-    exec->inDim4 = param->W4.inDim();
-    exec->outDim = param->W1.outDim();
-    exec->param = param;
-    exec->activate = activate;
-    exec->derivate = derivate;
+    exec->drop_factor = cur_drop_factor;
     return exec;
 };
 
 class LinearFourExecute :public Execute {
-public:
-    Tensor2D x1, x2, x3, x4, y, b;
-    int inDim1, inDim2, inDim3, inDim4, outDim, count;
-    FourParams* param;
-
-public:
+  public:
+    bool bTrain;
+  public:
     inline void  forward() {
-        count = batch.size();
-        x1.init(inDim1, count);
-        x2.init(inDim2, count);
-        x3.init(inDim3, count);
-        x4.init(inDim4, count);
-        b.init(outDim, count);
-        y.init(outDim, count);
-
-
+        int count = batch.size();
+        //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
-            LinearFourNode* ptr = (LinearFourNode*)batch[idx];
-            for (int idy = 0; idy < inDim1; idy++) {
-                x1[idy][idx] = ptr->in1->val[idy];
-            }
-            for (int idy = 0; idy < inDim2; idy++) {
-                x2[idy][idx] = ptr->in2->val[idy];
-            }
-            for (int idy = 0; idy < inDim3; idy++) {
-                x3[idy][idx] = ptr->in3->val[idy];
-            }
-            for (int idy = 0; idy < inDim4; idy++) {
-                x4[idy][idx] = ptr->in4->val[idy];
-            }
-            if (param->bUseB) {
-                for (int idy = 0; idy < outDim; idy++) {
-                    b[idy][idx] = param->b.val.v[idy];
-                }
-            }
-        }
-
-        y.mat() = param->W1.val.mat() * x1.mat() + param->W2.val.mat() * x2.mat() + param->W3.val.mat() * x3.mat() + param->W4.val.mat() * x4.mat();
-
-        if (param->bUseB) {
-            y.vec() += b.vec();
-        }
-
-        for (int idx = 0; idx < count; idx++) {
-            LinearFourNode* ptr = (LinearFourNode*)batch[idx];
-            for (int idy = 0; idy < outDim; idy++) {
-                ptr->val[idy] = y[idy][idx];
-            }
-            ptr->forward_drop(bTrain, drop_factor);
+            batch[idx]->compute();
+            batch[idx]->forward_drop(bTrain, drop_factor);
         }
     }
 
     inline void backward() {
-        Tensor2D lx1, lx2, lx3, lx4, ly;
-        lx1.init(inDim1, count);
-        lx2.init(inDim2, count);
-        lx3.init(inDim3, count);
-        lx4.init(inDim4, count);
-        ly.init(outDim, count);
-
+        int count = batch.size();
+        //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
-            LinearFourNode* ptr = (LinearFourNode*)batch[idx];
-            ptr->backward_drop();
-            for (int idy = 0; idy < outDim; idy++) {
-                ly[idy][idx] = ptr->loss[idy];
-            }
+            batch[idx]->backward_drop();
+            batch[idx]->backward();
         }
-
-        param->W1.grad.mat() += ly.mat() * x1.mat().transpose();
-        param->W2.grad.mat() += ly.mat() * x2.mat().transpose();
-        param->W3.grad.mat() += ly.mat() * x3.mat().transpose();
-        param->W4.grad.mat() += ly.mat() * x4.mat().transpose();
-
-        if (param->bUseB) {
-            for (int idx = 0; idx < count; idx++) {
-                for (int idy = 0; idy < outDim; idy++) {
-                    param->b.grad.v[idy] += ly[idy][idx];
-                }
-            }
-        }
-
-        lx1.mat() += param->W1.val.mat().transpose() * ly.mat();
-        lx2.mat() += param->W2.val.mat().transpose() * ly.mat();
-        lx3.mat() += param->W3.val.mat().transpose() * ly.mat();
-        lx4.mat() += param->W4.val.mat().transpose() * ly.mat();
-
-        for (int idx = 0; idx < count; idx++) {
-            LinearFourNode* ptr = (LinearFourNode*)batch[idx];
-            for (int idy = 0; idy < inDim1; idy++) {
-                ptr->in1->loss[idy] += lx1[idy][idx];
-            }
-            for (int idy = 0; idy < inDim2; idy++) {
-                ptr->in2->loss[idy] += lx2[idy][idx];
-            }
-            for (int idy = 0; idy < inDim3; idy++) {
-                ptr->in3->loss[idy] += lx3[idy][idx];
-            }
-            for (int idy = 0; idy < inDim4; idy++) {
-                ptr->in4->loss[idy] += lx4[idy][idx];
-            }
-        }
-
     }
 };
 
 inline PExecute LinearFourNode::generate(bool bTrain, dtype cur_drop_factor) {
     LinearFourExecute* exec = new LinearFourExecute();
     exec->batch.push_back(this);
-    exec->drop_factor = cur_drop_factor * drop_value;
-    exec->inDim1 = param->W1.inDim();
-    exec->inDim2 = param->W2.inDim();
-    exec->inDim3 = param->W3.inDim();
-    exec->inDim4 = param->W4.inDim();
-    exec->outDim = param->W1.outDim();
-    exec->param = param;
     exec->bTrain = bTrain;
+    exec->drop_factor = cur_drop_factor;
     return exec;
 };
 

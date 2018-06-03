@@ -154,12 +154,12 @@ class UniNode : public Node {
         return true;
     }
 
-    size_t typeHashCode() const override {
-        void *act = reinterpret_cast<void*>(activate);
-        void *de = reinterpret_cast<void*>(derivate);
-        return Node::typeHashCode() ^ ::typeHashCode(param) ^ ::typeHashCode(act) ^
-            (::typeHashCode(de) << 1);
-    }
+//    size_t typeHashCode() const override {
+//        void *act = reinterpret_cast<void*>(activate);
+//        void *de = reinterpret_cast<void*>(derivate);
+//        return Node::typeHashCode() ^ ::typeHashCode(param) ^ ::typeHashCode(act) ^
+//            (::typeHashCode(de) << 1);
+//    }
 };
 
 // non-linear feed-forward node
@@ -293,14 +293,15 @@ class LinearNode : public Node {
         return true;
     }
 
-    size_t typeHashCode() const override {
-        return Node::typeHashCode() ^ ::typeHashCode(param);
-    }
+//    size_t typeHashCode() const override {
+//        return Node::typeHashCode() ^ ::typeHashCode(param);
+//    }
 };
 
 
 class UniExecute :public Execute {
   public:
+      bool bTrain;
     Tensor2D x, ty, y, b;
     int inDim, outDim;
     UniParams* param;
@@ -561,6 +562,7 @@ inline PExecute UniNode::generate(bool bTrain, dtype cur_drop_factor) {
 
 class LinearUniExecute :public Execute {
   public:
+      bool bTrain;
     inline void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
@@ -591,6 +593,7 @@ inline PExecute LinearUniNode::generate(bool bTrain, dtype cur_drop_factor) {
 #if USE_GPU
 class LinearExecute :public Execute {
 public:
+    bool bTrain;
     Tensor2D x, y, b;
     int inDim, outDim, count;
     UniParams* param;
@@ -725,7 +728,7 @@ class LinearExecute :public Execute {
     Tensor2D x, y;
     int inDim, outDim, count;
     UniParams* param;
-
+    bool bTrain;
     inline void  forward() {
         count = batch.size();
         x.init(inDim, count);

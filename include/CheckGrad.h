@@ -30,7 +30,6 @@ class CheckGrad {
   public:
     template<typename Example, typename Classifier>
     inline void check(Classifier* classifier, const vector<Example>& examples, const string& description) {
-        abort();
         dtype orginValue, lossAdd, lossPlus;
         int idx, idy;
         dtype mockGrad, computeGrad;

@@ -137,6 +137,7 @@ class SparseNode : public Node {
 
 class SparseExecute :public Execute {
   public:
+      bool bTrain;
     inline void  forward() {
         int count = batch.size();
         //#pragma omp parallel for
