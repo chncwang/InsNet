@@ -2,12 +2,12 @@
 #define _LOOKUPTABLE_H_
 
 /*
- *  LookupTable.h:
- *  Lookup operation, for embeddings
- *
- *  Created on: Apr 22, 2017
- *      Author: mszhang
- */
+*  LookupTable.h:
+*  Lookup operation, for embeddings
+*
+*  Created on: Apr 22, 2017
+*      Author: mszhang
+*/
 
 #include "SparseParam.h"
 #include "MyLib.h"
@@ -15,16 +15,17 @@
 #include "Node.h"
 #include "Graph.h"
 #include "ModelUpdate.h"
-#include "profiler.h"
 
 class LookupTable {
-public:
+  public:
     PAlphabet elems;
     SparseParam E;
     bool bFineTune;
     int nDim;
     int nVSize;
     int nUNKId;
+
+  public:
 
     LookupTable() {
         nVSize = 0;
@@ -35,7 +36,7 @@ public:
     }
 
     //random initialization
-    void initial(PAlphabet alpha, int dim, bool fineTune = true) {
+    inline void initial(PAlphabet alpha, int dim, bool fineTune = true) {
         elems = alpha;
         nVSize = elems->size();
         nUNKId = elems->from_string(unknownkey);
@@ -43,31 +44,27 @@ public:
     }
 
     //initialization by pre-trained embeddings
-    bool initial(PAlphabet alpha, const string& inFile, bool fineTune = true, dtype norm = -1) {
+    inline bool initial(PAlphabet alpha, const string& inFile, bool fineTune = true, bool bNormalize = true) {
         elems = alpha;
         nVSize = elems->size();
         nUNKId = elems->from_string(unknownkey);
-        return initialWeights(inFile, fineTune, norm);
+        return initialWeights(inFile, fineTune, bNormalize);
     }
 
-    void initialWeights(int dim, bool tune) {
-        if (dim <=0 || nVSize == 0 || (nVSize == 1 && nUNKId >= 0)) {
+    inline void initialWeights(int dim, bool tune) {
+        if (nVSize == 0) {
             std::cout << "please check the alphabet" << std::endl;
             return;
         }
         nDim = dim;
         E.initial(nDim, nVSize);
-        E.val.random(sqrt(1.0 / nDim));
         //E.val.norm2one();
         bFineTune = tune;
-#if USE_GPU
-        E.val.copyFromHostToDevice();
-#endif
     }
 
     // default should be fineTune, just for initialization
-    bool initialWeights(const string& inFile, bool tune, dtype norm = -1) {
-        if (nVSize == 0 || !elems->is_fixed() || (nVSize == 1 && nUNKId >= 0)) {
+    inline bool initialWeights(const string& inFile, bool tune, bool normalize = true) {
+        if (nVSize == 0 || !elems->is_fixed()) {
             std::cout << "please check the alphabet" << std::endl;
             return false;
         }
@@ -78,11 +75,6 @@ public:
             inf.clear();
         }
         inf.open(inFile.c_str());
-
-        if (!inf.is_open()) {
-            std::cout << "please check the input file" << std::endl;
-            return false;
-        }
 
         string strLine, curWord;
         int wordId;
@@ -108,6 +100,7 @@ public:
         nDim = vecInfo.size() - 1;
 
         E.initial(nDim, nVSize);
+        E.val = 0;
 
         std::cout << "word embedding dim is " << nDim << std::endl;
 
@@ -154,42 +147,39 @@ public:
             std::cout << unknownkey << " not found, using averaged value to initialize." << std::endl;
         }
 
-
+		
         int oovWords = 0;
         for (int id = 0; id < nVSize; id++) {
             if (indexers.find(id) == indexers.end()) {
                 oovWords++;
-                for (int idy = 0; idy < nDim; idy++) {
-                    E.val[id][idy] = nUNKId >= 0 ? E.val[nUNKId][idy] : sum[idy] / (count + 1);
-                }
+                //for (int idy = 0; idy < nDim; idy++) {
+                //    E.val[id][idy] = nUNKId >= 0 ? E.val[nUNKId][idy] : sum[idy] / count;
+                //}
             }
         }
-
+		
 
         std::cout << "OOV num is " << oovWords << ", total num is " << nVSize << ", embedding oov ratio is " << oovWords * 1.0 / nVSize << std::endl;
         std::cout << "unknown id" << nUNKId << std::endl;
         bFineTune = tune;
-        if (norm > 0) {
-            E.val.norm2one(norm);
+        if (normalize) {
+            E.val.norm2one();
         }
-#if USE_GPU
-        E.val.copyFromHostToDevice();
-#endif
         return true;
     }
 
-    void exportAdaParams(ModelUpdate& ada) {
+    inline void exportAdaParams(ModelUpdate& ada) {
         if (bFineTune) {
             ada.addParam(&E);
         }
     }
 
 
-    int getElemId(const string& strFeat) {
+    inline int getElemId(const string& strFeat) {
         return elems->from_string(strFeat);
     }
 
-    void save(std::ofstream &os) const {
+    inline void save(std::ofstream &os) const {
         E.save(os);
         os << bFineTune << std::endl;
         os << nDim << std::endl;
@@ -198,7 +188,7 @@ public:
     }
 
     //set alpha directly
-    void load(std::ifstream &is, PAlphabet alpha) {
+    inline void load(std::ifstream &is, PAlphabet alpha) {
         E.load(is);
         is >> bFineTune;
         is >> nDim;
@@ -211,25 +201,27 @@ public:
 
 
 class LookupNode : public Node {
-public:
+  public:
     LookupTable* param;
     int xid;
 
+  public:
     LookupNode() {
         xid = -1;
         param = NULL;
         node_type = "lookup";
     }
 
-    void setParam(LookupTable* paramInit) {
+    inline void setParam(LookupTable* paramInit) {
         param = paramInit;
     }
 
-    void clearValue() {
+    inline void clearValue() {
         Node::clearValue();
         xid = -1;
     }
 
+  public:
     //notice the output
     //this should be leaf nodes
     void forward(Graph *cg, const string& strNorm) {
@@ -245,10 +237,11 @@ public:
         cg->addNode(this);
     }
 
-    PExecute generate(bool bTrain, dtype cur_drop_factor);
+  public:
+    inline PExecute generate(bool bTrain);
 
     // better to rewrite for deep understanding
-    bool typeEqual(PNode other) override {
+    inline bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         if (!result) return false;
 
@@ -260,11 +253,8 @@ public:
         return true;
     }
 
-    size_t typeHashCode() const override {
-        return Node::typeHashCode() ^ ::typeHashCode(param);
-    }
-
     // for which do no require merge
+  public:
     void compute() {
         if (xid >= 0) {
             param->E.value(xid, val);
@@ -282,110 +272,71 @@ public:
 };
 
 
-#if USE_GPU
+//#if USE_GPU
+//class LookupExecute :public Execute {
+//public:
+//  bool bTrain;
+//public:
+//  inline void  forward() {
+//    int count = batch.size();
+//
+//    for (int idx = 0; idx < count; idx++) {
+//      LookupNode* ptr = (LookupNode*)batch[idx];
+//      ptr->compute();
+//      ptr->forward_drop(bTrain);
+//    }
+//  }
+//
+//  inline void backward() {
+//    int count = batch.size();
+//    for (int idx = 0; idx < count; idx++) {
+//      LookupNode* ptr = (LookupNode*)batch[idx];
+//      ptr->backward_drop();
+//      ptr->backward();
+//    }
+//  }
+//};
+//
+//
+//inline PExecute LookupNode::generate(bool bTrain) {
+//  LookupExecute* exec = new LookupExecute();
+//  exec->batch.push_back(this);
+//  exec->bTrain = bTrain;
+//  return exec;
+//}
+//#else
 class LookupExecute :public Execute {
-public:
-    int dim;
-    Tensor2D drop_mask;
-    LookupTable *table;
-    std::vector<int> xids;
-
-    void  forward() {
+  public:
+    bool bTrain;
+  public:
+    inline void  forward() {
         int count = batch.size();
-        drop_mask.init(dim, count);
-        CalculateDropMask(count, dim, drop_mask);
-        xids.reserve(count);
-        std::vector<dtype*> vals;
-        vals.reserve(count);
+//#pragma omp parallel for schedule(static,1)
         for (int idx = 0; idx < count; idx++) {
-            LookupNode *n = static_cast<LookupNode*>(batch[idx]);
-            xids.push_back(n->xid);
-            vals.push_back(n->val.value);
+            LookupNode* ptr = (LookupNode*)batch[idx];
+            ptr->compute();
+            ptr->forward_drop(bTrain);
         }
-
-        n3ldg_cuda::LookupForward(xids, table->E.val.value, bTrain,
-                drop_mask.value, dynamicDropValue(), count, dim, vals);
-#if TEST_CUDA
-        drop_mask.copyFromDeviceToHost();
-        for (int i = 0; i < count; ++i) {
-            for (int j = 0; j < dim; ++j) {
-                dtype v = drop_mask[i][j];
-                batch[i]->drop_mask[j] = v <= dynamicDropValue() ?
-                    0 : 1;
-            }
-        }
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->compute();
-            batch[idx]->forward_drop(bTrain, drop_factor);
-            int xid = static_cast<LookupNode*>(batch[idx])->xid;
-            n3ldg_cuda::Assert(batch[idx]->val.verify("lookup forward"));
-        }
-#endif
     }
 
-    void backward() {
+    inline void backward() {
         int count = batch.size();
-        std::vector<dtype*> losses;
-        losses.reserve(count);
-        for (Node *n : batch) {
-            losses.push_back(n->loss.value);
-        }
-        n3ldg_cuda::LookupBackward(xids, table->nUNKId, table->bFineTune,
-                losses,
-                drop_mask.value,
-                dynamicDropValue(),
-                count,
-                dim,
-                table->E.grad.value,
-                table->E.dIndexers.value);
-#if TEST_CUDA
+//#pragma omp parallel for schedule(static,1)
         for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward_drop();
-            batch[idx]->backward();
+            LookupNode* ptr = (LookupNode*)batch[idx];
+            ptr->backward_drop();
+            ptr->backward();
         }
-
-        n3ldg_cuda::Assert(table->E.grad.verify("lookup backward grad"));
-        n3ldg_cuda::Assert(n3ldg_cuda::Verify(table->E.indexers.c_buf(),
-                    table->E.dIndexers.value,
-                    table->E.dIndexers.len,
-                    "lookup backward index"));
-#endif
     }
 };
-#else
-class LookupExecute :public Execute {
-    public:
-        void  forward() {
-            int count = batch.size();
-            //#pragma omp parallel for
-            for (int idx = 0; idx < count; idx++) {
-                batch[idx]->compute();
-                batch[idx]->forward_drop(bTrain, drop_factor);
-            }
-        }
-
-        void backward() {
-            int count = batch.size();
-            //#pragma omp parallel for
-            for (int idx = 0; idx < count; idx++) {
-                batch[idx]->backward_drop();
-                batch[idx]->backward();
-            }
-        }
-};
-#endif
 
 
-PExecute LookupNode::generate(bool bTrain, dtype cur_drop_factor) {
+inline PExecute LookupNode::generate(bool bTrain) {
     LookupExecute* exec = new LookupExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
-    exec->drop_factor = cur_drop_factor;
-#if USE_GPU
-    exec->table = param;
-    exec->dim = dim;
-#endif
     return exec;
 }
+//#endif
 
 #endif /*_LOOKUPTABLE_H*/

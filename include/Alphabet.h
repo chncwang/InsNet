@@ -20,7 +20,7 @@
  */
 class basic_quark {
     static const  int max_capacity = 10000000;
-  public:
+  protected:
     typedef unordered_map<std::string, int> StringToId;
     typedef std::vector<std::string> IdToString;
 

@@ -13,59 +13,9 @@
 #include "Eigen/Dense"
 #include "Node.h"
 #include "MyLib.h"
-#include <set>
-#include <map>
-#include <unordered_map>
-#include "profiler.h"
-#include <vector>
 
 using namespace Eigen;
 
-int GetDegree(std::map<void*, int> &degree_map, PNode p) {
-    auto it = degree_map.find(p);
-    if (it == degree_map.end()) {
-        degree_map.insert(std::pair<void*, int>(p, p->degree));
-        return p->degree;
-    } else {
-        return it->second;
-    }
-}
-
-void DecreaseDegree(std::map<void*, int> &degree_map, PNode p) {
-    auto it = degree_map.find(p);
-    if (it == degree_map.end()) {
-        degree_map.insert(std::pair<void*, int>(p, p->degree - 1));
-    } else {
-        --(it->second);
-    }
-}
-
-struct SelfHash {
-    size_t operator()(size_t hash) const {
-        return hash;
-    }
-};
-
-typedef std::unordered_map<size_t, vector<PNode>, SelfHash> NodeMap;
-
-void Insert(const PNode node, NodeMap& node_map) {
-    size_t x_hash = node->typeHashCode();
-    auto it = node_map.find(x_hash);
-    if (it == node_map.end()) {
-        std::vector<PNode> v = {node};
-        node_map.insert(std::make_pair<size_t, std::vector<PNode>>(std::move(x_hash), std::move(v)));
-    } else {
-        it->second.push_back(node);
-    }
-}
-
-int Size(const NodeMap &map) {
-    int sum = 0;
-    for (auto it : map) {
-        sum += it.second.size();
-    }
-    return sum;
-}
 
 // one Node means a vector
 // the col should be 1, because we aimed for NLP only
@@ -73,56 +23,44 @@ class Graph {
   protected:
     vector<PExecute> execs; //backward
     vector<PNode> nodes; //forward
-    NodeMap free_nodes;
+    vector<PNode> free_nodes;
     vector<PNode> finish_nodes;
     vector<PNode> all_nodes;
 
   public:
     bool train;
-    dtype drop_factor;
 
   public:
     Graph() {
-        drop_factor = 1.0;
-    }
-
-    virtual ~Graph() {
-        int count = execs.size();
-        for (int idx = 0; idx < count; idx++) {
-            delete execs.at(idx);
-        }
+        execs.clear();
         execs.clear();
         nodes.clear();
         free_nodes.clear();
     }
 
-
-    void setDropFactor(dtype cur_drop_factor) {
-        drop_factor = cur_drop_factor;
-        if (drop_factor <= 0) drop_factor = 0;
-        if (drop_factor >= 1.0) drop_factor = 1.0;
+    virtual ~Graph() {
+        int count = execs.size();
+        for (int idx = 0; idx < count; idx++) {
+            delete execs[idx];
+        }
+        execs.clear();
+        execs.clear();
+        nodes.clear();
+        free_nodes.clear();
     }
 
   public:
-    void clearValue(const bool& bTrain = false) {
-        NodeMap node_map;
-        for (Node *node : nodes) {
-            Insert(node, node_map);
-        }
-        for (auto it : node_map) {
-            PExecute new_exec = it.second.at(0)->generate(train,
-                    drop_factor);
-            new_exec->batch = it.second;
-            new_exec->clearValue();
-            delete new_exec;
-        }
-
-
+    inline void clearValue(const bool& bTrain = false) {
         int count = execs.size();
         for (int idx = 0; idx < count; idx++) {
-            delete execs.at(idx);
+            delete execs[idx];
         }
         execs.clear();
+
+        count = nodes.size();
+        for (int idx = 0; idx < count; idx++) {
+            nodes[idx]->clearValue();
+        }
         nodes.clear();
         free_nodes.clear();
         finish_nodes.clear();
@@ -131,68 +69,76 @@ class Graph {
         train = bTrain;
     }
 
-    void backward() {
+    inline void backward() {
         int count = execs.size();
         for (int idx = count - 1; idx >= 0; idx--) {
-            execs.at(idx)->backward();
+            execs[idx]->backward();
         }
     }
 
-    void addNode(PNode x) {
-        static int index;
-        x->node_index = index++;
+    inline void addNode(PNode x) {
         nodes.push_back(x);
         if (x->degree == 0) {
-            Insert(x, free_nodes);
+            free_nodes.push_back(x);
         }
         all_nodes.push_back(x);
     }
 
     //real executation
-    void compute(bool log = false) {
-        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
+    inline void compute() {
+        int free_count = free_nodes.size();
 
-        int i = 0;
-        while (Size(free_nodes) > 0) {
+        while (free_count > 0) {
             vector<PExecute> cur_execs;
-            if (log)
-            std::cout << "i:" << i++ << std::endl;
-            for (auto it : free_nodes) {
-                if (log)
-                std::cout << "ndoe_type:" << it.second.at(0)->node_type <<
-                    " size:" << it.second.size() << std::endl;
-                PExecute new_exec = it.second.at(0)->generate(train,
-                        drop_factor);
-                new_exec->batch = it.second;
-                cur_execs.push_back(new_exec);
+            int cur_execs_size = 0;
+
+            for (int idx = 0; idx < free_count; idx++) {
+                bool find = false;
+                for (int idy = 0; idy < cur_execs_size; idy++) {
+                    if (cur_execs[idy]->addNode(free_nodes[idx])) {
+                        find = true;
+                        break;
+                    }
+                }
+
+                if (!find) {
+                    PExecute new_exec = free_nodes[idx]->generate(train);
+                    cur_execs.push_back(new_exec);
+                    cur_execs_size++;
+                }
+
             }
 
-            for (PExecute e : cur_execs) {
-                //profiler.BeginEvent("forward");
-                e->forwardFully();
-                //profiler.EndEvent();
-                execs.push_back(e);
+            //execute
+//#pragma omp parallel for
+            for (int idy = 0; idy < cur_execs_size; idy++) {
+                cur_execs[idy]->forward();
+            }
+
+            for (int idy = 0; idy < cur_execs_size; idy++) {
+                execs.push_back(cur_execs[idy]);
             }
 
             //finished nodes
-            NodeMap new_free_nodes;
-            for (auto vec_it : free_nodes) {
-                for (auto free_node_it : vec_it.second) {
-                    finish_nodes.push_back(free_node_it);
-                    for (auto parent_it : free_node_it->parents) {
-                        if (parent_it->degree <= 0) {
-                            abort();
-                        }
-                        parent_it->degree--;
-                        if (parent_it->degree == 0) {
-                            Insert(parent_it, new_free_nodes);
-                        }
+            vector<PNode> new_free_nodes;
+            for (int idx = 0; idx < free_count; idx++) {
+                finish_nodes.push_back(free_nodes[idx]);
+                int parent_count = free_nodes[idx]->parents.size();
+                for (int idy = 0; idy < parent_count; idy++) {
+                    free_nodes[idx]->parents[idy]->degree--;
+                    if (free_nodes[idx]->parents[idy]->degree == 0) {
+                        new_free_nodes.push_back(free_nodes[idx]->parents[idy]);
                     }
                 }
             }
 
             // update free nodes
-            free_nodes = std::move(new_free_nodes);
+            free_nodes.clear();
+            free_count = new_free_nodes.size();
+            for (int idx = 0; idx < free_count; idx++) {
+                free_nodes.push_back(new_free_nodes[idx]);
+            }
+
         }
 
         if (finish_nodes.size() != all_nodes.size()) {
@@ -200,47 +146,49 @@ class Graph {
             int total_node_num = all_nodes.size();
             int unprocessed = 0;
             for (int idx = 0; idx < total_node_num; idx++) {
-                PNode curNode = all_nodes.at(idx);
-                if (curNode->degree > 0) {
-                    std::cout << "unprocessed node:" << curNode->node_type << " degree:" << curNode->degree << std::endl;
+                PNode curNode = all_nodes[idx];
+                if (curNode->degree >= 0) {
+                    curNode->typeEqual(all_nodes[0]);
                     unprocessed++;
                 }
             }
             std::cout << "unprocessed: " << unprocessed << std::endl;
-            abort();
         }
     }
+
 };
+
+
 
 
 // one very useful function to collect pointers of derived nodes
 template<typename DerivedNode>
-vector<PNode> getPNodes(vector<DerivedNode>& inputs, int size) {
+inline vector<PNode> getPNodes(vector<DerivedNode>& inputs, int size) {
     int usedSize = inputs.size();
     if (size >= 0 && size < usedSize) usedSize = size;
     vector<PNode> pnodes;
     for (int idx = 0; idx < usedSize; idx++) {
-        pnodes.push_back(&(inputs.at(idx)));
+        pnodes.push_back(&(inputs[idx]));
     }
 
     return pnodes;
 }
 
 template<typename DerivedNode>
-vector<PNode> getPNodes(DerivedNode inputs[], int size) {
+inline vector<PNode> getPNodes(DerivedNode inputs[], int size) {
     //int usedSize = inputs.;
     //if (size >= 0 && size < usedSize) usedSize = size;
     int usedSize = size;
     vector<PNode> pnodes;
     for (int idx = 0; idx < usedSize; idx++) {
-        pnodes.push_back(&(inputs.at(idx)));
+        pnodes.push_back(&(inputs[idx]));
     }
 
     return pnodes;
 }
 
 template<typename DerivedNode>
-vector<PNode> getPNodes(vector<DerivedNode>& inputs, int start, int length) {
+inline vector<PNode> getPNodes(vector<DerivedNode>& inputs, int start, int length) {
     int end, tmp_end = start + length;
     if (tmp_end > inputs.size())
         end = inputs.size();
@@ -249,14 +197,14 @@ vector<PNode> getPNodes(vector<DerivedNode>& inputs, int start, int length) {
     //if (size >= 0 && size < usedSize) usedSize = size;
     vector<PNode> pnodes;
     for (int idx = start; idx < end; idx++) {
-        pnodes.push_back(&(inputs.at(idx)));
+        pnodes.push_back(&(inputs[idx]));
     }
 
     return pnodes;
 }
 
 template<typename DerivedNode>
-vector<PNode> getPNodes(DerivedNode inputs[], int size, int start, int length) {
+inline vector<PNode> getPNodes(DerivedNode inputs[], int size, int start, int length) {
     int end, tmp_end = start + length;
     if (tmp_end > size)
         end = size;
@@ -265,7 +213,7 @@ vector<PNode> getPNodes(DerivedNode inputs[], int size, int start, int length) {
     //if (size >= 0 && size < usedSize) usedSize = size;
     vector<PNode> pnodes;
     for (int idx = start; idx < end; idx++) {
-        pnodes.push_back(&(inputs.at(idx)));
+        pnodes.push_back(&(inputs[idx]));
     }
 
     return pnodes;

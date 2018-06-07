@@ -16,7 +16,7 @@
 #include "Graph.h"
 
 class TriParams {
-public:
+  public:
     Param W1;
     Param W2;
     Param W3;
@@ -24,12 +24,12 @@ public:
 
     bool bUseB;
 
-public:
+  public:
     TriParams() {
         bUseB = true;
     }
 
-    void exportAdaParams(ModelUpdate& ada) {
+    inline void exportAdaParams(ModelUpdate& ada) {
         ada.addParam(&W1);
         ada.addParam(&W2);
         ada.addParam(&W3);
@@ -38,7 +38,7 @@ public:
         }
     }
 
-    void initial(int nOSize, int nISize1, int nISize2, int nISize3, bool useB = true) {
+    inline void initial(int nOSize, int nISize1, int nISize2, int nISize3, bool useB = true) {
         W1.initial(nOSize, nISize1);
         W2.initial(nOSize, nISize2);
         W3.initial(nOSize, nISize3);
@@ -49,7 +49,7 @@ public:
         }
     }
 
-    void save(std::ofstream &os) const {
+    inline void save(std::ofstream &os) const {
         os << bUseB << std::endl;
         W1.save(os);
         W2.save(os);
@@ -59,7 +59,7 @@ public:
         }
     }
 
-    void load(std::ifstream &is) {
+    inline void load(std::ifstream &is) {
         is >> bUseB;
         W1.load(is);
         W2.load(is);
@@ -76,14 +76,14 @@ public:
 // for input variables, we exploit column vector,
 // which means a concrete input vector x_i is represented by x(0, i), x(1, i), ..., x(n, i)
 class TriNode : public Node {
-public:
+  public:
     PNode in1, in2, in3;
     TriParams* param;
     dtype(*activate)(const dtype&);   // activation function
     dtype(*derivate)(const dtype&, const dtype&);  // derivation function of activation function
 
 
-public:
+  public:
     TriNode() : Node() {
         in1 = in2 = in3 = NULL;
         activate = ftanh;
@@ -97,22 +97,22 @@ public:
     }
 
 
-    void setParam(TriParams* paramInit) {
+    inline void setParam(TriParams* paramInit) {
         param = paramInit;
     }
 
-    void clearValue() {
+    inline void clearValue() {
         Node::clearValue();
         in1 = in2 = in3 = NULL;
     }
 
     // define the activate function and its derivation form
-    void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
+    inline void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
         activate = f;
         derivate = f_deri;
     }
 
-public:
+  public:
     void forward(Graph *cg, PNode x1, PNode x2, PNode x3) {
         in1 = x1;
         in2 = x2;
@@ -124,8 +124,8 @@ public:
         cg->addNode(this);
     }
 
-public:
-    void compute(Tensor1D& ty) {
+  public:
+    inline void compute(Tensor1D& ty) {
         ty.mat() = param->W1.val.mat() * in1->val.mat() + param->W2.val.mat() * in2->val.mat() + param->W3.val.mat() * in3->val.mat();
         if (param->bUseB) {
             ty.vec() += param->b.val.vec();
@@ -133,7 +133,7 @@ public:
         val.vec() = ty.vec().unaryExpr(ptr_fun(activate));
     }
 
-    void backward(Tensor1D& ty, Tensor1D& lty) {
+    inline void backward(Tensor1D& ty, Tensor1D& lty) {
         lty.vec() = loss.vec() * ty.vec().binaryExpr(val.vec(), ptr_fun(derivate));
 
         param->W1.grad.mat() += lty.mat() * in1->val.tmat();
@@ -149,11 +149,11 @@ public:
         in3->loss.mat() += param->W3.val.mat().transpose() * lty.mat();
     }
 
-public:
-    PExecute generate(bool bTrain, dtype drop_factor);
+  public:
+    inline PExecute generate(bool bTrain);
 
     // better to rewrite for deep understanding
-    bool typeEqual(PNode other) {
+    inline bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         if (!result) return false;
 
@@ -176,27 +176,27 @@ public:
 // for input variables, we exploit column vector,
 // which means a concrete input vector x_i is represented by x(0, i), x(1, i), ..., x(n, i)
 class LinearTriNode : public Node {
-public:
+  public:
     PNode in1, in2, in3;
     TriParams* param;
 
-public:
+  public:
     LinearTriNode() : Node() {
         in1 = in2 = in3 = NULL;
         param = NULL;
         node_type = "linear_tri";
     }
 
-    void setParam(TriParams* paramInit) {
+    inline void setParam(TriParams* paramInit) {
         param = paramInit;
     }
 
-    void clearValue() {
+    inline void clearValue() {
         Node::clearValue();
         in1 = in2 = in3 = NULL;
     }
 
-public:
+  public:
     void forward(Graph *cg, PNode x1, PNode x2, PNode x3) {
         in1 = x1;
         in2 = x2;
@@ -208,8 +208,8 @@ public:
         cg->addNode(this);
     }
 
-public:
-    void compute() {
+  public:
+    inline void compute() {
         val.mat() = param->W1.val.mat() * in1->val.mat() + param->W2.val.mat() * in2->val.mat() + param->W3.val.mat() * in3->val.mat();
 
         if (param->bUseB) {
@@ -217,7 +217,7 @@ public:
         }
     }
 
-    void backward() {
+    inline void backward() {
         param->W1.grad.mat() += loss.mat() * in1->val.tmat();
         param->W2.grad.mat() += loss.mat() * in2->val.tmat();
         param->W3.grad.mat() += loss.mat() * in3->val.tmat();
@@ -231,11 +231,11 @@ public:
         in3->loss.mat() += param->W3.val.mat().transpose() * loss.mat();
     }
 
-public:
-    PExecute generate(bool bTrain, dtype drop_factor);
+  public:
+    inline PExecute generate(bool bTrain);
 
     // better to rewrite for deep understanding
-    bool typeEqual(PNode other) {
+    inline bool typeEqual(PNode other) {
         bool result = Node::typeEqual(other);
         if (!result) return false;
 
@@ -252,14 +252,15 @@ public:
 
 #if USE_GPU
 class TriExecute :public Execute {
-public:
+  public:
     Tensor2D x1, x2, x3, ty, y, b;
     int inDim1, inDim2, inDim3, outDim;
     TriParams* param;
     dtype(*activate)(const dtype&);   // activation function
     dtype(*derivate)(const dtype&, const dtype&);  // derivation function of activation function
+    bool bTrain;
 
-public:
+  public:
     ~TriExecute() {
         param = NULL;
         activate = NULL;
@@ -268,8 +269,8 @@ public:
     }
 
 
-public:
-    void  forward() {
+  public:
+    inline void  forward() {
         int count = batch.size();
         x1.init(inDim1, count);
         x2.init(inDim2, count);
@@ -309,11 +310,11 @@ public:
             for (int idy = 0; idy < outDim; idy++) {
                 ptr->val[idy] = y[idx][idy];
             }
-            ptr->forward_drop(bTrain, drop_factor);
+            ptr->forward_drop(bTrain);
         }
     }
 
-    void backward() {
+    inline void backward() {
         int count = batch.size();
         Tensor2D lx1, lx2, lx3, lty, ly;
         lx1.init(inDim1, count);
@@ -364,13 +365,14 @@ public:
 };
 
 class LinearTriExecute :public Execute {
-public:
+  public:
     Tensor2D x1, x2, x3, y, b;
     int inDim1, inDim2, inDim3, outDim, count;
     TriParams* param;
+    bool bTrain;
 
-public:
-    void  forward() {
+  public:
+    inline void  forward() {
         count = batch.size();
         x1.init(inDim1, count);
         x2.init(inDim2, count);
@@ -408,11 +410,11 @@ public:
             for (int idy = 0; idy < outDim; idy++) {
                 ptr->val[idy] = y[idx][idy];
             }
-            ptr->forward_drop(bTrain, drop_factor);
+            ptr->forward_drop(bTrain);
         }
     }
 
-    void backward() {
+    inline void backward() {
         Tensor2D lx1, lx2, lx3, ly;
         lx1.init(inDim1, count);
         lx2.init(inDim2, count);
@@ -460,7 +462,7 @@ public:
 };
 
 
-PExecute TriNode::generate(bool bTrain, dtype drop_factor) {
+inline PExecute TriNode::generate(bool bTrain) {
     TriExecute* exec = new TriExecute();
     exec->batch.push_back(this);
     exec->inDim1 = param->W1.inDim();
@@ -471,12 +473,11 @@ PExecute TriNode::generate(bool bTrain, dtype drop_factor) {
     exec->activate = activate;
     exec->derivate = derivate;
     exec->bTrain = bTrain;
-    exec->drop_factor = drop_factor;
     return exec;
 }
 
 
-PExecute LinearTriNode::generate(bool bTrain, dtype drop_factor) {
+inline PExecute LinearTriNode::generate(bool bTrain) {
     LinearTriExecute* exec = new LinearTriExecute();
     exec->batch.push_back(this);
     exec->inDim1 = param->W1.inDim();
@@ -485,22 +486,22 @@ PExecute LinearTriNode::generate(bool bTrain, dtype drop_factor) {
     exec->outDim = param->W1.outDim();
     exec->param = param;
     exec->bTrain = bTrain;
-    exec->drop_factor = drop_factor;
     return exec;
 }
 #elif USE_BASE
 class TriExecute :public Execute {
-public:
+  public:
+    bool bTrain;
     int dim;
     vector<Tensor1D> tys, ltys;
-public:
-    void  forward() {
+  public:
+    inline void  forward() {
         int count = batch.size();
         tys.resize(count);
         for (int idx = 0; idx < count; idx++) {
             tys[idx].init(dim, NULL);
         }
-        //#pragma omp parallel for schedule(static,1)
+//#pragma omp parallel for schedule(static,1)
         for (int idx = 0; idx < count; idx++) {
             TriNode* ptr = (TriNode*)batch[idx];
             ptr->compute(tys[idx]);
@@ -508,13 +509,13 @@ public:
         }
     }
 
-    void backward() {
+    inline void backward() {
         int count = batch.size();
         ltys.resize(count);
         for (int idx = 0; idx < count; idx++) {
             ltys[idx].init(dim, NULL);
         }
-        //#pragma omp parallel for schedule(static,1)
+//#pragma omp parallel for schedule(static,1)
         for (int idx = 0; idx < count; idx++) {
             TriNode* ptr = (TriNode*)batch[idx];
             ptr->backward_drop();
@@ -523,20 +524,21 @@ public:
     }
 };
 
-PExecute TriNode::generate(bool bTrain, dtype drop_factor) {
+inline PExecute TriNode::generate(bool bTrain) {
     TriExecute* exec = new TriExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
     exec->dim = dim;
-    exec->drop_factor = drop_factor;
     return exec;
 };
 
 class LinearTriExecute :public Execute {
-public:
-    void  forward() {
+  public:
+    bool bTrain;
+  public:
+    inline void  forward() {
         int count = batch.size();
-        //#pragma omp parallel for schedule(static,1)
+//#pragma omp parallel for schedule(static,1)
         for (int idx = 0; idx < count; idx++) {
             LinearTriNode* ptr = (LinearTriNode*)batch[idx];
             ptr->compute();
@@ -544,9 +546,9 @@ public:
         }
     }
 
-    void backward() {
+    inline void backward() {
         int count = batch.size();
-        //#pragma omp parallel for schedule(static,1)
+//#pragma omp parallel for schedule(static,1)
         for (int idx = 0; idx < count; idx++) {
             LinearTriNode* ptr = (LinearTriNode*)batch[idx];
             ptr->backward_drop();
@@ -555,23 +557,23 @@ public:
     }
 };
 
-PExecute LinearTriNode::generate(bool bTrain, dtype drop_factor) {
+inline PExecute LinearTriNode::generate(bool bTrain) {
     LinearTriExecute* exec = new LinearTriExecute();
     exec->batch.push_back(this);
     exec->bTrain = bTrain;
-    exec->drop_factor = drop_factor;
     return exec;
 };
 #else
 class TriExecute :public Execute {
-public:
+  public:
     Tensor2D x1, x2, x3, ty, y, b;
     int inDim1, inDim2, inDim3, outDim;
     TriParams* param;
     dtype(*activate)(const dtype&);   // activation function
     dtype(*derivate)(const dtype&, const dtype&);  // derivation function of activation function
+    bool bTrain;
 
-public:
+  public:
     ~TriExecute() {
         param = NULL;
         activate = NULL;
@@ -580,8 +582,8 @@ public:
     }
 
 
-public:
-    void  forward() {
+  public:
+    inline void  forward() {
         int count = batch.size();
         x1.init(inDim1, count);
         x2.init(inDim2, count);
@@ -621,11 +623,11 @@ public:
             for (int idy = 0; idy < outDim; idy++) {
                 ptr->val[idy] = y[idx][idy];
             }
-            ptr->forward_drop(bTrain, drop_factor);
+            ptr->forward_drop(bTrain);
         }
     }
 
-    void backward() {
+    inline void backward() {
         int count = batch.size();
         Tensor2D lx1, lx2, lx3, lty, ly;
         lx1.init(inDim1, count);
@@ -676,13 +678,14 @@ public:
 };
 
 class LinearTriExecute :public Execute {
-public:
+  public:
     Tensor2D x1, x2, x3, y, b;
     int inDim1, inDim2, inDim3, outDim, count;
     TriParams* param;
+    bool bTrain;
 
-public:
-    void  forward() {
+  public:
+    inline void  forward() {
         count = batch.size();
         x1.init(inDim1, count);
         x2.init(inDim2, count);
@@ -720,11 +723,11 @@ public:
             for (int idy = 0; idy < outDim; idy++) {
                 ptr->val[idy] = y[idx][idy];
             }
-            ptr->forward_drop(bTrain, drop_factor);
+            ptr->forward_drop(bTrain);
         }
     }
 
-    void backward() {
+    inline void backward() {
         Tensor2D lx1, lx2, lx3, ly;
         lx1.init(inDim1, count);
         lx2.init(inDim2, count);
@@ -772,7 +775,7 @@ public:
 };
 
 
-PExecute TriNode::generate(bool bTrain, dtype drop_factor) {
+inline PExecute TriNode::generate(bool bTrain) {
     TriExecute* exec = new TriExecute();
     exec->batch.push_back(this);
     exec->inDim1 = param->W1.inDim();
@@ -783,12 +786,11 @@ PExecute TriNode::generate(bool bTrain, dtype drop_factor) {
     exec->activate = activate;
     exec->derivate = derivate;
     exec->bTrain = bTrain;
-    exec->drop_factor = drop_factor;
     return exec;
 }
 
 
-PExecute LinearTriNode::generate(bool bTrain, dtype drop_factor) {
+inline PExecute LinearTriNode::generate(bool bTrain) {
     LinearTriExecute* exec = new LinearTriExecute();
     exec->batch.push_back(this);
     exec->inDim1 = param->W1.inDim();
@@ -797,7 +799,6 @@ PExecute LinearTriNode::generate(bool bTrain, dtype drop_factor) {
     exec->outDim = param->W1.outDim();
     exec->param = param;
     exec->bTrain = bTrain;
-    exec->drop_factor = drop_factor;
     return exec;
 }
 #endif

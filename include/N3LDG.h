@@ -27,15 +27,13 @@
 #include "Biaffine.h"
 #include "LSTM1.h"
 #include "SoftMaxLoss.h"
+#include "APCOP.h"
+#include "APOP.h"
+#include "SparseCOP.h"
+#include "SparseOP.h"
 #include "TransferOP.h"
 #include "AttentionHelp.h"
 #include "Attention.h"
-#include "APOP.h"
-#include "SparseOP.h"
-#include "ActionOP.h"
-#include "LogSoftMax.h"
-#if USE_GPU
-#include "N3LDG_cuda.h"
-#endif
+#include "profiler.h"
 
 #endif
