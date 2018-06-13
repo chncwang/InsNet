@@ -38,6 +38,7 @@ class Node {
   public:
     int dim;
     int degree;
+    int depth = 0;
     string node_type;
 
   public:
@@ -167,6 +168,7 @@ class Node {
         if (degree >= 0) {
             parents.push_back(parent);
             parent->degree++;
+            parent->depth = std::max(depth + 1, parent->depth);
         }
     }
 };
