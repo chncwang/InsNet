@@ -74,6 +74,7 @@ class Graph {
     vector<PExecute> execs; //backward
     vector<PNode> nodes; //forward
     NodeMap free_nodes;
+    std::map<size_t, std::pair<int, int>> node_type_depth;
     vector<PNode> finish_nodes;
     vector<PNode> all_nodes;
 
@@ -94,6 +95,7 @@ class Graph {
         execs.clear();
         nodes.clear();
         free_nodes.clear();
+        node_type_depth.clear();
     }
 
 
@@ -146,6 +148,16 @@ class Graph {
             Insert(x, free_nodes);
         }
         all_nodes.push_back(x);
+
+        size_t x_type_hash = x->typeHashCode();
+        auto it = node_type_depth.find(x_type_hash);
+        if (it == node_type_depth.end()) {
+            node_type_depth.insert(std::pair<size_t, std::pair<int, int>>(
+                        x_type_hash, std::pair<int, int>(x->depth, 1)));
+        } else {
+            it->second.first += x->depth;
+            it->second.second++;
+        }
     }
 
     //real executation
@@ -154,45 +166,50 @@ class Graph {
 
         int i = 0;
         while (Size(free_nodes) > 0) {
-            vector<PExecute> cur_execs;
             if (log)
             std::cout << "i:" << i++ << std::endl;
+            float min_avg_depth = 100000000;
+            std::vector<Node*> shallow_nodes;
+            size_t min_hash = 0;
             for (auto it : free_nodes) {
-                if (log)
-                std::cout << "ndoe_type:" << it.second.at(0)->node_type <<
-                    " size:" << it.second.size() << std::endl;
-                PExecute new_exec = it.second.at(0)->generate(train,
-                        drop_factor);
-                new_exec->batch = it.second;
-                cur_execs.push_back(new_exec);
+                size_t type_hash = it.first;
+                auto depth_it = node_type_depth.find(type_hash);
+                float avg_depth = (float)depth_it->second.first /
+                    depth_it->second.second;
+                if (avg_depth < min_avg_depth) {
+                    min_avg_depth = avg_depth;
+                    shallow_nodes = std::move(it.second);
+                    min_hash = type_hash;
+                }
             }
+            Node *first_node = shallow_nodes.at(0);
+            PExecute cur_exec = first_node->generate(train, drop_factor);
+            cur_exec->batch = std::move(shallow_nodes);
+            free_nodes.erase(min_hash);
 
-            for (PExecute e : cur_execs) {
-                //profiler.BeginEvent("forward");
-                e->forwardFully();
-                //profiler.EndEvent();
-                execs.push_back(e);
-            }
+            static int count_sum;
+            static int c;
+            count_sum += cur_exec->batch.size();
+            ++c;
+            std::cout << "batch count avg:" << (float)count_sum / c << std::endl;
+            //profiler.BeginEvent("forward");
+            cur_exec->forwardFully();
+            //profiler.EndEvent();
+            execs.push_back(cur_exec);
 
             //finished nodes
-            NodeMap new_free_nodes;
-            for (auto vec_it : free_nodes) {
-                for (auto free_node_it : vec_it.second) {
-                    finish_nodes.push_back(free_node_it);
-                    for (auto parent_it : free_node_it->parents) {
-                        if (parent_it->degree <= 0) {
-                            abort();
-                        }
-                        parent_it->degree--;
-                        if (parent_it->degree == 0) {
-                            Insert(parent_it, new_free_nodes);
-                        }
+            for (Node* free_node : cur_exec->batch) {
+                finish_nodes.push_back(free_node);
+                for (auto parent_it : free_node->parents) {
+                    if (parent_it->degree <= 0) {
+                        abort();
+                    }
+                    parent_it->degree--;
+                    if (parent_it->degree == 0) {
+                        Insert(parent_it, free_nodes);
                     }
                 }
             }
-
-            // update free nodes
-            free_nodes = std::move(new_free_nodes);
         }
 
         if (finish_nodes.size() != all_nodes.size()) {
