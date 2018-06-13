@@ -178,7 +178,7 @@ class Graph {
                     depth_it->second.second;
                 if (avg_depth < min_avg_depth) {
                     min_avg_depth = avg_depth;
-                    shallow_nodes = std::move(it.second);
+                    shallow_nodes = it.second;
                     min_hash = type_hash;
                 }
             }
@@ -187,11 +187,6 @@ class Graph {
             cur_exec->batch = std::move(shallow_nodes);
             free_nodes.erase(min_hash);
 
-            static int count_sum;
-            static int c;
-            count_sum += cur_exec->batch.size();
-            ++c;
-            std::cout << "batch count avg:" << (float)count_sum / c << std::endl;
             //profiler.BeginEvent("forward");
             cur_exec->forwardFully();
             //profiler.EndEvent();
