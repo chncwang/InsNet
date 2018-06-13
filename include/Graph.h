@@ -168,6 +168,11 @@ class Graph {
             }
 
             for (PExecute e : cur_execs) {
+                static int count_sum;
+                static int c;
+                count_sum += e->batch.size();
+                ++c;
+                std::cout << "batch count avg:" << (float)count_sum / c << std::endl;
                 //profiler.BeginEvent("forward");
                 e->forwardFully();
                 //profiler.EndEvent();
