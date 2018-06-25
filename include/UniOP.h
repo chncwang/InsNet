@@ -603,10 +603,6 @@ public:
 
     void  forward() {
         int count = batch.size();
-        if (param->W.index == 7) {
-            n3ldg_cuda::Assert(param->W.val.verify("index 7 euqal"));
-            std::cout << "index 7 W verified" << std::endl;
-        }
 
         x.init(inDim, count);
         y.init(outDim, count);
