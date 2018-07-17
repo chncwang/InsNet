@@ -71,6 +71,16 @@ class BucketNode : public Node {
         cg->addNode(this);
     }
 
+    void forward(Graph *cg, const dtype *value) {
+#if USE_GPU
+      abort();
+#else
+      Vec(val.v, dim) = Vec(value, dim);
+      degree = 0;
+      cg->addNode(this);
+#endif
+    }
+
     void compute() {
 
     }
