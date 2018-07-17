@@ -71,7 +71,7 @@ class BucketNode : public Node {
         cg->addNode(this);
     }
 
-    void forward(Graph *cg, const dtype *value) {
+    void forwardArr(Graph *cg, dtype *value) {
 #if USE_GPU
       abort();
 #else
