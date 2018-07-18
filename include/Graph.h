@@ -226,60 +226,60 @@ class Graph {
 
 
 // one very useful function to collect pointers of derived nodes
-template<typename DerivedNode>
-vector<PNode> getPNodes(vector<DerivedNode>& inputs, int size) {
-    int usedSize = inputs.size();
-    if (size >= 0 && size < usedSize) usedSize = size;
-    vector<PNode> pnodes;
-    for (int idx = 0; idx < usedSize; idx++) {
-        pnodes.push_back(&(inputs.at(idx)));
-    }
+//template<typename DerivedNode>
+//vector<PNode> getPNodes(vector<DerivedNode>& inputs, int size) {
+//    int usedSize = inputs.size();
+//    if (size >= 0 && size < usedSize) usedSize = size;
+//    vector<PNode> pnodes;
+//    for (int idx = 0; idx < usedSize; idx++) {
+//        pnodes.push_back(&(inputs.at(idx)));
+//    }
 
-    return pnodes;
-}
+//    return pnodes;
+//}
 
-template<typename DerivedNode>
-vector<PNode> getPNodes(DerivedNode inputs[], int size) {
+//template<typename DerivedNode>
+//vector<PNode> getPNodes(DerivedNode inputs[], int size) {
     //int usedSize = inputs.;
     //if (size >= 0 && size < usedSize) usedSize = size;
-    int usedSize = size;
-    vector<PNode> pnodes;
-    for (int idx = 0; idx < usedSize; idx++) {
-        pnodes.push_back(&(inputs.at(idx)));
-    }
+//    int usedSize = size;
+//    vector<PNode> pnodes;
+//    for (int idx = 0; idx < usedSize; idx++) {
+//        pnodes.push_back(&(inputs.at(idx)));
+//    }
 
-    return pnodes;
-}
+//    return pnodes;
+//}
 
-template<typename DerivedNode>
-vector<PNode> getPNodes(vector<DerivedNode>& inputs, int start, int length) {
-    int end, tmp_end = start + length;
-    if (tmp_end > inputs.size())
-        end = inputs.size();
-    else
-        end = tmp_end;
+//template<typename DerivedNode>
+//vector<PNode> getPNodes(vector<DerivedNode>& inputs, int start, int length) {
+//    int end, tmp_end = start + length;
+//    if (tmp_end > inputs.size())
+//        end = inputs.size();
+//    else
+//        end = tmp_end;
     //if (size >= 0 && size < usedSize) usedSize = size;
-    vector<PNode> pnodes;
-    for (int idx = start; idx < end; idx++) {
-        pnodes.push_back(&(inputs.at(idx)));
-    }
+//    vector<PNode> pnodes;
+//    for (int idx = start; idx < end; idx++) {
+//        pnodes.push_back(&(inputs.at(idx)));
+//    }
 
-    return pnodes;
-}
+//    return pnodes;
+//}
 
-template<typename DerivedNode>
-vector<PNode> getPNodes(DerivedNode inputs[], int size, int start, int length) {
-    int end, tmp_end = start + length;
-    if (tmp_end > size)
-        end = size;
-    else
-        end = tmp_end;
+//template<typename DerivedNode>
+//vector<PNode> getPNodes(DerivedNode inputs[], int size, int start, int length) {
+//    int end, tmp_end = start + length;
+//    if (tmp_end > size)
+//        end = size;
+//    else
+//        end = tmp_end;
     //if (size >= 0 && size < usedSize) usedSize = size;
-    vector<PNode> pnodes;
-    for (int idx = start; idx < end; idx++) {
-        pnodes.push_back(&(inputs.at(idx)));
-    }
+//    vector<PNode> pnodes;
+//    for (int idx = start; idx < end; idx++) {
+//        pnodes.push_back(&(inputs.at(idx)));
+//    }
 
-    return pnodes;
-}
+//    return pnodes;
+//}
 #endif

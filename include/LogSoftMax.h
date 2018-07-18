@@ -87,7 +87,7 @@ class LogSoftMax {
             _expmiddles[idx].forward(cg, &_middles[idx]);
         }
 
-        _sum.forward(cg, getPNodes(_expmiddles, _nSize));
+        _sum.forward(cg, toPointers<ActivateNode, Node>(_expmiddles, _nSize));
         _logsum.forward(cg, &_sum);
 
         for (int idx = 0; idx < _nSize; idx++) {
