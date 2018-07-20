@@ -23,7 +23,7 @@ class ModelUpdate {
         _params.clear();
 
         _reg = 1e-8;
-        _alpha = 0.01;
+        _alpha = 0.001;
         _eps = 1e-8;
 
         _belta1 = 0.9;

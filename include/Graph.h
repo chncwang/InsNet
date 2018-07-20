@@ -106,7 +106,7 @@ class Graph {
     }
 
   public:
-    void clearValue(const bool& bTrain = false) {
+    void clearValue(const bool& bTrain = true) {
         train = bTrain;
         NodeMap node_map;
         for (Node *node : nodes) {

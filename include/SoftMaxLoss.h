@@ -5,8 +5,8 @@
 #include "Metric.h"
 #include "Node.h"
 
-
-dtype loss(PNode x, const vector<dtype> &answer, Metric& eval, int batchsize = 1) {
+dtype softMaxLoss(PNode x, const vector<dtype> &answer, Metric& eval,
+    dtype batchsize) {
     int nDim = x->dim;
     int labelsize = answer.size();
     if (labelsize != nDim) {
