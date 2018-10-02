@@ -225,6 +225,10 @@ public:
         param = paramInit;
     }
 
+    void setParam(const LookupTable &table) {
+        param = &table;
+    }
+
     void clearValue() {
         Node::clearValue();
         xid = -1;
