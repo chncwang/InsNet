@@ -131,6 +131,10 @@ class TanhNode :public Node {
     }
 
   public:
+    void forward(Graph &graph, Node &input) {
+        this->forward(&graph, &input);
+    }
+
     void forward(Graph *cg, PNode x) {
         in = x;
         degree = 0;
@@ -326,6 +330,10 @@ class SigmoidNode :public Node {
     }
 
   public:
+    void forward(Graph &graph, Node &input) {
+        this->forward(&graph, &input);
+    }
+
     void forward(Graph *cg, PNode x) {
         in = x;
         degree = 0;

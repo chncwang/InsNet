@@ -251,6 +251,9 @@ class LinearNode : public Node {
         node_type = "linear";
     }
 
+    void setParam(UniParams &uni_params) {
+        this->setParam(&uni_params);
+    }
 
     void setParam(UniParams* paramInit) {
         if (paramInit->bUseB) {
@@ -271,6 +274,10 @@ class LinearNode : public Node {
         degree = 0;
         in->addParent(this);
         cg->addNode(this);
+    }
+
+    void forward(Graph &graph, Node &x) {
+        forward(&graph, &x);
     }
 
   public:

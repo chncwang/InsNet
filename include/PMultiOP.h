@@ -31,6 +31,10 @@ class PMultiNode : public Node {
     }
 
   public:
+    void forward(Graph &graph, Node &input1, Node &input2) {
+        this->forward(&graph, &input1, &input2);
+    }
+
     void forward(Graph *cg, PNode x1, PNode x2) {
         in1 = x1;
         in2 = x2;

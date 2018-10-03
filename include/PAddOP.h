@@ -33,6 +33,11 @@ public:
     }
 
 public:
+    void forward(Graph &graph, Node &input1, Node &input2) {
+        vector<Node *> inputs = {&input1, &input2};
+        this->forward(&graph, inputs);
+    }
+
     void forward(Graph *cg, const vector<PNode>& x) {
         if (x.size() == 0) {
             std::cout << "empty inputs for add" << std::endl;

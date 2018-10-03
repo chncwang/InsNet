@@ -225,7 +225,7 @@ public:
         param = paramInit;
     }
 
-    void setParam(const LookupTable &table) {
+    void setParam(LookupTable &table) {
         param = &table;
     }
 

@@ -6,7 +6,7 @@
 *  LSTM variation 1
 *
 *  Created on: June 13, 2017
-*      Author: mszhang
+*      Author: mszhang, chncwang
 */
 
 #include "MyLib.h"
@@ -17,6 +17,8 @@
 #include "PMultiOP.h"
 #include "PAddOP.h"
 #include "BucketOP.h"
+
+#include <memory>
 
 struct LSTM1Params {
     UniParams input_hidden;
@@ -451,4 +453,200 @@ public:
         }
     }
 };
+
+struct DynamicLSTMBuilder {
+    vector<shared_ptr<LinearNode>> _inputgates_hidden;
+    vector<shared_ptr<LinearNode>> _inputgates_input;
+    vector<shared_ptr<PAddNode>> _inputgates_add;
+    vector<shared_ptr<SigmoidNode>> _inputgates;
+
+    vector<shared_ptr<LinearNode>> _forgetgates_hidden;
+    vector<shared_ptr<LinearNode>> _forgetgates_input;
+    vector<shared_ptr<PAddNode>> _forgetgates_add;
+    vector<shared_ptr<SigmoidNode>> _forgetgates;
+
+    vector<shared_ptr<LinearNode>> _halfcells_hidden;
+    vector<shared_ptr<LinearNode>> _halfcells_input;
+    vector<shared_ptr<PAddNode>> _halfcells_add;
+    vector<shared_ptr<TanhNode>> _halfcells;
+
+    vector<shared_ptr<LinearNode>> _outputgates_hidden;
+    vector<shared_ptr<LinearNode>> _outputgates_input;
+    vector<shared_ptr<PAddNode>> _outputgates_add;
+    vector<shared_ptr<SigmoidNode>> _outputgates;
+
+    vector<shared_ptr<PMultiNode>> _inputfilters;
+    vector<shared_ptr<PMultiNode>> _forgetfilters;
+
+    vector<shared_ptr<PAddNode>> _cells;
+
+    vector<shared_ptr<TanhNode>> _halfhiddens;
+    vector<shared_ptr<PMultiNode>> _hiddens;
+
+    BucketNode _bucket;
+
+    void init(int out_dim) {
+        _bucket.init(out_dim, -1);
+    }
+
+    void forward(Graph &graph, LSTM1Params &lstm_params, const vector<PNode>& inputs,
+            bool is_left_to_right) {
+        if (inputs.empty()) {
+            std::cerr << "empty inputs for lstm operation" << std::endl;
+            abort();
+        }
+
+        int out_dim = lstm_params.input_input.W.outDim();
+
+        for (int i = 0; i < inputs.size(); ++i) {
+            shared_ptr<LinearNode> inputgate_hidden(new LinearNode);
+            inputgate_hidden->init(out_dim, -1);
+            inputgate_hidden->setParam(lstm_params.input_hidden);
+            _inputgates_hidden.push_back(inputgate_hidden);
+
+            shared_ptr<LinearNode> inputgate_input(new LinearNode);
+            inputgate_input->init(out_dim, -1);
+            inputgate_input->setParam(lstm_params.input_input);
+            _inputgates_input.push_back(inputgate_input);
+
+            shared_ptr<LinearNode> forgetgate_hidden(new LinearNode);
+            forgetgate_hidden->init(out_dim, -1);
+            forgetgate_hidden->setParam(lstm_params.forget_hidden);
+            _forgetgates_hidden.push_back(forgetgate_hidden);
+
+            shared_ptr<LinearNode> forgetgate_input(new LinearNode);
+            forgetgate_input->init(out_dim, -1);
+            forgetgate_input->setParam(lstm_params.forget_input);
+            _forgetgates_input.push_back(forgetgate_input);
+
+            shared_ptr<LinearNode> halfcell_hidden(new LinearNode);
+            halfcell_hidden->init(out_dim, -1);
+            halfcell_hidden->setParam(lstm_params.cell_hidden);
+            _halfcells_hidden.push_back(halfcell_hidden);
+
+            shared_ptr<LinearNode> halfcell_input(new LinearNode);
+            halfcell_input->init(out_dim, -1);
+            halfcell_input->setParam(lstm_params.cell_input);
+            _halfcells_input.push_back(halfcell_input);
+
+            shared_ptr<LinearNode> outputgate_hidden(new LinearNode);
+            outputgate_hidden->init(out_dim, -1);
+            outputgate_hidden->setParam(lstm_params.output_hidden);
+            _outputgates_hidden.push_back(outputgate_hidden);
+
+            shared_ptr<LinearNode> outputgate_input(new LinearNode);
+            outputgate_input->init(out_dim, -1);
+            outputgate_input->setParam(lstm_params.output_input);
+            _outputgates_input.push_back(outputgate_input);
+
+            shared_ptr<PMultiNode> inputfilter(new PMultiNode);
+            inputfilter->init(out_dim, -1);
+            _inputfilters.push_back(inputfilter);
+
+            shared_ptr<PMultiNode> forgetfilter(new PMultiNode);
+            forgetfilter->init(out_dim, -1);
+            _forgetfilters.push_back(forgetfilter);
+
+            shared_ptr<PAddNode> cell(new PAddNode);
+            cell->init(out_dim, -1);
+            _cells.push_back(cell);
+
+            shared_ptr<TanhNode> halfhidden(new TanhNode);
+            halfhidden->init(out_dim, -1);
+            _halfhiddens.push_back(halfhidden);
+
+            shared_ptr<PMultiNode> hidden(new PMultiNode);
+            hidden->init(out_dim, -1);
+            _hiddens.push_back(hidden);
+
+            shared_ptr<PAddNode> inputgate_add(new PAddNode);
+            inputgate_add->init(out_dim, -1);
+            _inputgates_add.push_back(inputgate_add);
+
+            shared_ptr<SigmoidNode> inputgate(new SigmoidNode);
+            inputgate->init(out_dim, -1);
+            _inputgates.push_back(inputgate);
+
+            shared_ptr<PAddNode> forgetgate_add(new PAddNode);
+            forgetgate_add->init(out_dim, -1);
+            _forgetgates_add.push_back(forgetgate_add);
+
+            shared_ptr<SigmoidNode> forgetgate(new SigmoidNode);
+            forgetgate->init(out_dim, -1);
+            _forgetgates.push_back(forgetgate);
+
+            shared_ptr<PAddNode> halfcell_add(new PAddNode);
+            halfcell_add->init(out_dim, -1);
+            _halfcells_add.push_back(halfcell_add);
+
+            shared_ptr<TanhNode> halfcell(new TanhNode);
+            halfcell->init(out_dim, -1);
+            _halfcells.push_back(halfcell);
+
+            shared_ptr<PAddNode> outputgate_add(new PAddNode);
+            outputgate_add->init(out_dim, -1);
+            _outputgates_add.push_back(outputgate_add);
+
+            shared_ptr<SigmoidNode> outputgate(new SigmoidNode);
+            outputgate->init(out_dim, -1);
+            _outputgates.push_back(outputgate);
+        }
+
+        int i_begin = is_left_to_right ? 0 : inputs.size() - 1;
+        int i_step = is_left_to_right ? 1 : -1;
+
+        for (int i = i_begin; is_left_to_right ? i < inputs.size() : i >= 0; i += i_step) {
+            if (i == i_begin) {
+                _bucket.forward(graph, 0);
+                _inputgates_hidden.at(i)->forward(graph, _bucket);
+                _inputgates_input.at(i)->forward(graph, *inputs.at(i));
+                _inputgates_add.at(i)->forward(graph, *_inputgates_hidden.at(i),
+                        *_inputgates_input.at(i));
+                _inputgates.at(i)->forward(graph, *_inputgates_add.at(i));
+
+                _outputgates_hidden.at(i)->forward(graph, _bucket);
+                _outputgates_input.at(i)->forward(graph, *inputs.at(i));
+                _outputgates_add.at(i)->forward(graph, *_outputgates_hidden.at(i), *_outputgates_input.at(i));
+                _outputgates.at(i)->forward(graph, *_outputgates_add.at(i));
+
+                _halfcells_hidden.at(i)->forward(graph, _bucket);
+                _halfcells_input.at(i)->forward(graph, *inputs.at(i));
+                _halfcells_add.at(i)->forward(graph, *_halfcells_hidden.at(i), *_halfcells_input.at(i));
+                _halfcells.at(i)->forward(graph, *_halfcells_add.at(i));
+
+                _inputfilters.at(i)->forward(graph, *_halfcells.at(i), *_inputgates.at(i));
+                _cells.at(i)->forward(graph, *_inputfilters.at(i), _bucket);
+                _halfhiddens.at(i)->forward(graph, *_cells.at(i));
+                _hiddens.at(i)->forward(graph, *_halfhiddens.at(i), *_outputgates.at(i));
+            } else {
+                _inputgates_hidden.at(i)->forward(graph, *_hiddens[i - i_step]);
+                _inputgates_input.at(i)->forward(graph, *inputs.at(i));
+                _inputgates_add.at(i)->forward(graph, *_inputgates_hidden.at(i), *_inputgates_input.at(i));
+                _inputgates.at(i)->forward(graph, *_inputgates_add.at(i));
+
+                _outputgates_hidden.at(i)->forward(graph, *_hiddens[i - i_step]);
+                _outputgates_input.at(i)->forward(graph, *inputs.at(i));
+                _outputgates_add.at(i)->forward(graph, *_outputgates_hidden.at(i), *_outputgates_input.at(i));
+                _outputgates.at(i)->forward(graph, *_outputgates_add.at(i));
+
+                _halfcells_hidden.at(i)->forward(graph, *_hiddens[i - i_step]);
+                _halfcells_input.at(i)->forward(graph, *inputs.at(i));
+                _halfcells_add.at(i)->forward(graph, *_halfcells_hidden.at(i), *_halfcells_input.at(i));
+                _halfcells.at(i)->forward(graph, *_halfcells_add.at(i));
+
+                _forgetgates_hidden.at(i)->forward(graph, *_hiddens[i - i_step]);
+                _forgetgates_input.at(i)->forward(graph, *inputs.at(i));
+                _forgetgates_add.at(i)->forward(graph, *_forgetgates_hidden.at(i), *_forgetgates_input.at(i));
+                _forgetgates.at(i)->forward(graph, *_forgetgates_add.at(i));
+
+                _inputfilters.at(i)->forward(graph, *_halfcells.at(i), *_inputgates.at(i));
+                _forgetfilters.at(i)->forward(graph, *_cells[i - i_step], *_forgetgates.at(i));
+                _cells.at(i)->forward(graph, *_inputfilters.at(i), *_forgetfilters.at(i));
+                _halfhiddens.at(i)->forward(graph, *_cells.at(i));
+                _hiddens.at(i)->forward(graph, *_halfhiddens.at(i), *_outputgates.at(i));
+            }
+        }
+    }
+};
+
 #endif

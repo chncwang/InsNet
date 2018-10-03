@@ -39,7 +39,10 @@ class BucketNode : public Node {
         Node::init(ndim, -1);
     }
 
-  public:
+    void forward(Graph &graph, dtype value) {
+        this->forward(&graph, value);
+    }
+
     void forward(Graph *cg, dtype value) {
 #if TEST_CUDA
         val  = value;
