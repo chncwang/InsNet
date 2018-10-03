@@ -483,22 +483,14 @@ struct DynamicLSTMBuilder {
     vector<shared_ptr<TanhNode>> _halfhiddens;
     vector<shared_ptr<PMultiNode>> _hiddens;
 
-    BucketNode _bucket;
-
-    void init(int out_dim) {
-        _bucket.init(out_dim, -1);
-    }
-
-    void forward(Graph &graph, LSTM1Params &lstm_params, const vector<PNode>& inputs,
-            bool is_left_to_right) {
-        if (inputs.empty()) {
-            std::cerr << "empty inputs for lstm operation" << std::endl;
+    void init(int size, LSTM1Params &lstm_params) {
+        if (size <= 0) {
+            std::cerr << "size is less than 0" << std::endl;
             abort();
         }
-
         int out_dim = lstm_params.input_input.W.outDim();
 
-        for (int i = 0; i < inputs.size(); ++i) {
+        for (int i = 0; i < size; ++i) {
             shared_ptr<LinearNode> inputgate_hidden(new LinearNode);
             inputgate_hidden->init(out_dim, -1);
             inputgate_hidden->setParam(lstm_params.input_hidden);
@@ -591,60 +583,56 @@ struct DynamicLSTMBuilder {
             outputgate->init(out_dim, -1);
             _outputgates.push_back(outputgate);
         }
+    }
 
+    void forward(Graph &graph, const vector<Node *>& inputs, Node &h0, Node &c0,
+            bool is_left_to_right = true) {
+        if (inputs.empty()) {
+            std::cerr << "empty inputs for lstm operation" << std::endl;
+            abort();
+        }
         int i_begin = is_left_to_right ? 0 : inputs.size() - 1;
         int i_step = is_left_to_right ? 1 : -1;
 
         for (int i = i_begin; is_left_to_right ? i < inputs.size() : i >= 0; i += i_step) {
+            Node *last_hidden, *last_cell;
             if (i == i_begin) {
-                _bucket.forward(graph, 0);
-                _inputgates_hidden.at(i)->forward(graph, _bucket);
-                _inputgates_input.at(i)->forward(graph, *inputs.at(i));
-                _inputgates_add.at(i)->forward(graph, *_inputgates_hidden.at(i),
-                        *_inputgates_input.at(i));
-                _inputgates.at(i)->forward(graph, *_inputgates_add.at(i));
-
-                _outputgates_hidden.at(i)->forward(graph, _bucket);
-                _outputgates_input.at(i)->forward(graph, *inputs.at(i));
-                _outputgates_add.at(i)->forward(graph, *_outputgates_hidden.at(i), *_outputgates_input.at(i));
-                _outputgates.at(i)->forward(graph, *_outputgates_add.at(i));
-
-                _halfcells_hidden.at(i)->forward(graph, _bucket);
-                _halfcells_input.at(i)->forward(graph, *inputs.at(i));
-                _halfcells_add.at(i)->forward(graph, *_halfcells_hidden.at(i), *_halfcells_input.at(i));
-                _halfcells.at(i)->forward(graph, *_halfcells_add.at(i));
-
-                _inputfilters.at(i)->forward(graph, *_halfcells.at(i), *_inputgates.at(i));
-                _cells.at(i)->forward(graph, *_inputfilters.at(i), _bucket);
-                _halfhiddens.at(i)->forward(graph, *_cells.at(i));
-                _hiddens.at(i)->forward(graph, *_halfhiddens.at(i), *_outputgates.at(i));
+                last_hidden = &h0;
+                last_cell = &c0;
             } else {
-                _inputgates_hidden.at(i)->forward(graph, *_hiddens[i - i_step]);
-                _inputgates_input.at(i)->forward(graph, *inputs.at(i));
-                _inputgates_add.at(i)->forward(graph, *_inputgates_hidden.at(i), *_inputgates_input.at(i));
-                _inputgates.at(i)->forward(graph, *_inputgates_add.at(i));
-
-                _outputgates_hidden.at(i)->forward(graph, *_hiddens[i - i_step]);
-                _outputgates_input.at(i)->forward(graph, *inputs.at(i));
-                _outputgates_add.at(i)->forward(graph, *_outputgates_hidden.at(i), *_outputgates_input.at(i));
-                _outputgates.at(i)->forward(graph, *_outputgates_add.at(i));
-
-                _halfcells_hidden.at(i)->forward(graph, *_hiddens[i - i_step]);
-                _halfcells_input.at(i)->forward(graph, *inputs.at(i));
-                _halfcells_add.at(i)->forward(graph, *_halfcells_hidden.at(i), *_halfcells_input.at(i));
-                _halfcells.at(i)->forward(graph, *_halfcells_add.at(i));
-
-                _forgetgates_hidden.at(i)->forward(graph, *_hiddens[i - i_step]);
-                _forgetgates_input.at(i)->forward(graph, *inputs.at(i));
-                _forgetgates_add.at(i)->forward(graph, *_forgetgates_hidden.at(i), *_forgetgates_input.at(i));
-                _forgetgates.at(i)->forward(graph, *_forgetgates_add.at(i));
-
-                _inputfilters.at(i)->forward(graph, *_halfcells.at(i), *_inputgates.at(i));
-                _forgetfilters.at(i)->forward(graph, *_cells[i - i_step], *_forgetgates.at(i));
-                _cells.at(i)->forward(graph, *_inputfilters.at(i), *_forgetfilters.at(i));
-                _halfhiddens.at(i)->forward(graph, *_cells.at(i));
-                _hiddens.at(i)->forward(graph, *_halfhiddens.at(i), *_outputgates.at(i));
+                last_hidden = _hiddens.at(i - i_step).get();
+                last_cell = _cells.at(i - i_step).get();
             }
+
+            _inputgates_hidden.at(i)->forward(graph, *last_hidden);
+            _inputgates_input.at(i)->forward(graph, *inputs.at(i));
+            _inputgates_add.at(i)->forward(graph, *_inputgates_hidden.at(i),
+                    *_inputgates_input.at(i));
+            _inputgates.at(i)->forward(graph, *_inputgates_add.at(i));
+
+            _outputgates_hidden.at(i)->forward(graph, *last_hidden);
+            _outputgates_input.at(i)->forward(graph, *inputs.at(i));
+            _outputgates_add.at(i)->forward(graph, *_outputgates_hidden.at(i),
+                    *_outputgates_input.at(i));
+            _outputgates.at(i)->forward(graph, *_outputgates_add.at(i));
+
+            _halfcells_hidden.at(i)->forward(graph, *last_hidden);
+            _halfcells_input.at(i)->forward(graph, *inputs.at(i));
+            _halfcells_add.at(i)->forward(graph, *_halfcells_hidden.at(i),
+                    *_halfcells_input.at(i));
+            _halfcells.at(i)->forward(graph, *_halfcells_add.at(i));
+
+            _forgetgates_hidden.at(i)->forward(graph, *last_hidden);
+            _forgetgates_input.at(i)->forward(graph, *inputs.at(i));
+            _forgetgates_add.at(i)->forward(graph, *_forgetgates_hidden.at(i),
+                    *_forgetgates_input.at(i));
+            _forgetgates.at(i)->forward(graph, *_forgetgates_add.at(i));
+
+            _inputfilters.at(i)->forward(graph, *_halfcells.at(i), *_inputgates.at(i));
+            _forgetfilters.at(i)->forward(graph, *last_cell, *_forgetgates.at(i));
+            _cells.at(i)->forward(graph, *_inputfilters.at(i), *_forgetfilters.at(i));
+            _halfhiddens.at(i)->forward(graph, *_cells.at(i));
+            _hiddens.at(i)->forward(graph, *_halfhiddens.at(i), *_outputgates.at(i));
         }
     }
 };
