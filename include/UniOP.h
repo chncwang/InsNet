@@ -61,7 +61,6 @@ class UniParams {
             b.load(is);
         }
     }
-
 };
 
 
@@ -240,11 +239,10 @@ class LinearUniNode : public Node {
 // for input variables, we exploit column vector,
 // which means a concrete input vector x_i is represented by x(0, i), x(1, i), ..., x(n, i)
 class LinearNode : public Node {
-  public:
+public:
     PNode in;
     UniParams* param;
 
-  public:
     LinearNode() : Node() {
         in = NULL;
         param = NULL;
@@ -267,8 +265,6 @@ class LinearNode : public Node {
         in = NULL;
     }
 
-
-  public:
     void forward(Graph *cg, PNode x) {
         in = x;
         degree = 0;
@@ -290,7 +286,6 @@ class LinearNode : public Node {
         in->loss.mat() += param->W.val.mat().transpose() * loss.mat();
     }
 
-  public:
     PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding
@@ -809,5 +804,118 @@ PExecute LinearNode::generate(bool bTrain, dtype cur_drop_factor) {
     return exec;
 };
 
+struct LinearWordVectorNode : public Node {
+    Node *input;
+    SparseParam *param;
+
+    LinearWordVectorNode() : input(nullptr), param(nullptr) {
+        node_type = "linear_word_vector_node";
+    }
+
+    void setParam(SparseParam &word_vectors) {
+        param = &word_vectors;
+    }
+
+    void forward(Graph &graph, Node &in) {
+        input = &in;
+        degree = 0;
+        in.addParent(this);
+        graph.addNode(this);
+    }
+
+    void compute() {
+        abort();
+    }
+
+    void backward() {
+        abort();
+    }
+
+    Execute* generate(bool bTrain, dtype cur_drop_factor);
+
+    bool typeEqual(PNode other) override {
+        bool result = Node::typeEqual(other);
+        if (!result) return false;
+        LinearWordVectorNode* conv_other = (LinearWordVectorNode*)other;
+        if (param != conv_other->param) {
+            return false;
+        }
+
+        return true;
+    }
+
+    size_t typeHashCode() const override {
+        return Node::typeHashCode() ^ ::typeHashCode(param);
+    }
+};
+
+#if USE_GPU
+struct LinearWordVectorExecute : public Execute {
+    void forward() {
+        abort();
+    }
+
+    void backward() {
+        abort();
+    }
+};
+#else
+
+struct LinearWordVectorExecute : public Execute {
+    Tensor2D x, y;
+    int inDim, outDim;
+    SparseParam *param;
+
+    void forward() {
+        int count = batch.size();
+        x.init(inDim, count);
+        y.init(outDim, count);
+
+        for (int i = 0; i < count; i++) {
+            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
+            memcpy(x.v + i * inDim, ptr->input->val.v, inDim * sizeof(dtype));
+        }
+
+        y.mat() = param->val.mat().transpose() * x.mat();
+
+        for (int i = 0; i < count; i++) {
+            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[i];
+            memcpy(ptr->val.v, y.v + i * outDim, outDim * sizeof(dtype));
+        }
+    }
+
+    void backward() {
+        Tensor2D lx, ly;
+        int count = batch.size();
+        lx.init(inDim, count);
+        ly.init(outDim, count);
+
+        for (int idx = 0; idx < count; idx++) {
+            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
+            memcpy(ly.v + idx * outDim, ptr->loss.v, outDim * sizeof(dtype));
+        }
+
+        lx.mat() = param->val.mat() * ly.mat();
+
+        for (int idx = 0; idx < count; idx++) {
+            LinearNode* ptr = (LinearNode*)batch[idx];
+            for (int idy = 0; idy < inDim; idy++) {
+                ptr->in->loss[idy] += lx[idx][idy];
+            }
+        }
+    }
+};
+
+#endif
+
+Execute* LinearWordVectorNode::generate(bool bTrain, dtype cur_drop_factor) {
+    LinearWordVectorExecute* exec = new LinearWordVectorExecute();
+    exec->batch.push_back(this);
+    exec->inDim = param->inDim();
+    exec->outDim = param->outDim();
+    exec->param = param;
+    exec->bTrain = bTrain;
+    return exec;
+}
 
 #endif /* UNIOP_H_ */
