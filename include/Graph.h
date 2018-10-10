@@ -182,6 +182,11 @@ class Graph {
                 }
             }
             Node *first_node = shallow_nodes.at(0);
+            if (log) {
+                std::cout << "Graph compute first_node node type:" << first_node->node_type <<
+                    std::endl;
+                std::cout << "node size:" << shallow_nodes.size() << std::endl;
+            }
             PExecute cur_exec = first_node->generate(train, drop_factor);
             cur_exec->batch = std::move(shallow_nodes);
             free_nodes.erase(min_hash);
@@ -213,7 +218,10 @@ class Graph {
             for (int idx = 0; idx < total_node_num; idx++) {
                 PNode curNode = all_nodes.at(idx);
                 if (curNode->degree > 0) {
-                    std::cout << "unprocessed node:" << curNode->node_type << " degree:" << curNode->degree << std::endl;
+                    std::cout << "unprocessed node:" << curNode->node_type <<
+                        " degree:" << curNode->degree <<
+                        " name:" << curNode->node_name <<
+                        std::endl;
                     unprocessed++;
                 }
             }

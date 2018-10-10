@@ -46,7 +46,6 @@ struct LSTM1Params {
 
     void initial(int nOSize, int nISize) {
         input_hidden.initial(nOSize, nOSize, false);
-        std::cout << "input_hidden index:" << input_hidden.W.index << std::endl;
         input_input.initial(nOSize, nISize, true);
         output_hidden.initial(nOSize, nOSize, false);
         output_input.initial(nOSize, nISize, true);
@@ -498,93 +497,114 @@ struct DynamicLSTMBuilder {
         shared_ptr<LinearNode> inputgate_hidden(new LinearNode);
         inputgate_hidden->init(out_dim, -1);
         inputgate_hidden->setParam(lstm_params.input_hidden);
+        inputgate_hidden->node_name = "inputgate_hidden";
         _inputgates_hidden.push_back(inputgate_hidden);
 
         shared_ptr<LinearNode> inputgate_input(new LinearNode);
         inputgate_input->init(out_dim, -1);
         inputgate_input->setParam(lstm_params.input_input);
+        inputgate_input->node_name = "inputgate_input";
         _inputgates_input.push_back(inputgate_input);
 
         shared_ptr<LinearNode> forgetgate_hidden(new LinearNode);
         forgetgate_hidden->init(out_dim, -1);
         forgetgate_hidden->setParam(lstm_params.forget_hidden);
+        forgetgate_hidden->node_name = "forgetgate_hidden";
         _forgetgates_hidden.push_back(forgetgate_hidden);
 
         shared_ptr<LinearNode> forgetgate_input(new LinearNode);
         forgetgate_input->init(out_dim, -1);
         forgetgate_input->setParam(lstm_params.forget_input);
+        forgetgate_input->node_name = "forgetgate_input";
         _forgetgates_input.push_back(forgetgate_input);
 
         shared_ptr<LinearNode> halfcell_hidden(new LinearNode);
         halfcell_hidden->init(out_dim, -1);
         halfcell_hidden->setParam(lstm_params.cell_hidden);
+        halfcell_hidden->node_name = "halfcell_hidden";
         _halfcells_hidden.push_back(halfcell_hidden);
 
         shared_ptr<LinearNode> halfcell_input(new LinearNode);
         halfcell_input->init(out_dim, -1);
         halfcell_input->setParam(lstm_params.cell_input);
+        halfcell_input->node_name = "halfcell_input";
         _halfcells_input.push_back(halfcell_input);
 
         shared_ptr<LinearNode> outputgate_hidden(new LinearNode);
         outputgate_hidden->init(out_dim, -1);
         outputgate_hidden->setParam(lstm_params.output_hidden);
+        outputgate_hidden->node_name = "outputgate_hidden";
         _outputgates_hidden.push_back(outputgate_hidden);
 
         shared_ptr<LinearNode> outputgate_input(new LinearNode);
         outputgate_input->init(out_dim, -1);
         outputgate_input->setParam(lstm_params.output_input);
+        outputgate_input->node_name = "outputgate_input";
         _outputgates_input.push_back(outputgate_input);
 
         shared_ptr<PMultiNode> inputfilter(new PMultiNode);
         inputfilter->init(out_dim, -1);
+        inputfilter->node_name = "inputfilter";
         _inputfilters.push_back(inputfilter);
 
         shared_ptr<PMultiNode> forgetfilter(new PMultiNode);
         forgetfilter->init(out_dim, -1);
+        forgetfilter->node_name = "forgetfilter";
         _forgetfilters.push_back(forgetfilter);
 
         shared_ptr<PAddNode> cell(new PAddNode);
         cell->init(out_dim, -1);
+        cell->node_name = "cell";
         _cells.push_back(cell);
 
         shared_ptr<TanhNode> halfhidden(new TanhNode);
         halfhidden->init(out_dim, -1);
+        halfhidden->node_name = "halfhidden";
         _halfhiddens.push_back(halfhidden);
 
         shared_ptr<PMultiNode> hidden(new PMultiNode);
         hidden->init(out_dim, -1);
+        hidden->node_name = "hidden";
         _hiddens.push_back(hidden);
 
         shared_ptr<PAddNode> inputgate_add(new PAddNode);
         inputgate_add->init(out_dim, -1);
+        inputgate_add->node_name = "inputgate_add";
         _inputgates_add.push_back(inputgate_add);
 
         shared_ptr<SigmoidNode> inputgate(new SigmoidNode);
         inputgate->init(out_dim, -1);
+        inputgate->node_name = "inputgate";
         _inputgates.push_back(inputgate);
 
         shared_ptr<PAddNode> forgetgate_add(new PAddNode);
         forgetgate_add->init(out_dim, -1);
+        forgetgate_add->node_name = "forgetgate_add";
         _forgetgates_add.push_back(forgetgate_add);
 
         shared_ptr<SigmoidNode> forgetgate(new SigmoidNode);
         forgetgate->init(out_dim, -1);
+        forgetgate->node_name = "forgetgate";
         _forgetgates.push_back(forgetgate);
 
         shared_ptr<PAddNode> halfcell_add(new PAddNode);
         halfcell_add->init(out_dim, -1);
+        halfcell_add->node_name = "halfcell_add";
         _halfcells_add.push_back(halfcell_add);
 
         shared_ptr<TanhNode> halfcell(new TanhNode);
         halfcell->init(out_dim, -1);
+        halfcell->node_name = "halfcell";
         _halfcells.push_back(halfcell);
 
         shared_ptr<PAddNode> outputgate_add(new PAddNode);
         outputgate_add->init(out_dim, -1);
+        outputgate_add->node_name = "outputgate_add";
         _outputgates_add.push_back(outputgate_add);
 
         shared_ptr<SigmoidNode> outputgate(new SigmoidNode);
         outputgate->init(out_dim, -1);
+        outputgate->node_name = "outputgate";
         _outputgates.push_back(outputgate);
 
         _inputgates_hidden.at(len)->forward(graph, *last_hidden);

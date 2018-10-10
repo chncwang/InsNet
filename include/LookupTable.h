@@ -249,6 +249,10 @@ public:
         cg->addNode(this);
     }
 
+    void forward(Graph &graph, const string &word) {
+        this->forward(&graph, word);
+    }
+
     PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding

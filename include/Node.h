@@ -40,6 +40,7 @@ class Node {
     int degree;
     int depth = 0;
     string node_type;
+    string node_name;
 
   public:
     Tensor1D drop_mask;

@@ -63,6 +63,10 @@ class BucketNode : public Node {
         cg->addNode(this);
     }
 
+    void forward(Graph &graph) {
+        this->forward(&graph);
+    }
+
     //value already assigned
     void forward(Graph *cg) {
 #if USE_GPU
