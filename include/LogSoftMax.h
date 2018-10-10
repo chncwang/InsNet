@@ -24,7 +24,6 @@ class LogSoftMax {
     PAddNode _sum;
     ActivateNode _logsum;
 
-
   public:
     LogSoftMax() {
         clear();
