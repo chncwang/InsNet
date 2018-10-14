@@ -50,6 +50,14 @@ dtype softMaxLoss(PNode x, const vector<dtype> &answer, Metric& eval,
 
 }
 
+dtype softMaxLoss(Node &node, int answer, Metric &metric, int batchsize) {
+    std::vector<dtype> fit_answer;
+    for (int i = 0; i < node.dim; ++i) {
+        fit_answer.push_back(i == answer);
+    }
+    return softMaxLoss(&node, fit_answer, metric, batchsize);
+}
+
 #if USE_GPU
 dtype softMaxLoss(const std::vector<PNode> &x, const std::vector<int> &answers,
         n3ldg_cuda::DeviceInt &correct,
