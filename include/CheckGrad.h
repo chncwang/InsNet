@@ -3,6 +3,7 @@
 
 #include "MyLib.h"
 #include <Eigen/Dense>
+#include <functional>
 
 using namespace Eigen;
 
@@ -22,12 +23,37 @@ class CheckGrad {
         _names.clear();
     }
 
+    void add(BaseParam &param, const std::string &name) {
+        this->add(&param, name);
+    }
+
     void add(BaseParam* param, const string& name) {
         _params.push_back(param);
         _names.push_back(name);
     }
 
   public:
+    template<typename Sample>
+    struct Classifier {
+        std::function<dtype(const Sample &sample)> loss;
+
+        Classifier(const std::function<dtype(const Sample &sample)> &los) {
+            loss = los;
+        }
+
+        dtype cost(const Sample &sample) {
+            return loss(sample);
+        }
+    };
+
+    template<typename Sample>
+    void check(const std::function<dtype(const Sample &sample)> &loss,
+            const std::vector<Sample> &samples,
+            const std::string &description) {
+        Classifier<Sample> classifier(loss);
+        check(&classifier, samples, description);
+    }
+
     template<typename Example, typename Classifier>
     void check(Classifier* classifier, const vector<Example>& examples, const string& description) {
         dtype orginValue, lossAdd, lossPlus;

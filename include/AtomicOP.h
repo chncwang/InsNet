@@ -404,49 +404,6 @@ public:
 #endif
     }
 #else
-    void  forward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-        profiler.BeginEvent("Sigmoid no-batch backward");
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward_drop();
-            batch[idx]->backward();
-        }
-        profiler.EndEvent();
-
-        profiler.BeginEvent("Sigmoid batch backward");
-
-        sumDim = 0;
-        for (int idx = 0; idx < count; idx++) {
-            sumDim += batch[idx]->dim;
-        }
-
-        x.init(sumDim);
-        y.init(sumDim);
-
-        int offset = 0;
-        for (int idx = 0; idx < count; idx++) {
-            SigmoidNode* ptr = (SigmoidNode*)batch[idx];
-            for (int idy = 0; idy < ptr->dim; idy++) {
-                x[offset + idy] = ptr->in->val[idy];
-            }
-            offset += ptr->dim;
-        }
-
-        y.vec() = x.vec().unaryExpr(ptr_fun(fsigmoid));
-
-        offset = 0;
-        for (int idx = 0; idx < count; idx++) {
-            SigmoidNode* ptr = (SigmoidNode*)batch[idx];
-            for (int idy = 0; idy < ptr->dim; idy++) {
-                ptr->val[idy] = y[offset + idy];
-            }
-            offset += ptr->dim;
-            ptr->forward_drop(bTrain, drop_factor);
-        }
-        profiler.EndEvent();
-    }
 #endif
 
 #if USE_GPU
@@ -480,46 +437,6 @@ public:
 #endif
     }
 #else
-    void backward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-        profiler.BeginEvent("Sigmoid no-batch backward");
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward_drop();
-            batch[idx]->backward();
-        }
-        profiler.EndEvent();
-
-        profiler.BeginEvent("Sigmoid batch backward");
-
-        Tensor1D lx, ly;
-        lx.init(sumDim);
-        ly.init(sumDim);
-
-        int offset = 0;
-        for (int idx = 0; idx < count; idx++) {
-            SigmoidNode* ptr = (SigmoidNode*)batch[idx];
-            ptr->backward_drop();
-            for (int idy = 0; idy < ptr->dim; idy++) {
-                ly[offset + idy] = ptr->loss[idy];
-            }
-            offset += ptr->dim;
-        }
-
-        lx.vec() = ly.vec() * x.vec().binaryExpr(y.vec(), ptr_fun(dsigmoid));
-
-        offset = 0;
-        for (int idx = 0; idx < count; idx++) {
-            SigmoidNode* ptr = (SigmoidNode*)batch[idx];
-            for (int idy = 0; idy < ptr->dim; idy++) {
-                ptr->in->loss[idy] += lx[offset + idy];
-            }
-            offset += ptr->dim;
-        }
-        profiler.EndEvent();
-
-    }
 #endif
 };
 
