@@ -875,9 +875,6 @@ struct LinearWordVectorExecute : public Execute {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
             memcpy(x.v + i * inDim, ptr->input->val.v, inDim * sizeof(dtype));
         }
-//        std::cout << "param outDim:" << param->outDim() << std::endl;
-//        std::cout << "x in dim:" << inDim << std::endl;
-
         y.mat() = param->val.mat().transpose() * x.mat();
 
         for (int i = 0; i < count; i++) {
@@ -896,6 +893,8 @@ struct LinearWordVectorExecute : public Execute {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
             memcpy(ly.v + idx * outDim, ptr->loss.v, outDim * sizeof(dtype));
         }
+
+        param->grad.mat() += x.mat() * ly.mat().transpose();
 
         lx.mat() = param->val.mat() * ly.mat();
 
