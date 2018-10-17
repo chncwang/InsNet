@@ -46,20 +46,24 @@ struct SelfHash {
     }
 };
 
-typedef std::unordered_map<size_t, vector<PNode>, SelfHash> NodeMap;
+template<typename NodePointer>
+using NodeMap = std::unordered_map<size_t, vector<NodePointer>, SelfHash>;
 
-void Insert(const PNode node, NodeMap& node_map) {
+template<typename NodePointer>
+void Insert(const NodePointer node, NodeMap<NodePointer>& node_map) {
     size_t x_hash = node->typeHashCode();
     auto it = node_map.find(x_hash);
     if (it == node_map.end()) {
-        std::vector<PNode> v = {node};
-        node_map.insert(std::make_pair<size_t, std::vector<PNode>>(std::move(x_hash), std::move(v)));
+        std::vector<NodePointer> v = {node};
+        node_map.insert(std::make_pair<size_t, std::vector<NodePointer>>(std::move(x_hash),
+                    std::move(v)));
     } else {
         it->second.push_back(node);
     }
 }
 
-int Size(const NodeMap &map) {
+template<typename NodePointer>
+int Size(const NodeMap<NodePointer> &map) {
     int sum = 0;
     for (auto it : map) {
         sum += it.second.size();
@@ -67,69 +71,47 @@ int Size(const NodeMap &map) {
     return sum;
 }
 
+template <typename T>
+std::vector<Node *> toWeakPointers(std::vector<T> &x) {
+    std::vector<Node *> nodes;
+    for (T& t : x) {
+        nodes.push_back(t.get());
+    }
+    return nodes;
+}
+
 // one Node means a vector
 // the col should be 1, because we aimed for NLP only
-class Graph {
+template <typename NodePointer>
+class TemplateGraph {
   protected:
     vector<PExecute> execs; //backward
-    vector<PNode> nodes; //forward
-    NodeMap free_nodes;
+    vector<NodePointer> nodes; //forward
+    NodeMap<NodePointer> free_nodes;
     std::map<size_t, std::pair<int, int>> node_type_depth;
-    vector<PNode> finish_nodes;
-    vector<PNode> all_nodes;
+    vector<NodePointer> finish_nodes;
+    vector<NodePointer> all_nodes;
 
   public:
     dtype drop_factor;
     bool train;
 
   public:
-    Graph() {
+    TemplateGraph() {
         drop_factor = 1.0;
     }
 
-    virtual ~Graph() {
+    virtual ~TemplateGraph() {
         int count = execs.size();
         for (int idx = 0; idx < count; idx++) {
             delete execs.at(idx);
         }
-        execs.clear();
-        nodes.clear();
-        free_nodes.clear();
-        node_type_depth.clear();
     }
-
 
     void setDropFactor(dtype cur_drop_factor) {
         drop_factor = cur_drop_factor;
         if (drop_factor <= 0) drop_factor = 0;
         if (drop_factor >= 1.0) drop_factor = 1.0;
-    }
-
-  public:
-    void clearValue(const bool& bTrain = true) {
-        train = bTrain;
-        NodeMap node_map;
-        for (Node *node : nodes) {
-            Insert(node, node_map);
-        }
-        for (auto it : node_map) {
-            PExecute new_exec = it.second.at(0)->generate(false,
-                    drop_factor);
-            new_exec->batch = it.second;
-            new_exec->clearValue();
-            delete new_exec;
-        }
-
-
-        int count = execs.size();
-        for (int idx = 0; idx < count; idx++) {
-            delete execs.at(idx);
-        }
-        execs.clear();
-        nodes.clear();
-        free_nodes.clear();
-        finish_nodes.clear();
-        all_nodes.clear();
     }
 
     void backward() {
@@ -139,7 +121,7 @@ class Graph {
         }
     }
 
-    void addNode(PNode x) {
+    void addNode(NodePointer x) {
         static int index;
         x->node_index = index++;
         nodes.push_back(x);
@@ -168,7 +150,7 @@ class Graph {
             if (log)
             std::cout << "i:" << i++ << std::endl;
             float min_avg_depth = 100000000;
-            std::vector<Node*> shallow_nodes;
+            std::vector<NodePointer> shallow_nodes;
             size_t min_hash = 0;
             for (auto it : free_nodes) {
                 size_t type_hash = it.first;
@@ -181,14 +163,14 @@ class Graph {
                     min_hash = type_hash;
                 }
             }
-            Node *first_node = shallow_nodes.at(0);
+            NodePointer first_node = shallow_nodes.at(0);
             if (log) {
                 std::cout << "Graph compute first_node node type:" << first_node->node_type <<
                     std::endl;
                 std::cout << "node size:" << shallow_nodes.size() << std::endl;
             }
             PExecute cur_exec = first_node->generate(train, drop_factor);
-            cur_exec->batch = std::move(shallow_nodes);
+            cur_exec->batch = toWeakPointers(shallow_nodes);
             free_nodes.erase(min_hash);
 
             //profiler.BeginEvent("forward");
@@ -197,15 +179,15 @@ class Graph {
             execs.push_back(cur_exec);
 
             //finished nodes
-            for (Node* free_node : cur_exec->batch) {
-                finish_nodes.push_back(free_node);
+            for (Node *free_node : cur_exec->batch) {
+                finish_nodes.push_back(NodePointer(free_node));
                 for (auto parent_it : free_node->parents) {
                     if (parent_it->degree <= 0) {
                         abort();
                     }
                     parent_it->degree--;
                     if (parent_it->degree == 0) {
-                        Insert(parent_it, free_nodes);
+                        Insert(NodePointer(parent_it), free_nodes);
                     }
                 }
             }
@@ -216,7 +198,7 @@ class Graph {
             int total_node_num = all_nodes.size();
             int unprocessed = 0;
             for (int idx = 0; idx < total_node_num; idx++) {
-                PNode curNode = all_nodes.at(idx);
+                NodePointer curNode = all_nodes.at(idx);
                 if (curNode->degree > 0) {
                     std::cout << "unprocessed node:" << curNode->node_type <<
                         " degree:" << curNode->degree <<
@@ -228,6 +210,12 @@ class Graph {
             std::cout << "unprocessed: " << unprocessed << std::endl;
             abort();
         }
+    }
+};
+
+struct Graph : public TemplateGraph<std::shared_ptr<Node>> {
+    void addNode(Node *node) {
+        TemplateGraph<std::shared_ptr<Node>>::addNode(std::shared_ptr<Node>(node));
     }
 };
 
