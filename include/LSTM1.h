@@ -454,33 +454,57 @@ public:
 };
 
 struct DynamicLSTMBuilder {
-    vector<shared_ptr<LinearNode>> _inputgates_hidden;
-    vector<shared_ptr<LinearNode>> _inputgates_input;
-    vector<shared_ptr<PAddNode>> _inputgates_add;
-    vector<shared_ptr<SigmoidNode>> _inputgates;
+    std::vector<std::shared_ptr<LinearNode>> _inputgates_hidden;
+    std::vector<std::shared_ptr<LinearNode>> _inputgates_input;
+    std::vector<std::shared_ptr<PAddNode>> _inputgates_add;
+    std::vector<std::shared_ptr<SigmoidNode>> _inputgates;
 
-    vector<shared_ptr<LinearNode>> _forgetgates_hidden;
-    vector<shared_ptr<LinearNode>> _forgetgates_input;
-    vector<shared_ptr<PAddNode>> _forgetgates_add;
-    vector<shared_ptr<SigmoidNode>> _forgetgates;
+    std::vector<std::shared_ptr<LinearNode>> _forgetgates_hidden;
+    std::vector<std::shared_ptr<LinearNode>> _forgetgates_input;
+    std::vector<std::shared_ptr<PAddNode>> _forgetgates_add;
+    std::vector<std::shared_ptr<SigmoidNode>> _forgetgates;
 
-    vector<shared_ptr<LinearNode>> _halfcells_hidden;
-    vector<shared_ptr<LinearNode>> _halfcells_input;
-    vector<shared_ptr<PAddNode>> _halfcells_add;
-    vector<shared_ptr<TanhNode>> _halfcells;
+    std::vector<std::shared_ptr<LinearNode>> _halfcells_hidden;
+    std::vector<std::shared_ptr<LinearNode>> _halfcells_input;
+    std::vector<std::shared_ptr<PAddNode>> _halfcells_add;
+    std::vector<std::shared_ptr<TanhNode>> _halfcells;
 
-    vector<shared_ptr<LinearNode>> _outputgates_hidden;
-    vector<shared_ptr<LinearNode>> _outputgates_input;
-    vector<shared_ptr<PAddNode>> _outputgates_add;
-    vector<shared_ptr<SigmoidNode>> _outputgates;
+    std::vector<std::shared_ptr<LinearNode>> _outputgates_hidden;
+    std::vector<std::shared_ptr<LinearNode>> _outputgates_input;
+    std::vector<std::shared_ptr<PAddNode>> _outputgates_add;
+    std::vector<std::shared_ptr<SigmoidNode>> _outputgates;
 
-    vector<shared_ptr<PMultiNode>> _inputfilters;
-    vector<shared_ptr<PMultiNode>> _forgetfilters;
+    std::vector<std::shared_ptr<PMultiNode>> _inputfilters;
+    std::vector<std::shared_ptr<PMultiNode>> _forgetfilters;
 
-    vector<shared_ptr<PAddNode>> _cells;
+    std::vector<std::shared_ptr<PAddNode>> _cells;
 
-    vector<shared_ptr<TanhNode>> _halfhiddens;
-    vector<shared_ptr<PMultiNode>> _hiddens;
+    std::vector<std::shared_ptr<TanhNode>> _halfhiddens;
+    std::vector<std::shared_ptr<PMultiNode>> _hiddens;
+
+//    void Copy(const DynamicLSTMBuilder &lstm) {
+//        CopyNodes(lstm._cells, _cells);
+//        CopyNodes(lstm._forgetfilters, _forgetfilters);
+//        CopyNodes(lstm._forgetgates, _forgetgates);
+//        CopyNodes(lstm._forgetgates_add, _forgetgates_add);
+//        CopyNodes(lstm._forgetgates_hidden, _forgetgates_hidden);
+//        CopyNodes(lstm._forgetgates_input, _forgetgates_input);
+//        CopyNodes(lstm._halfcells, _halfcells);
+//        CopyNodes(lstm._halfcells_add, _halfcells_add);
+//        CopyNodes(lstm._halfcells_hidden, _halfcells_hidden);
+//        CopyNodes(lstm._halfcells_input, _halfcells_input);
+//        CopyNodes(lstm._halfhiddens, _halfhiddens);
+//        CopyNodes(lstm._hiddens, _hiddens);
+//        CopyNodes(lstm._inputfilters, _inputfilters);
+//        CopyNodes(lstm._inputgates, _inputgates);
+//        CopyNodes(lstm._inputgates_add, _inputgates_add);
+//        CopyNodes(lstm._inputgates_hidden, _inputgates_hidden);
+//        CopyNodes(lstm._inputgates_input, _inputgates_input);
+//        CopyNodes(lstm._outputgates, _outputgates);
+//        CopyNodes(lstm._outputgates_add, _outputgates_add);
+//        CopyNodes(lstm._outputgates_hidden, _outputgates_hidden);
+//        CopyNodes(lstm._outputgates_input, _outputgates_input);
+//    }
 
     void forward(Graph &graph, LSTM1Params &lstm_params, Node &input, Node &h0, Node &c0) {
         Node *last_hidden, *last_cell;

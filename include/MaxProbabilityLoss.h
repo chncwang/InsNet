@@ -15,21 +15,11 @@ std::pair<dtype, std::vector<int>> MaxLogProbabilityLoss(std::vector<Node *> &no
 
     for (int i = 0; i < nodes.size(); ++i) {
         Node &node = *nodes.at(i);
-        dtype max = node.val.v[0];
-        int max_j = 0;
-        for (int j = 1; j < node.dim; ++j) {
-            //std::cout << "j:" << node.val.v[j] << std::endl;
-            if (node.val.v[j] > max) {
-                max = node.val.v[j];
-                max_j = j;
-            }
-        }
-        results.push_back(max_j);
-
-        Tensor1D exp;
-        exp.init(node.dim);
-        exp.vec() = (node.val.vec() - max).exp();
-        dtype sum = static_cast<Eigen::Tensor<dtype, 0>>(exp.vec().sum())(0);
+        auto tuple = toExp(node);
+        std::pair<int, dtype> &max_pair = std::get<1>(tuple);
+        results.push_back(max_pair.first);
+        dtype sum = std::get<2>(tuple);
+        Tensor1D &exp = *std::get<0>(tuple);
         //std::cout << "sum:" << sum << std::endl;
 
         Tensor1D loss_tensor;
@@ -40,7 +30,7 @@ std::pair<dtype, std::vector<int>> MaxLogProbabilityLoss(std::vector<Node *> &no
         node.loss.vec() = loss_tensor.vec().unaryExpr(
                 [=](dtype x)->dtype {return x * reverse_batchsize;});
         //std::cout << "max:" << max << " answer v:" << node.val.v[answer] << std::endl;
-        loss += (log(sum) - node.val.v[answer] + max) * reverse_batchsize;
+        loss += (log(sum) - node.val.v[answer] + max_pair.second) * reverse_batchsize;
     }
 
     return std::make_pair(loss, std::move(results));

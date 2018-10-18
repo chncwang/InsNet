@@ -15,6 +15,9 @@
 #include <iomanip>
 #include <functional>
 #include <string>
+#include <tuple>
+#include <memory>
+#include <utility>
 #include "MyTensor.h"
 #if USE_GPU
 #include "N3LDG_cuda.h"
@@ -174,8 +177,37 @@ class Node {
     }
 };
 
-typedef  Node* PNode;
+typedef Node* PNode;
 
+template<typename T>
+std::vector<Node*> toNodePointers(const std::vector<std::shared_ptr<T>> &vec) {
+    std::vector<Node *> results;
+    for (const std::shared_ptr<T> &p : vec) {
+        results.push_back(p.get());
+    }
+    return results;
+}
+
+/* *
+ * return tuple<exp, pair<max_i, max>, sum>
+ * */
+std::tuple<std::unique_ptr<Tensor1D>, std::pair<int, dtype>, dtype> toExp(const Node &node) {
+    dtype max = node.val.v[0];
+    int max_j = 0;
+    for (int j = 1; j < node.dim; ++j) {
+        if (node.val.v[j] > max) {
+            max = node.val.v[j];
+            max_j = j;
+        }
+    }
+
+    std::unique_ptr<Tensor1D> exp(new Tensor1D);
+    exp->init(node.dim);
+    exp->vec() = (node.val.vec() - max).exp();
+    dtype sum = static_cast<Eigen::Tensor<dtype, 0>>(exp->vec().sum())(0);
+
+    return std::make_tuple(std::move(exp), std::make_pair(max_j, max), sum);
+}
 
 #if USE_GPU
 void clearNodes(std::vector<Node*> &nodes, int dim) {

@@ -16,6 +16,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
+#include <memory>
 
 #include "NRMat.h"
 #include "Eigen/Dense"
