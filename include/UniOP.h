@@ -162,77 +162,6 @@ class UniNode : public Node {
     }
 };
 
-// non-linear feed-forward node
-// input nodes should be specified by forward function
-// for input variables, we exploit column vector,
-// which means a concrete input vector x_i is represented by x(0, i), x(1, i), ..., x(n, i)
-class LinearUniNode : public Node {
-  public:
-    PNode in;
-    UniParams* param;
-
-  public:
-    LinearUniNode() : Node() {
-        in = NULL;
-        param = NULL;
-        node_type = "linear_uni";
-    }
-
-
-    void setParam(UniParams* paramInit) {
-        param = paramInit;
-    }
-
-    void clearValue() {
-        Node::clearValue();
-        in = NULL;
-    }
-
-
-  public:
-    void forward(Graph *cg, PNode x) {
-        in = x;
-        degree = 0;
-        in->addParent(this);
-        cg->addNode(this);
-    }
-
-  public:
-    void compute() {
-        val.mat() = param->W.val.mat() * in->val.mat();
-        if (param->bUseB) {
-            val.vec() += param->b.val.vec();
-        }
-    }
-
-    void backward() {
-        param->W.grad.mat() += loss.mat() * in->val.tmat();
-        if (param->bUseB) {
-            param->b.grad.vec() += loss.vec();
-        }
-        in->loss.mat() += param->W.val.mat().transpose() * loss.mat();
-    }
-
-  public:
-    PExecute generate(bool bTrain, dtype cur_drop_factor);
-
-    // better to rewrite for deep understanding
-    bool typeEqual(PNode other) {
-        abort(); // This method is deprecated, considering performance.
-        bool result = Node::typeEqual(other);
-        if (!result) return false;
-
-        LinearUniNode* conv_other = (LinearUniNode*)other;
-        if (param != conv_other->param) {
-            return false;
-        }
-
-        return true;
-    }
-
-};
-
-
 
 // non-linear feed-forward node
 // input nodes should be specified by forward function
@@ -567,35 +496,6 @@ PExecute UniNode::generate(bool bTrain, dtype cur_drop_factor) {
     return exec;
 };
 
-class LinearUniExecute :public Execute {
-  public:
-    void  forward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->compute();
-            batch[idx]->forward_drop(bTrain, drop_factor);
-        }
-    }
-
-    void backward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward_drop();
-            batch[idx]->backward();
-        }
-    }
-};
-
-PExecute LinearUniNode::generate(bool bTrain, dtype cur_drop_factor) {
-    LinearUniExecute* exec = new LinearUniExecute();
-    exec->batch.push_back(this);
-    exec->bTrain = bTrain;
-    exec->drop_factor = cur_drop_factor;
-    return exec;
-};
-
 #if USE_GPU
 class LinearExecute :public Execute {
 public:
@@ -626,7 +526,7 @@ public:
                 x.value, y.value, count, inDim, outDim, param->bUseB);
 
         n3ldg_cuda::MatrixMultiplyMatrix(param->W.val.value, x.value, y.value,
-                outDim, inDim, count, false);
+                outDim, inDim, count, param->bUseB);
 
         std::vector<dtype*> vals;
         vals.reserve(count);
@@ -641,9 +541,18 @@ public:
             for (int idy = 0; idy < inDim; idy++) {
                 x[idx][idy] = ptr->in->val[idy];
             }
+            if (param->bUseB) {
+                for (int i = 0; i < outDim; ++i) {
+                    b[idx][i] = param->b.val.v[i];
+                }
+            }
         }
 
         y.mat() = param->W.val.mat() * x.mat();
+        if (param->bUseB) {
+            y.vec() += b.vec();
+        }
+
         n3ldg_cuda::Assert(x.verify("forward x"));
         n3ldg_cuda::Assert(y.verify("forward y"));
 
@@ -655,7 +564,6 @@ public:
             n3ldg_cuda::Assert(ptr->val.verify("linear forward val"));
         }
 #endif
-
     }
 
     void backward() {
@@ -667,11 +575,10 @@ public:
         std::vector<dtype*> ly_vec;
         ly_vec.reserve(count);
         for (int i = 0; i < count; ++i) {
-            UniNode* ptr = (UniNode*)batch[i];
+            LinearNode* ptr = (LinearNode*)batch[i];
             ly_vec.push_back(ptr->loss.value);
         }
-        n3ldg_cuda::CalculateLyForLinearBackward(ly_vec, ly.value, count,
-                outDim);
+        n3ldg_cuda::CopyFromMultiVectorsToOneVector(ly_vec, ly.value, count, outDim);
         n3ldg_cuda::MatrixMultiplyMatrix(ly.value, x.value,
                 param->W.grad.value, outDim, count, inDim, true, true, false);
         n3ldg_cuda::MatrixMultiplyMatrix(param->W.val.value, ly.value,
@@ -679,7 +586,7 @@ public:
         std::vector<dtype*> losses;
         losses.reserve(count);
         for (int idx = 0; idx < count; idx++) {
-            UniNode* ptr = (UniNode*)batch[idx];
+            LinearNode* ptr = (LinearNode*)batch[idx];
             losses.push_back(ptr->in->loss.value);
         }
 
@@ -689,7 +596,7 @@ public:
 
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
-            UniNode* ptr = (UniNode*)batch[idx];
+            LinearNode* ptr = (LinearNode*)batch[idx];
             ptr->backward_drop();
             for (int idy = 0; idy < outDim; idy++) {
                 ly[idx][idy] = ptr->loss[idy];
@@ -714,14 +621,14 @@ public:
         n3ldg_cuda::Assert(lx.verify("linear execute backward lx"));
 
         for (int idx = 0; idx < count; idx++) {
-            UniNode* ptr = (UniNode*)batch[idx];
+            LinearNode* ptr = (LinearNode*)batch[idx];
             for (int idy = 0; idy < inDim; idy++) {
                 ptr->in->loss[idy] += lx[idx][idy];
             }
         }
 
         for (Node * n : batch) {
-            UniNode *ptr = static_cast<UniNode *>(n);
+            LinearNode *ptr = static_cast<LinearNode *>(n);
             n3ldg_cuda::Assert(ptr->in->loss.verify("backward loss"));
         }
 #endif
@@ -850,15 +757,120 @@ struct LinearWordVectorNode : public Node {
 };
 
 #if USE_GPU
+
 struct LinearWordVectorExecute : public Execute {
+    Tensor2D x, y;
+    int inDim, outDim;
+    SparseParam *param;
+
     void forward() {
-        abort();
+        int count = batch.size();
+
+        x.init(inDim, count);
+        y.init(outDim, count);
+        std::vector<dtype*> xs, ys;
+        xs.reserve(batch.size());
+        ys.reserve(batch.size());
+
+        for (int i = 0; i < batch.size(); ++i) {
+            LinearNode *n = static_cast<LinearNode*>(batch.at(i));
+
+            xs.push_back(n->in->val.value);
+            ys.push_back(n->val.value);
+        }
+
+        n3ldg_cuda::CopyForUniNodeForward(xs, nullptr, x.value, y.value, count, inDim, outDim,
+                false);
+        n3ldg_cuda::MatrixMultiplyMatrix(param->val.value, x.value, y.value, outDim, inDim, count,
+                false, false, true);
+
+        std::vector<dtype*> vals;
+        vals.reserve(count);
+        for (Node *node : batch) {
+            vals.push_back(node->val.value);
+        }
+
+        n3ldg_cuda::CopyFromOneVectorToMultiVals(y.value, vals, count, outDim);
+#if TEST_CUDA
+        for (int idx = 0; idx < count; idx++) {
+            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
+            for (int idy = 0; idy < inDim; idy++) {
+                x[idx][idy] = ptr->input->val[idy];
+            }
+        }
+
+        y.mat() = param->val.mat().transpose() * x.mat();
+        n3ldg_cuda::Assert(x.verify("forward x"));
+        n3ldg_cuda::Assert(y.verify("forward y"));
+
+        for (int idx = 0; idx < count; idx++) {
+            LinearNode* ptr = (LinearNode*)batch[idx];
+            for (int idy = 0; idy < outDim; idy++) {
+                ptr->val[idy] = y[idx][idy];
+            }
+            n3ldg_cuda::Assert(ptr->val.verify("linear forward val"));
+        }
+#endif
     }
 
     void backward() {
-        abort();
+        int count = batch.size();
+        Tensor2D lx, ly;
+        lx.init(inDim, count);
+        ly.init(outDim, count);
+
+        std::vector<dtype*> ly_vec;
+        ly_vec.reserve(count);
+        for (int i = 0; i < count; ++i) {
+            UniNode* ptr = (UniNode*)batch[i];
+            ly_vec.push_back(ptr->loss.value);
+        }
+        n3ldg_cuda::CopyFromMultiVectorsToOneVector(ly_vec, ly.value, count, outDim);
+        n3ldg_cuda::MatrixMultiplyMatrix(x.value, ly.value, param->grad.value, inDim, count,
+                outDim, true, true, false);
+        n3ldg_cuda::MatrixMultiplyMatrix(param->val.value, ly.value, lx.value, inDim, outDim,
+                count, false, false, false);
+        std::vector<dtype*> losses;
+        losses.reserve(count);
+        for (int idx = 0; idx < count; idx++) {
+            UniNode* ptr = (UniNode*)batch[idx];
+            losses.push_back(ptr->in->loss.value);
+        }
+
+        n3ldg_cuda::AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(ly.value, lx.value,
+                nullptr, losses, count, outDim, inDim, false);
+#if TEST_CUDA
+        for (int idx = 0; idx < count; idx++) {
+            Node* ptr = batch[idx];
+            for (int idy = 0; idy < outDim; idy++) {
+                ly[idx][idy] = ptr->loss[idy];
+            }
+        }
+
+        n3ldg_cuda::Assert(x.verify("backward x"));
+        n3ldg_cuda::Assert(ly.verify("backward x"));
+
+        param->grad.mat() += x.mat() * ly.mat().transpose();
+        n3ldg_cuda::Assert(param->grad.verify("LinearExecute backward W grad"));
+
+        lx.mat() += param->val.mat() * ly.mat();
+        n3ldg_cuda::Assert(lx.verify("linear execute backward lx"));
+
+        for (int idx = 0; idx < count; idx++) {
+            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
+            for (int idy = 0; idy < inDim; idy++) {
+                ptr->input->loss[idy] += lx[idx][idy];
+            }
+        }
+
+        for (Node * n : batch) {
+            LinearWordVectorNode *ptr = static_cast<LinearWordVectorNode *>(n);
+            n3ldg_cuda::Assert(ptr->input->loss.verify("backward loss"));
+        }
+#endif
     }
 };
+
 #else
 
 struct LinearWordVectorExecute : public Execute {
@@ -899,7 +911,7 @@ struct LinearWordVectorExecute : public Execute {
         lx.mat() = param->val.mat() * ly.mat();
 
         for (int idx = 0; idx < count; idx++) {
-            LinearNode* ptr = (LinearNode*)batch[idx];
+            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
             for (int idy = 0; idy < inDim; idy++) {
                 ptr->in->loss[idy] += lx[idx][idy];
             }

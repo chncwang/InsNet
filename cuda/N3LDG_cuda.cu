@@ -23,8 +23,7 @@
 
 namespace n3ldg_cuda {
 
-using std::cout;
-using std::endl;
+using namespace std;
 
 #if USE_FLOAT
 #define cuda_sqrt(x) sqrtf(x)
@@ -98,7 +97,7 @@ cublasHandle_t& GetCublasHandle() {
 
 cudaError_t MyCudaMemcpy(void *dest, const void *src, size_t count,
         cudaMemcpyKind kind) {
-    cudaError_t e = cudaMemcpy(dest, src, count, kind);
+    cudaError_t e = cudaMemcpyAsync(dest, src, count, kind, NULL);
     return e;
 }
 
@@ -572,15 +571,13 @@ void CopyFromHostToDevice(const std::vector<dtype*> &src,
     CallCuda(MemoryPool::Ins().Free(long_dest));
 }
 
-__global__ void KernelCopyFromMultiVectorsToOneVector(const dtype **src,
-        dtype *dest,
-        int count,
+__global__ void KernelCopyFromMultiVectorsToOneVector(const dtype **src, dtype *dest, int count,
         int len) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
     for (int i = index; i < count * len; i += step) {
-        int count_i = i % count;
-        int len_i = i / count;
+        int count_i = i / len;
+        int len_i = i % len;
         dest[i] = src[count_i][len_i];
     }
 }
@@ -1217,28 +1214,6 @@ void CalculateLtyForUniBackward(ActivatedEnum activated,
             ly_arr.value, ty, y, drop_mask, drop_factor, lty, count, dim);
     CheckCudaError();
     cudaDeviceSynchronize();
-}
-
-__global__ void KernelCalculateLyForLinearBackward(const dtype *const*ly_vec,
-        dtype *ly, int count, int dim) {
-    int index = DeviceDefaultIndex();
-    int step = DeviceDefaultStep();
-    int len = count * dim;
-    for (int i = index; i < len; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        ly[i] = ly_vec[count_i][dim_i];
-    }
-}
-
-void CalculateLyForLinearBackward(const std::vector<dtype*> &ly_vec, dtype *ly,
-        int count, int dim) {
-    NumberPointerArray ly_arr;
-    ly_arr.init((dtype**)ly_vec.data(), ly_vec.size());
-    int block_count = std::min(BLOCK_COUNT, (count * dim + TPB - 1) / TPB);
-    KernelCalculateLyForLinearBackward<<<block_count,
-        TPB>>>(ly_arr.value, ly, count, dim);
-    CheckCudaError();
 }
 
 __global__ void KernelAddLtyToParamBiasAndAddLxToInputLossesForUniBackward(
@@ -2797,6 +2772,193 @@ int Predict(const dtype* val, int dim) {
     return result.v;
 }
 
+__global__ void KernelMax(const dtype *const *v, int dim, int count, dtype *block_maxes,
+        int *block_max_is,
+        int *block_counters,
+        int *max_indexes,
+        dtype *max_vals) {
+    __shared__ volatile dtype shared_max[TPB];
+    __shared__ volatile dtype shared_max_i[TPB];
+    __shared__ volatile bool is_last_block;
+    if (threadIdx.x == 0 && blockIdx.y == 0) {
+        block_counters[blockIdx.x] = 0;
+    }
+    if (threadIdx.x == 0) {
+        is_last_block = false;
+    }
+
+    int count_i = blockIdx.x;
+    int offset = blockIdx.y * blockDim.x + threadIdx.x;
+    shared_max[threadIdx.x] = offset < dim ? v[count_i][offset] : -INFINITY;
+    shared_max_i[threadIdx.x] = offset;
+    __syncthreads();
+
+    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+        if (threadIdx.x < i && shared_max[threadIdx.x] < shared_max[threadIdx.x + i]) {
+            shared_max[threadIdx.x] = shared_max[threadIdx.x + i];
+            shared_max_i[threadIdx.x] = shared_max_i[threadIdx.x + i];
+        }
+        __syncthreads();
+    }
+
+    int block_maxes_offset = blockIdx.x * gridDim.y + blockIdx.y;
+    if (threadIdx.x == 0) {
+        block_maxes[block_maxes_offset] = shared_max[0];
+        block_max_is[block_maxes_offset] = shared_max_i[0];
+        if (atomicAdd(block_counters + blockIdx.x, 1) == gridDim.y - 1) {
+            is_last_block = true;
+        }
+    }
+    __syncthreads();
+
+    if (is_last_block) {
+        dtype max = -INFINITY;
+        int max_i;
+        for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
+            int offset = blockIdx.x * gridDim.y + i;
+            if (block_maxes[offset] > max) {
+                max = block_maxes[offset];
+                max_i = block_max_is[offset];
+            }
+        }
+
+        shared_max[threadIdx.x] = max;
+        shared_max_i[threadIdx.x] = max_i;
+        __syncthreads();
+
+        for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+            if (threadIdx.x < i && shared_max[threadIdx.x + i]) {
+                shared_max[threadIdx.x] = shared_max[threadIdx.x + i];
+                shared_max_i[threadIdx.x] = shared_max_i[threadIdx.x + i];
+            }
+            __syncthreads();
+        }
+
+        if (threadIdx.x == 0) {
+            max_vals[count_i] = shared_max[0];
+            max_indexes[count_i] = shared_max_i[0];
+        }
+    }
+}
+
+void Max(const dtype *const *v, int dim, int count, int *max_indexes, dtype *max_vals) {
+    int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
+    int block_y_count = (dim - 1 + thread_count) / thread_count;
+    dim3 block_dim(count, block_y_count, 1);
+
+    NumberArray block_maxes;
+    block_maxes.init(block_y_count * count);
+    IntArray block_max_is, block_counters;
+    block_max_is.init(block_y_count * count);
+    block_counters.init(count);
+
+    KernelMax<<<block_dim, thread_count>>>(v, dim, count, block_maxes.value, block_max_is.value,
+            block_counters.value, max_indexes, max_vals);
+    CheckCudaError();
+}
+
+__global__ void KernelExp(const dtype *const *in, int dim, int count, const dtype *number_to_sub,
+        dtype *const *out) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < dim * count; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        out[count_i][dim_i] = cuda_exp(in[count_i][dim_i] - number_to_sub[count_i]);
+    }
+}
+
+void Exp(const dtype *const *in, int dim, int count, const dtype *number_to_sub,
+        dtype *const *out) {
+    int block_count = DefaultBlockCount(dim * count);
+    KernelExp<<<block_count, TPB>>>(in, dim, count, number_to_sub, out);
+}
+
+__global__ void KernelMax(const dtype *const *v, int dim, int count, dtype *block_maxes,
+        int *block_max_is,
+        int *block_counters,
+        int *max_indexes,
+        dtype *max_vals) {
+    __shared__ volatile dtype shared_max[TPB];
+    __shared__ volatile dtype shared_max_i[TPB];
+    __shared__ volatile bool is_last_block;
+    if (threadIdx.x == 0 && blockIdx.y == 0) {
+        block_counters[blockIdx.x] = 0;
+    }
+    if (threadIdx.x == 0) {
+        is_last_block = false;
+    }
+
+    int count_i = blockIdx.x;
+    int offset = blockIdx.y * blockDim.x + threadIdx.x;
+    shared_max[threadIdx.x] = offset < dim ? v[count_i][offset] : -INFINITY;
+    shared_max_i[threadIdx.x] = offset;
+    __syncthreads();
+
+    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+        if (threadIdx.x < i && shared_max[threadIdx.x] < shared_max[threadIdx.x + i]) {
+            shared_max[threadIdx.x] = shared_max[threadIdx.x + i];
+            shared_max_i[threadIdx.x] = shared_max_i[threadIdx.x + i];
+        }
+        __syncthreads();
+    }
+
+    int block_maxes_offset = blockIdx.x * gridDim.y + blockIdx.y;
+    if (threadIdx.x == 0) {
+        block_maxes[block_maxes_offset] = shared_max[0];
+        block_max_is[block_maxes_offset] = shared_max_i[0];
+        if (atomicAdd(block_counters + blockIdx.x, 1) == gridDim.y - 1) {
+            is_last_block = true;
+        }
+    }
+    __syncthreads();
+
+    if (is_last_block) {
+        dtype max = -INFINITY;
+        int max_i;
+        for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
+            int offset = blockIdx.x * gridDim.y + i;
+            if (block_maxes[offset] > max) {
+                max = block_maxes[offset];
+                max_i = block_max_is[offset];
+            }
+        }
+
+        shared_max[threadIdx.x] = max;
+        shared_max_i[threadIdx.x] = max_i;
+        __syncthreads();
+
+        for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+            if (threadIdx.x < i && shared_max[threadIdx.x + i]) {
+                shared_max[threadIdx.x] = shared_max[threadIdx.x + i];
+                shared_max_i[threadIdx.x] = shared_max_i[threadIdx.x + i];
+            }
+            __syncthreads();
+        }
+
+        if (threadIdx.x == 0) {
+            max_vals[count_i] = shared_max[0];
+            max_indexes[count_i] = shared_max_i[0];
+        }
+    }
+}
+
+void Max(const dtype *const *v, int dim, int count, int *max_indexes, dtype *max_vals) {
+    int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
+    int block_y_count = (dim - 1 + thread_count) / thread_count;
+    dim3 block_dim(count, block_y_count, 1);
+
+    NumberArray block_maxes;
+    block_maxes.init(block_y_count * count);
+    IntArray block_max_is, block_counters;
+    block_max_is.init(block_y_count * count);
+    block_counters.init(count);
+
+    KernelMax<<<block_dim, thread_count>>>(v, dim, count, block_maxes.value, block_max_is.value,
+            block_counters.value, max_indexes, max_vals);
+    CheckCudaError();
+}
+
 __global__ void KernelSquareSum(const dtype *v, int len, dtype *global_sum,
         int *block_counter, dtype *result) {
     __shared__ volatile dtype shared_sum[TPB];
@@ -2830,7 +2992,7 @@ __global__ void KernelSquareSum(const dtype *v, int len, dtype *global_sum,
     __syncthreads();
 
     if (is_last_block) {
-        float sum = 0.0f;
+        dtype sum = 0.0f;
         for (int i = threadIdx.x; i < gridDim.x; i += blockDim.x) {
             sum += global_sum[i];
         }

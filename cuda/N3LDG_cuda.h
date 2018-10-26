@@ -445,6 +445,8 @@ void PrintInts(const int* p, int len);
 void InitCuda(int device_id = 0);
 void EndCuda();
 
+void CopyFromMultiVectorsToOneVector(const std::vector<dtype*> &src, dtype *dest, int count,
+        int len);
 void CopyFromOneVectorToMultiVals(const dtype *src, std::vector<dtype*> &vals,
         int count,
         int len);
@@ -666,8 +668,6 @@ void PAddBackward(const std::vector<dtype*> &losses, int count, int dim,
         const dtype *drop_mask,
         dtype drop_factor,
         std::vector<std::vector<dtype*>> &in_losses);
-void CalculateLyForLinearBackward(const std::vector<dtype*> &ly_vec, dtype *ly,
-        int count, int dim);
 void SoftMaxLoss(const std::vector<dtype*> &vals, std::vector<dtype*> &losses,
         int *correct_count,
         const std::vector<int> &answers,
