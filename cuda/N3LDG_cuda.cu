@@ -2874,13 +2874,10 @@ void Exp(const dtype *const *in, int dim, int count, const dtype *number_to_sub,
     KernelExp<<<block_count, TPB>>>(in, dim, count, number_to_sub, out);
 }
 
-__global__ void KernelMax(const dtype *const *v, int dim, int count, dtype *block_maxes,
-        int *block_max_is,
+__global__ void KernelSum(const dtype *const *v, int dim, int count, dtype *block_sums,
         int *block_counters,
-        int *max_indexes,
-        dtype *max_vals) {
-    __shared__ volatile dtype shared_max[TPB];
-    __shared__ volatile dtype shared_max_i[TPB];
+        dtype *sum_vals) {
+    __shared__ volatile dtype shared_sum[TPB];
     __shared__ volatile bool is_last_block;
     if (threadIdx.x == 0 && blockIdx.y == 0) {
         block_counters[blockIdx.x] = 0;
@@ -2891,22 +2888,19 @@ __global__ void KernelMax(const dtype *const *v, int dim, int count, dtype *bloc
 
     int count_i = blockIdx.x;
     int offset = blockIdx.y * blockDim.x + threadIdx.x;
-    shared_max[threadIdx.x] = offset < dim ? v[count_i][offset] : -INFINITY;
-    shared_max_i[threadIdx.x] = offset;
+    shared_sum[threadIdx.x] = offset < dim ? v[count_i][offset] : 0.0f;
     __syncthreads();
 
     for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-        if (threadIdx.x < i && shared_max[threadIdx.x] < shared_max[threadIdx.x + i]) {
-            shared_max[threadIdx.x] = shared_max[threadIdx.x + i];
-            shared_max_i[threadIdx.x] = shared_max_i[threadIdx.x + i];
+        if (threadIdx.x < i) {
+            shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
         }
         __syncthreads();
     }
 
-    int block_maxes_offset = blockIdx.x * gridDim.y + blockIdx.y;
+    int block_sums_offset = blockIdx.x * gridDim.y + blockIdx.y;
     if (threadIdx.x == 0) {
-        block_maxes[block_maxes_offset] = shared_max[0];
-        block_max_is[block_maxes_offset] = shared_max_i[0];
+        block_sums[block_sums_offset] = shared_sum[0];
         if (atomicAdd(block_counters + blockIdx.x, 1) == gridDim.y - 1) {
             is_last_block = true;
         }
@@ -2914,50 +2908,44 @@ __global__ void KernelMax(const dtype *const *v, int dim, int count, dtype *bloc
     __syncthreads();
 
     if (is_last_block) {
-        dtype max = -INFINITY;
-        int max_i;
+        dtype sum = 0.0f;
         for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
             int offset = blockIdx.x * gridDim.y + i;
-            if (block_maxes[offset] > max) {
-                max = block_maxes[offset];
-                max_i = block_max_is[offset];
-            }
+            sum += block_sums[offset];
         }
 
-        shared_max[threadIdx.x] = max;
-        shared_max_i[threadIdx.x] = max_i;
+        shared_sum[threadIdx.x] = sum;
         __syncthreads();
 
         for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-            if (threadIdx.x < i && shared_max[threadIdx.x + i]) {
-                shared_max[threadIdx.x] = shared_max[threadIdx.x + i];
-                shared_max_i[threadIdx.x] = shared_max_i[threadIdx.x + i];
+            if (threadIdx.x < i) {
+                shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
             }
             __syncthreads();
         }
 
         if (threadIdx.x == 0) {
-            max_vals[count_i] = shared_max[0];
-            max_indexes[count_i] = shared_max_i[0];
+            sum_vals[count_i] = shared_sum[0];
         }
     }
 }
 
-void Max(const dtype *const *v, int dim, int count, int *max_indexes, dtype *max_vals) {
+void Sum(const dtype *const *v, int dim, int count, dtype *sum_vals) {
     int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
     int block_y_count = (dim - 1 + thread_count) / thread_count;
     dim3 block_dim(count, block_y_count, 1);
 
-    NumberArray block_maxes;
-    block_maxes.init(block_y_count * count);
-    IntArray block_max_is, block_counters;
-    block_max_is.init(block_y_count * count);
+    NumberArray block_sums;
+    block_sums.init(block_y_count * count);
+    IntArray block_counters;
     block_counters.init(count);
 
-    KernelMax<<<block_dim, thread_count>>>(v, dim, count, block_maxes.value, block_max_is.value,
-            block_counters.value, max_indexes, max_vals);
+    KernelSum<<<block_dim, thread_count>>>(v, dim, count, block_sums.value, block_counters.value,
+            sum_vals);
     CheckCudaError();
 }
+
+
 
 __global__ void KernelSquareSum(const dtype *v, int len, dtype *global_sum,
         int *block_counter, dtype *result) {
