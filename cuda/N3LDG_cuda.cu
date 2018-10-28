@@ -97,7 +97,7 @@ cublasHandle_t& GetCublasHandle() {
 
 cudaError_t MyCudaMemcpy(void *dest, const void *src, size_t count,
         cudaMemcpyKind kind) {
-    cudaError_t e = cudaMemcpyAsync(dest, src, count, kind, NULL);
+    cudaError_t e = cudaMemcpy(dest, src, count, kind);
     return e;
 }
 
@@ -2872,6 +2872,7 @@ void Exp(const dtype *const *in, int dim, int count, const dtype *number_to_sub,
         dtype *const *out) {
     int block_count = DefaultBlockCount(dim * count);
     KernelExp<<<block_count, TPB>>>(in, dim, count, number_to_sub, out);
+    CheckCudaError();
 }
 
 __global__ void KernelSum(const dtype *const *v, int dim, int count, dtype *block_sums,
@@ -2945,7 +2946,56 @@ void Sum(const dtype *const *v, int dim, int count, dtype *sum_vals) {
     CheckCudaError();
 }
 
+__global__ void KernelSoftMaxLossByExp(const dtype *const *exps, int dim, int count,
+        const dtype *sums,
+        const int *answers,
+        dtype reverse_batchsize,
+        dtype **losses) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < dim * count; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
 
+        dtype loss = exps[count_i][dim_i] / sums[count_i];
+        if (dim_i == answers[count_i]) {
+            loss -= 1.0f;
+        }
+        losses[count_i][dim_i] = loss * reverse_batchsize;
+    }
+}
+
+void SoftMaxLossByExp(const dtype *const *exps, int dim, int count, const dtype *sums,
+        const int *answers,
+        dtype reverse_batchsize,
+        dtype **losses) {
+    int block_count = DefaultBlockCount(dim * count);
+    KernelSoftMaxLossByExp<<<block_count, TPB>>>(exps, dim, count, sums, answers,
+            reverse_batchsize, losses);
+    CheckCudaError();
+}
+
+__global__ void computLoss(const dtype *sums, int count, const dtype *const *vals, int dim,
+        const int *answers, const dtype *max_vals, dtype reverse_batchsize) {
+}
+
+std::vector<int> SoftMaxLoss(const dtype *const *vals, int dim, int count, int batchsize,
+        dtype **losses) {
+    IntArray answer_arr;
+    answer_arr.init(count);
+    NumberArray max_vals, sum_vals;
+    max_vals.init(count);
+    sum_vals.init(count);
+
+    Max(vals, dim, count, answer_arr.value, max_vals.value);
+    Exp(vals, dim, count, max_vals.value, losses);
+    Sum(losses, dim, count, sum_vals.value);
+    SoftMaxLossByExp(losses, dim, count, sum_vals.value, answer_arr.value, 1.0 / batchsize,
+            losses);
+
+    vector<int> answers(count);
+    MyCudaMemcpy(answers.data(), max_vals.value, count * sizeof(dtype), cudaMemcpyDeviceToHost);
+}
 
 __global__ void KernelSquareSum(const dtype *v, int len, dtype *global_sum,
         int *block_counter, dtype *result) {
