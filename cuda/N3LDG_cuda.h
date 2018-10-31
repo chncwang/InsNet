@@ -266,7 +266,7 @@ struct Tensor1D {
 #endif
     }
 
-    bool verify(const char *message) {
+    bool verify(const char *message) const {
 #if TEST_CUDA
         return Verify(v, value, dim, message);
 #else
@@ -675,6 +675,12 @@ void SoftMaxLoss(const std::vector<dtype*> &vals, std::vector<dtype*> &losses,
         int count,
         int dim);
 int Predict(const dtype* val, int dim);
+std::pair<dtype, std::vector<int>> SoftMaxLoss(const std::vector<const dtype *> &vals_vector,
+        int count,
+        int dim,
+        const std::vector<int> &gold_answers,
+        int batchsize,
+        const std::vector<dtype *> &losses_vector);
 dtype SquareSum(const dtype *v, int len);
 dtype SquareSum(const dtype *v, const bool *indexers, int count, int dim);
 void Rescale(dtype *v, int len, dtype scale);

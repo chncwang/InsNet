@@ -30,11 +30,13 @@ using namespace std;
 #define cuda_pow(x, y) powf(x, y)
 #define cuda_tanh(x) tanhf(x)
 #define cuda_exp(x) __expf(x)
+#define cuda_log(x) logf(x)
 #else
 #define cuda_sqrt(x) sqrt(x)
 #define cuda_pow(x, y) pow(x, y)
 #define cuda_tanh(x) tanh(x)
 #define cuda_exp(x) exp(x)
+#define cuda_log(x) log(x)
 #endif
 
 #define KERNEL_LOG
@@ -97,7 +99,8 @@ cublasHandle_t& GetCublasHandle() {
 
 cudaError_t MyCudaMemcpy(void *dest, const void *src, size_t count,
         cudaMemcpyKind kind) {
-    cudaError_t e = cudaMemcpy(dest, src, count, kind);
+    cudaError_t e = cudaMemcpyAsync(dest, src, count, kind, 0);
+    CallCuda(e);
     return e;
 }
 
@@ -116,10 +119,6 @@ NumberPointerArray::~NumberPointerArray() {
     if (value != NULL) {
         CallCuda(MemoryPool::Ins().Free(value));
     }
-}
-
-void Memcpy(dtype *dest, dtype*src, int size, cudaMemcpyKind kind) {
-    CallCuda(MyCudaMemcpy(dest, src, size, kind));
 }
 
 int NextTwoIntegerPowerNumber(int number) {
@@ -2772,7 +2771,7 @@ int Predict(const dtype* val, int dim) {
     return result.v;
 }
 
-__global__ void KernelMax(const dtype *const *v, int dim, int count, dtype *block_maxes,
+__global__ void KernelMax(const dtype *const *v, int count, int dim, dtype *block_maxes,
         int *block_max_is,
         int *block_counters,
         int *max_indexes,
@@ -2841,7 +2840,7 @@ __global__ void KernelMax(const dtype *const *v, int dim, int count, dtype *bloc
     }
 }
 
-void Max(const dtype *const *v, int dim, int count, int *max_indexes, dtype *max_vals) {
+void Max(const dtype *const *v, int count, int dim, int *max_indexes, dtype *max_vals) {
     int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
     int block_y_count = (dim - 1 + thread_count) / thread_count;
     dim3 block_dim(count, block_y_count, 1);
@@ -2857,7 +2856,7 @@ void Max(const dtype *const *v, int dim, int count, int *max_indexes, dtype *max
     CheckCudaError();
 }
 
-__global__ void KernelExp(const dtype *const *in, int dim, int count, const dtype *number_to_sub,
+__global__ void KernelExp(const dtype *const *in, int count, int dim, const dtype *number_to_sub,
         dtype *const *out) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
@@ -2868,14 +2867,14 @@ __global__ void KernelExp(const dtype *const *in, int dim, int count, const dtyp
     }
 }
 
-void Exp(const dtype *const *in, int dim, int count, const dtype *number_to_sub,
+void Exp(const dtype *const *in, int count, int dim, const dtype *number_to_sub,
         dtype *const *out) {
     int block_count = DefaultBlockCount(dim * count);
     KernelExp<<<block_count, TPB>>>(in, dim, count, number_to_sub, out);
     CheckCudaError();
 }
 
-__global__ void KernelSum(const dtype *const *v, int dim, int count, dtype *block_sums,
+__global__ void KernelSum(const dtype *const *v, int count, int dim, dtype *block_sums,
         int *block_counters,
         dtype *sum_vals) {
     __shared__ volatile dtype shared_sum[TPB];
@@ -2931,7 +2930,7 @@ __global__ void KernelSum(const dtype *const *v, int dim, int count, dtype *bloc
     }
 }
 
-void Sum(const dtype *const *v, int dim, int count, dtype *sum_vals) {
+void Sum(const dtype *const *v, int count, int dim, dtype *sum_vals) {
     int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
     int block_y_count = (dim - 1 + thread_count) / thread_count;
     dim3 block_dim(count, block_y_count, 1);
@@ -2946,11 +2945,14 @@ void Sum(const dtype *const *v, int dim, int count, dtype *sum_vals) {
     CheckCudaError();
 }
 
-__global__ void KernelSoftMaxLossByExp(const dtype *const *exps, int dim, int count,
+__global__ void KernelSoftMaxLossByExp(const dtype *const *exps, int count, int dim,
+        const dtype *const *vals,
         const dtype *sums,
+        const dtype *max_vals,
         const int *answers,
         dtype reverse_batchsize,
-        dtype **losses) {
+        dtype **grads,
+        dtype *losses) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
     for (int i = index; i < dim * count; i += step) {
@@ -2961,40 +2963,59 @@ __global__ void KernelSoftMaxLossByExp(const dtype *const *exps, int dim, int co
         if (dim_i == answers[count_i]) {
             loss -= 1.0f;
         }
-        losses[count_i][dim_i] = loss * reverse_batchsize;
+        grads[count_i][dim_i] = loss * reverse_batchsize;
+        losses[count_i] = (cuda_log(sums[count_i]) - vals[count_i][answers[count_i]] + max_vals[count_i])
+            * reverse_batchsize;
     }
 }
 
-void SoftMaxLossByExp(const dtype *const *exps, int dim, int count, const dtype *sums,
+void SoftMaxLossByExp(const dtype *const *exps, int count, int dim, const dtype *const *vals,
+        const dtype *sums,
+        const dtype *max_vals,
         const int *answers,
         dtype reverse_batchsize,
-        dtype **losses) {
+        dtype **grads,
+        dtype *losses) {
     int block_count = DefaultBlockCount(dim * count);
-    KernelSoftMaxLossByExp<<<block_count, TPB>>>(exps, dim, count, sums, answers,
-            reverse_batchsize, losses);
+    KernelSoftMaxLossByExp<<<block_count, TPB>>>(exps, dim, count, vals, sums, max_vals, answers,
+            reverse_batchsize, grads, losses);
     CheckCudaError();
 }
 
-__global__ void computLoss(const dtype *sums, int count, const dtype *const *vals, int dim,
-        const int *answers, const dtype *max_vals, dtype reverse_batchsize) {
-}
-
-std::vector<int> SoftMaxLoss(const dtype *const *vals, int dim, int count, int batchsize,
-        dtype **losses) {
-    IntArray answer_arr;
+std::pair<dtype, std::vector<int>> SoftMaxLoss(const std::vector<const dtype *> &vals_vector,
+        int count,
+        int dim,
+        const std::vector<int> &gold_answers,
+        int batchsize,
+        const std::vector<dtype *> &losses_vector) {
+    IntArray answer_arr, gold_answer_arr;
     answer_arr.init(count);
+    gold_answer_arr.init((int*)gold_answers.data(), count);
+
     NumberArray max_vals, sum_vals;
     max_vals.init(count);
     sum_vals.init(count);
+    NumberPointerArray vals, losses;
+    vals.init((dtype**)vals_vector.data(), count);
+    losses.init((dtype**)losses_vector.data(), count);
 
-    Max(vals, dim, count, answer_arr.value, max_vals.value);
-    Exp(vals, dim, count, max_vals.value, losses);
-    Sum(losses, dim, count, sum_vals.value);
-    SoftMaxLossByExp(losses, dim, count, sum_vals.value, answer_arr.value, 1.0 / batchsize,
-            losses);
+    Max(vals.value, dim, count, answer_arr.value, max_vals.value);
+    Exp(vals.value, dim, count, max_vals.value, losses.value);
+    Sum(losses.value, dim, count, sum_vals.value);
+
+    NumberArray loss_arr;
+    loss_arr.init(count);
+
+    SoftMaxLossByExp(losses.value, dim, count, vals.value, sum_vals.value, max_vals.value,
+            gold_answer_arr.value, 1.0 / batchsize, losses.value, loss_arr.value);
 
     vector<int> answers(count);
-    MyCudaMemcpy(answers.data(), max_vals.value, count * sizeof(dtype), cudaMemcpyDeviceToHost);
+    MyCudaMemcpy(answers.data(), max_vals.value, count * sizeof(int), cudaMemcpyDeviceToHost);
+
+    vector<dtype> loss_vector(count);
+    MyCudaMemcpy(loss_vector.data(), loss_arr.value, count * sizeof(dtype), cudaMemcpyDeviceToHost);
+    dtype loss_sum = accumulate(loss_vector.begin(), loss_vector.end(), 0.0f);
+    return std::make_pair(loss_sum, answers);
 }
 
 __global__ void KernelSquareSum(const dtype *v, int len, dtype *global_sum,
