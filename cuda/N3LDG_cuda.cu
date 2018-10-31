@@ -1,5 +1,6 @@
 #include "N3LDG_cuda.h"
 #include <array>
+#include <boost/format.hpp>
 #include <cstdlib>
 #include <vector>
 #include <algorithm>
@@ -24,6 +25,7 @@
 namespace n3ldg_cuda {
 
 using namespace std;
+using boost::format;
 
 #if USE_FLOAT
 #define cuda_sqrt(x) sqrtf(x)
@@ -2826,7 +2828,7 @@ __global__ void KernelMax(const dtype *const *v, int count, int dim, dtype *bloc
         __syncthreads();
 
         for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-            if (threadIdx.x < i && shared_max[threadIdx.x + i]) {
+            if (threadIdx.x < i && shared_max[threadIdx.x + i] > shared_max[threadIdx.x]) {
                 shared_max[threadIdx.x] = shared_max[threadIdx.x + i];
                 shared_max_i[threadIdx.x] = shared_max_i[threadIdx.x + i];
             }
@@ -2840,10 +2842,31 @@ __global__ void KernelMax(const dtype *const *v, int count, int dim, dtype *bloc
     }
 }
 
+__global__ void KernelSingleMax(const dtype *const *v, int count, int dim,
+        int *max_indexes,
+        dtype *max_vals) {
+    for (int count_i = 0; count_i < count; ++count_i) {
+        dtype max_val = -INFINITY;
+        int max_i;
+        for (int dim_i = 0; dim_i < dim; ++ dim_i) {
+            if (v[count_i][dim_i] > max_val) {
+                max_val = v[count_i][dim_i];
+                max_i = dim_i;
+            }
+        }
+
+        max_indexes[count_i] = max_i;
+        max_vals[count_i] = max_val;
+    }
+}
+
 void Max(const dtype *const *v, int count, int dim, int *max_indexes, dtype *max_vals) {
     int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
     int block_y_count = (dim - 1 + thread_count) / thread_count;
     dim3 block_dim(count, block_y_count, 1);
+
+//    cout << format("Max count:%1% dim:%2% thread_count:%3% block_y_count:%4%") % count % dim % thread_count
+//            % block_y_count << endl;
 
     NumberArray block_maxes;
     block_maxes.init(block_y_count * count);
@@ -2851,8 +2874,27 @@ void Max(const dtype *const *v, int count, int dim, int *max_indexes, dtype *max
     block_max_is.init(block_y_count * count);
     block_counters.init(count);
 
-    KernelMax<<<block_dim, thread_count>>>(v, dim, count, block_maxes.value, block_max_is.value,
+    KernelMax<<<block_dim, thread_count>>>(v, count, dim, block_maxes.value, block_max_is.value,
             block_counters.value, max_indexes, max_vals);
+#if TEST_CUDA
+    NumberArray max_val_arr;
+    IntArray max_indexer_arr;
+    max_val_arr.init(count);
+    max_indexer_arr.init(count);
+    KernelSingleMax<<<1, 1>>>(v, count, dim, max_indexer_arr.value, max_val_arr.value);
+    vector<int> max_indexer_target(count), max_indexer_gold(count);
+    MyCudaMemcpy(max_indexer_target.data(), max_indexes, count * sizeof(int), cudaMemcpyDeviceToHost);
+    MyCudaMemcpy(max_indexer_gold.data(), max_indexer_arr.value, count * sizeof(int),
+            cudaMemcpyDeviceToHost);
+    for (int i = 0; i < count; ++i) {
+        if (max_indexer_target.at(i) != max_indexer_gold.at(i)) {
+            cerr << format("max_indexer_target:%1% max_indexer_gold:%2%") % max_indexer_target.at(i)
+                % max_indexer_gold.at(i) << endl;
+            abort();
+        }
+    }
+#endif
+
     CheckCudaError();
 }
 
@@ -2870,7 +2912,8 @@ __global__ void KernelExp(const dtype *const *in, int count, int dim, const dtyp
 void Exp(const dtype *const *in, int count, int dim, const dtype *number_to_sub,
         dtype *const *out) {
     int block_count = DefaultBlockCount(dim * count);
-    KernelExp<<<block_count, TPB>>>(in, dim, count, number_to_sub, out);
+    //cout << format("Exp count:%1% dim:%2% block_count:%3%") % count % dim % block_count << endl;
+    KernelExp<<<block_count, TPB>>>(in, count, dim, number_to_sub, out);
     CheckCudaError();
 }
 
@@ -2940,7 +2983,7 @@ void Sum(const dtype *const *v, int count, int dim, dtype *sum_vals) {
     IntArray block_counters;
     block_counters.init(count);
 
-    KernelSum<<<block_dim, thread_count>>>(v, dim, count, block_sums.value, block_counters.value,
+    KernelSum<<<block_dim, thread_count>>>(v, count, dim, block_sums.value, block_counters.value,
             sum_vals);
     CheckCudaError();
 }
@@ -2977,7 +3020,7 @@ void SoftMaxLossByExp(const dtype *const *exps, int count, int dim, const dtype 
         dtype **grads,
         dtype *losses) {
     int block_count = DefaultBlockCount(dim * count);
-    KernelSoftMaxLossByExp<<<block_count, TPB>>>(exps, dim, count, vals, sums, max_vals, answers,
+    KernelSoftMaxLossByExp<<<block_count, TPB>>>(exps, count, dim, vals, sums, max_vals, answers,
             reverse_batchsize, grads, losses);
     CheckCudaError();
 }
@@ -2999,18 +3042,18 @@ std::pair<dtype, std::vector<int>> SoftMaxLoss(const std::vector<const dtype *> 
     vals.init((dtype**)vals_vector.data(), count);
     losses.init((dtype**)losses_vector.data(), count);
 
-    Max(vals.value, dim, count, answer_arr.value, max_vals.value);
-    Exp(vals.value, dim, count, max_vals.value, losses.value);
-    Sum(losses.value, dim, count, sum_vals.value);
+    Max(vals.value, count, dim, answer_arr.value, max_vals.value);
+    Exp(vals.value, count, dim, max_vals.value, losses.value);
+    Sum(losses.value, count, dim, sum_vals.value);
 
     NumberArray loss_arr;
     loss_arr.init(count);
 
-    SoftMaxLossByExp(losses.value, dim, count, vals.value, sum_vals.value, max_vals.value,
+    SoftMaxLossByExp(losses.value, count, dim, vals.value, sum_vals.value, max_vals.value,
             gold_answer_arr.value, 1.0 / batchsize, losses.value, loss_arr.value);
 
     vector<int> answers(count);
-    MyCudaMemcpy(answers.data(), max_vals.value, count * sizeof(int), cudaMemcpyDeviceToHost);
+    MyCudaMemcpy(answers.data(), answer_arr.value, count * sizeof(int), cudaMemcpyDeviceToHost);
 
     vector<dtype> loss_vector(count);
     MyCudaMemcpy(loss_vector.data(), loss_arr.value, count * sizeof(dtype), cudaMemcpyDeviceToHost);
