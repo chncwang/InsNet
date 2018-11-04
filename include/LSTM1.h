@@ -20,7 +20,7 @@
 
 #include <memory>
 
-struct LSTM1Params {
+struct LSTM1Params : public TransferableComponents {
     UniParams input_hidden;
     UniParams input_input;
     UniParams output_hidden;
@@ -30,8 +30,7 @@ struct LSTM1Params {
     UniParams cell_hidden;
     UniParams cell_input;
 
-    LSTM1Params() {
-    }
+    LSTM1Params() = default;
 
     void exportAdaParams(ModelUpdate& ada) {
         input_hidden.exportAdaParams(ada);
@@ -86,6 +85,10 @@ struct LSTM1Params {
         cell_input.load(is);
     }
 
+    std::vector<Transferable *> transferablePtrs() override {
+        return {&input_hidden, &input_input, &output_hidden, &output_input, &forget_input,
+            &forget_hidden, &cell_hidden, &cell_input};
+    }
 };
 
 // standard LSTM1 using tanh as activation function

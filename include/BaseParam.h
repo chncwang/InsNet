@@ -14,7 +14,11 @@
 
 #include "MyTensor.h"
 
-struct BaseParam {
+struct BaseParam
+#if USE_GPU
+: public n3ldg_cuda::Transferable
+#endif
+{
     Tensor2D val;
     Tensor2D grad;
     int index;
@@ -38,15 +42,35 @@ struct BaseParam {
     virtual void save(std::ofstream &os)const = 0;
     virtual void load(std::ifstream &is) = 0;
 #if USE_GPU
-    virtual void copyFromHostToDevice() {
+    virtual void copyFromHostToDevice() override {
         val.copyFromHostToDevice();
         grad.copyFromHostToDevice();
     }
-    virtual void copyFromDeviceToHost() {
+    virtual void copyFromDeviceToHost() override {
         val.copyFromDeviceToHost();
         grad.copyFromDeviceToHost();
     }
 #endif
 };
+
+#if USE_GPU
+class TransferableComponents : public n3ldg_cuda::Transferable
+{
+public:
+    void copyFromHostToDevice() override {
+        for (auto *t : transferablePtrs()) {
+            t->copyFromHostToDevice();
+        }
+    }
+
+    void copyFromDeviceToHost() override {
+        for (auto *t : transferablePtrs()) {
+            t->copyFromDeviceToHost();
+        }
+    }
+
+    virtual std::vector<n3ldg_cuda::Transferable *> transferablePtrs() = 0;
+};
+#endif
 
 #endif /* BasePARAM_H_ */

@@ -301,16 +301,12 @@ void Tensor1D::initOnDevice(int dim) {
 Tensor1D::Tensor1D(const Tensor1D &t) {
     dim = t.dim;
     memcpy(v, t.v, dim *sizeof(dtype));
-    CallCuda(MyCudaMemcpy(value, t.value, dim * sizeof(dtype),
-                cudaMemcpyDeviceToDevice));
+    CallCuda(MyCudaMemcpy(value, t.value, dim * sizeof(dtype), cudaMemcpyDeviceToDevice));
 }
 
 Tensor1D::~Tensor1D() {
     if (value != NULL) {
         CallCuda(MemoryPool::Ins().Free(value));
-    }
-    if (v != NULL) {
-        delete []v;
     }
 }
 

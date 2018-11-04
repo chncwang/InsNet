@@ -19,13 +19,12 @@
 #include <cstdlib>
 #include "profiler.h"
 
-class UniParams {
+class UniParams : public TransferableComponents {
   public:
     Param W;
     Param b;
     bool bUseB;
 
-  public:
     UniParams() {
         bUseB = true;
     }
@@ -59,6 +58,13 @@ class UniParams {
         W.load(is);
         if (bUseB) {
             b.load(is);
+        }
+    }
+
+    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
+        std::vector<Transferable *> ptrs = {&W};
+        if (bUseB) {
+            ptrs.push_back(&b);
         }
     }
 };
@@ -99,11 +105,6 @@ class UniNode : public Node {
 
     void setParam(UniParams* paramInit) {
         param = paramInit;
-    }
-
-    void clearValue() {
-        Node::clearValue();
-        in = NULL;
     }
 
     // define the activate function and its derivation form
@@ -189,11 +190,6 @@ public:
         param = paramInit;
     }
 
-    void clearValue() {
-        Node::clearValue();
-        in = NULL;
-    }
-
     void forward(Graph *cg, PNode x) {
         in = x;
         degree = 0;
@@ -205,7 +201,6 @@ public:
         forward(&graph, &x);
     }
 
-  public:
     void compute() {
         val.mat() = param->W.val.mat() * in->val.mat();
     }

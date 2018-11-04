@@ -84,13 +84,6 @@ class APNode : public Node {
         param = paramInit;
     }
 
-    void clearValue() {
-        Node::clearValue();
-        ins.clear();
-        bTrain = false;
-    }
-
-  public:
     //notice the output
     void forward(Graph *cg, const vector<string>& x) {
         int featId;
@@ -105,7 +98,7 @@ class APNode : public Node {
         cg->addNode(this);
         bTrain = cg->train;
     }
-  public:
+
     void compute() {
         param->W.value(ins, val, bTrain);
     }
@@ -116,7 +109,6 @@ class APNode : public Node {
         param->W.loss(ins, loss);
     }
 
-  public:
     PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding

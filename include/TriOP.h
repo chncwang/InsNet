@@ -101,11 +101,6 @@ public:
         param = paramInit;
     }
 
-    void clearValue() {
-        Node::clearValue();
-        in1 = in2 = in3 = NULL;
-    }
-
     // define the activate function and its derivation form
     void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
         activate = f;
@@ -191,12 +186,6 @@ public:
         param = paramInit;
     }
 
-    void clearValue() {
-        Node::clearValue();
-        in1 = in2 = in3 = NULL;
-    }
-
-public:
     void forward(Graph *cg, PNode x1, PNode x2, PNode x3) {
         in1 = x1;
         in2 = x2;
@@ -208,7 +197,6 @@ public:
         cg->addNode(this);
     }
 
-public:
     void compute() {
         val.mat() = param->W1.val.mat() * in1->val.mat() + param->W2.val.mat() * in2->val.mat() + param->W3.val.mat() * in3->val.mat();
 

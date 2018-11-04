@@ -27,12 +27,6 @@ public:
         node_type = "point-add";
     }
 
-    void clearValue() {
-        ins.clear();
-        Node::clearValue();
-    }
-
-public:
     void forward(Graph &graph, Node &input1, Node &input2) {
         vector<Node *> inputs = {&input1, &input2};
         this->forward(&graph, inputs);

@@ -17,20 +17,13 @@
 class PMultiNode : public Node {
   public:
     PNode in1, in2;
-  public:
+
     PMultiNode() : Node() {
         in1 = NULL;
         in2 = NULL;
         node_type = "point-multiply";
     }
-  public:
-    virtual void clearValue() {
-        Node::clearValue();
-        in1 = NULL;
-        in2 = NULL;
-    }
 
-  public:
     void forward(Graph &graph, Node &input1, Node &input2) {
         this->forward(&graph, &input1, &input2);
     }
@@ -44,7 +37,6 @@ class PMultiNode : public Node {
         cg->addNode(this);
     }
 
-  public:
     void compute() {
         val.vec() = in1->val.vec() * in2->val.vec();
     }
@@ -54,7 +46,6 @@ class PMultiNode : public Node {
         in2->loss.vec() += loss.vec() * in1->val.vec();
     }
 
-  public:
     // better to rewrite for deep understanding
     bool typeEqual(PNode other) {
         return Node::typeEqual(other);

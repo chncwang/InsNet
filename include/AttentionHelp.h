@@ -36,13 +36,6 @@ public:
         unnormeds.clear();
     }
 
-    void clearValue() {
-        Node::clearValue();
-        ins.clear();
-        unnormeds.clear();
-        sum = 0;
-    }
-
     void setParam(int maxsize) {
         masks.resize(maxsize);
         mask_losses.resize(maxsize);
@@ -70,8 +63,7 @@ public:
         for (int i = 0; i < nSize; i++) {
             if (x[i]->val.dim != dim || a[i]->val.dim != 1) {
                 std::cout << "input matrixes are not matched" << std::endl;
-                clearValue();
-                return;
+                abort();
             }
             ins.push_back(x[i]);
             unnormeds.push_back(a[i]);
@@ -304,15 +296,6 @@ class AttentionSoftMaxVNode : public Node {
         unnormeds.clear();
     }
 
-    void clearValue() {
-        Node::clearValue();
-        ins.clear();
-        unnormeds.clear();
-#if !USE_GPU
-        sum.zero();
-#endif
-    }
-
     void setParam(int maxsize) {
         masks.resize(maxsize);
         mask_losses.resize(maxsize);
@@ -350,8 +333,7 @@ class AttentionSoftMaxVNode : public Node {
         for (int i = 0; i < nSize; i++) {
             if (x[i]->val.dim != dim || a[i]->val.dim != dim) {
                 std::cout << "input matrixes are not matched" << std::endl;
-                clearValue();
-                return;
+                abort();
             }
             ins.push_back(x[i]);
             unnormeds.push_back(a[i]);

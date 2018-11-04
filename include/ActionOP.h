@@ -82,12 +82,6 @@ class ActionNode : public Node {
         Node::init(dim, -1);
     }
 
-    void clearValue() {
-        Node::clearValue();
-        actid = -1;
-    }
-
-  public:
     //notice the output
     void forward(Graph *cg, const string& ac, PNode x) {
         actid = param->getFeatureId(ac);
@@ -97,7 +91,6 @@ class ActionNode : public Node {
         cg->addNode(this);
     }
 
-  public:
     void compute() {
         if (param->nDim != in->dim) {
             std::cout << "warning: action dim not equal ." << std::endl;

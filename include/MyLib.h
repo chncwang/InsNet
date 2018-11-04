@@ -1,4 +1,5 @@
 #ifndef _MYLIB_H_
+#include <fstream>
 #define _MYLIB_H_
 
 #include <string>

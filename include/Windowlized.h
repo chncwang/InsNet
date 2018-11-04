@@ -28,20 +28,6 @@ class WindowBuilder {
 
   public:
     WindowBuilder() {
-        clear();
-    }
-
-    ~WindowBuilder() {
-        clear();
-    }
-
-
-    void resize(int maxsize) {
-        _outputs.resize(maxsize);
-    }
-
-    void clear() {
-        _outputs.clear();
         _context = 0;
         _window = 0;
         _nSize = 0;
@@ -49,6 +35,9 @@ class WindowBuilder {
         _outDim = 0;
     }
 
+    void resize(int maxsize) {
+        _outputs.resize(maxsize);
+    }
 
     void init(int inDim, int context) {
         _context = context;
@@ -62,9 +51,6 @@ class WindowBuilder {
         _bucket.init(_inDim, -1);
     }
 
-
-
-  public:
     void forward(Graph *cg, const vector<PNode>& x) {
         if (x.size() == 0) {
             std::cout << "empty inputs for windowlized operation" << std::endl;
@@ -87,6 +73,5 @@ class WindowBuilder {
     }
 
 };
-
 
 #endif

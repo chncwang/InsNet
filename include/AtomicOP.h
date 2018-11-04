@@ -43,11 +43,6 @@ class ActivateNode :public Node {
         in = NULL;
     }
 
-    void clearValue() {
-        Node::clearValue();
-        in = NULL;
-    }
-
     // define the activate function and its derivation form
     void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
         activate = f;
@@ -122,11 +117,6 @@ class TanhNode :public Node {
     }
 
     ~TanhNode() {
-        in = NULL;
-    }
-
-    void clearValue() {
-        Node::clearValue();
         in = NULL;
     }
 
@@ -324,12 +314,6 @@ class SigmoidNode :public Node {
         in = NULL;
     }
 
-    void clearValue() {
-        Node::clearValue();
-        in = NULL;
-    }
-
-  public:
     void forward(Graph &graph, Node &input) {
         this->forward(&graph, &input);
     }
@@ -464,13 +448,6 @@ class ReluNode :public Node {
         in = NULL;
     }
 
-    void clearValue() {
-        Node::clearValue();
-        in = NULL;
-    }
-
-
-  public:
     void forward(Graph *cg, PNode x) {
         in = x;
         degree = 0;
@@ -542,12 +519,6 @@ class IndexNode :public Node {
 
     ~IndexNode() {
         in = NULL;
-    }
-
-    void clearValue() {
-        Node::clearValue();
-        in = NULL;
-        index_id = -1;
     }
 
     //can not be dropped since the output is a scalar
@@ -624,13 +595,6 @@ class PSubNode : public Node {
         in2 = NULL;
         node_type = "point-subtraction";
     }
-  public:
-    virtual void clearValue() {
-        Node::clearValue();
-        in1 = NULL;
-        in2 = NULL;
-    }
-
 
   public:
     void forward(Graph *cg, PNode x1, PNode x2) {
@@ -701,12 +665,6 @@ class PDotNode : public Node {
         in2 = NULL;
         dim = 1;
         node_type = "point-dot";
-    }
-  public:
-    virtual void clearValue() {
-        Node::clearValue();
-        in1 = NULL;
-        in2 = NULL;
     }
 
     //can not be dropped since the output is a scalar

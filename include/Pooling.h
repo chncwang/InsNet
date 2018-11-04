@@ -33,15 +33,6 @@ class PoolNode : public Node {
         ins.clear();
     }
 
-    void clearValue() {
-        Node::clearValue();
-        ins.clear();
-        for(int idx = 0; idx < dim; idx++) {
-            masks[idx] = -1;
-        }
-    }
-
-
     void init(int ndim, dtype dropout) {
         Node::init(ndim, dropout);
         masks.resize(ndim);
@@ -61,8 +52,7 @@ class PoolNode : public Node {
         for (int i = 0; i < nSize; i++) {
             if (x[i]->val.dim != dim) {
                 std::cout << "input matrixes are not matched" << std::endl;
-                clearValue();
-                return;
+                abort();
             }
             ins.push_back(x[i]);
         }
@@ -518,18 +508,12 @@ class SumPoolNode : public Node {
     ~SumPoolNode() {
         ins.clear();
     }
-  public:
+
     SumPoolNode() : Node() {
         ins.clear();
         node_type = "sum-pool";
     }
 
-    void clearValue() {
-        ins.clear();
-        Node::clearValue();
-    }
-
-  public:
     void forward(Graph *cg, const vector<PNode>& x) {
         if (x.size() == 0) {
             std::cout << "empty inputs for add" << std::endl;
@@ -888,15 +872,10 @@ class AvgPoolNode : public Node {
     ~AvgPoolNode() {
         ins.clear();
     }
-  public:
+
     AvgPoolNode() : Node() {
         ins.clear();
         node_type = "avg-pool";
-    }
-
-    void clearValue() {
-        ins.clear();
-        Node::clearValue();
     }
 
   public:

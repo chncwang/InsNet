@@ -2,6 +2,7 @@
 #define N3LDG_CUDA_N3LDG_CUDA_H
 
 #include "Def.h"
+#include "../include/MyTensor.h"
 
 #include <iostream>
 #include <cassert>
@@ -175,112 +176,7 @@ bool Verify(dtype *host, dtype* device, int len, const char* message);
 bool Verify(bool *host, bool *device, int len, const char* message);
 bool Verify(int *host, int *device, int len, const char* message);
 
-struct Tensor1D {
-    dtype *value = NULL;
-    dtype *v = NULL;
-    int dim = 0;
-
-    Tensor1D() = default;
-    Tensor1D(const Tensor1D &);
-    Tensor1D(Tensor1D &&) {
-        abort();
-    }
-    void init(int len);
-    void initOnMemoryAndDevice(int len);
-    ~Tensor1D();
-
-    void save(std::ofstream &s) const {
-    }
-
-    void load(std::ifstream &s) {
-    }
-
-    const Mat mat() const {
-        return Mat(v, dim, 1);
-    }
-
-    Mat mat() {
-        return Mat(v, dim, 1);
-    }
-
-    const Mat tmat() const {
-        return Mat(v, 1, dim);
-    }
-
-    void zero() {
-        assert(v != NULL);
-        memset((void*)v, 0, dim * sizeof(dtype));;
-    }
-
-    Mat tmat() {
-        return Mat(v, 1, dim);
-    }
-
-    const Vec vec() const {
-        return Vec(v, dim);
-    }
-
-    Vec vec() {
-        return Vec(v, dim);
-    }
-
-    inline dtype& operator[](const int i) {
-        return v[i];  // no boundary check?
-    }
-
-    inline const dtype& operator[](const int i) const {
-        return v[i];  // no boundary check?
-    }
-
-    inline Tensor1D& operator=(const dtype &a) { // assign a to every element
-        for (int i = 0; i < dim; i++)
-            v[i] = a;
-        return *this;
-    }
-
-    inline Tensor1D& operator=(const std::vector<dtype> &a) { // assign a to every element
-        for (int i = 0; i < dim; i++)
-            v[i] = a[i];
-        return *this;
-    }
-
-    inline Tensor1D& operator=(const nr::NRVec<dtype> &a) { // assign a to every element
-        for (int i = 0; i < dim; i++)
-            v[i] = a[i];
-        return *this;
-    }
-
-    inline Tensor1D& operator=(const Tensor1D &a) { // assign a to every element
-        for (int i = 0; i < dim; i++)
-            v[i] = a[i];
-        return *this;
-    }
-
-    inline void random(dtype bound) {
-        dtype min = -bound, max = bound;
-        for (int i = 0; i < dim; i++) {
-            v[i] =  (dtype(rand()) / RAND_MAX) * (max - min) + min;
-        }
-#if USE_GPU
-        copyFromHostToDevice();
-#endif
-    }
-
-    bool verify(const char *message) const {
-#if TEST_CUDA
-        return Verify(v, value, dim, message);
-#else
-        return true;
-#endif
-    }
-
-    void copyFromHostToDevice();
-    void copyFromDeviceToHost();
-private:
-    void initOnDevice(int len);
-};
-
-struct Tensor2D {
+struct Tensor2D : public Transferable {
     dtype *value = NULL;
     dtype *v = NULL;
     int row = 0;
@@ -426,8 +322,8 @@ struct Tensor2D {
     }
     void initOnMemoryAndDevice(int row, int col);
 
-    void copyFromHostToDevice();
-    void copyFromDeviceToHost();
+    void copyFromHostToDevice() override;
+    void copyFromDeviceToHost() override;
 private:
     void initOnDevice(int row, int col);
 };

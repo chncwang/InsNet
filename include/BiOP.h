@@ -102,11 +102,6 @@ class BiNode : public Node {
         param = paramInit;
     }
 
-    void clearValue() {
-        Node::clearValue();
-        in1 = in2 = NULL;
-    }
-
     // define the activate function and its derivation form
     void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
         activate = f;
@@ -195,13 +190,6 @@ class LinearBiNode : public Node {
         param = paramInit;
     }
 
-    void clearValue() {
-        Node::clearValue();
-        in1 = in2 = NULL;
-    }
-
-
-  public:
     void forward(Graph *cg, PNode x1, PNode x2) {
         in1 = x1;
         in2 = x2;

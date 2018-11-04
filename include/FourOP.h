@@ -111,13 +111,6 @@ class FourNode : public Node {
         param = paramInit;
     }
 
-    void clearValue() {
-        Node::clearValue();
-        in1 = in2 = in3 = in4 = NULL;
-        ty = 0;
-        lty = 0;
-    }
-
     // define the activate function and its derivation form
     void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
         activate = f;
@@ -207,12 +200,6 @@ class LinearFourNode : public Node {
         param = paramInit;
     }
 
-    void clearValue() {
-        Node::clearValue();
-        in1 = in2 = in3 = in4 = NULL;
-    }
-
-  public:
     void forward(Graph *cg, PNode x1, PNode x2, PNode x3, PNode x4) {
         in1 = x1;
         in2 = x2;

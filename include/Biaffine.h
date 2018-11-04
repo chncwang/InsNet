@@ -106,14 +106,6 @@ class BiaffineNode : public Node {
         expandIn2 = expandIns2;
     }
 
-    void clearValue() {
-        Node::clearValue();
-        in1.clear();
-        in2.clear();
-        vals.clear();
-        losses.clear();
-    }
-
     void init(int dim) {
         this->dim = dim;
         vals.resize(classDim);

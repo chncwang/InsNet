@@ -25,16 +25,6 @@ class BucketNode : public Node {
         node_type = "bucket";
     }
   public:
-    virtual void clearValue() {
-        //Node::clearValue();
-#if !USE_GPU || TEST_CUDA
-        loss = 0;
-        degree = 0;
-#endif
-        if (drop_value > 0)drop_mask = 1;
-        parents.clear();
-    }
-
     virtual void init(int ndim, dtype dropout) {
         Node::init(ndim, -1);
     }

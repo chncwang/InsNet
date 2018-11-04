@@ -73,8 +73,6 @@ class SparseNode : public Node {
     SparseParams* param;
     vector<int> ins;
 
-
-  public:
     SparseNode() : Node() {
         ins.clear();
         param = NULL;
@@ -85,12 +83,6 @@ class SparseNode : public Node {
         param = paramInit;
     }
 
-    void clearValue() {
-        Node::clearValue();
-        ins.clear();
-    }
-
-  public:
     //notice the output
     void forward(Graph *cg, const vector<string>& x) {
         int featId;
@@ -105,7 +97,6 @@ class SparseNode : public Node {
         cg->addNode(this);
     }
 
-  public:
     void compute() {
         param->W.value(ins, val);
     }
@@ -116,7 +107,6 @@ class SparseNode : public Node {
         param->W.loss(ins, loss);
     }
 
-  public:
     PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding

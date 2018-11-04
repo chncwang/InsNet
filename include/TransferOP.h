@@ -67,7 +67,6 @@ class TransferNode : public Node {
     int xid;
     TransferParams* param;
 
-  public:
     TransferNode() : Node() {
         in = NULL;
         xid = -1;
@@ -80,13 +79,6 @@ class TransferNode : public Node {
         param = paramInit;
     }
 
-    void clearValue() {
-        Node::clearValue();
-        in = NULL;
-        xid = -1;
-    }
-
-  public:
     void forward(Graph *cg, PNode x, const string& strNorm) {
         in = x;
         xid = param->getElemId(strNorm);
@@ -97,7 +89,6 @@ class TransferNode : public Node {
         in->addParent(this);
     }
 
-  public:
     void compute() {
         if (xid >= 0) {
             val.mat() = param->W[xid].val.mat() * in->val.mat();
@@ -111,7 +102,6 @@ class TransferNode : public Node {
         }
     }
 
-  public:
     PExecute generate(bool bTrain, dtype cur_drop_factor);
 
     // better to rewrite for deep understanding

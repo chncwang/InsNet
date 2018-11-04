@@ -17,7 +17,11 @@
 #include "ModelUpdate.h"
 #include "profiler.h"
 
-class LookupTable {
+class LookupTable
+#if USE_GPU
+: public TransferableComponents
+#endif
+{
 public:
     PAlphabet elems;
     SparseParam E;
@@ -33,6 +37,12 @@ public:
         nUNKId = -1;
         bFineTune = false;
     }
+
+#if USE_GPU
+    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() {
+        return {&E};
+    }
+#endif
 
     //random initialization
     void initial(PAlphabet alpha, int dim, bool fineTune = true) {
@@ -207,6 +217,9 @@ public:
         elems = alpha;
     }
 
+    void load(std::ifstream &is, Alphabet &alpha) {
+        this->load(is, &alpha);
+    }
 };
 
 
@@ -227,11 +240,6 @@ public:
 
     void setParam(LookupTable &table) {
         param = &table;
-    }
-
-    void clearValue() {
-        Node::clearValue();
-        xid = -1;
     }
 
     //notice the output

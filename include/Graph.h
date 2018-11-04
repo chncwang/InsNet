@@ -82,7 +82,6 @@ class Graph {
     dtype drop_factor;
     bool train;
 
-  public:
     Graph() {
         drop_factor = 1.0;
     }
@@ -103,33 +102,6 @@ class Graph {
         drop_factor = cur_drop_factor;
         if (drop_factor <= 0) drop_factor = 0;
         if (drop_factor >= 1.0) drop_factor = 1.0;
-    }
-
-  public:
-    void clearValue(const bool& bTrain = true) {
-        train = bTrain;
-        NodeMap node_map;
-        for (Node *node : nodes) {
-            Insert(node, node_map);
-        }
-        for (auto it : node_map) {
-            PExecute new_exec = it.second.at(0)->generate(false,
-                    drop_factor);
-            new_exec->batch = it.second;
-            new_exec->clearValue();
-            delete new_exec;
-        }
-
-
-        int count = execs.size();
-        for (int idx = 0; idx < count; idx++) {
-            delete execs.at(idx);
-        }
-        execs.clear();
-        nodes.clear();
-        free_nodes.clear();
-        finish_nodes.clear();
-        all_nodes.clear();
     }
 
     void backward() {
