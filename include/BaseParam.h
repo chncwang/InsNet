@@ -39,8 +39,8 @@ struct BaseParam
     virtual void randpoint(int& idx, int &idy) = 0;
     virtual dtype squareGradNorm() = 0;
     virtual void rescaleGrad(dtype scale) = 0;
-    virtual void save(std::ofstream &os)const = 0;
-    virtual void load(std::ifstream &is) = 0;
+    virtual void save(std::ostream &os)const = 0;
+    virtual void load(std::istream &is) = 0;
 #if USE_GPU
     virtual void copyFromHostToDevice() override {
         val.copyFromHostToDevice();

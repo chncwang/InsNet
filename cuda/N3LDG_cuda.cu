@@ -354,9 +354,6 @@ Tensor2D::~Tensor2D() {
     if (value != NULL) {
         CallCuda(MemoryPool::Ins().Free(value));
     }
-    if (v != NULL) {
-        delete [] v;
-    }
 }
 
 void Tensor2D::copyFromHostToDevice() {
@@ -510,7 +507,7 @@ void InitCuda(int device_id) {
 
 #if DEVICE_MEMORY == 0
     cnmemDevice_t device;
-    device.size = 2000000000;
+    device.size = 10000000000;
     device.device = device_id;
     cnmemInit(1, &device, CNMEM_FLAGS_DEFAULT);
 #else

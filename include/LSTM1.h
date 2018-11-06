@@ -20,7 +20,11 @@
 
 #include <memory>
 
-struct LSTM1Params : public TransferableComponents {
+struct LSTM1Params
+#if USE_GPU
+: public TransferableComponents
+#endif
+{
     UniParams input_hidden;
     UniParams input_input;
     UniParams output_hidden;
@@ -85,10 +89,12 @@ struct LSTM1Params : public TransferableComponents {
         cell_input.load(is);
     }
 
+#if USE_GPU
     std::vector<Transferable *> transferablePtrs() override {
         return {&input_hidden, &input_input, &output_hidden, &output_input, &forget_input,
             &forget_hidden, &cell_hidden, &cell_input};
     }
+#endif
 };
 
 // standard LSTM1 using tanh as activation function

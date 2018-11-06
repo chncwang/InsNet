@@ -165,14 +165,14 @@ class Param : public BaseParam {
 #endif
     }
 
-    void save(std::ofstream &os)const {
+    void save(std::ostream &os)const {
         val.save(os);
         aux_square.save(os);
         aux_mean.save(os);
         os << iter << endl;
     }
 
-    void load(std::ifstream &is) {
+    void load(std::istream &is) {
         val.load(is);
         aux_square.load(is);
         aux_mean.load(is);

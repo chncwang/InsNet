@@ -198,7 +198,7 @@ struct APParam : BaseParam {
         }
     }
 
-    void save(std::ofstream &os)const {
+    void save(std::ostream &os)const {
         val.save(os);
         aux.save(os);
         os << max_update << std::endl;
@@ -211,7 +211,7 @@ struct APParam : BaseParam {
     }
 
 
-    void load(std::ifstream &is) {
+    void load(std::istream &is) {
         val.load(is);
         aux.load(is);
         is >> max_update;

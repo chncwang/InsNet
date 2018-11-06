@@ -6,15 +6,26 @@
 #include "Eigen/Dense"
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <vector>
+#include <cmath>
 #include <fstream>
+#include <map>
+#include <memory>
 #include "Def.h"
+#include <boost/format.hpp>
 
 using namespace Eigen;
 
+class Serializable {
+//    typedef nlohmann::json json;
+
+//    std::unique_ptr<json> toJson() const;
+
+//    void fromJson(const json &);
+};
+
 namespace n3ldg_cpu {
 
-class Tensor1D {
-public:
+struct Tensor1D {
     dtype *v;
     int dim;
 
@@ -90,12 +101,6 @@ public:
         return *this;
     }
 
-//    Tensor1D& operator=(const NRVec<dtype> &a) { // assign a to every element
-//        for (int i = 0; i < dim; i++)
-//            v[i] = a[i];
-//        return *this;
-//    }
-
     Tensor1D& operator=(const Tensor1D &a) { // assign a to every element
         for (int i = 0; i < dim; i++)
             v[i] = a[i];
@@ -111,27 +116,35 @@ public:
 
     void save(std::ostream &os) const {
         os << dim << std::endl;
-        os << v[0];
-        for (int idx = 1; idx < dim; idx++) {
-            os << " " << v[idx];
+        dtype sum = 0.0f;
+        for (int idx = 0; idx < dim; idx++) {
+            os << v[idx] << std::endl;
+            sum += v[idx];
         }
-        os << std::endl;
+        os << sum << std::endl;
     }
 
     void load(std::istream &is) {
         int curDim;
         is >> curDim;
         init(curDim);
+        dtype sum = 0.0f;
         for (int idx = 0; idx < dim; idx++) {
             is >> v[idx];
+            sum += v[idx];
+        }
+        dtype saved_sum;
+        is >> saved_sum;
+        if (abs(saved_sum - sum) > 0.001) {
+            std::cerr << boost::format(
+                    "loading Tensor1D error, saved_sum is %1%, but computed sum is %2%")
+                % saved_sum % sum << std::endl;
+            abort();
         }
     }
-
 };
 
-
 struct Tensor2D {
-public:
     dtype *v;
     int col, row, size;
 
@@ -141,7 +154,7 @@ public:
         v = NULL;
     }
 
-    ~Tensor2D() {
+    virtual ~Tensor2D() {
         if (v) {
             delete[] v;
         }
@@ -152,7 +165,7 @@ public:
 
     //please call this function before using it really. must! must! must!
     //only this function allocates memories
-    void init(int nrow, int ncol) {
+    virtual void init(int nrow, int ncol) {
         row = nrow;
         col = ncol;
         size = col * row;
@@ -249,26 +262,36 @@ public:
     }
 
 
-    void save(std::ofstream &os) const {
+    void save(std::ostream &os) const {
         os << size << " " << row << " " << col << std::endl;
-        os << v[0];
+        dtype sum = 0.0f;
         for (int idx = 1; idx < size; idx++) {
-            os << " " << v[idx];
+            os << v[idx] << std::endl;
+            sum += v[idx];
         }
-        os << std::endl;
+        os << sum << std::endl;
     }
 
-    void load(std::ifstream &is) {
+    void load(std::istream &is) {
         int curSize, curRow, curCol;
         is >> curSize;
         is >> curRow;
         is >> curCol;
         init(curRow, curCol);
+        dtype sum = 0.0f;
         for (int idx = 0; idx < size; idx++) {
             is >> v[idx];
+            sum += v[idx];
+        }
+        dtype saved_sum;
+        is >> saved_sum;
+        if (abs(saved_sum - sum) > 0.001) {
+            std::cerr << boost::format(
+                    "loading Tensor2D error, saved_sum is %1%, but computed sum is %2%")
+                % saved_sum % sum << std::endl;
+            abort();
         }
     }
-
 };
 }
 
@@ -282,8 +305,9 @@ public:
     virtual void copyFromDeviceToHost() = 0;
 };
 
-class Tensor1D : public n3ldg_cpu::Tensor1D, public Transferable {
-public:
+bool Verify(dtype *host, dtype* device, int len, const char* message);
+
+struct Tensor1D : public n3ldg_cpu::Tensor1D, public Transferable {
     dtype *value = NULL;
 
     Tensor1D() = default;
@@ -322,6 +346,51 @@ public:
 private:
     void initOnDevice(int len);
 };
+
+struct Tensor2D : public n3ldg_cpu::Tensor2D, public Transferable {
+    dtype *value = NULL;
+
+    Tensor2D() = default;
+    Tensor2D(const Tensor2D &);
+    Tensor2D(Tensor2D &&) {
+        abort();
+    }
+    ~Tensor2D();
+
+    void init(int row, int col);
+
+    void zero() {
+        assert(v != NULL);
+        if (v == NULL) {
+            std::cerr << "tensor2d v is null" << std::endl;
+            abort();
+        }
+        n3ldg_cpu::Tensor2D::zero();
+    }
+
+    void random(dtype bound) {
+        n3ldg_cpu::Tensor2D::random(bound);
+#if USE_GPU
+        copyFromHostToDevice();
+#endif
+    }
+
+    bool verify(const char* message) {
+#if TEST_CUDA
+        return Verify(v, value, size, message);
+#else
+        return true;
+#endif
+    }
+
+    void initOnMemoryAndDevice(int row, int col);
+
+    void copyFromHostToDevice() override;
+    void copyFromDeviceToHost() override;
+private:
+    void initOnDevice(int row, int col);
+};
+
 
 }
 #endif

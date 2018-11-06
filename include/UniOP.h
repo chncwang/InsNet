@@ -19,7 +19,11 @@
 #include <cstdlib>
 #include "profiler.h"
 
-class UniParams : public TransferableComponents {
+class UniParams
+#if USE_GPU
+: public TransferableComponents 
+#endif
+{
   public:
     Param W;
     Param b;
@@ -61,12 +65,14 @@ class UniParams : public TransferableComponents {
         }
     }
 
+#if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
         std::vector<Transferable *> ptrs = {&W};
         if (bUseB) {
             ptrs.push_back(&b);
         }
     }
+#endif
 };
 
 
@@ -908,7 +914,7 @@ struct LinearWordVectorExecute : public Execute {
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
             for (int idy = 0; idy < inDim; idy++) {
-                ptr->in->loss[idy] += lx[idx][idy];
+                ptr->input->loss[idy] += lx[idx][idy];
             }
         }
     }
