@@ -15,7 +15,7 @@
 namespace n3ldg_cuda {
 
 struct NumberPointerArray {
-    dtype **value = NULL;
+    dtype **value = nullptr;
     int len = 0;
 
     NumberPointerArray() = default;
@@ -30,7 +30,7 @@ struct NumberPointerArray {
 };
 
 struct PageLockedNumberPointerArray {
-    dtype **value = NULL;
+    dtype **value = nullptr;
     int len = 0;
 
     PageLockedNumberPointerArray() = default;
@@ -47,7 +47,7 @@ struct PageLockedNumberPointerArray {
 };
 
 struct NumberPointerPointerArray {
-    dtype ***value = NULL;
+    dtype ***value = nullptr;
     int len = 0;
 
     NumberPointerPointerArray() = default;
@@ -62,7 +62,7 @@ struct NumberPointerPointerArray {
 };
 
 struct NumberArray {
-    dtype *value = NULL;
+    dtype *value = nullptr;
     int len = 0;
 
     NumberArray() = default;
@@ -76,7 +76,7 @@ struct NumberArray {
 };
 
 struct IntPointerArray {
-    int **value = NULL;
+    int **value = nullptr;
     int len = 0;
 
     IntPointerArray() = default;
@@ -89,7 +89,7 @@ struct IntPointerArray {
 };
 
 struct DeviceNumber {
-    dtype *value = NULL;
+    dtype *value = nullptr;
     dtype v = 0.0f;
 
     DeviceNumber() = default;
@@ -106,7 +106,7 @@ struct DeviceNumber {
 };
 
 struct DeviceInt {
-    int *value = NULL;
+    int *value = nullptr;
     int v = 0;
 
     DeviceInt() = default;
@@ -124,7 +124,7 @@ struct DeviceInt {
 };
 
 struct IntArray {
-    int *value = NULL;
+    int *value = nullptr;
     int len = 0;
 
     IntArray() = default;
@@ -140,7 +140,7 @@ struct IntArray {
 };
 
 struct PageLockedIntArray {
-    int *value = NULL;
+    int *value = nullptr;
     int len = 0;
 
     PageLockedIntArray() = default;
@@ -156,7 +156,8 @@ struct PageLockedIntArray {
 };
 
 struct BoolArray {
-    bool *value = NULL;
+    bool *value = nullptr;
+    bool *v = nullptr;
     int len = 0;
 
     BoolArray() = default;
@@ -179,7 +180,6 @@ void Assert(bool v);
 void Memset(dtype *p, int len, dtype value);
 void Memset(bool *p, int len, bool value);
 void *Malloc(int size);
-void Memcpy(void *dest, void *src, int size, cudaMemcpyKind kind);
 void BatchMemset(const std::vector<dtype*> &vec, int count, int dim,
         dtype value);
 void PrintNums(const dtype* p, int len);
@@ -188,6 +188,7 @@ void PrintInts(const int* p, int len);
 void InitCuda(int device_id = 0);
 void EndCuda();
 
+cudaError_t MyCudaMemcpy(void *dest, const void *src, size_t count, cudaMemcpyKind kind);
 void CopyFromMultiVectorsToOneVector(const std::vector<dtype*> &src, dtype *dest, int count,
         int len);
 void CopyFromOneVectorToMultiVals(const dtype *src, std::vector<dtype*> &vals,

@@ -94,6 +94,10 @@ struct LSTM1Params
         return {&input_hidden, &input_input, &output_hidden, &output_input, &forget_input,
             &forget_hidden, &cell_hidden, &cell_input};
     }
+
+    virtual std::string name() const {
+        return "LSTM1Params";
+    }
 #endif
 };
 

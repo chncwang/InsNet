@@ -71,6 +71,11 @@ class UniParams
         if (bUseB) {
             ptrs.push_back(&b);
         }
+        return ptrs;
+    }
+
+    virtual std::string name() const {
+        return "UniParams";
     }
 #endif
 };

@@ -13,23 +13,34 @@
 // Notice: aux_square is an aux_squareiliary variable to help parameter updating
 // The in-out dimension definiation is different with dense parameters.
 class SparseParam : public BaseParam {
-  public:
+public:
     Tensor2D aux_square;
     Tensor2D aux_mean;
     NRVec<bool> indexers;
     NRVec<int> last_update;
+
 #if USE_GPU
     n3ldg_cuda::BoolArray dIndexers;
     n3ldg_cuda::IntArray dIters;
 
-    void copyFromDeviceToHost() override {
-        BaseParam::copyFromDeviceToHost();
-        dIndexers.copyToHost(indexers.c_buf());
-    }
-
     void copyFromHostToDevice() override {
         BaseParam::copyFromHostToDevice();
-        dIndexers.copyFromHost(indexers.c_buf());
+        n3ldg_cuda::MyCudaMemcpy(dIters.value, last_update.c_buf(), sizeof(int) * dIters.len,
+                cudaMemcpyHostToDevice);
+        aux_square.copyFromHostToDevice();
+        aux_mean.copyFromHostToDevice();
+    }
+
+    void copyFromDeviceToHost() override {
+        BaseParam::copyFromDeviceToHost();
+        n3ldg_cuda::MyCudaMemcpy(last_update.c_buf(), dIters.value, sizeof(int) * dIters.len,
+                cudaMemcpyDeviceToHost);
+        aux_square.copyFromDeviceToHost();
+        aux_mean.copyFromDeviceToHost();
+    }
+
+    virtual std::string name() const {
+        return "SparseParam";
     }
 #endif
 
@@ -38,15 +49,17 @@ class SparseParam : public BaseParam {
         //not in the aligned memory pool
 #if USE_GPU
         val.initOnMemoryAndDevice(outDim, inDim);
+        aux_square.initOnMemoryAndDevice(outDim, inDim);
+        aux_mean.initOnMemoryAndDevice(outDim, inDim);
 #else
         val.init(outDim, inDim);
+        aux_square.init(outDim, inDim);
+        aux_mean.init(outDim, inDim);
 #endif
         dtype bound = sqrt(6.0 / (outDim + inDim));
         //dtype bound = 0.001;
         val.random(bound);
         grad.init(outDim, inDim);
-        aux_square.init(outDim, inDim);
-        aux_mean.init(outDim, inDim);
         indexers.resize(inDim);
         indexers = false;
         last_update.resize(inDim);
@@ -316,6 +329,7 @@ class SparseParam : public BaseParam {
         }
     }
 
+private:
 };
 
 #endif /* SPARSEPARAM_H_ */

@@ -42,6 +42,10 @@ public:
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() {
         return {&E};
     }
+
+    virtual std::string name() const {
+        return "LookupTable";
+    }
 #endif
 
     //random initialization

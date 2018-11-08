@@ -265,7 +265,7 @@ struct Tensor2D {
     void save(std::ostream &os) const {
         os << size << " " << row << " " << col << std::endl;
         dtype sum = 0.0f;
-        for (int idx = 1; idx < size; idx++) {
+        for (int idx = 0; idx < size; idx++) {
             os << v[idx] << std::endl;
             sum += v[idx];
         }
@@ -303,6 +303,7 @@ class Transferable {
 public:
     virtual void copyFromHostToDevice() = 0;
     virtual void copyFromDeviceToHost() = 0;
+    virtual std::string name() const = 0;
 };
 
 bool Verify(dtype *host, dtype* device, int len, const char* message);
@@ -318,6 +319,10 @@ struct Tensor1D : public n3ldg_cpu::Tensor1D, public Transferable {
     void init(int len);
     void initOnMemoryAndDevice(int len);
     ~Tensor1D();
+
+    virtual std::string name() const {
+        return "Tensor1D";
+    }
 
     Tensor1D& operator=(const Tensor1D &tensor) {
         abort();
@@ -358,6 +363,10 @@ struct Tensor2D : public n3ldg_cpu::Tensor2D, public Transferable {
     ~Tensor2D();
 
     void init(int row, int col);
+
+    virtual std::string name() const {
+        return "Tensor2D";
+    }
 
     void zero() {
         assert(v != NULL);

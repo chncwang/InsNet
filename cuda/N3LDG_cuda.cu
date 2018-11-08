@@ -101,7 +101,8 @@ cublasHandle_t& GetCublasHandle() {
 
 cudaError_t MyCudaMemcpy(void *dest, const void *src, size_t count,
         cudaMemcpyKind kind) {
-    cudaError_t e = cudaMemcpyAsync(dest, src, count, kind, 0);
+    cudaError_t e;
+    e = cudaMemcpyAsync(dest, src, count, kind, 0);
     CallCuda(e);
     return e;
 }
@@ -1575,10 +1576,6 @@ void *Malloc(int size) {
     void *p;
     CallCuda(cudaMalloc(&p, size));
     return p;
-}
-
-void Memcpy(void *dest, void *src, int size, cudaMemcpyKind kind) {
-    CallCuda(cudaMemcpy(dest, src, size, kind));
 }
 
 __global__ void KernelBatchMemset(dtype **p, int count, int dim, dtype value) {

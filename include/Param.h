@@ -25,12 +25,14 @@ class Param : public BaseParam {
     void initial(int outDim, int inDim) {
 #if USE_GPU
         val.initOnMemoryAndDevice(outDim, inDim);
+        aux_square.initOnMemoryAndDevice(outDim, inDim);
+        aux_mean.initOnMemoryAndDevice(outDim, inDim);
 #else
         val.init(outDim, inDim);
-#endif
-        grad.init(outDim, inDim);
         aux_square.init(outDim, inDim);
         aux_mean.init(outDim, inDim);
+#endif
+        grad.init(outDim, inDim);
         dtype bound = sqrt(6.0 / (outDim + inDim + 1));
         val.random(bound);
         iter = 0;
@@ -40,6 +42,19 @@ class Param : public BaseParam {
         n3ldg_cuda::Memset(aux_mean.value, outDim * inDim, 0.0f);
 #endif
     }
+
+#if USE_GPU
+    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() {
+        auto v = BaseParam::transferablePtrs();
+        v.push_back(&aux_square);
+        v.push_back(&aux_mean);
+        return v;
+    }
+
+    virtual std::string name() const {
+        return "Param";
+    }
+#endif
 
     int outDim() {
         return val.row;
