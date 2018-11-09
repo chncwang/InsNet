@@ -319,6 +319,12 @@ public:
 
     void load(std::istream &is) {
         val.load(is);
+        grad.init(val.row, val.col);
+        indexers.resize(val.col);
+        indexers = false;
+#if USE_GPU
+        dIndexers.init(indexers.c_buf(), indexers.size());
+#endif
         aux_square.load(is);
         aux_mean.load(is);
         int curInDim;

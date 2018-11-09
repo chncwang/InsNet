@@ -189,6 +189,9 @@ class Param : public BaseParam {
 
     void load(std::istream &is) {
         val.load(is);
+        int outDim = val.row;
+        int inDim = val.col;
+        grad.init(outDim, inDim);
         aux_square.load(is);
         aux_mean.load(is);
         is >> iter;

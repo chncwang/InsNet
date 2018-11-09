@@ -117,11 +117,12 @@ struct Tensor1D {
     void save(std::ostream &os) const {
         os << dim << std::endl;
         dtype sum = 0.0f;
+        os << v[0];
         for (int idx = 0; idx < dim; idx++) {
-            os << v[idx] << std::endl;
+            os << " " << v[idx];
             sum += v[idx];
         }
-        os << sum << std::endl;
+        os << std::endl << sum << std::endl;
     }
 
     void load(std::istream &is) {
@@ -264,12 +265,17 @@ struct Tensor2D {
 
     void save(std::ostream &os) const {
         os << size << " " << row << " " << col << std::endl;
+        if (size <= 0) {
+            std::cerr << "Tensor2D size is " << size << std::endl;
+            abort();
+        }
         dtype sum = 0.0f;
-        for (int idx = 0; idx < size; idx++) {
-            os << v[idx] << std::endl;
+        os << v[0];
+        for (int idx = 1; idx < size; idx++) {
+            os << " " << v[idx];
             sum += v[idx];
         }
-        os << sum << std::endl;
+        os << std::endl << sum << std::endl;
     }
 
     void load(std::istream &is) {
