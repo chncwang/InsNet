@@ -291,7 +291,7 @@ struct Tensor2D {
         }
         dtype saved_sum;
         is >> saved_sum;
-        if (abs(saved_sum - sum) > 0.001) {
+        if (abs(saved_sum - sum) > 0.01 * abs(saved_sum)) {
             std::cerr << boost::format(
                     "loading Tensor2D error, saved_sum is %1%, but computed sum is %2%")
                 % saved_sum % sum << std::endl;

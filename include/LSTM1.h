@@ -495,30 +495,6 @@ struct DynamicLSTMBuilder {
     std::vector<std::shared_ptr<TanhNode>> _halfhiddens;
     std::vector<std::shared_ptr<PMultiNode>> _hiddens;
 
-//    void Copy(const DynamicLSTMBuilder &lstm) {
-//        CopyNodes(lstm._cells, _cells);
-//        CopyNodes(lstm._forgetfilters, _forgetfilters);
-//        CopyNodes(lstm._forgetgates, _forgetgates);
-//        CopyNodes(lstm._forgetgates_add, _forgetgates_add);
-//        CopyNodes(lstm._forgetgates_hidden, _forgetgates_hidden);
-//        CopyNodes(lstm._forgetgates_input, _forgetgates_input);
-//        CopyNodes(lstm._halfcells, _halfcells);
-//        CopyNodes(lstm._halfcells_add, _halfcells_add);
-//        CopyNodes(lstm._halfcells_hidden, _halfcells_hidden);
-//        CopyNodes(lstm._halfcells_input, _halfcells_input);
-//        CopyNodes(lstm._halfhiddens, _halfhiddens);
-//        CopyNodes(lstm._hiddens, _hiddens);
-//        CopyNodes(lstm._inputfilters, _inputfilters);
-//        CopyNodes(lstm._inputgates, _inputgates);
-//        CopyNodes(lstm._inputgates_add, _inputgates_add);
-//        CopyNodes(lstm._inputgates_hidden, _inputgates_hidden);
-//        CopyNodes(lstm._inputgates_input, _inputgates_input);
-//        CopyNodes(lstm._outputgates, _outputgates);
-//        CopyNodes(lstm._outputgates_add, _outputgates_add);
-//        CopyNodes(lstm._outputgates_hidden, _outputgates_hidden);
-//        CopyNodes(lstm._outputgates_input, _outputgates_input);
-//    }
-
     void forward(Graph &graph, LSTM1Params &lstm_params, Node &input, Node &h0, Node &c0) {
         Node *last_hidden, *last_cell;
         int len = _hiddens.size();
