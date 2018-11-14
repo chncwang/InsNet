@@ -199,7 +199,7 @@ public:
     }
 
 
-    int getElemId(const string& strFeat) {
+    int getElemId(const string& strFeat) const {
         return elems->from_string(strFeat);
     }
 
