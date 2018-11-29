@@ -2,6 +2,7 @@
 #include <fstream>
 #define _MYLIB_H_
 
+#include <functional>
 #include <string>
 #include <vector>
 #include <fstream>
@@ -794,6 +795,16 @@ size_t typeHashCode(void *p) {
     std::cerr << message << endl;\
     abort(); \
   }
+
+template <typename T, typename S>
+std::vector<T> transferVector(const std::vector<S> &src_vector,
+        const std::function<T(const S&)> &transfer) {
+    std::vector<T> result;
+    for (const S& src : src_vector) {
+        result.push_back(transfer(src));
+    }
+    return result;
+}
 
 #endif
 
