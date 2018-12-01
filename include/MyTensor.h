@@ -140,7 +140,6 @@ struct Tensor1D {
             std::cerr << boost::format(
                     "loading Tensor1D error, saved_sum is %1%, but computed sum is %2%")
                 % saved_sum % sum << std::endl;
-            abort();
         }
     }
 };
@@ -295,7 +294,6 @@ struct Tensor2D {
             std::cerr << boost::format(
                     "loading Tensor2D error, saved_sum is %1%, but computed sum is %2%")
                 % saved_sum % sum << std::endl;
-            abort();
         }
     }
 };
