@@ -117,6 +117,8 @@ public:
         }
 
         //find the first line, decide the wordDim;
+		vector<string>::iterator it = sLines.begin();
+		sLines.erase(it);
         vector<string> vecInfo;
         split_bychar(sLines[0], vecInfo, ' ');
         nDim = vecInfo.size() - 1;

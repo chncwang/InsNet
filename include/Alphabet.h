@@ -27,6 +27,7 @@ class basic_quark {
     StringToId m_string_to_id;
     IdToString m_id_to_string;
     bool m_b_fixed;
+	bool m_v_done;
     int m_size;
 
   public:
@@ -93,6 +94,15 @@ class basic_quark {
         if (it != m_string_to_id.end()) {
             return it->second;
         } else if (!m_b_fixed) {
+			if(m_v_done){
+			    StringToId::const_iterator i = m_string_to_id.find(unknownkey); 
+                if(it == m_string_to_id.end()) {
+		            cout<< "no such word in alphabet and unknown word id is not initialed" << endl;
+		            abort();
+		        }else{
+		             return i->second;
+		             } 
+			}
             int newid = m_size;
             m_id_to_string.push_back(str);
             m_string_to_id.insert(std::pair<std::string, int>(str, newid));
@@ -108,6 +118,7 @@ class basic_quark {
         m_string_to_id.clear();
         m_id_to_string.clear();
         m_b_fixed = false;
+		m_v_done = false;
         m_size = 0;
     }
 
@@ -117,6 +128,9 @@ class basic_quark {
             m_b_fixed = true;
         }
     }
+    void set_v_Done(bool bvdone) {
+        m_v_done = bvdone;
+    }	
 
     bool is_fixed() const {
         return m_b_fixed;
@@ -162,6 +176,7 @@ class basic_quark {
                 from_string(elem_iter->first);
             }
         }
+		set_v_Done(true);
         set_fixed_flag(true);
     }
 
