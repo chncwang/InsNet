@@ -20,13 +20,17 @@ using namespace Eigen;
 
 
 class BucketNode : public Node {
-  public:
+public:
     BucketNode() : Node() {
         node_type = "bucket";
     }
-  public:
-    virtual void init(int ndim, dtype dropout) {
-        Node::init(ndim, -1);
+
+    virtual void init(int ndim) {
+#if USE_GPU
+        Node::initOnHostAndDevice(ndim);
+#else
+        Node::init(ndim);
+#endif
     }
 
     void forward(Graph &graph, dtype value) {
@@ -57,7 +61,6 @@ class BucketNode : public Node {
         this->forward(&graph);
     }
 
-    //value already assigned
     void forward(Graph *cg) {
 #if USE_GPU
         n3ldg_cuda::Memset(loss.value, dim, 0.0f);
@@ -69,67 +72,29 @@ class BucketNode : public Node {
     }
 
     void forwardArr(Graph *cg, dtype *value) {
-#if USE_GPU
-      abort();
-#else
-      Vec(val.v, dim) = Vec(value, dim);
       degree = 0;
+      Vec(val.v, dim) = Vec(value, dim);
       cg->addNode(this);
-#endif
     }
 
-    void compute() {
+    void compute() {}
 
-    }
+    void backward() {}
 
-    void backward() {
+    PExecute generate();
 
-    }
-
-  public:
-    PExecute generate(bool bTrain, dtype cur_drop_factor);
-
-    // better to rewrite for deep understanding
     bool typeEqual(PNode other) {
         return Node::typeEqual(other);
     }
 
 };
 
-#if USE_GPU
 class BucketExecute : public Execute {
-  public:
-    void  forward() override {}
-
-    void backward() override {}
 };
 
-#else
-class BucketExecute : public Execute {
-  public:
-    void  forward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->forward_drop(bTrain, drop_factor);
-        }
-    }
-
-    void backward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward_drop();
-        }
-    }
-};
-#endif
-
-PExecute BucketNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute BucketNode::generate() {
     BucketExecute* exec = new BucketExecute();
     exec->batch.push_back(this);
-    exec->bTrain = bTrain;
-    exec->drop_factor = cur_drop_factor;
     return exec;
 }
 

@@ -2,6 +2,9 @@
 #define _ALPHABET_
 
 #include "MyLib.h"
+#include "serializable.h"
+#include <boost/format.hpp>
+#include <string>
 
 /*
  please check to ensure that m_size not exceeds the upbound of int
@@ -18,32 +21,15 @@
  *  @param  int         ID class name to be used.
  *  @author Naoaki Okazaki
  */
-class basic_quark {
+class basic_quark : public N3LDGSerializable {
     static const  int max_capacity = 10000000;
-  public:
+public:
     typedef unordered_map<std::string, int> StringToId;
     typedef std::vector<std::string> IdToString;
 
     StringToId m_string_to_id;
     IdToString m_id_to_string;
-    bool m_b_fixed;
-	bool m_v_done;
     int m_size;
-
-  public:
-    /**
-     * Construct.
-     */
-    basic_quark() {
-        clear();
-
-    }
-
-    /**
-     * Destruct.
-     */
-    virtual ~basic_quark() {
-    }
 
     /**
      * Map a string to its associated ID.
@@ -55,15 +41,9 @@ class basic_quark {
         StringToId::const_iterator it = m_string_to_id.find(str);
         if (it != m_string_to_id.end()) {
             return it->second;
-        } else if (!m_b_fixed) {
-            int newid = m_size;
-            m_id_to_string.push_back(str);
-            m_string_to_id.insert(std::pair<std::string, int>(str, newid));
-            m_size++;
-            if (m_size >= max_capacity)m_b_fixed = true;
-            return newid;
         } else {
-            return -1;
+            cerr << str << " not found" << endl;
+            abort();
         }
     }
 
@@ -74,79 +54,47 @@ class basic_quark {
      *  @param  def         Default value if the ID was out of range.
      *  @return           String value associated with the ID.
      */
-    const std::string& from_id(const int& qid, const std::string& def = "") const {
+    const std::string& from_id(const int& qid) const {
         if (qid < 0 || m_size <= qid) {
-            return def;
+            cerr << "qid:" << qid << endl;
+            abort();
         } else {
             return m_id_to_string[qid];
         }
     }
 
-
-
-    /**
-     * Convert string value into the associated ID value.
-     *  @param  str         String value.
-     *  @return           ID if any, otherwise -1.
-     */
-    int from_string(const std::string& str) {
+    int insert_string(const std::string& str) {
         StringToId::const_iterator it = m_string_to_id.find(str);
         if (it != m_string_to_id.end()) {
             return it->second;
-        } else if (!m_b_fixed) {
-			if(m_v_done){
-			    StringToId::const_iterator i = m_string_to_id.find(unknownkey); 
-                if(it == m_string_to_id.end()) {
-		            cout<< "no such word in alphabet and unknown word id is not initialed" << endl;
-		            abort();
-		        }else{
-		             return i->second;
-		             } 
-			}
+        } else {
             int newid = m_size;
             m_id_to_string.push_back(str);
             m_string_to_id.insert(std::pair<std::string, int>(str, newid));
             m_size++;
-            if (m_size >= max_capacity)m_b_fixed = true;
             return newid;
+        }
+    }
+
+    int from_string(const std::string& str) const {
+        StringToId::const_iterator it = m_string_to_id.find(str);
+        if (it != m_string_to_id.end()) {
+            return it->second;
         } else {
-            return -1;
+            cerr << str << " not found" << endl;
+            abort();
         }
     }
 
-    void clear() {
-        m_string_to_id.clear();
-        m_id_to_string.clear();
-        m_b_fixed = false;
-		m_v_done = false;
-        m_size = 0;
+    bool find_string(const string &str) const {
+        return m_string_to_id.find(str) != m_string_to_id.end();
     }
 
-    void set_fixed_flag(bool bfixed) {
-        m_b_fixed = bfixed;
-        if (!m_b_fixed && m_size >= max_capacity) {
-            m_b_fixed = true;
-        }
-    }
-    void set_v_Done(bool bvdone) {
-        m_v_done = bvdone;
-    }	
-
-    bool is_fixed() const {
-        return m_b_fixed;
-    }
-
-    /**
-     * Get the number of string-to-id associations.
-     *  @return           The number of association.
-     */
     size_t size() const {
         return m_size;
     }
 
-
     void read(std::ifstream &inf) {
-        clear();
         string featKey;
         int featId;
         inf >> m_size;
@@ -155,9 +103,6 @@ class basic_quark {
             m_string_to_id[featKey] = i;
             m_id_to_string.push_back(featKey);
             assert(featId == i);
-        }
-        if (m_size > 0) {
-            set_fixed_flag(true);
         }
     }
 
@@ -168,26 +113,18 @@ class basic_quark {
         }
     }
 
-    void initial(const unordered_map<string, int>& elem_stat, int cutOff = 0) {
-        clear();
+    void init(const unordered_map<string, int>& elem_stat, int cutOff = 0) {
         unordered_map<string, int>::const_iterator elem_iter;
         for (elem_iter = elem_stat.begin(); elem_iter != elem_stat.end(); elem_iter++) {
             if (elem_iter->second > cutOff) {
-                from_string(elem_iter->first);
+                insert_string(elem_iter->first);
             }
         }
-		set_v_Done(true);
-        set_fixed_flag(true);
     }
 
     // initial by a file (first column), always an embedding file
-    void initial(const string& inFile, bool bUseUnknown = true) {
-        clear();
+    void init(const string& inFile, bool bUseUnknown = true) {
         ifstream inf;
-        if (inf.is_open()) {
-            inf.close();
-            inf.clear();
-        }
         inf.open(inFile.c_str());
 
         string strLine;
@@ -204,15 +141,24 @@ class basic_quark {
         if (bUseUnknown) {
             from_string(unknownkey);
         }
-        if (m_size > 0) {
-            set_fixed_flag(true);
-        }
     }
 
+    Json::Value toJson() const override {
+        Json::Value json;
+        json["m_string_to_id"] = ::toJson(m_string_to_id);
+        json["m_id_to_string"] = ::toJson(m_id_to_string);
+        json["m_size"] = m_size;
+        return json;
+    }
+
+    void fromJson(const Json::Value &json) override {
+        m_string_to_id = intMapFromJson(json["m_string_to_id"]);
+        m_id_to_string = stringVectorFromJson(json["m_id_to_string"]);
+        m_size = json["m_size"].asInt();
+    }
 };
 
 typedef basic_quark Alphabet;
-typedef basic_quark*  PAlphabet;
 
 #endif
 

@@ -33,8 +33,8 @@ class PoolNode : public Node {
         ins.clear();
     }
 
-    void init(int ndim, dtype dropout) {
-        Node::init(ndim, dropout);
+    void init(int ndim) {
+        Node::init(ndim);
         masks.resize(ndim);
         for(int idx = 0; idx < ndim; idx++) {
             masks[idx] = -1;
@@ -67,7 +67,7 @@ class PoolNode : public Node {
 
 
   public:
-    PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate();
 
     // better to rewrite for deep understanding
     bool typeEqual(PNode other) {
@@ -78,7 +78,6 @@ class PoolNode : public Node {
     virtual void setMask() = 0;
 
     void compute() {
-        int nSize = ins.size();
         setMask();
         for(int i = 0; i < dim; i++) {
             int mask_i = masks.at(i);
@@ -165,7 +164,7 @@ public:
         cg->addNode(this);
     }
 
-    PExecute generate(bool bTrain, dtype cur_drop_factor) override;
+    PExecute generate() override;
 };
 #else
 class MaxPoolNode : public PoolNode {
@@ -262,7 +261,7 @@ public:
         cg->addNode(this);
     }
 
-    PExecute generate(bool bTrain, dtype cur_drop_factor) override;
+    PExecute generate() override;
 };
 #else
 class MinPoolNode : public PoolNode {
@@ -363,7 +362,6 @@ public:
         }
 
         for (int idx = 0; idx < count; idx++) {
-            int in_i = 0;
             for (Node *n : static_cast<MaxPoolNode*>(batch[idx])->ins) {
                 n3ldg_cuda::Assert(n->loss.verify("max pooling backward"));
             }
@@ -372,7 +370,7 @@ public:
     }
 };
 
-PExecute MaxPoolNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute MaxPoolNode::generate() {
     MaxPoolExecute *exec = new MaxPoolExecute;
     exec->batch.push_back(this);
     exec->dim = dim;
@@ -453,7 +451,6 @@ public:
         }
 
         for (int idx = 0; idx < count; idx++) {
-            int in_i = 0;
             for (Node *n : static_cast<MaxPoolNode*>(batch[idx])->ins) {
                 n3ldg_cuda::Assert(n->loss.verify("max pooling backward"));
             }
@@ -462,7 +459,7 @@ public:
     }
 };
 
-PExecute MinPoolNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute MinPoolNode::generate() {
     MinPoolExecute *exec = new MinPoolExecute;
     exec->batch.push_back(this);
     exec->dim = dim;
@@ -470,32 +467,11 @@ PExecute MinPoolNode::generate(bool bTrain, dtype cur_drop_factor) {
 }
 #endif
 
-class PoolExecute : public Execute {
-  public:
-    virtual void  forward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->compute();
-            batch[idx]->forward_drop(bTrain, drop_factor);
-        }
-    }
+class PoolExecute : public Execute {};
 
-    virtual void backward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward_drop();
-            batch[idx]->backward();
-        }
-    }
-};
-
-PExecute PoolNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute PoolNode::generate() {
     PoolExecute* exec = new PoolExecute();
     exec->batch.push_back(this);
-    exec->bTrain = bTrain;
-    exec->drop_factor = cur_drop_factor;
     return exec;
 }
 
@@ -738,7 +714,7 @@ class SumPoolNode : public Node {
 
 
   public:
-    PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate();
 
     // better to rewrite for deep understanding
     bool typeEqual(PNode other) {
@@ -830,33 +806,12 @@ public:
     }
 };
 #else
-class SumPoolExecute : public Execute {
-  public:
-    void  forward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->compute();
-            batch[idx]->forward_drop(bTrain, drop_factor);
-        }
-    }
-
-    void backward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward_drop();
-            batch[idx]->backward();
-        }
-    }
-};
+class SumPoolExecute : public Execute {};
 #endif
 
-PExecute SumPoolNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute SumPoolNode::generate() {
     SumPoolExecute* exec = new SumPoolExecute();
     exec->batch.push_back(this);
-    exec->bTrain = bTrain;
-    exec->drop_factor = cur_drop_factor;
 #if USE_GPU
     exec->dim = dim;
 #endif
@@ -1104,7 +1059,7 @@ class AvgPoolNode : public Node {
 
 
   public:
-    PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate();
 
     // better to rewrite for deep understanding
     bool typeEqual(PNode other) {
@@ -1196,33 +1151,12 @@ public:
     }
 };
 #else
-class AvgPoolExecute : public Execute {
-  public:
-    void  forward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->compute();
-            batch[idx]->forward_drop(bTrain, drop_factor);
-        }
-    }
-
-    void backward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward_drop();
-            batch[idx]->backward();
-        }
-    }
-};
+class AvgPoolExecute : public Execute {};
 #endif
 
-PExecute AvgPoolNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute AvgPoolNode::generate() {
     AvgPoolExecute* exec = new AvgPoolExecute();
     exec->batch.push_back(this);
-    exec->bTrain = bTrain;
-    exec->drop_factor = cur_drop_factor;
 #if USE_GPU
     exec->dim = dim;
 #endif

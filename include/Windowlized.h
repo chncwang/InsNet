@@ -46,12 +46,12 @@ class WindowBuilder {
         _outDim = _window * _inDim;
         int maxsize = _outputs.size();
         for (int idx = 0; idx < maxsize; idx++) {
-            _outputs[idx].init(_outDim, -1); // dropout is not supported here
+            _outputs[idx].init(_outDim);
         }
-        _bucket.init(_inDim, -1);
+        _bucket.init(_inDim);
     }
 
-    void forward(Graph *cg, const vector<PNode>& x) {
+    void forward(Graph &cg, const vector<PNode>& x) {
         if (x.size() == 0) {
             std::cout << "empty inputs for windowlized operation" << std::endl;
             return;

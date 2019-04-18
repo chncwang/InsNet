@@ -19,6 +19,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <memory>
+#include <json/json.h>
 
 #include "NRMat.h"
 #include "Eigen/Dense"
@@ -802,6 +803,40 @@ std::vector<T> transferVector(const std::vector<S> &src_vector,
     std::vector<T> result;
     for (const S& src : src_vector) {
         result.push_back(transfer(src));
+    }
+    return result;
+}
+
+template<typename K, typename V>
+Json::Value toJson(const unordered_map<K, V> &map) {
+    Json::Value result;
+    for (auto it = map.begin(); it != map.end(); ++it) {
+        result[it->first] = it->second;
+    }
+    return result;
+}
+
+unordered_map<string, int> intMapFromJson(const Json::Value &json) {
+    unordered_map<string, int> result;
+    for (auto it = json.begin(); it != json.end(); ++it) {
+        result.insert(make_pair<string, int>(it.key().asString(), it->asInt()));
+    }
+    return result;
+}
+
+template<typename T>
+Json::Value toJson(const vector<T> &v) {
+    Json::Value result;
+    for (const T &e : v) {
+        result.append(e);
+    }
+    return result;
+}
+
+vector<string> stringVectorFromJson(const Json::Value &json) {
+    vector<string> result;
+    for (Json::Value::ArrayIndex i = 0; i < json.size(); ++i) {
+        result.push_back(json[i].asString());
     }
     return result;
 }

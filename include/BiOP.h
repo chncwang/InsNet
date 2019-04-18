@@ -16,15 +16,18 @@
 #include "Graph.h"
 #include "ModelUpdate.h"
 
-class BiParams {
-  public:
+class BiParams : public N3LDGSerializable
+#if USE_GPU
+, public TransferableComponents
+#endif
+{
+public:
     Param W1;
     Param W2;
     Param b;
 
     bool bUseB;
 
-  public:
     BiParams() {
         bUseB = true;
     }
@@ -37,49 +40,58 @@ class BiParams {
         }
     }
 
-    void initial(int nOSize, int nISize1, int nISize2, bool useB = true) {
-        W1.initial(nOSize, nISize1);
-        W2.initial(nOSize, nISize2);
+    void init(int nOSize, int nISize1, int nISize2, bool useB = true) {
+        W1.init(nOSize, nISize1);
+        W2.init(nOSize, nISize2);
         bUseB = useB;
         if (bUseB) {
-            b.initial(nOSize, 1);
+            b.init(nOSize, 1);
         }
     }
 
-    void save(std::ofstream &os) const {
-        os << bUseB << std::endl;
-        W1.save(os);
-        W2.save(os);
+    Json::Value toJson() const override {
+        Json::Value json;
+        json["use_b"] = bUseB;
+        json["w1"] = W1.toJson();
+        json["w2"] = W2.toJson();
         if (bUseB) {
-            b.save(os);
+            json["b"] = b.toJson();
         }
+        return json;
     }
 
-    void load(std::ifstream &is) {
-        is >> bUseB;
-        W1.load(is);
-        W2.load(is);
+    void fromJson(const Json::Value &json) {
+        bUseB = json["use_b"].asBool();
+        W1.fromJson(json["w1"]);
+        W2.fromJson(json["w2"]);
         if (bUseB) {
-            b.load(is);
+            b.fromJson(json["b"]);
         }
     }
 
+#if USE_GPU
+    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
+        std::vector<Transferable *> ptrs = {&W1, &W2, &b};
+        if (bUseB) {
+            ptrs.push_back(&b);
+        }
+        return ptrs;
+    }
+
+    virtual std::string name() const {
+        return "BiParams";
+    }
+#endif
 };
 
-// non-linear feed-forward node
-// input nodes should be specified by forward function
-// for input variables, we exploit column vector,
-// which means a concrete input vector x_i is represented by x(0, i), x(1, i), ..., x(n, i)
 class BiNode : public Node {
-  public:
+public:
     PNode in1, in2;
     BiParams* param;
-    dtype(*activate)(const dtype&);   // activation function
-    dtype(*derivate)(const dtype&, const dtype&);  // derivation function of activation function
+    dtype(*activate)(const dtype&);
+    dtype(*derivate)(const dtype&, const dtype&);
     Tensor1D ty, lty;
 
-
-  public:
     BiNode() : Node() {
         in1 = in2 = NULL;
         activate = ftanh;
@@ -92,8 +104,8 @@ class BiNode : public Node {
         in1 = in2 = NULL;
     }
 
-    void init(int ndim, dtype dropout) {
-        Node::init(ndim, dropout);
+    void init(int ndim) {
+        Node::init(ndim);
         ty.init(ndim);
         lty.init(ndim);
     }
@@ -102,14 +114,15 @@ class BiNode : public Node {
         param = paramInit;
     }
 
-    // define the activate function and its derivation form
+    void setParam(BiParams& paramInit) {
+        param = &paramInit;
+    }
+
     void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
         activate = f;
         derivate = f_deri;
     }
 
-
-  public:
     void forward(Graph *cg, PNode x1, PNode x2) {
         in1 = x1;
         in2 = x2;
@@ -119,7 +132,10 @@ class BiNode : public Node {
         cg->addNode(this);
     }
 
-  public:
+    void forward(Graph &cg, Node &x1, Node &x2) {
+        this->forward(&cg, &x1, &x2);
+    }
+
     void compute() {
         ty.mat() = param->W1.val.mat() * in1->val.mat() + param->W2.val.mat() * in2->val.mat();
         if (param->bUseB) {
@@ -143,9 +159,8 @@ class BiNode : public Node {
     }
 
   public:
-    PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate();
 
-    // better to rewrite for deep understanding
     bool typeEqual(PNode other) override {
         bool result = Node::typeEqual(other);
         if (!result) return false;
@@ -170,10 +185,6 @@ class BiNode : public Node {
 };
 
 
-// non-linear feed-forward node
-// input nodes should be specified by forward function
-// for input variables, we exploit column vector,
-// which means a concrete input vector x_i is represented by x(0, i), x(1, i), ..., x(n, i)
 class LinearBiNode : public Node {
   public:
     PNode in1, in2;
@@ -221,7 +232,7 @@ class LinearBiNode : public Node {
     }
 
   public:
-    PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate();
 
     // better to rewrite for deep understanding
     bool typeEqual(PNode other) {
@@ -242,7 +253,6 @@ class LinearBiNode : public Node {
 class BiExecute :public Execute {
   public:
     Tensor2D x1, x2, ty, y, b;
-    Tensor2D drop_mask;
     int inDim1, inDim2, outDim;
     BiParams* param;
     dtype(*activate)(const dtype&);   // activation function
@@ -254,7 +264,6 @@ class BiExecute :public Execute {
         x1.init(inDim1, count);
         x2.init(inDim2, count);
         y.init(outDim, count);
-        drop_mask.init(outDim, count);
 #if TEST_CUDA
         b.init(outDim, count);
 #endif
@@ -294,13 +303,8 @@ class BiExecute :public Execute {
                 ty.value, outDim, inDim1, count, param->bUseB);
         n3ldg_cuda::MatrixMultiplyMatrix(param->W2.val.value, x2.value,
                 ty.value, outDim, inDim2, count, true);
-        if (bTrain) {
-            n3ldg_cuda::CalculateDropoutMask(dynamicDropValue(), count, outDim,
-                    drop_mask.value);
-        }
         n3ldg_cuda::ActivatedEnum activatedEnum = ToActivatedEnum(activate);
-        n3ldg_cuda::Activated(activatedEnum, ty.value, ys, y.value, outDim,
-                bTrain, dynamicDropValue(), drop_mask.value);
+        n3ldg_cuda::Activated(activatedEnum, ty.value, ys, y.value, outDim);
 #if TEST_CUDA
         ty.mat() = param->W1.val.mat() * x1.mat() + param->W2.val.mat() * x2.mat();
 
@@ -319,17 +323,7 @@ class BiExecute :public Execute {
             }
         }
 
-        drop_mask.copyFromDeviceToHost();
         for (int i = 0; i < count; ++i) {
-            for (int j = 0; j < outDim; ++j) {
-                dtype v = drop_mask[i][j];
-                batch[i]->drop_mask[j] = v <= dynamicDropValue() ? 0 : 1;
-            }
-        }
-
-        for (int i = 0; i < count; ++i) {
-            dtype drop_value = batch[0]->drop_value;
-            batch[i]->forward_drop(bTrain, drop_factor);
             n3ldg_cuda::Assert(batch[i]->val.verify(
                         "BiExecute forward batch i val"));
         }
@@ -373,7 +367,6 @@ class BiExecute :public Execute {
             for (int idy = 0; idy < outDim; idy++) {
                 ptr->val[idy] = y[idx][idy];
             }
-            ptr->forward_drop(bTrain, drop_factor);
         }
     }
 #endif
@@ -395,12 +388,10 @@ class BiExecute :public Execute {
         }
         n3ldg_cuda::ActivatedEnum activated = ToActivatedEnum(activate);
         n3ldg_cuda::CalculateLtyForUniBackward(activated, ly_vec, ty.value,
-                y.value, drop_mask.value, dynamicDropValue(), lty.value, count,
-                outDim);
+                y.value, lty.value, count, outDim);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             BiNode* ptr = (BiNode*)batch[idx];
-            ptr->backward_drop();
             for (int idy = 0; idy < outDim; idy++) {
                 ly[idx][idy] = ptr->loss[idy];
             }
@@ -412,16 +403,16 @@ class BiExecute :public Execute {
         n3ldg_cuda::Assert(lty.verify("BiExecute backward lty"));
 #endif
 #if TEST_CUDA
-        n3ldg_cuda::Assert(param->W1.grad.verify("bi backward W grad initial"));
-        n3ldg_cuda::Assert(param->W2.grad.verify("bi backward W grad initial"));
+        n3ldg_cuda::Assert(param->W1.grad.verify("bi backward W grad init"));
+        n3ldg_cuda::Assert(param->W2.grad.verify("bi backward W grad init"));
 #endif
         n3ldg_cuda::MatrixMultiplyMatrix(lty.value, x1.value,
                 param->W1.grad.value, outDim, count, inDim1, true, true, false);
         n3ldg_cuda::MatrixMultiplyMatrix(lty.value, x2.value,
                 param->W2.grad.value, outDim, count, inDim2, true, true, false);
 #if TEST_CUDA
-        n3ldg_cuda::Assert(param->W1.val.verify("bi W1.val initial"));
-        n3ldg_cuda::Assert(param->W2.val.verify("bi W2.val initial"));
+        n3ldg_cuda::Assert(param->W1.val.verify("bi W1.val init"));
+        n3ldg_cuda::Assert(param->W2.val.verify("bi W2.val init"));
 #endif
         n3ldg_cuda::MatrixMultiplyMatrix(param->W1.val.value, lty.value,
                 lx1.value, inDim1, outDim, count, false, false, true);
@@ -441,7 +432,7 @@ class BiExecute :public Execute {
         }
 #if TEST_CUDA
         n3ldg_cuda::Assert(param->b.grad.verify(
-                    "bi backward param b initial"));
+                    "bi backward param b init"));
 #endif
         n3ldg_cuda::AddLtyToParamBiasAndAddLxToInputLossesForBiBackward(
                 lty.value, lx1.value, lx2.value, param->b.grad.value,
@@ -488,7 +479,6 @@ class BiExecute :public Execute {
 
         for (int idx = 0; idx < count; idx++) {
             BiNode* ptr = (BiNode*)batch[idx];
-            ptr->backward_drop();
             for (int idy = 0; idy < outDim; idy++) {
                 ly[idx][idy] = ptr->loss[idy];
             }
@@ -523,11 +513,9 @@ class BiExecute :public Execute {
 #endif
 };
 
-PExecute BiNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute BiNode::generate() {
     BiExecute* exec = new BiExecute();
     exec->batch.push_back(this);
-    exec->bTrain = bTrain;
-    exec->drop_factor = cur_drop_factor;
     exec->inDim1 = param->W1.inDim();
     exec->inDim2 = param->W2.inDim();
     exec->outDim = param->W1.outDim();
@@ -537,32 +525,11 @@ PExecute BiNode::generate(bool bTrain, dtype cur_drop_factor) {
     return exec;
 };
 
-class LinearBiExecute :public Execute {
-  public:
-    void  forward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->compute();
-            batch[idx]->forward_drop(bTrain, drop_factor);
-        }
-    }
+class LinearBiExecute :public Execute {};
 
-    void backward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward_drop();
-            batch[idx]->backward();
-        }
-    }
-};
-
-PExecute LinearBiNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute LinearBiNode::generate() {
     LinearBiExecute* exec = new LinearBiExecute();
     exec->batch.push_back(this);
-    exec->bTrain = bTrain;
-    exec->drop_factor = cur_drop_factor;
     return exec;
 };
 

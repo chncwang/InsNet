@@ -26,6 +26,7 @@ class ModelUpdate {
         _alpha = 0.001;
         _eps = 1e-8;
 
+
         _belta1 = 0.9;
         _belta2 = 0.999;
     }
@@ -85,18 +86,11 @@ class ModelUpdate {
 
     void updateAdam(dtype maxScale) {
 #if TEST_CUDA
-        maxScale = 0.1;
+        maxScale = 10;
 #endif
         dtype sumNorm = 0.0;
         for (int idx = 0; idx < _params.size(); idx++) {
             sumNorm += _params[idx]->squareGradNorm();
-        }
-        if (std::isnan(double(sumNorm)) || sumNorm > 1e20) { //too large
-#if USE_GPU
-            abort();
-#endif
-            clearGrad();
-            return;
         }
         dtype norm = sqrt(sumNorm);
         if (maxScale > 0 && norm > maxScale) {

@@ -16,13 +16,17 @@
 
 // Notice: aux is an auxiliary variable to help parameter updating
 class Param : public BaseParam {
-  public:
+public:
     Tensor2D aux_square;
     Tensor2D aux_mean;
     int iter;
 
+    Param() = default;
+
+    Param(bool is_bias) : BaseParam(is_bias) {}
+
     // allow sparse and dense parameters have different parameter initialization methods
-    void initial(int outDim, int inDim) {
+    void init(int outDim, int inDim) {
 #if USE_GPU
         val.initOnMemoryAndDevice(outDim, inDim);
         aux_square.initOnMemoryAndDevice(outDim, inDim);
@@ -33,8 +37,12 @@ class Param : public BaseParam {
         aux_mean.init(outDim, inDim);
 #endif
         grad.init(outDim, inDim);
-        dtype bound = sqrt(6.0 / (outDim + inDim + 1));
-        val.random(bound);
+        if (isBias()) {
+            val.assignAll(0.0f);
+        } else {
+            dtype bound = sqrt(6.0 / (outDim + inDim + 1));
+            val.random(bound);
+        }
         iter = 0;
 #if USE_GPU
         n3ldg_cuda::Memset(grad.value, outDim * inDim, 0.0f);
@@ -81,13 +89,13 @@ class Param : public BaseParam {
         n3ldg_cuda::UpdateAdagrad(val.value, grad.value, val.row, val.col,
                 aux_square.value, alpha, reg, eps);
 #if TEST_CUDA
-        if (val.col > 1 && val.row > 1)grad.vec() = grad.vec() + val.vec() * reg;
+        if (!isBias()) grad.vec() = grad.vec() + val.vec() * reg;
         aux_square.vec() = aux_square.vec() + grad.vec().square();
         val.vec() = val.vec() - grad.vec() * alpha / (aux_square.vec() + eps).sqrt();
         n3ldg_cuda::Assert(val.verify("Param adagrad"));
 #endif
 #else
-        if (val.col > 1 && val.row > 1)grad.vec() = grad.vec() + val.vec() * reg;
+        if (!isBias()) grad.vec() = grad.vec() + val.vec() * reg;
         aux_square.vec() = aux_square.vec() + grad.vec().square();
         val.vec() = val.vec() - grad.vec() * alpha / (aux_square.vec() + eps).sqrt();
 #endif
@@ -101,7 +109,7 @@ class Param : public BaseParam {
         n3ldg_cuda::Assert(aux_mean.verify("Param adam begin aux_mean"));
         n3ldg_cuda::Assert(aux_square.verify("Param adam begin aux_square"));
 #endif
-        n3ldg_cuda::UpdateAdam(val.value, grad.value, val.row, val.col,
+        n3ldg_cuda::UpdateAdam(val.value, grad.value, val.row, val.col, isBias(),
                 aux_mean.value,
                 aux_square.value,
                 iter,
@@ -111,7 +119,7 @@ class Param : public BaseParam {
                 reg,
                 eps);
 #if TEST_CUDA
-        if (val.col > 1 && val.row > 1)grad.vec() = grad.vec() + val.vec() * reg;
+        if (!isBias()) grad.vec() = grad.vec() + val.vec() * reg;
         aux_mean.vec() = belta1 * aux_mean.vec() + (1 - belta1) * grad.vec();
         aux_square.vec() = belta2 * aux_square.vec() + (1 - belta2) * grad.vec().square();
         dtype lr_t = alpha * sqrt(1 - pow(belta2, iter + 1)) / (1 - pow(belta1, iter + 1));
@@ -119,7 +127,7 @@ class Param : public BaseParam {
         n3ldg_cuda::Assert(val.verify("Param adam"));
 #endif
 #else
-        if (val.col > 1 && val.row > 1)grad.vec() = grad.vec() + val.vec() * reg;
+        if (!isBias())grad.vec() = grad.vec() + val.vec() * reg;
         aux_mean.vec() = belta1 * aux_mean.vec() + (1 - belta1) * grad.vec();
         aux_square.vec() = belta2 * aux_square.vec() + (1 - belta2) * grad.vec().square();
         dtype lr_t = alpha * sqrt(1 - pow(belta2, iter + 1)) / (1 - pow(belta1, iter + 1));
@@ -131,8 +139,6 @@ class Param : public BaseParam {
     void randpoint(int& idx, int &idy) {
         //select indexes randomly
         std::vector<int> idRows, idCols;
-        idRows.clear();
-        idCols.clear();
         for (int i = 0; i < val.row; i++)
             idRows.push_back(i);
         for (int i = 0; i < val.col; i++)
@@ -141,8 +147,8 @@ class Param : public BaseParam {
         random_shuffle(idRows.begin(), idRows.end());
         random_shuffle(idCols.begin(), idCols.end());
 
-        idy = idRows[0];
-        idx = idCols[0];
+        idy = idRows.at(0);
+        idx = idCols.at(0);
     }
 
     dtype squareGradNorm() {
@@ -180,21 +186,20 @@ class Param : public BaseParam {
 #endif
     }
 
-    void save(std::ostream &os)const {
-        val.save(os);
-        aux_square.save(os);
-        aux_mean.save(os);
-        os << iter << endl;
+    virtual Json::Value toJson() const {
+        Json::Value json;
+        json["val"] = val.toJson();
+        json["aux_square"] = aux_square.toJson();
+        json["aux_mean"] = aux_mean.toJson();
+        json["iter"] = iter;
+        return json;
     }
 
-    void load(std::istream &is) {
-        val.load(is);
-        int outDim = val.row;
-        int inDim = val.col;
-        grad.init(outDim, inDim);
-        aux_square.load(is);
-        aux_mean.load(is);
-        is >> iter;
+    virtual void fromJson(const Json::Value &json) {
+        val.fromJson(json["val"]);
+        aux_square.fromJson(json["aux_square"]);
+        aux_mean.fromJson(json["aux_mean"]);
+        iter = json["iter"].asInt();
     }
 };
 

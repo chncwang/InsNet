@@ -278,7 +278,7 @@ public:
 
 
 public:
-    PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate();
 
     // better to rewrite for deep understanding
     bool typeEqual(PNode other) {
@@ -299,7 +299,6 @@ class PAddExecute : public Execute {
 public:
     int in_count;
     int dim;
-    Tensor2D drop_mask;
 
 public:
     Tensor1D x, y;
@@ -308,9 +307,6 @@ public:
 #if USE_GPU
     void  forward() {
         int count = batch.size();
-
-        drop_mask.init(dim, count);
-        CalculateDropMask(count, dim, drop_mask);
 
         std::vector<std::vector<dtype*>> in_vals;
         in_vals.reserve(in_count);
@@ -329,19 +325,10 @@ public:
             PAddNode *padd = static_cast<PAddNode*>(n);
             outs.push_back(padd->val.value);
         }
-        n3ldg_cuda::PAddForward(in_vals, count, dim, in_count, drop_mask.value,
-            drop_factor, outs);
+        n3ldg_cuda::PAddForward(in_vals, count, dim, in_count, outs);
 #if TEST_CUDA
-        drop_mask.copyFromDeviceToHost();
-        for (int i = 0; i < count; ++i) {
-            for (int j = 0; j < dim; ++j) {
-                dtype v = drop_mask[i][j];
-                batch[i]->drop_mask[j] = v <= drop_factor ? 0 : 1;
-            }
-        }
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
-            batch[idx]->forward_drop(bTrain, drop_factor);
         }
         for (Node *n : batch) {
             n3ldg_cuda::Assert(n->val.verify("PAdd forward"));
@@ -351,10 +338,8 @@ public:
 #else
     void  forward() {
         int count = batch.size();
-        //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
-            batch[idx]->forward_drop(bTrain, drop_factor);
         }
     }
 #endif
@@ -379,11 +364,9 @@ public:
             PAddNode *padd = static_cast<PAddNode*>(n);
             out_losses.push_back(padd->loss.value);
         }
-        n3ldg_cuda::PAddBackward(out_losses, count, dim, in_count,
-            drop_mask.value, drop_factor, in_losses);
+        n3ldg_cuda::PAddBackward(out_losses, count, dim, in_count, in_losses);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward_drop();
             batch[idx]->backward();
         }
 
@@ -398,25 +381,19 @@ public:
 #else
     void backward() {
         int count = batch.size();
-        //#pragma omp parallel for
         for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward_drop();
             batch[idx]->backward();
         }
     }
 #endif
 };
 
-
-PExecute PAddNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute PAddNode::generate() {
     PAddExecute* exec = new PAddExecute();
     exec->batch.push_back(this);
-    exec->bTrain = bTrain;
-    exec->drop_factor = cur_drop_factor * drop_value;
     exec->in_count = ins.size();
     exec->dim = dim;
     return exec;
 }
-
 
 #endif

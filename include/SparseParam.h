@@ -44,8 +44,8 @@ public:
     }
 #endif
 
-    // allow sparse and dense parameters have different parameter initialization methods
-    void initial(int outDim, int inDim) {
+    // allow sparse and dense parameters have different parameter initization methods
+    void init(int outDim, int inDim) {
         //not in the aligned memory pool
 #if USE_GPU
         val.initOnMemoryAndDevice(outDim, inDim);
@@ -307,35 +307,19 @@ public:
         }
     }
 
-    void save(std::ostream &os)const {
-        val.save(os);
-        aux_square.save(os);
-        aux_mean.save(os);
-        os << val.col << std::endl;
-        for (int idx = 0; idx < val.col; idx++) {
-            os << last_update[idx] << std::endl;
-        }
+    virtual Json::Value toJson() const {
+        Json::Value json;
+        json["val"] = val.toJson();
+        json["aux_square"] = aux_square.toJson();
+        json["aux_mean"] = aux_mean.toJson();
+        return json;
     }
 
-    void load(std::istream &is) {
-        val.load(is);
-        grad.init(val.row, val.col);
-        indexers.resize(val.col);
-        indexers = false;
-#if USE_GPU
-        dIndexers.init(indexers.c_buf(), indexers.size());
-#endif
-        aux_square.load(is);
-        aux_mean.load(is);
-        int curInDim;
-        is >> curInDim;
-        last_update.resize(curInDim);
-        for (int idx = 0; idx < curInDim; idx++) {
-            is >> last_update[idx];
-        }
+    virtual void fromJson(const Json::Value &json) {
+        val.fromJson(json["val"]);
+        aux_square.fromJson(json["aux_square"]);
+        aux_mean.fromJson(json["aux_mean"]);
     }
-
-private:
 };
 
 #endif /* SPARSEPARAM_H_ */

@@ -65,10 +65,12 @@ class CheckGrad {
 
             _params[i]->val[idx][idy] = orginValue + 0.001;
             lossAdd = 0.0;
+            cout << "add 0.001" << endl;
             for (int j = 0; j < examples.size(); j++) {
                 lossAdd += classifier->cost(examples[j]);
             }
 
+            cout << "minus 0.001" << endl;
             _params[i]->val[idx][idy] = orginValue - 0.001;
             lossPlus = 0.0;
             for (int j = 0; j < examples.size(); j++) {

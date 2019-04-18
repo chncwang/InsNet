@@ -16,14 +16,17 @@
 #include "Graph.h"
 #include "ModelUpdate.h"
 #include "profiler.h"
+#include "boost/format.hpp"
 
-class LookupTable
+using boost::format;
+
+class LookupTable : public N3LDGSerializable
 #if USE_GPU
-: public TransferableComponents
+, public TransferableComponents
 #endif
 {
 public:
-    PAlphabet elems;
+    Alphabet elems;
     SparseParam E;
     bool bFineTune;
     int nDim;
@@ -33,7 +36,6 @@ public:
     LookupTable() {
         nVSize = 0;
         nDim = 0;
-        elems = NULL;
         nUNKId = -1;
         bFineTune = false;
     }
@@ -48,29 +50,29 @@ public:
     }
 #endif
 
-    //random initialization
-    void initial(PAlphabet alpha, int dim, bool fineTune = true) {
+    void init(const Alphabet &alpha, int dim, bool fineTune = true) {
         elems = alpha;
-        nVSize = elems->size();
-        nUNKId = elems->from_string(unknownkey);
-        initialWeights(dim, fineTune);
+        nVSize = elems.size();
+        nUNKId = elems.from_string(unknownkey);
+        initWeights(dim, fineTune);
     }
 
     //initialization by pre-trained embeddings
-    bool initial(PAlphabet alpha, const string& inFile, bool fineTune = true, dtype norm = -1) {
+    void init(const Alphabet &alpha, const string& inFile, bool fineTune = true, dtype norm = -1) {
         elems = alpha;
-        nVSize = elems->size();
-        nUNKId = elems->from_string(unknownkey);
-        return initialWeights(inFile, fineTune, norm);
+        nVSize = elems.size();
+        nUNKId = elems.from_string(unknownkey);
+        initWeights(inFile, fineTune, norm);
     }
 
-    void initialWeights(int dim, bool tune) {
+    void initWeights(int dim, bool tune) {
         if (dim <=0 || nVSize == 0 || (nVSize == 1 && nUNKId >= 0)) {
-            std::cout << "please check the alphabet" << std::endl;
-            return;
+            std::cerr << "please check the alphabet" << std::endl;
+            abort();
         }
         nDim = dim;
-        E.initial(nDim, nVSize);
+        cout << format("initWeights dim:%1% vocabulary_size:%2%\n") % nDim % nVSize;
+        E.init(nDim, nVSize);
         E.val.random(sqrt(1.0 / nDim));
         //E.val.norm2one();
         bFineTune = tune;
@@ -80,29 +82,23 @@ public:
     }
 
     // default should be fineTune, just for initialization
-    bool initialWeights(const string& inFile, bool tune, dtype norm = -1) {
-        if (nVSize == 0 || !elems->is_fixed() || (nVSize == 1 && nUNKId >= 0)) {
-            std::cout << "please check the alphabet" << std::endl;
-            return false;
+    void initWeights(const string& inFile, bool tune, dtype norm = -1) {
+        if (nVSize == 0 || (nVSize == 1 && nUNKId >= 0)) {
+            cout << "nVSize:" << nVSize << " nUNKId:" << nUNKId << endl;
+            std::cerr << "please check the alphabet" << std::endl;
+            abort();
         }
 
         ifstream inf;
-        if (inf.is_open()) {
-            inf.close();
-            inf.clear();
-        }
         inf.open(inFile.c_str());
 
         if (!inf.is_open()) {
-            std::cout << "please check the input file" << std::endl;
-            return false;
+            std::cerr << "please check the input file" << std::endl;
+            abort();
         }
 
         string strLine, curWord;
-        int wordId;
-
         vector<string> sLines;
-        sLines.clear();
         while (1) {
             if (!my_getline(inf, strLine)) {
                 break;
@@ -113,7 +109,8 @@ public:
         }
         inf.close();
         if (sLines.size() == 0) {
-            return false;
+            cerr << "sLines size is 0" << endl;
+            abort();
         }
 
         //find the first line, decide the wordDim;
@@ -123,7 +120,8 @@ public:
         split_bychar(sLines[0], vecInfo, ' ');
         nDim = vecInfo.size() - 1;
 
-        E.initial(nDim, nVSize);
+        cout << format("nDim:%1% nVSize:%2%") % nDim % nVSize << endl;
+        E.init(nDim, nVSize);
 
         std::cout << "word embedding dim is " << nDim << std::endl;
 
@@ -138,9 +136,8 @@ public:
                 std::cout << "error embedding file" << std::endl;
             }
             curWord = vecInfo[0];
-            //we assume the keys are normalized
-            wordId = elems->from_string(curWord);
-            if (wordId >= 0) {
+            if (elems.find_string(curWord)) {
+                int wordId = elems.insert_string(curWord);
                 count++;
                 if (nUNKId == wordId) {
                     bHasUnknown = true;
@@ -158,7 +155,7 @@ public:
         if (count == 0) {
             E.val.random(sqrt(3.0 / nDim));
             std::cout << "find no overlapped lexicons in the embedding file" << std::endl;
-            return false;
+            abort();
         }
 
         if (nUNKId >= 0 && !bHasUnknown) {
@@ -191,7 +188,6 @@ public:
 #if USE_GPU
         E.val.copyFromHostToDevice();
 #endif
-        return true;
     }
 
     void exportAdaParams(ModelUpdate& ada) {
@@ -202,29 +198,32 @@ public:
 
 
     int getElemId(const string& strFeat) const {
-        return elems->from_string(strFeat);
+        return elems.find_string(strFeat) ? elems.from_string(strFeat) : nUNKId;
     }
 
-    void save(std::ofstream &os) const {
-        E.save(os);
-        os << bFineTune << std::endl;
-        os << nDim << std::endl;
-        os << nVSize << std::endl;
-        os << nUNKId << std::endl;
+    bool findElemId(const string &str) const {
+        return elems.find_string(str);
     }
 
-    //set alpha directly
-    void load(std::ifstream &is, PAlphabet alpha) {
-        E.load(is);
-        is >> bFineTune;
-        is >> nDim;
-        is >> nVSize;
-        is >> nUNKId;
-        elems = alpha;
+    Json::Value toJson() const {
+        Json::Value json;
+        json["e"] = E.toJson();
+        json["finetune"] = bFineTune;
+        json["dim"] = nDim;
+        json["vocabulary_size"] = nVSize;
+        json["unkown_id"] = nUNKId;
+        json["word_ids"] = elems.toJson();
+        return json;
     }
 
-    void load(std::ifstream &is, Alphabet &alpha) {
-        this->load(is, &alpha);
+    void fromJson(const Json::Value &json) {
+        bFineTune = json["finetune"].asBool();
+        nDim = json["dim"].asInt();
+        nVSize = json["vocabulary_size"].asInt();
+        nUNKId = json["unkown_id"].asInt();
+        elems.fromJson(json["word_ids"]);
+        E.init(nDim, nVSize);
+        E.fromJson(json["e"]);
     }
 };
 
@@ -252,12 +251,14 @@ public:
     //this should be leaf nodes
     void forward(Graph *cg, const string& strNorm) {
         assert(param != NULL);
-        xid = param->getElemId(strNorm);
-        if (xid < 0 && param->nUNKId >= 0) {
+        if (!param->findElemId(strNorm)) {
+            if (param->nUNKId < 0) {
+                cerr << "nUNKId is negative:" << param->nUNKId << endl;
+                abort();
+            }
             xid = param->nUNKId;
-        }
-        if (param->bFineTune && xid < 0) {
-            std::cout << "Caution: unknown words are not modeled !" << std::endl;
+        } else {
+            xid = param->getElemId(strNorm);
         }
         degree = 0;
         cg->addNode(this);
@@ -267,7 +268,7 @@ public:
         this->forward(&graph, word);
     }
 
-    PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate();
 
     // better to rewrite for deep understanding
     bool typeEqual(PNode other) override {
@@ -308,14 +309,11 @@ public:
 class LookupExecute :public Execute {
 public:
     int dim;
-    Tensor2D drop_mask;
     LookupTable *table;
     std::vector<int> xids;
 
     void  forward() {
         int count = batch.size();
-        drop_mask.init(dim, count);
-        CalculateDropMask(count, dim, drop_mask);
         xids.reserve(count);
         std::vector<dtype*> vals;
         vals.reserve(count);
@@ -325,21 +323,10 @@ public:
             vals.push_back(n->val.value);
         }
 
-        n3ldg_cuda::LookupForward(xids, table->E.val.value, bTrain,
-                drop_mask.value, dynamicDropValue(), count, dim, vals);
+        n3ldg_cuda::LookupForward(xids, table->E.val.value, count, dim, vals);
 #if TEST_CUDA
-        drop_mask.copyFromDeviceToHost();
-        for (int i = 0; i < count; ++i) {
-            for (int j = 0; j < dim; ++j) {
-                dtype v = drop_mask[i][j];
-                batch[i]->drop_mask[j] = v <= dynamicDropValue() ?
-                    0 : 1;
-            }
-        }
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
-            batch[idx]->forward_drop(bTrain, drop_factor);
-            int xid = static_cast<LookupNode*>(batch[idx])->xid;
             n3ldg_cuda::Assert(batch[idx]->val.verify("lookup forward"));
         }
 #endif
@@ -354,15 +341,12 @@ public:
         }
         n3ldg_cuda::LookupBackward(xids, table->nUNKId, table->bFineTune,
                 losses,
-                drop_mask.value,
-                dynamicDropValue(),
                 count,
                 dim,
                 table->E.grad.value,
                 table->E.dIndexers.value);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward_drop();
             batch[idx]->backward();
         }
 
@@ -375,34 +359,12 @@ public:
     }
 };
 #else
-class LookupExecute :public Execute {
-    public:
-        void  forward() {
-            int count = batch.size();
-            //#pragma omp parallel for
-            for (int idx = 0; idx < count; idx++) {
-                batch[idx]->compute();
-                batch[idx]->forward_drop(bTrain, drop_factor);
-            }
-        }
-
-        void backward() {
-            int count = batch.size();
-            //#pragma omp parallel for
-            for (int idx = 0; idx < count; idx++) {
-                batch[idx]->backward_drop();
-                batch[idx]->backward();
-            }
-        }
-};
+class LookupExecute :public Execute {};
 #endif
 
-
-PExecute LookupNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute LookupNode::generate() {
     LookupExecute* exec = new LookupExecute();
     exec->batch.push_back(this);
-    exec->bTrain = bTrain;
-    exec->drop_factor = cur_drop_factor;
 #if USE_GPU
     exec->table = param;
     exec->dim = dim;

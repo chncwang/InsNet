@@ -1,20 +1,12 @@
 #ifndef BasicGraph
 #define BasicGraph
 
-/*
-*  Graph.h:
-*  manage nodes in a neural network model
-*
-*  Created on: Apr 21, 2017
-*      Author: mszhang
-*/
-
-
 #include "Eigen/Dense"
 #include "Node.h"
 #include "MyLib.h"
 #include <set>
 #include <map>
+#include <memory>
 #include <unordered_map>
 #include "profiler.h"
 #include <vector>
@@ -67,51 +59,37 @@ int Size(const NodeMap &map) {
     return sum;
 }
 
-// one Node means a vector
-// the col should be 1, because we aimed for NLP only
 class Graph {
-  protected:
-    vector<PExecute> execs; //backward
-    vector<PNode> nodes; //forward
+protected:
+    vector<PExecute> execs;
+    vector<Node *> nodes;
     NodeMap free_nodes;
     std::map<size_t, std::pair<int, int>> node_type_depth;
     vector<PNode> finish_nodes;
     vector<PNode> all_nodes;
 
-  public:
-    dtype drop_factor;
-    bool train;
-
-    Graph() {
-        drop_factor = 1.0;
-    }
+public:
+    Graph() = default;
 
     virtual ~Graph() {
         int count = execs.size();
         for (int idx = 0; idx < count; idx++) {
             delete execs.at(idx);
         }
-        execs.clear();
-        nodes.clear();
-        free_nodes.clear();
-        node_type_depth.clear();
-    }
 
-
-    void setDropFactor(dtype cur_drop_factor) {
-        drop_factor = cur_drop_factor;
-        if (drop_factor <= 0) drop_factor = 0;
-        if (drop_factor >= 1.0) drop_factor = 1.0;
+        for (Node *n : nodes) {
+            delete n;
+        }
     }
 
     void backward() {
         int count = execs.size();
         for (int idx = count - 1; idx >= 0; idx--) {
-            execs.at(idx)->backward();
+            execs.at(idx)->backwardFully();
         }
     }
 
-    void addNode(PNode x) {
+    void addNode(Node *x) {
         static int index;
         x->node_index = index++;
         nodes.push_back(x);
@@ -131,9 +109,8 @@ class Graph {
         }
     }
 
-    //real executation
     void compute(bool log = false) {
-        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
+//        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
 
         int i = 0;
         while (Size(free_nodes) > 0) {
@@ -159,7 +136,7 @@ class Graph {
                     std::endl;
                 std::cout << "node size:" << shallow_nodes.size() << std::endl;
             }
-            PExecute cur_exec = first_node->generate(train, drop_factor);
+            PExecute cur_exec = first_node->generate();
             cur_exec->batch = std::move(shallow_nodes);
             free_nodes.erase(min_hash);
 

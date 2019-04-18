@@ -18,7 +18,7 @@
 class SparseParams {
   public:
     SparseParam W;
-    PAlphabet elems;
+    Alphabet elems;
     int nVSize;
     int nDim;
 
@@ -26,41 +26,30 @@ class SparseParams {
     SparseParams() {
         nVSize = 0;
         nDim = 0;
-        elems = NULL;
     }
 
     void exportAdaParams(ModelUpdate& ada) {
         ada.addParam(&W);
     }
 
-    void initialWeights(int nOSize) {
+    void initWeights(int nOSize) {
         if (nVSize == 0) {
-            std::cout << "please check the alphabet" << std::endl;
-            return;
+            std::cerr << "nVSize is 0" << std::endl;
+            abort();
         }
         nDim = nOSize;
-        W.initial(nOSize, nVSize);
+        W.init(nOSize, nVSize);
     }
 
 
-    //random initialization
-    void initial(PAlphabet alpha, int nOSize, int base = 1) {
-        assert(base >= 1);
+    void init(const Alphabet &alpha, int nOSize) {
         elems = alpha;
-        nVSize = base * elems->size();
-        if (base > 1) {
-            std::cout << "nVSize: " << nVSize << ", Alpha Size = " << elems->size()  << ", Require more Alpha."<< std::endl;
-            elems->set_fixed_flag(false);
-        }
-        initialWeights(nOSize);
+        nVSize = elems.size();
+        initWeights(nOSize);
     }
 
     int getFeatureId(const string& strFeat) {
-        int idx = elems->from_string(strFeat);
-        if(!elems->m_b_fixed && elems->m_size >= nVSize) {
-            std::cout << "Sparse Alphabet stopped collecting features" << std::endl;
-            elems->set_fixed_flag(true);
-        }
+        int idx = elems.from_string(strFeat);
         return idx;
     }
 
@@ -107,7 +96,7 @@ class SparseNode : public Node {
         param->W.loss(ins, loss);
     }
 
-    PExecute generate(bool bTrain, dtype cur_drop_factor);
+    PExecute generate();
 
     // better to rewrite for deep understanding
     bool typeEqual(PNode other) {
@@ -124,34 +113,11 @@ class SparseNode : public Node {
 
 };
 
+class SparseExecute :public Execute {};
 
-class SparseExecute :public Execute {
-  public:
-    void  forward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->compute();
-            batch[idx]->forward_drop(bTrain, drop_factor);
-        }
-    }
-
-    void backward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward_drop();
-            batch[idx]->backward();
-        }
-    }
-};
-
-
-PExecute SparseNode::generate(bool bTrain, dtype cur_drop_factor) {
+PExecute SparseNode::generate() {
     SparseExecute* exec = new SparseExecute();
     exec->batch.push_back(this);
-    exec->bTrain = bTrain;
-    exec->drop_factor = cur_drop_factor;
     return exec;
 }
 
