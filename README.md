@@ -4,7 +4,7 @@ N3LDG++ is a neural network libary based on dynamic graph for natural language p
 
 I'm the author to implement the first GPU implementation of N3LDG and I love N3LDG sincerely. To develop a GPU faster and well-designed N3LDG, we derive it independently, thereby being able to develop it according to our own ideas and remvoing some original C++ codes of bad taste, without the restriction of being compatible of those N3LDG-based repos.
 
-GPUs are expensive and it is important to make full use of GPU threads. Compared with N3LDG, all CUDA codes are especially designed for NLP net, to achieve an extremely fast training speed.
+GPUs are expensive and it is important to make full use of GPU threads. Compared with N3LDG, all CUDA codes are especially designed for NLP net, to achieve an extremely fast training speed. In addition, our CUDA implementation is completed.
 
 We wish N3LDG++ a better N3LDG.
 
