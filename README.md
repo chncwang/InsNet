@@ -1,26 +1,27 @@
-N3LDG
+N3LDG-plus
 ===========================
-A lightweight neural network libary based on dynamic graph for natural language processing (LibN3L-3.0)
+N3LDG++ is a neural network libary based on dynamic graph for natural language processing.
 
-To use this library, just include the directory in your code and call it by "#include N3LDG.h"
+I'm the author to implement the first GPU implementation of N3LDG and I love N3LDG sincerely. To develop a GPU faster and well-designed N3LDG, I derive it independently, thereby being able to develop it according to my own ideas and remvoing some original C++ codes of bad taste, without the restriction of being compatible of those N3LDG-based repos.
+
+I wish N3LDG++ a better N3LDG.
 
 ## Installation:
 ### Prerequisitions:
-#### EIGEN
-You can get EIGEN from http://eigen.tuxfamily.org/index.php?title=Main_Page
-#### CMake
-You can get CMake from https://cmake.org/install/
-#### cuda
-You can get cuda from https://developer.nvidia.com/cuda-80-ga2-download-archive
 
-If you have any problem, please send an email to mason.zms@gmail.com
+boost 1.68(a fairly late version may be satisfied) is required.
+
+CUDA 8.0 is required if you wan't to run it on GPU.
+
+If you have any problem, feel free to send an email to chncwang@gmail.com
+
 ## Examples:
 Some examples are realeased at:
-* https://github.com/zhangmeishan/NNTranSegmentor
-* https://github.com/yunan4nlp/N3LDGClassifier
-* https://github.com/yunan4nlp/N3LDGSemiCRFSegmentation-SegDemo
+* https://github.com/chncwang/single-turn-conversation
 
 for cuda usage, see:
 * https://github.com/chncwang/news-title-classification
+* https://github.com/chncwang/single-turn-conversation
+
 ## Authors:
-Zhang Meishan, Wang Qiansheng, Han Zijia, Yu Nan
+Wang Qiansheng, Zhang Meishan, Han Zijia
