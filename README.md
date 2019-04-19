@@ -26,4 +26,4 @@ for cuda usage, see:
 * https://github.com/chncwang/single-turn-conversation
 
 ## Authors:
-Wang Qiansheng, Zhang Meishan, Han Zijia
+Wang Qiansheng, Zhang Meishan, Han Zijia, Cao Xue, Wang Zhen
