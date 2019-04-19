@@ -1,4 +1,4 @@
-N3LDG-plus
+N3LDG++
 ===========================
 N3LDG++ is a neural network libary based on dynamic graph for natural language processing.
 
