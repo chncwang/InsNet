@@ -1,17 +1,19 @@
-N3LDG-plus
+N3LDG++
 ===========================
 N3LDG++ is a neural network libary based on dynamic graph for natural language processing.
 
-I'm the author to implement the first GPU implementation of N3LDG and I love N3LDG sincerely. To develop a GPU faster and well-designed N3LDG, I derive it independently, thereby being able to develop it according to my own ideas and remvoing some original C++ codes of bad taste, without the restriction of being compatible of those N3LDG-based repos.
+I'm the author to implement the first GPU implementation of N3LDG and I love N3LDG sincerely. To develop a GPU faster and well-designed N3LDG, we derive it independently, thereby being able to develop it according to our own ideas and remvoing some original C++ codes of bad taste, without the restriction of being compatible of those N3LDG-based repos.
 
-I wish N3LDG++ a better N3LDG.
+GPUs are expensive and it is important to make full use of GPU threads. Compared with N3LDG, all CUDA codes are especially designed for NLP net, to achieve an extremely fast training speed. In addition, our CUDA implementation is completed.
+
+We wish N3LDG++ a better N3LDG.
 
 ## Installation:
 ### Prerequisitions:
 
 boost 1.68(a fairly late version may be satisfied) is required.
 
-CUDA 8.0 is required if you wan't to run it on GPU.
+CUDA 8.0 is required if you want to run it on GPU.
 
 If you have any problem, feel free to send an email to chncwang@gmail.com
 
@@ -24,4 +26,4 @@ for cuda usage, see:
 * https://github.com/chncwang/single-turn-conversation
 
 ## Authors:
-Wang Qiansheng, Zhang Meishan, Han Zijia
+Wang Qiansheng, Zhang Meishan, Han Zijia, Cao Xue, Wang Zhen
