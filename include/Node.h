@@ -6,7 +6,7 @@
 *  basic processing unit in a neural network
 *  (1) we have a node structure to build user graph
 *  (2) we have a execute structure to merge similar nodes that can be execute together
-*  The real forward and backward are defined in Execute.
+*  The real forward and backward are defined in Executor.
 *  Every operation should define a node class and a execute class together.
 *
 *  Created on: Apr 21, 2017
@@ -108,26 +108,13 @@ dtype fselu(const dtype& x) {
     return lambda * x;
 }
 
-
-
-class Execute;
+class Executor;
 
 class Node {
 public:
-    std::vector<Node*> parents;
-    Tensor1D val;
-    Tensor1D loss;
-    int dim;
-    int degree;
-    int depth = 0;
-    string node_type;
-    string node_name;
-    int node_index;
-
-    Node() : node_type("interface") {
-        dim = 0;
-        degree = 0;
-        parents.clear();
+    Node(const string &node_type, int dim = 0) : dim_(dim) {
+        degree_ = 0;
+        node_type_ = node_type;
     }
 
     virtual ~Node() = default;
@@ -137,57 +124,116 @@ public:
             cerr << "dim is less than 0:" << ndim << endl;
             abort();
         }
-        dim = ndim;
-        val.init(dim);
-        loss.init(dim);
-#if USE_GPU
-        n3ldg_cuda::Memset(val.value, dim, 0.0f);
-        n3ldg_cuda::Memset(loss.value, dim, 0.0f);
-#endif
+        dim_ = ndim;
+        val_.init(dim_);
+        loss_.init(dim_);
     }
 
 #if USE_GPU
     virtual void initOnHostAndDevice(int ndim) {
-        dim = ndim;
-        val.initOnMemoryAndDevice(ndim);
-        loss.initOnMemoryAndDevice(ndim);
-        n3ldg_cuda::Memset(val.value, dim, 0.0f);
-        n3ldg_cuda::Memset(loss.value, dim, 0.0f);
+        dim_ = ndim;
+        val_.initOnMemoryAndDevice(ndim);
+        loss_.initOnMemoryAndDevice(ndim);
+        n3ldg_cuda::Memset(val_.value, dim_, 0.0f);
+        n3ldg_cuda::Memset(loss_.value, dim_, 0.0f);
     }
 #endif
 
     virtual void compute() = 0;
     virtual void backward() = 0;
 
-    virtual Execute* generate() = 0;
+    virtual Executor* generate() = 0;
 
     virtual bool typeEqual(Node* other) {
-        if (node_type.compare(other->node_type) != 0) {
+        if (node_type_.compare(other->node_type_) != 0) {
             return false;
         }
-        if (dim != other->dim) {
+        if (dim_ != other->dim_) {
             return false;
         }
         return true;
     }
 
     virtual size_t typeHashCode() const {
-        return std::hash<std::string>{}(node_type) ^ std::hash<int>{}(dim);
+        return std::hash<std::string>{}(node_type_) ^ std::hash<int>{}(dim_);
     }
 
     virtual void addParent(Node* parent) {
-        if (degree >= 0) {
-            parents.push_back(parent);
-            parent->degree++;
-            parent->depth = std::max(depth + 1, parent->depth);
+        if (degree_ >= 0) {
+            parents_.push_back(parent);
+            parent->degree_++;
+            parent->depth_ = std::max(depth_ + 1, parent->depth_);
         }
     }
+
+    const Tensor1D &getVal() const {
+        return val_;
+    }
+
+    Tensor1D &val() {
+        return val_;
+    }
+
+    const Tensor1D &getLoss() const {
+        return loss_;
+    }
+
+    Tensor1D &loss() {
+        return loss_;
+    }
+
+    int getDim() const {
+        return dim_;
+    }
+
+    int getDegree() const {
+        return degree_;
+    }
+
+    void setDegree(int degree) {
+        degree_ = degree;
+    }
+
+    const string &getNodeName() const {
+        return node_name_;
+    }
+
+    void setNodeName(const string &node_name) {
+        node_name_ = node_name;
+    }
+
+    void setNodeIndex(int node_index) {
+        node_index_ = node_index;
+    }
+
+    int getDepth() const {
+        return depth_;
+    }
+
+    const string &getNodeType() const {
+        return node_type_;
+    }
+
+    const vector<Node*> getParents() const {
+        return parents_;
+    }
+
+private:
+    std::vector<Node*> parents_;
+    Tensor1D val_;
+    Tensor1D loss_;
+    int dim_;
+    int degree_ = 0;
+    int depth_ = 0;
+    string node_type_;
+    string node_name_;
+    int node_index_;
 };
 
 typedef Node* PNode;
 
 template<typename T>
-std::vector<Node*> toNodePointers(std::vector<T *> &vec) {
+std::vector<Node*> toNodePointers(const std::vector<T *> &vec) {
     std::vector<Node *> results;
     for (T *p : vec) {
         results.push_back(p);
@@ -199,20 +245,19 @@ std::vector<Node*> toNodePointers(std::vector<T *> &vec) {
  * return tuple<exp, pair<max_i, max>, sum>
  * */
 std::tuple<std::unique_ptr<Tensor1D>, std::pair<int, dtype>, dtype> toExp(const Node &node) {
-    dtype max = node.val.v[0];
+    dtype max = node.getVal().v[0];
     int max_j = 0;
-    for (int j = 1; j < node.dim; ++j) {
-        if (node.val.v[j] > max) {
-            max = node.val.v[j];
+    for (int j = 1; j < node.getDim(); ++j) {
+        if (node.getVal().v[j] > max) {
+            max = node.getVal().v[j];
             max_j = j;
         }
     }
 
     std::unique_ptr<Tensor1D> exp(new Tensor1D);
-    exp->init(node.dim);
-    exp->vec() = (node.val.vec() - max).exp();
+    exp->init(node.getDim());
+    exp->vec() = (node.getVal().vec() - max).exp();
     dtype sum = static_cast<Eigen::Tensor<dtype, 0>>(exp->vec().sum())(0);
-
     return std::make_tuple(std::move(exp), std::make_pair(max_j, max), sum);
 }
 
@@ -221,27 +266,31 @@ void clearNodes(std::vector<Node*> &nodes, int dim) {
     std::vector<dtype*> val_and_losses;
     val_and_losses.reserve(2 * nodes.size());
     for (Node *n : nodes) {
-        val_and_losses.push_back(n->val.value);
-        val_and_losses.push_back(n->loss.value);
+        val_and_losses.push_back(n->getVal().value);
+        val_and_losses.push_back(n->getLoss().value);
     }
     n3ldg_cuda::BatchMemset(val_and_losses, val_and_losses.size(), dim,
             0.0f);
 }
 #endif
 
-class Execute {
+class Executor {
 public:
     std::vector<PNode> batch;
 #if USE_GPU
     void *graph_info;
 #endif
 
-    virtual ~Execute() = default;
+    virtual ~Executor() = default;
+
+    int getDim() const {
+        return batch.at(batch.size() - 1)->getDim();
+    }
 
     void forwardFully() {
         forward();
         for (Node *node : batch) {
-            node->degree = -1;
+            node->setDegree(-1);
         }
     }
 
@@ -277,7 +326,7 @@ protected:
     }
 };
 
-typedef  Execute* PExecute;
+typedef  Executor* PExecutor;
 
 #if USE_GPU
 

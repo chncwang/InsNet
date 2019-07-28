@@ -57,6 +57,7 @@ public:
     virtual void init(int outDim, int inDim) = 0;
     virtual void updateAdagrad(dtype alpha, dtype reg, dtype eps) = 0;
     virtual void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) = 0;
+    virtual void updateAdamW(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) = 0;
     virtual int outDim() = 0;
     virtual int inDim() = 0;
     virtual void clearGrad() = 0;

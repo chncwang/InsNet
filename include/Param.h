@@ -64,15 +64,15 @@ public:
     }
 #endif
 
-    int outDim() {
+    int outDim() override {
         return val.row;
     }
 
-    int inDim() {
+    int inDim() override {
         return val.col;
     }
 
-    void clearGrad() {
+    void clearGrad() override {
 #if USE_GPU
         n3ldg_cuda::Memset(grad.value, grad.size, 0.0f);
 #if TEST_CUDA
@@ -84,7 +84,7 @@ public:
 #endif
     }
 
-    void updateAdagrad(dtype alpha, dtype reg, dtype eps) {
+    void updateAdagrad(dtype alpha, dtype reg, dtype eps) override {
 #if USE_GPU
         n3ldg_cuda::UpdateAdagrad(val.value, grad.value, val.row, val.col,
                 aux_square.value, alpha, reg, eps);
@@ -101,7 +101,7 @@ public:
 #endif
     }
 
-    void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) {
+    void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override {
 #if USE_GPU
 #if TEST_CUDA
         n3ldg_cuda::Assert(val.verify("Param adam begin val"));
@@ -127,7 +127,7 @@ public:
         n3ldg_cuda::Assert(val.verify("Param adam"));
 #endif
 #else
-        if (!isBias())grad.vec() = grad.vec() + val.vec() * reg;
+        if (!isBias()) grad.vec() = grad.vec() + val.vec() * reg;
         aux_mean.vec() = belta1 * aux_mean.vec() + (1 - belta1) * grad.vec();
         aux_square.vec() = belta2 * aux_square.vec() + (1 - belta2) * grad.vec().square();
         dtype lr_t = alpha * sqrt(1 - pow(belta2, iter + 1)) / (1 - pow(belta1, iter + 1));
@@ -136,7 +136,35 @@ public:
         iter++;
     }
 
-    void randpoint(int& idx, int &idy) {
+    void updateAdamW(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override {
+#if USE_GPU
+#if TEST_CUDA
+        n3ldg_cuda::Assert(val.verify("Param adam begin val"));
+        n3ldg_cuda::Assert(grad.verify("Param adam begin grad"));
+        n3ldg_cuda::Assert(aux_mean.verify("Param adam begin aux_mean"));
+        n3ldg_cuda::Assert(aux_square.verify("Param adam begin aux_square"));
+#endif
+        n3ldg_cuda::UpdateAdamW(val.value, grad.value, val.row, val.col, isBias(), aux_mean.value,
+                aux_square.value, iter, belta1, belta2, alpha, reg, eps);
+#if TEST_CUDA
+        aux_mean.vec() = belta1 * aux_mean.vec() + (1 - belta1) * grad.vec();
+        aux_square.vec() = belta2 * aux_square.vec() + (1 - belta2) * grad.vec().square();
+        dtype lr_t = alpha * sqrt(1 - pow(belta2, iter + 1)) / (1 - pow(belta1, iter + 1));
+        val.vec() = (1 - (isBias() ? 0.0f : reg)) * val.vec() -
+            aux_mean.vec() * lr_t / (aux_square.vec() + eps).sqrt();
+        n3ldg_cuda::Assert(val.verify("Param adam"));
+#endif
+#else
+        aux_mean.vec() = belta1 * aux_mean.vec() + (1 - belta1) * grad.vec();
+        aux_square.vec() = belta2 * aux_square.vec() + (1 - belta2) * grad.vec().square();
+        dtype lr_t = alpha * sqrt(1 - pow(belta2, iter + 1)) / (1 - pow(belta1, iter + 1));
+        val.vec() = (1 - (isBias() ? 0.0f : reg)) * val.vec() -
+            aux_mean.vec() * lr_t / (aux_square.vec() + eps).sqrt();
+#endif
+        iter++;
+    }
+
+    void randpoint(int& idx, int &idy) override {
         //select indexes randomly
         std::vector<int> idRows, idCols;
         for (int i = 0; i < val.row; i++)
@@ -151,7 +179,7 @@ public:
         idx = idCols.at(0);
     }
 
-    dtype squareGradNorm() {
+    dtype squareGradNorm() override {
 #if USE_GPU && !TEST_CUDA
         return n3ldg_cuda::SquareSum(grad.value, grad.size);
 #elif USE_GPU && TEST_CUDA
@@ -174,7 +202,7 @@ public:
 #endif
     }
 
-    void rescaleGrad(dtype scale) {
+    void rescaleGrad(dtype scale) override {
 #if USE_GPU
         n3ldg_cuda::Rescale(grad.value, grad.size, scale);
 #if TEST_CUDA
@@ -186,7 +214,7 @@ public:
 #endif
     }
 
-    virtual Json::Value toJson() const {
+    virtual Json::Value toJson() const override {
         Json::Value json;
         json["val"] = val.toJson();
         json["aux_square"] = aux_square.toJson();
@@ -195,7 +223,7 @@ public:
         return json;
     }
 
-    virtual void fromJson(const Json::Value &json) {
+    virtual void fromJson(const Json::Value &json) override {
         val.fromJson(json["val"]);
         aux_square.fromJson(json["aux_square"]);
         aux_mean.fromJson(json["aux_mean"]);

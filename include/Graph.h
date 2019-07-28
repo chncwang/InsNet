@@ -16,8 +16,8 @@ using namespace Eigen;
 int GetDegree(std::map<void*, int> &degree_map, PNode p) {
     auto it = degree_map.find(p);
     if (it == degree_map.end()) {
-        degree_map.insert(std::pair<void*, int>(p, p->degree));
-        return p->degree;
+        degree_map.insert(std::pair<void*, int>(p, p->getDegree()));
+        return p->getDegree();
     } else {
         return it->second;
     }
@@ -26,7 +26,7 @@ int GetDegree(std::map<void*, int> &degree_map, PNode p) {
 void DecreaseDegree(std::map<void*, int> &degree_map, PNode p) {
     auto it = degree_map.find(p);
     if (it == degree_map.end()) {
-        degree_map.insert(std::pair<void*, int>(p, p->degree - 1));
+        degree_map.insert(std::pair<void*, int>(p, p->getDegree() - 1));
     } else {
         --(it->second);
     }
@@ -61,7 +61,7 @@ int Size(const NodeMap &map) {
 
 class Graph {
 protected:
-    vector<PExecute> execs;
+    vector<PExecutor> execs;
     vector<Node *> nodes;
     NodeMap free_nodes;
     std::map<size_t, std::pair<int, int>> node_type_depth;
@@ -91,9 +91,9 @@ public:
 
     void addNode(Node *x) {
         static int index;
-        x->node_index = index++;
+        x->setNodeIndex(index++);
         nodes.push_back(x);
-        if (x->degree == 0) {
+        if (x->getDegree() == 0) {
             Insert(x, free_nodes);
         }
         all_nodes.push_back(x);
@@ -102,20 +102,15 @@ public:
         auto it = node_type_depth.find(x_type_hash);
         if (it == node_type_depth.end()) {
             node_type_depth.insert(std::pair<size_t, std::pair<int, int>>(
-                        x_type_hash, std::pair<int, int>(x->depth, 1)));
+                        x_type_hash, std::pair<int, int>(x->getDepth(), 1)));
         } else {
-            it->second.first += x->depth;
+            it->second.first += x->getDepth();
             it->second.second++;
         }
     }
 
-    void compute(bool log = false) {
-//        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-
-        int i = 0;
+    void compute() {
         while (Size(free_nodes) > 0) {
-            if (log)
-            std::cout << "i:" << i++ << std::endl;
             float min_avg_depth = 100000000;
             std::vector<Node*> shallow_nodes;
             size_t min_hash = 0;
@@ -131,29 +126,23 @@ public:
                 }
             }
             Node *first_node = shallow_nodes.at(0);
-            if (log) {
-                std::cout << "Graph compute first_node node type:" << first_node->node_type <<
-                    std::endl;
-                std::cout << "node size:" << shallow_nodes.size() << std::endl;
-            }
-            PExecute cur_exec = first_node->generate();
+            PExecutor cur_exec = first_node->generate();
             cur_exec->batch = std::move(shallow_nodes);
             free_nodes.erase(min_hash);
-
-            //profiler.BeginEvent("forward");
+#if USE_GPU
+            clearNodes(cur_exec->batch, cur_exec->getDim());
+#endif
             cur_exec->forwardFully();
-            //profiler.EndEvent();
             execs.push_back(cur_exec);
 
-            //finished nodes
             for (Node* free_node : cur_exec->batch) {
                 finish_nodes.push_back(free_node);
-                for (auto parent_it : free_node->parents) {
-                    if (parent_it->degree <= 0) {
+                for (auto parent_it : free_node->getParents()) {
+                    if (parent_it->getDegree() <= 0) {
                         abort();
                     }
-                    parent_it->degree--;
-                    if (parent_it->degree == 0) {
+                    parent_it->setDegree(parent_it->getDegree() - 1);
+                    if (parent_it->getDegree() == 0) {
                         Insert(parent_it, free_nodes);
                     }
                 }
@@ -161,20 +150,21 @@ public:
         }
 
         if (finish_nodes.size() != all_nodes.size()) {
-            std::cout << "error: several nodes are not executed, finished: " << finish_nodes.size() << ", all: " << all_nodes.size() << std::endl;
+            std::cerr << "error: several nodes are not executed, finished: " <<
+                finish_nodes.size() << ", all: " << all_nodes.size() << std::endl;
             int total_node_num = all_nodes.size();
             int unprocessed = 0;
             for (int idx = 0; idx < total_node_num; idx++) {
                 PNode curNode = all_nodes.at(idx);
-                if (curNode->degree > 0) {
-                    std::cout << "unprocessed node:" << curNode->node_type <<
-                        " degree:" << curNode->degree <<
-                        " name:" << curNode->node_name <<
+                if (curNode->getDegree() > 0) {
+                    std::cerr << "unprocessed node:" << curNode->getNodeType() <<
+                        " degree:" << curNode->getDegree() <<
+                        " name:" << curNode->getNodeName() <<
                         std::endl;
                     unprocessed++;
                 }
             }
-            std::cout << "unprocessed: " << unprocessed << std::endl;
+            std::cerr << "unprocessed: " << unprocessed << std::endl;
             abort();
         }
     }

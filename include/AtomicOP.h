@@ -31,11 +31,10 @@ public:
     dtype(*activate)(const dtype&);
     dtype(*derivate)(const dtype&, const dtype&);
 
-    ActivateNode() : Node() {
-        in = NULL;
+    ActivateNode() : Node("activate") {
+        in = nullptr;
         activate = ftanh;
         derivate = dtanh;
-        node_type = "activate";
     }
 
     ~ActivateNode() = default;
@@ -47,20 +46,20 @@ public:
 
     void forward(Graph *cg, Node* x) {
         in = x;
-        degree = 0;
         in->addParent(this);
         cg->addNode(this);
     }
 
     void compute() {
-        val.vec() = in->val.vec().unaryExpr(ptr_fun(activate));
+        val().vec() = in->val().vec().unaryExpr(ptr_fun(activate));
     }
 
     void backward() {
-        in->loss.vec() += loss.vec() * in->val.vec().binaryExpr(val.vec(), ptr_fun(derivate));
+        in->loss().vec() += loss().vec() * in->val().vec().binaryExpr(val().vec(),
+                ptr_fun(derivate));
     }
 
-    PExecute generate();
+    PExecutor generate();
 
     bool typeEqual(Node* other) {
         bool result = Node::typeEqual(other);
@@ -69,11 +68,11 @@ public:
 };
 
 
-class ActivateExecute :public Execute {
+class ActivateExecutor :public Executor {
 };
 
-PExecute ActivateNode::generate() {
-    ActivateExecute* exec = new ActivateExecute();
+PExecutor ActivateNode::generate() {
+    ActivateExecutor* exec = new ActivateExecutor();
     exec->batch.push_back(this);
     return exec;
 };
@@ -83,13 +82,12 @@ class TanhNode :public Node {
     Node* in;
 
   public:
-    TanhNode() : Node() {
-        in = NULL;
-        node_type = "tanh";
+    TanhNode() : Node("tanh") {
+        in = nullptr;
     }
 
     ~TanhNode() {
-        in = NULL;
+        in = nullptr;
     }
 
   public:
@@ -99,22 +97,21 @@ class TanhNode :public Node {
 
     void forward(Graph *cg, Node* x) {
         in = x;
-        degree = 0;
         in->addParent(this);
         cg->addNode(this);
     }
 
   public:
     void compute() {
-        val.vec() = in->val.vec().unaryExpr(ptr_fun(ftanh));
+        val().vec() = in->val().vec().unaryExpr(ptr_fun(ftanh));
     }
 
     void backward() {
-        in->loss.vec() += loss.vec() * in->val.vec().binaryExpr(val.vec(), ptr_fun(dtanh));
+        in->loss().vec() += loss().vec() * in->val().vec().binaryExpr(val().vec(), ptr_fun(dtanh));
     }
 
   public:
-    PExecute generate();
+    PExecutor generate();
 
     // better to rewrite for deep understanding
     bool typeEqual(Node* other) {
@@ -123,7 +120,7 @@ class TanhNode :public Node {
     }
 };
 
-class TanhExecute :public Execute {
+class TanhExecutor :public Executor {
 public:
     int dim;
     Tensor1D y, x;
@@ -138,17 +135,17 @@ public:
         for (Node *n : batch) {
             TanhNode *tanh = static_cast<TanhNode*>(n);
 #if TEST_CUDA
-            tanh->in->val.copyFromHostToDevice();
+            tanh->in->val().copyFromHostToDevice();
 #endif
-            xs.push_back(tanh->in->val.value);
-            ys.push_back(tanh->val.value);
+            xs.push_back(tanh->in->val().value);
+            ys.push_back(tanh->val().value);
         }
 
         n3ldg_cuda::TanhForward(n3ldg_cuda::ActivatedEnum::TANH, xs, count, dim, ys);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
-            n3ldg_cuda::Assert(batch.at(idx)->val.verify("Tanh forward"));
+            n3ldg_cuda::Assert(batch.at(idx)->getVal().verify("Tanh forward"));
         }
 #endif
     }
@@ -158,7 +155,7 @@ public:
         //#pragma omp parallel for  
         sumDim = 0;
         for (int idx = 0; idx < count; idx++) {
-            sumDim += batch[idx]->dim;
+            sumDim += batch[idx]->getDim();
         }
 
         x.init(sumDim);
@@ -167,10 +164,10 @@ public:
         int offset = 0;
         for (int idx = 0; idx < count; idx++) {
             TanhNode* ptr = (TanhNode*)batch[idx];
-            for (int idy = 0; idy < ptr->dim; idy++) {
-                x[offset + idy] = ptr->in->val[idy];
+            for (int idy = 0; idy < ptr->getDim(); idy++) {
+                x[offset + idy] = ptr->in->val()[idy];
             }
-            offset += ptr->dim;
+            offset += ptr->getDim();
         }
 
         y.vec() = x.vec().unaryExpr(ptr_fun(ftanh));
@@ -178,10 +175,10 @@ public:
         offset = 0;
         for (int idx = 0; idx < count; idx++) {
             TanhNode* ptr = (TanhNode*)batch[idx];
-            for (int idy = 0; idy < ptr->dim; idy++) {
-                ptr->val[idy] = y[offset + idy];
+            for (int idy = 0; idy < ptr->getDim(); idy++) {
+                ptr->val()[idy] = y[offset + idy];
             }
-            offset += ptr->dim;
+            offset += ptr->getDim();
         }
     }
 #endif
@@ -196,12 +193,12 @@ public:
         for (Node *n : batch) {
             TanhNode *tanh = static_cast<TanhNode*>(n);
 #if TEST_CUDA
-            tanh->loss.copyFromHostToDevice();
-            tanh->in->loss.copyFromHostToDevice();
+            tanh->loss().copyFromHostToDevice();
+            tanh->in->loss().copyFromHostToDevice();
 #endif
-            vals.push_back(tanh->val.value);
-            losses.push_back(tanh->loss.value);
-            in_losses.push_back(tanh->in->loss.value);
+            vals.push_back(tanh->val().value);
+            losses.push_back(tanh->loss().value);
+            in_losses.push_back(tanh->in->loss().value);
         }
         n3ldg_cuda::TanhBackward(n3ldg_cuda::ActivatedEnum::TANH, losses, vals, count, dim,
                 in_losses);
@@ -211,7 +208,7 @@ public:
         }
         for (Node *n : batch) {
             TanhNode *tanh = static_cast<TanhNode*>(n);
-            n3ldg_cuda::Assert(tanh->in->loss.verify("TanhExecute backward"));
+            n3ldg_cuda::Assert(tanh->in->getLoss().verify("TanhExecutor backward"));
         }
 #endif
     }
@@ -226,10 +223,10 @@ public:
         int offset = 0;
         for (int idx = 0; idx < count; idx++) {
             TanhNode* ptr = (TanhNode*)batch[idx];
-            for (int idy = 0; idy < ptr->dim; idy++) {
-                ly[offset + idy] = ptr->loss[idy];
+            for (int idy = 0; idy < ptr->getDim(); idy++) {
+                ly[offset + idy] = ptr->loss()[idy];
             }
-            offset += ptr->dim;
+            offset += ptr->getDim();
         }
 
         lx.vec() = ly.vec() * x.vec().binaryExpr(y.vec(), ptr_fun(dtanh));
@@ -237,35 +234,33 @@ public:
         offset = 0;
         for (int idx = 0; idx < count; idx++) {
             TanhNode* ptr = (TanhNode*)batch[idx];
-            for (int idy = 0; idy < ptr->dim; idy++) {
-                ptr->in->loss[idy] += lx[offset + idy];
+            for (int idy = 0; idy < ptr->getDim(); idy++) {
+                ptr->in->loss()[idy] += lx[offset + idy];
             }
-            offset += ptr->dim;
+            offset += ptr->getDim();
         }
     }
 #endif
 };
 
-PExecute TanhNode::generate() {
-    TanhExecute* exec = new TanhExecute();
+PExecutor TanhNode::generate() {
+    TanhExecutor* exec = new TanhExecutor();
     exec->batch.push_back(this);
-    exec->dim = dim;
+    exec->dim = getDim();
     return exec;
 };
 
 
 class SigmoidNode :public Node {
-  public:
+public:
     Node* in;
 
-  public:
-    SigmoidNode() : Node() {
-        in = NULL;
-        node_type = "sigmoid";
+    SigmoidNode() : Node("sigmoid") {
+        in = nullptr;
     }
 
     ~SigmoidNode() {
-        in = NULL;
+        in = nullptr;
     }
 
     void forward(Graph &graph, Node &input) {
@@ -274,22 +269,22 @@ class SigmoidNode :public Node {
 
     void forward(Graph *cg, Node* x) {
         in = x;
-        degree = 0;
         in->addParent(this);
         cg->addNode(this);
     }
 
   public:
     void compute() {
-        val.vec() = in->val.vec().unaryExpr(ptr_fun(fsigmoid));
+        val().vec() = in->val().vec().unaryExpr(ptr_fun(fsigmoid));
     }
 
     void backward() {
-        in->loss.vec() += loss.vec() * in->val.vec().binaryExpr(val.vec(), ptr_fun(dsigmoid));
+        in->loss().vec() += loss().vec() * in->val().vec().binaryExpr(val().vec(),
+                ptr_fun(dsigmoid));
     }
 
   public:
-    PExecute generate();
+    PExecutor generate();
 
     // better to rewrite for deep understanding
     bool typeEqual(Node* other) {
@@ -299,7 +294,7 @@ class SigmoidNode :public Node {
 };
 
 
-class SigmoidExecute :public Execute {
+class SigmoidExecutor :public Executor {
   public:
     int dim;
 public:
@@ -315,17 +310,17 @@ public:
         for (Node *n : batch) {
             SigmoidNode *tanh = static_cast<SigmoidNode*>(n);
 #if TEST_CUDA
-            tanh->in->val.copyFromHostToDevice();
+            tanh->in->val().copyFromHostToDevice();
 #endif
-            xs.push_back(tanh->in->val.value);
-            ys.push_back(tanh->val.value);
+            xs.push_back(tanh->in->val().value);
+            ys.push_back(tanh->val().value);
         }
 
         n3ldg_cuda::TanhForward(n3ldg_cuda::ActivatedEnum::SIGMOID, xs, count, dim, ys);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
-            n3ldg_cuda::Assert(batch.at(idx)->val.verify("Sigmoid forward"));
+            n3ldg_cuda::Assert(batch.at(idx)->getVal().verify("Sigmoid forward"));
         }
 #endif
     }
@@ -342,12 +337,12 @@ public:
         for (Node *n : batch) {
             SigmoidNode *tanh = static_cast<SigmoidNode*>(n);
 #if TEST_CUDA
-            tanh->loss.copyFromHostToDevice();
-            tanh->in->loss.copyFromHostToDevice();
+            tanh->loss().copyFromHostToDevice();
+            tanh->in->loss().copyFromHostToDevice();
 #endif
-            vals.push_back(tanh->val.value);
-            losses.push_back(tanh->loss.value);
-            in_losses.push_back(tanh->in->loss.value);
+            vals.push_back(tanh->val().value);
+            losses.push_back(tanh->loss().value);
+            in_losses.push_back(tanh->in->loss().value);
         }
         n3ldg_cuda::TanhBackward(n3ldg_cuda::ActivatedEnum::SIGMOID, losses, vals, count, dim,
                 in_losses);
@@ -357,7 +352,7 @@ public:
         }
         for (Node *n : batch) {
             SigmoidNode *tanh = static_cast<SigmoidNode*>(n);
-            n3ldg_cuda::Assert(tanh->in->loss.verify("SigmoidExecute backward"));
+            n3ldg_cuda::Assert(tanh->in->getLoss().verify("SigmoidExecutor backward"));
         }
 #endif
     }
@@ -365,10 +360,10 @@ public:
 #endif
 };
 
-PExecute SigmoidNode::generate() {
-    SigmoidExecute* exec = new SigmoidExecute();
+PExecutor SigmoidNode::generate() {
+    SigmoidExecutor* exec = new SigmoidExecutor();
     exec->batch.push_back(this);
-    exec->dim = dim;
+    exec->dim = getDim();
     return exec;
 };
 
@@ -378,33 +373,31 @@ class ReluNode :public Node {
     Node* in;
 
   public:
-    ReluNode() : Node() {
-        in = NULL;
-        node_type = "relu";
+    ReluNode() : Node("relu") {
+        in = nullptr;
     }
 
     ~ReluNode() {
-        in = NULL;
+        in = nullptr;
     }
 
     void forward(Graph *cg, Node* x) {
         in = x;
-        degree = 0;
         in->addParent(this);
         cg->addNode(this);
     }
 
   public:
     void compute() {
-        val.vec() = in->val.vec().unaryExpr(ptr_fun(frelu));
+        val().vec() = in->val().vec().unaryExpr(ptr_fun(frelu));
     }
 
     void backward() {
-        in->loss.vec() += loss.vec() * in->val.vec().binaryExpr(val.vec(), ptr_fun(drelu));
+        in->loss().vec() += loss().vec() * in->val().vec().binaryExpr(val().vec(), ptr_fun(drelu));
     }
 
   public:
-    PExecute generate();
+    PExecutor generate();
 
     // better to rewrite for deep understanding
     bool typeEqual(Node* other) {
@@ -413,10 +406,10 @@ class ReluNode :public Node {
     }
 };
 
-class ReluExecute :public Execute {};
+class ReluExecutor :public Executor {};
 
-PExecute ReluNode::generate() {
-    ReluExecute* exec = new ReluExecute();
+PExecutor ReluNode::generate() {
+    ReluExecutor* exec = new ReluExecutor();
     exec->batch.push_back(this);
     return exec;
 };
@@ -426,46 +419,45 @@ class PDotNode : public Node {
 public:
     Node* in1, *in2;
 
-    PDotNode() : Node() {
-        in1 = NULL;
-        in2 = NULL;
-        dim = 1;
-        node_type = "point-dot";
+    PDotNode() : Node("point-dot", 1) {
+        in1 = nullptr;
+        in2 = nullptr;
     }
 
-    void init() {
-        dim = 1;
+    void init(int dim = 1){
+        if (dim != 1) {
+            abort();
+        }
         Node::init(dim);
     }
 
     void forward(Graph *cg, Node* x1, Node* x2) {
         in1 = x1;
         in2 = x2;
-        degree = 0;
         in1->addParent(this);
         in2->addParent(this);
         cg->addNode(this);
     }
 
     void compute() {
-        val[0] = 0.0;
-        for (int idx = 0; idx < in1->dim; idx++) {
-            val[0] += in1->val[idx] * in2->val[idx];
+        val()[0] = 0.0;
+        for (int idx = 0; idx < in1->getDim(); idx++) {
+            val()[0] += in1->val()[idx] * in2->val()[idx];
         }
     }
 
     void backward() {
-        for (int idx = 0; idx < in1->dim; idx++) {
-            in1->loss[idx] += loss[0] * in2->val[idx];
-            in2->loss[idx] += loss[0] * in1->val[idx];
+        for (int idx = 0; idx < in1->getDim(); idx++) {
+            in1->loss()[idx] += loss()[0] * in2->val()[idx];
+            in2->loss()[idx] += loss()[0] * in1->val()[idx];
         }
     }
 
-    PExecute generate();
+    PExecutor generate();
 };
 
 #if USE_GPU
-class PDotExecute :public Execute {
+class PDotExecutor :public Executor {
 public:
     void  forward() {
         int count = batch.size();
@@ -475,20 +467,20 @@ public:
         vals.reserve(count);
         for (Node *node : batch) {
             PDotNode *dot = static_cast<PDotNode*>(node);
-            ins1.push_back(dot->in1->val.value);
-            ins2.push_back(dot->in2->val.value);
-            vals.push_back(dot->val.value);
+            ins1.push_back(dot->in1->val().value);
+            ins2.push_back(dot->in2->val().value);
+            vals.push_back(dot->val().value);
         }
 
         n3ldg_cuda::PDotForward(ins1, ins2, count,
-                static_cast<PDotNode*>(batch.at(0))->in1->dim, vals);
+                static_cast<PDotNode*>(batch.at(0))->in1->getDim(), vals);
 #if TEST_CUDA
         for (Node *node : batch) {
             PDotNode *dot = static_cast<PDotNode*>(node);
-            n3ldg_cuda::Assert(dot->in1->val.verify("PDot in1"));
-            n3ldg_cuda::Assert(dot->in2->val.verify("PDot in2"));
+            n3ldg_cuda::Assert(dot->in1->getVal().verify("PDot in1"));
+            n3ldg_cuda::Assert(dot->in2->getVal().verify("PDot in2"));
             node->compute();
-            n3ldg_cuda::Assert(node->val.verify("PDot forward"));
+            n3ldg_cuda::Assert(node->getVal().verify("PDot forward"));
         }
 #endif
     }
@@ -501,27 +493,24 @@ public:
         in_losses2.reserve(count);
         for (Node *node : batch) {
             PDotNode *dot = static_cast<PDotNode*>(node);
-            losses.push_back(dot->loss.value);
-            in_losses1.push_back(dot->in1->loss.value);
-            in_losses2.push_back(dot->in2->loss.value);
+            losses.push_back(dot->loss().value);
+            in_losses1.push_back(dot->in1->loss().value);
+            in_losses2.push_back(dot->in2->loss().value);
         }
         n3ldg_cuda::PDotBackward(losses, ins1, ins2, count,
-                static_cast<PDotNode*>(batch.at(0))->in1->dim, in_losses1,
+                static_cast<PDotNode*>(batch.at(0))->in1->getDim(), in_losses1,
                 in_losses2);
 
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward();
-            n3ldg_cuda::Assert(batch[idx]->loss.verify(
-                        "PDotExecute backward"));
+            n3ldg_cuda::Assert(batch[idx]->getLoss().verify("PDotExecutor backward"));
         }
 
         for (Node *node : batch) {
             PDotNode *dot = static_cast<PDotNode*>(node);
-            n3ldg_cuda::Assert(dot->in1->loss.verify(
-                        "PDotExecute backward in1"));
-            n3ldg_cuda::Assert(dot->in2->loss.verify(
-                        "PDotExecute backward in2"));
+            n3ldg_cuda::Assert(dot->in1->getLoss().verify("PDotExecutor backward in1"));
+            n3ldg_cuda::Assert(dot->in2->getLoss().verify("PDotExecutor backward in2"));
         }
 #endif
     }
@@ -531,96 +520,108 @@ private:
     std::vector<dtype*> ins2;
 };
 #else
-class PDotExecute :public Execute {
+class PDotExecutor :public Executor {
 };
 #endif
 
 
-PExecute PDotNode::generate() {
-    PDotExecute* exec = new PDotExecute();
+PExecutor PDotNode::generate() {
+    PDotExecutor* exec = new PDotExecutor();
     exec->batch.push_back(this);
     return exec;
 }
 
 class DropoutNode : public Node {
 public:
-    Node* in = NULL;
-    Tensor1D drop_mask;
-    dtype drop_value = 0.0f;
-    bool is_training = true;
+    DropoutNode(dtype dropout, bool is_training) : Node("dropout"), drop_value_(dropout),
+    is_training_(is_training) {}
 
-    DropoutNode() {
-        node_type = "dropout";
-    }
-
-    void init(int dimm, dtype dropout) {
+    void init(int dimm) override {
         Node::init(dimm);
-        drop_value = dropout;
-        drop_mask.init(dimm);
+        drop_mask_.init(dimm);
     }
 
 #if USE_GPU
-    void initOnHostAndDevice(int ndim, dtype dropout) {
+    void initOnHostAndDevice(int ndim) override {
         Node::initOnHostAndDevice(ndim);
-        drop_mask.init(ndim);
+        drop_mask_.init(ndim);
     }
 #endif
 
     virtual void generate_dropmask() {
-        int dropNum = (int)(dim * drop_value);
-        std::vector<int> tmp_masks(dim);
-        for (int idx = 0; idx < dim; idx++) {
+        int dropNum = (int)(getDim() * drop_value_);
+        std::vector<int> tmp_masks(getDim());
+        for (int idx = 0; idx < getDim(); idx++) {
             tmp_masks[idx] = idx < dropNum ? 0 : 1;
         }
         random_shuffle(tmp_masks.begin(), tmp_masks.end());
-        for (int idx = 0; idx < dim; idx++) {
-            drop_mask[idx] = tmp_masks[idx];
+        for (int idx = 0; idx < getDim(); idx++) {
+            drop_mask_[idx] = tmp_masks[idx];
         }
     }
 
     void forward(Graph &graph, Node &x) {
-        in = &x;
-        degree = 0;
-        in->addParent(this);
+        in_ = &x;
+        in_->addParent(this);
         graph.addNode(this);
     }
 
     void compute() override {
-        if (is_training) {
+        if (is_training_) {
 #if !TEST_CUDA
             generate_dropmask();
 #endif
         } else {
-            drop_mask = 1 - drop_value;
+            drop_mask_ = 1 - drop_value_;
         }
-//        std::cout << "before compute:" << in->val.toString() << std::endl;
-        val.vec() = in->val.vec() * drop_mask.vec();
-//        std::cout << "after compute:" << val.toString() << std::endl;
+//        cout << boost::format("compute is_training:%1%\n") % is_training_;
+//        std::cout << "before compute:" << in_->val().toString() << std::endl;
+        val().vec() = in_->val().vec() * drop_mask_.vec();
+//        std::cout << "after compute:" << val().toString() << std::endl;
     }
 
     void backward() override {
-//        std::cout << "before backward:" << loss.toString() << std::endl;
-        in->loss.vec() += loss.vec() * drop_mask.vec();
-//        std::cout << "after backward:" << in->loss.toString() << std::endl;
+//        cout << boost::format("backward is_training:%1%\n") % is_training_;
+//        std::cout << "before backward:" << loss().toString() << std::endl;
+        in_->loss().vec() += loss().vec() * drop_mask_.vec();
+//        std::cout << "after backward:" << in_->loss().toString() << std::endl;
     }
 
     bool typeEqual(Node *other) override {
         DropoutNode *o = static_cast<DropoutNode*>(other);
-        if (o->is_training != is_training) {
+        if (o->is_training_ != is_training_) {
             std::cerr << "is_training not equal" << std::endl;
             abort();
         }
-        return Node::typeEqual(other) && abs(drop_value - o->drop_value) < 0.001f;
+        return Node::typeEqual(other) && abs(drop_value_ - o->drop_value_) < 0.001f;
     }
 
     size_t typeHashCode() const override {
-        return Node::typeHashCode() ^ (std::hash<int>{}((int)(10000 * drop_value)) << 1);
+        return Node::typeHashCode() ^ (std::hash<int>{}((int)(10000 * drop_value_)) << 1);
     }
 
-    PExecute generate() override;
+    PExecutor generate() override;
+
+    Node* in() {
+        return in_;
+    }
+
+    bool isTraning() {
+        return is_training_;
+    }
+
+    Tensor1D &dropMask() {
+        return drop_mask_;
+    }
+
+private:
+    Node* in_ = nullptr;
+    Tensor1D drop_mask_;
+    dtype drop_value_ = 0.0f;
+    bool is_training_ = true;
 };
 
-class DropoutExecute :public Execute {
+class DropoutExecutor :public Executor {
   public:
     Tensor2D drop_mask;
     dtype drop_value;
@@ -643,10 +644,10 @@ class DropoutExecute :public Execute {
         for (Node *n : batch) {
             DropoutNode *tanh = static_cast<DropoutNode*>(n);
 #if TEST_CUDA
-            tanh->in->val.copyFromHostToDevice();
+            tanh->in()->val().copyFromHostToDevice();
 #endif
-            xs.push_back(tanh->in->val.value);
-            ys.push_back(tanh->val.value);
+            xs.push_back(tanh->in()->getVal().value);
+            ys.push_back(tanh->getVal().value);
         }
 
         CalculateDropMask(count, dim, drop_mask);
@@ -656,12 +657,12 @@ class DropoutExecute :public Execute {
         for (int i = 0; i < count; ++i) {
             for (int j = 0; j < dim; ++j) {
                 dtype v = drop_mask[i][j];
-                static_cast<DropoutNode*>(batch.at(i))->drop_mask[j] = v <= drop_value ? 0 : 1;
+                static_cast<DropoutNode*>(batch.at(i))->dropMask()[j] = v <= drop_value ? 0 : 1;
             }
         }
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
-            n3ldg_cuda::Assert(batch.at(idx)->val.verify("Dropout forward"));
+            n3ldg_cuda::Assert(batch.at(idx)->val().verify("Dropout forward"));
         }
 #endif
     }
@@ -675,12 +676,12 @@ class DropoutExecute :public Execute {
         for (Node *n : batch) {
             DropoutNode *tanh = static_cast<DropoutNode*>(n);
 #if TEST_CUDA
-            tanh->loss.copyFromHostToDevice();
-            tanh->in->loss.copyFromHostToDevice();
+            tanh->loss().copyFromHostToDevice();
+            tanh->in()->loss().copyFromHostToDevice();
 #endif
-            vals.push_back(tanh->val.value);
-            losses.push_back(tanh->loss.value);
-            in_losses.push_back(tanh->in->loss.value);
+            vals.push_back(tanh->val().value);
+            losses.push_back(tanh->loss().value);
+            in_losses.push_back(tanh->in()->loss().value);
         }
         n3ldg_cuda::DropoutBackward(losses, vals, count, dim, is_training, drop_mask.value,
                 drop_value, in_losses);
@@ -690,18 +691,18 @@ class DropoutExecute :public Execute {
         }
         for (Node *n : batch) {
             DropoutNode *tanh = static_cast<DropoutNode*>(n);
-            n3ldg_cuda::Assert(tanh->in->loss.verify("DropoutExecute backward"));
+            n3ldg_cuda::Assert(tanh->in()->loss().verify("DropoutExecutor backward"));
         }
 #endif
     }
 #endif
 };
 
-PExecute DropoutNode::generate() {
-    DropoutExecute* exec = new DropoutExecute();
+PExecutor DropoutNode::generate() {
+    DropoutExecutor* exec = new DropoutExecutor();
     exec->batch.push_back(this);
-    exec->is_training = is_training;
-    exec->dim = dim;
+    exec->is_training = isTraning();
+    exec->dim = getDim();
     return exec;
 }
 

@@ -46,7 +46,6 @@ class ModelUpdate {
         }
     }
 
-
     void update() {
         for (int idx = 0; idx < _params.size(); idx++) {
             _params[idx]->updateAdagrad(_alpha, _reg, _eps);
@@ -58,13 +57,6 @@ class ModelUpdate {
         dtype sumNorm = 0.0;
         for (int idx = 0; idx < _params.size(); idx++) {
             sumNorm += _params[idx]->squareGradNorm();
-        }
-        if (std::isnan(double(sumNorm)) || sumNorm > 1e20) { //too large
-#if USE_GPU
-            abort();
-#endif
-            clearGrad();
-            return;
         }
         dtype norm = sqrt(sumNorm);
         if (norm > maxScale) {
@@ -106,6 +98,37 @@ class ModelUpdate {
             p->copyFromHostToDevice();
         }
 #endif
+    }
+
+    void updateAdamW(dtype max_scale) {
+#if TEST_CUDA
+        max_scale = 10;
+#endif
+        dtype sumNorm = 0.0;
+        for (int idx = 0; idx < _params.size(); idx++) {
+            sumNorm += _params[idx]->squareGradNorm();
+        }
+        dtype norm = sqrt(sumNorm);
+        if (max_scale > 0 && norm > max_scale) {
+            dtype scale = max_scale / norm;
+            for (int idx = 0; idx < _params.size(); idx++) {
+                _params[idx]->rescaleGrad(scale);
+            }
+        }
+
+        updateAdamW();
+#if TEST_CUDA
+        for (BaseParam *p : _params) {
+            p->copyFromHostToDevice();
+        }
+#endif
+    }
+
+    void updateAdamW() {
+        for (int idx = 0; idx < _params.size(); idx++) {
+            _params[idx]->updateAdamW(_belta1, _belta2, _alpha, _reg, _eps);
+            _params[idx]->clearGrad();
+        }
     }
 
     void rescaleGrad(dtype scale) {

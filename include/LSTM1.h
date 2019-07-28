@@ -16,6 +16,7 @@
 #include "PMultiOP.h"
 #include "PAddOP.h"
 #include "BucketOP.h"
+#include "UniOP.h"
 
 #include <memory>
 
@@ -131,7 +132,7 @@ struct DynamicLSTMBuilder {
 
     std::vector<TanhNode*> _halfhiddens;
     std::vector<PMultiNode*> _hiddens_before_dropout;
-    std::vector<DropoutNode*> _hiddens;
+    std::vector<Node*> _hiddens;
 
     int size() {
         return _hiddens.size();
@@ -153,120 +154,105 @@ struct DynamicLSTMBuilder {
         LinearNode *inputgate_hidden = new LinearNode;
         inputgate_hidden->init(out_dim);
         inputgate_hidden->setParam(lstm_params.input_hidden);
-        inputgate_hidden->node_name = "inputgate_hidden";
+        inputgate_hidden->setNodeName("lstm inputgate_hidden");
         _inputgates_hidden.push_back(inputgate_hidden);
 
         LinearNode *inputgate_input = new LinearNode;
         inputgate_input->init(out_dim);
         inputgate_input->setParam(lstm_params.input_input);
-        inputgate_input->node_name = "inputgate_input";
+        inputgate_input->setNodeName("lstm inputgate_input");
         _inputgates_input.push_back(inputgate_input);
 
         LinearNode *forgetgate_hidden = new LinearNode;
         forgetgate_hidden->init(out_dim);
         forgetgate_hidden->setParam(lstm_params.forget_hidden);
-        forgetgate_hidden->node_name = "forgetgate_hidden";
+        forgetgate_hidden->setNodeName("lstm forgetgate_hidden");
         _forgetgates_hidden.push_back(forgetgate_hidden);
 
         LinearNode *forgetgate_input = new LinearNode;
         forgetgate_input->init(out_dim);
         forgetgate_input->setParam(lstm_params.forget_input);
-        forgetgate_input->node_name = "forgetgate_input";
+        forgetgate_input->setNodeName("lstm forgetgate_input");
         _forgetgates_input.push_back(forgetgate_input);
 
         LinearNode *halfcell_hidden = new LinearNode;
         halfcell_hidden->init(out_dim);
         halfcell_hidden->setParam(lstm_params.cell_hidden);
-        halfcell_hidden->node_name = "halfcell_hidden";
+        halfcell_hidden->setNodeName("lstm halfcell_hidden");
         _halfcells_hidden.push_back(halfcell_hidden);
 
         LinearNode *halfcell_input = new LinearNode;
         halfcell_input->init(out_dim);
         halfcell_input->setParam(lstm_params.cell_input);
-        halfcell_input->node_name = "halfcell_input";
+        halfcell_input->setNodeName("lstm halfcell_input");
         _halfcells_input.push_back(halfcell_input);
 
         LinearNode *outputgate_hidden = new LinearNode;
         outputgate_hidden->init(out_dim);
         outputgate_hidden->setParam(lstm_params.output_hidden);
-        outputgate_hidden->node_name = "outputgate_hidden";
+        outputgate_hidden->setNodeName("lstm outputgate_hidden");
         _outputgates_hidden.push_back(outputgate_hidden);
 
         LinearNode *outputgate_input = new LinearNode;
         outputgate_input->init(out_dim);
         outputgate_input->setParam(lstm_params.output_input);
-        outputgate_input->node_name = "outputgate_input";
+        outputgate_input->setNodeName("lstm outputgate_input");
         _outputgates_input.push_back(outputgate_input);
 
         PMultiNode *inputfilter = new PMultiNode;
         inputfilter->init(out_dim);
-        inputfilter->node_name = "inputfilter";
         _inputfilters.push_back(inputfilter);
 
         PMultiNode *forgetfilter = new PMultiNode;
         forgetfilter->init(out_dim);
-        forgetfilter->node_name = "forgetfilter";
         _forgetfilters.push_back(forgetfilter);
 
         PAddNode *cell = new PAddNode;
         cell->init(out_dim);
-        cell->node_name = "cell";
         _cells.push_back(cell);
 
         TanhNode *halfhidden = new TanhNode;
         halfhidden->init(out_dim);
-        halfhidden->node_name = "halfhidden";
         _halfhiddens.push_back(halfhidden);
 
         PMultiNode *hidden_before_dropout = new PMultiNode;
         hidden_before_dropout->init(out_dim);
-        hidden_before_dropout->node_name = "hidden_before_dropout";
         _hiddens_before_dropout.push_back(hidden_before_dropout);
 
-        DropoutNode *hidden = new DropoutNode;
-        hidden->init(out_dim, dropout);
-        hidden->is_training = is_training;
-        hidden->node_name = "hidden";
+        DropoutNode *hidden = new DropoutNode(dropout, is_training);
+        hidden->init(out_dim);
         _hiddens.push_back(hidden);
 
         PAddNode * inputgate_add = new PAddNode;
         inputgate_add->init(out_dim);
-        inputgate_add->node_name = "inputgate_add";
         _inputgates_add.push_back(inputgate_add);
 
         SigmoidNode *inputgate = new SigmoidNode;
         inputgate->init(out_dim);
-        inputgate->node_name = "inputgate";
         _inputgates.push_back(inputgate);
 
         PAddNode *forgetgate_add = new PAddNode;
         forgetgate_add->init(out_dim);
-        forgetgate_add->node_name = "forgetgate_add";
         _forgetgates_add.push_back(forgetgate_add);
 
         SigmoidNode *forgetgate = new SigmoidNode;
         forgetgate->init(out_dim);
-        forgetgate->node_name = "forgetgate";
         _forgetgates.push_back(forgetgate);
 
         PAddNode *halfcell_add = new PAddNode;
         halfcell_add->init(out_dim);
-        halfcell_add->node_name = "halfcell_add";
         _halfcells_add.push_back(halfcell_add);
 
         TanhNode *halfcell = new TanhNode;
         halfcell->init(out_dim);
-        halfcell->node_name = "halfcell";
         _halfcells.push_back(halfcell);
 
         PAddNode *outputgate_add = new PAddNode;
         outputgate_add->init(out_dim);
-        outputgate_add->node_name = "outputgate_add";
         _outputgates_add.push_back(outputgate_add);
 
         SigmoidNode *outputgate = new SigmoidNode;
         outputgate->init(out_dim);
-        outputgate->node_name = "outputgate";
         _outputgates.push_back(outputgate);
 
         _inputgates_hidden.at(len)->forward(graph, *last_hidden);
@@ -299,7 +285,7 @@ struct DynamicLSTMBuilder {
         _halfhiddens.at(len)->forward(graph, *_cells.at(len));
         _hiddens_before_dropout.at(len)->forward(graph, *_halfhiddens.at(len),
                 *_outputgates.at(len));
-        _hiddens.at(len)->forward(graph, *_hiddens_before_dropout.at(len));
+        ((DropoutNode*)_hiddens.at(len))->forward(graph, *_hiddens_before_dropout.at(len));
     }
 };
 

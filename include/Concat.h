@@ -23,10 +23,9 @@ public:
     vector<int> inDims;
     vector<PNode> ins;
 
-    ConcatNode() : Node() {
+    ConcatNode() : Node("concat") {
         inDims.clear();
         ins.clear();
-        node_type = "concat";
     }
 
     void forward(Graph &cg, const vector<PNode>& x) {
@@ -40,7 +39,6 @@ public:
             ins.push_back(x[i]);
         }
 
-        degree = 0;
         int nSize = ins.size();
         for (int i = 0; i < nSize; ++i) {
             ins[i]->addParent(this);
@@ -48,20 +46,20 @@ public:
         inDims.clear();
         int curDim = 0;
         for (int i = 0; i < nSize; ++i) {
-            inDims.push_back(ins[i]->val.dim);
+            inDims.push_back(ins[i]->val().dim);
             curDim += inDims[i];
         }
-        if (curDim != dim) {
-            std::cout << "input dim size not match" << curDim << "\t" << dim << std::endl;
+        if (curDim != getDim()) {
+            std::cerr << "input dim size not match" << curDim << "\t" << getDim() << std::endl;
             abort();
         }
         cg.addNode(this);
     }
 
-    PExecute generate();
+    PExecutor generate() override;
 
     // better to rewrite for deep understanding
-    bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) override {
         if (!Node::typeEqual(other)) {
             return false;
         }
@@ -87,23 +85,23 @@ public:
         return hash_code;
     }
 
-    void compute() {
+    void compute() override {
         int nSize = ins.size();
         int offset = 0;
         for (int i = 0; i < nSize; ++i) {
-            memcpy(val.v + offset, ins.at(i)->val.v,
+            memcpy(val().v + offset, ins.at(i)->val().v,
                     inDims.at(i) * sizeof(dtype));
             offset += inDims[i];
         }
     }
 
 
-    void backward() {
+    void backward() override {
         int nSize = ins.size();
         int offset = 0;
         for (int i = 0; i < nSize; ++i) {
             for (int idx = 0; idx < inDims[i]; idx++) {
-                ins[i]->loss[idx] += loss[offset + idx];
+                ins[i]->loss()[idx] += loss()[offset + idx];
             }
             offset += inDims[i];
         }
@@ -112,7 +110,7 @@ public:
 };
 
 #if USE_GPU
-class ConcatExecute : public Execute {
+class ConcatExecutor : public Executor {
   public:
     int outDim;
     int inCount;
@@ -126,9 +124,9 @@ class ConcatExecute : public Execute {
         for (Node *node : batch) {
             ConcatNode *concat = static_cast<ConcatNode*>(node);
             for (Node *in : concat->ins) {
-                in_vals.push_back(in->val.value);
+                in_vals.push_back(in->val().value);
             }
-            vals.push_back(node->val.value);
+            vals.push_back(node->val().value);
         }
 
         n3ldg_cuda::ConcatForward(in_vals, static_cast<ConcatNode*>(batch.at(0))->inDims, vals,
@@ -136,7 +134,7 @@ class ConcatExecute : public Execute {
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
-            n3ldg_cuda::Assert(batch[idx]->val.verify("concat forward"));
+            n3ldg_cuda::Assert(batch[idx]->val().verify("concat forward"));
         }
 #endif
     }
@@ -149,9 +147,9 @@ class ConcatExecute : public Execute {
         for (Node *node : batch) {
             ConcatNode *concat = static_cast<ConcatNode*>(node);
             for (Node *in : concat->ins) {
-                in_losses.push_back(in->loss.value);
+                in_losses.push_back(in->loss().value);
             }
-            losses.push_back(node->loss.value);
+            losses.push_back(node->loss().value);
         }
 
         n3ldg_cuda::ConcatBackward(in_losses, static_cast<ConcatNode*>(batch.at(0))->inDims,
@@ -163,19 +161,19 @@ class ConcatExecute : public Execute {
         for (int idx = 0; idx < count; idx++) {
             for (int j = 0; j < inCount; ++j) {
                 n3ldg_cuda::Assert(static_cast<ConcatNode *>(batch[idx])->
-                        ins[j]->loss.verify("concat backward"));
+                        ins[j]->loss().verify("concat backward"));
             }
         }
 #endif
     }
 };
 #else
-class ConcatExecute : public Execute {
+class ConcatExecutor : public Executor {
 };
 #endif
 
-PExecute ConcatNode::generate() {
-    ConcatExecute* exec = new ConcatExecute();
+PExecutor ConcatNode::generate() {
+    ConcatExecutor* exec = new ConcatExecutor();
     exec->batch.push_back(this);
 #if USE_GPU
     exec->inCount = this->ins.size();

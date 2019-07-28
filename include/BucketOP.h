@@ -9,21 +9,18 @@
 *  Created on: Apr 21, 2017
 *      Author: mszhang
 */
-
+#include <vector>
 #include "Eigen/Dense"
 #include "MyLib.h"
 #include "Node.h"
 #include "Graph.h"
 
 using namespace Eigen;
-
-
+using std::vector;
 
 class BucketNode : public Node {
 public:
-    BucketNode() : Node() {
-        node_type = "bucket";
-    }
+    BucketNode() : Node("bucket") {}
 
     virtual void init(int ndim) {
 #if USE_GPU
@@ -33,67 +30,82 @@ public:
 #endif
     }
 
-    void forward(Graph &graph, dtype value) {
-        this->forward(&graph, value);
+    void forward(Graph &graph, const vector<dtype> &input) {
+        if (input.size() != getDim()) {
+            cerr << boost::format("input size %1% is not equal to dim %2%") % input.size() %
+                getDim() << endl;
+            abort();
+        }
+        input_ = input;
+        graph.addNode(this);
     }
 
-    void forward(Graph *cg, dtype value) {
-#if TEST_CUDA
-        val  = value;
-        loss = 0;
-#endif
-#if USE_GPU
-        n3ldg_cuda::Memset(val.value, dim, value);
-        n3ldg_cuda::Memset(loss.value, dim, 0.0f);
-#if TEST_CUDA
-        n3ldg_cuda::Assert(val.verify("bucket forward"));
-        n3ldg_cuda::Assert(loss.verify("loss verify"));
-#endif
-#else
-        val = value;
-        loss = 0;
-#endif
-        degree = 0;
-        cg->addNode(this);
+    void forward(Graph &graph, dtype v) {
+        vector<dtype> input;
+        for (int i = 0; i < getDim(); ++i) {
+            input.push_back(v);
+        }
+        forward(graph, input);
     }
 
     void forward(Graph &graph) {
-        this->forward(&graph);
+        forward(graph, 0);
     }
 
-    void forward(Graph *cg) {
+    void compute() {
+        abort();
+    }
+
+    void backward() {
+        abort();
+    }
+
+    PExecutor generate();
+
+private:
+    vector<dtype> input_;
+    friend class BucketExecutor;
+};
+
+class BucketExecutor : public Executor {
+public:
+    void forward() override {
 #if USE_GPU
-        n3ldg_cuda::Memset(loss.value, dim, 0.0f);
-#else
-        loss = 0;
+        int count = batch.size();
+        vector<dtype*> ys;
+        vector<dtype> cpu_x;
+        cpu_x.reserve(getDim() * count);
+        for (Node *node : batch) {
+            BucketNode *bucket = static_cast<BucketNode*>(node);
+            ys.push_back(bucket->val().value);
+            for (int i = 0; i < getDim(); ++i) {
+                cpu_x.push_back(bucket->input_.at(i));
+            }
+        }
+        n3ldg_cuda::BucketForward(cpu_x, count, getDim(), ys);
+#if TEST_CUDA
+        for (Node *node : batch) {
+            BucketNode *bucket = static_cast<BucketNode*>(node);
+            dtype *v = node->val().v;
+            for (int i = 0; i < getDim(); ++i) {
+                v[i] = bucket->input_.at(i);
+            }
+            n3ldg_cuda::Assert(node->val().verify("bucket forward"));
+        }
 #endif
-        degree = 0;
-        cg->addNode(this);
+#else
+        for (Node *node : batch) {
+            BucketNode *bucket = static_cast<BucketNode*>(node);
+            node->val() = bucket->input_;
+        }
+#endif
     }
 
-    void forwardArr(Graph *cg, dtype *value) {
-      degree = 0;
-      Vec(val.v, dim) = Vec(value, dim);
-      cg->addNode(this);
-    }
-
-    void compute() {}
-
-    void backward() {}
-
-    PExecute generate();
-
-    bool typeEqual(PNode other) {
-        return Node::typeEqual(other);
-    }
-
+    void backward() override {}
 };
 
-class BucketExecute : public Execute {
-};
-
-PExecute BucketNode::generate() {
-    BucketExecute* exec = new BucketExecute();
+PExecutor BucketNode::generate() {
+    BucketExecutor* exec = new BucketExecutor();
     exec->batch.push_back(this);
     return exec;
 }

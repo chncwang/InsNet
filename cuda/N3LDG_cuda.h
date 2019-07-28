@@ -176,7 +176,7 @@ struct BoolArray {
 bool Verify(bool *host, bool *device, int len, const char* message);
 bool Verify(int *host, int *device, int len, const char* message);
 
-void Assert(bool v);
+void Assert(bool v, const std::string &message = "");
 void Memset(dtype *p, int len, dtype value);
 void Memset(bool *p, int len, bool value);
 void *Malloc(int size);
@@ -185,7 +185,7 @@ void BatchMemset(const std::vector<dtype*> &vec, int count, int dim,
 void PrintNums(const dtype* p, int len);
 void PrintInts(const int* p, int len);
 
-void InitCuda(int device_id = 0);
+void InitCuda(int device_id = 0, float memory_in_gb = 0.0f);
 void EndCuda();
 
 cudaError_t MyCudaMemcpy(void *dest, const void *src, size_t count, cudaMemcpyKind kind);
@@ -240,6 +240,7 @@ void DropoutBackward(const std::vector<dtype*> &losses,
         const dtype *drop_mask,
         dtype drop_factor,
         std::vector<dtype*> &in_losses);
+void BucketForward(const std::vector<dtype> input, int count, int dim, std::vector<dtype*> &ys);
 void CopyForUniNodeForward(const std::vector<dtype*> &xs, const dtype* b,
         dtype* xs_dest,
         dtype* b_dest,
@@ -256,6 +257,7 @@ void CopyForBiNodeForward(const std::vector<dtype*>& x1s,
         int count,
         int x1_len,
         int x2_len,
+        bool use_b,
         int b_len);
 void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y, int row, int col,
         int count,
@@ -283,7 +285,8 @@ void AddLtyToParamBiasAndAddLxToInputLossesForBiBackward(const dtype *lty,
         int count,
         int out_dim,
         int in_dim1,
-        int in_dim2);
+        int in_dim2,
+        bool use_b);
 void CalculateDropoutMask(dtype dropout_ratio, int count, int dim, dtype *mask);
 void ConcatForward(const std::vector<dtype*> &in_vals,
         const std::vector<int> &in_dims,
@@ -413,6 +416,14 @@ void UpdateAdam(dtype *val, dtype *grad, int row, int col, dtype *aux_mean,
         dtype *aux_square,
         const bool *indexers,
         int *iters,
+        dtype belta1,
+        dtype belta2,
+        dtype alpha,
+        dtype reg,
+        dtype eps);
+void UpdateAdamW(dtype *val, dtype *grad, int row, int col, bool is_bias, dtype *aux_mean,
+        dtype *aux_square,
+        int iter,
         dtype belta1,
         dtype belta2,
         dtype alpha,

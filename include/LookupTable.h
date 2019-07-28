@@ -32,6 +32,7 @@ public:
     int nDim;
     int nVSize;
     int nUNKId;
+    bool inited = false;
 
     LookupTable() {
         nVSize = 0;
@@ -51,10 +52,13 @@ public:
 #endif
 
     void init(const Alphabet &alpha, int dim, bool fineTune = true) {
-        elems = alpha;
-        nVSize = elems.size();
-        nUNKId = elems.from_string(unknownkey);
-        initWeights(dim, fineTune);
+        if (!inited) {
+            elems = alpha;
+            nVSize = elems.size();
+            nUNKId = elems.from_string(unknownkey);
+            initWeights(dim, fineTune);
+            inited = true;
+        }
     }
 
     //initialization by pre-trained embeddings
@@ -232,11 +236,11 @@ class LookupNode : public Node {
 public:
     LookupTable* param;
     int xid;
+    string word;
 
-    LookupNode() {
+    LookupNode() : Node("lookup") {
         xid = -1;
         param = NULL;
-        node_type = "lookup";
     }
 
     void setParam(LookupTable* paramInit) {
@@ -251,6 +255,7 @@ public:
     //this should be leaf nodes
     void forward(Graph *cg, const string& strNorm) {
         assert(param != NULL);
+        word = strNorm;
         if (!param->findElemId(strNorm)) {
             if (param->nUNKId < 0) {
                 cerr << "nUNKId is negative:" << param->nUNKId << endl;
@@ -260,7 +265,6 @@ public:
         } else {
             xid = param->getElemId(strNorm);
         }
-        degree = 0;
         cg->addNode(this);
     }
 
@@ -268,7 +272,7 @@ public:
         this->forward(&graph, word);
     }
 
-    PExecute generate();
+    PExecutor generate() override;
 
     // better to rewrite for deep understanding
     bool typeEqual(PNode other) override {
@@ -288,25 +292,25 @@ public:
     }
 
     // for which do no require merge
-    void compute() {
+    void compute() override {
         if (xid >= 0) {
-            param->E.value(xid, val);
+            param->E.value(xid, val());
         } else {
-            val.zero();
+            val().zero();
         }
     }
 
-    void backward() {
+    void backward() override {
         assert(param != NULL);
         if (xid == param->nUNKId || (xid >= 0 && param->bFineTune)) {
-            param->E.loss(xid, loss);
+            param->E.loss(xid, loss());
         }
     }
 };
 
 
 #if USE_GPU
-class LookupExecute :public Execute {
+class LookupExecutor :public Executor {
 public:
     int dim;
     LookupTable *table;
@@ -320,14 +324,14 @@ public:
         for (int idx = 0; idx < count; idx++) {
             LookupNode *n = static_cast<LookupNode*>(batch[idx]);
             xids.push_back(n->xid);
-            vals.push_back(n->val.value);
+            vals.push_back(n->val().value);
         }
 
         n3ldg_cuda::LookupForward(xids, table->E.val.value, count, dim, vals);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
-            n3ldg_cuda::Assert(batch[idx]->val.verify("lookup forward"));
+            n3ldg_cuda::Assert(batch[idx]->val().verify("lookup forward"));
         }
 #endif
     }
@@ -337,7 +341,7 @@ public:
         std::vector<dtype*> losses;
         losses.reserve(count);
         for (Node *n : batch) {
-            losses.push_back(n->loss.value);
+            losses.push_back(n->loss().value);
         }
         n3ldg_cuda::LookupBackward(xids, table->nUNKId, table->bFineTune,
                 losses,
@@ -359,15 +363,15 @@ public:
     }
 };
 #else
-class LookupExecute :public Execute {};
+class LookupExecutor :public Executor {};
 #endif
 
-PExecute LookupNode::generate() {
-    LookupExecute* exec = new LookupExecute();
+PExecutor LookupNode::generate() {
+    LookupExecutor* exec = new LookupExecutor();
     exec->batch.push_back(this);
 #if USE_GPU
     exec->table = param;
-    exec->dim = dim;
+    exec->dim = getDim();
 #endif
     return exec;
 }

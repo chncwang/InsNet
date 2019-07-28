@@ -11,6 +11,7 @@
 #include <iostream>
 #include <json/json.h>
 #include <boost/format.hpp>
+#include <boost/range/irange.hpp>
 
 using namespace std;
 
@@ -28,8 +29,9 @@ struct MemoryBlock {
 
     MemoryBlock(void *p, int size, void *buddy = nullptr) {
         static int global_id;
-        if (size <= 0 || size & (size - 1) != 0) {
+        if (size <= 0 || (size & (size - 1)) != 0) {
             std::cerr << "illegal size:" << size << std::endl;
+            abort();
         }
         this->p = p;
         this->size = size;
@@ -58,6 +60,24 @@ public:
 
     cudaError_t Malloc(void **p, int size);
     cudaError_t Free(void *p);
+
+    void Init(float size_in_gb) {
+        cout << boost::format("MemoryPool Init size:%1%") % size_in_gb << endl;
+        vector<void*> pointers;
+        if (size_in_gb > 0.0f) {
+            for (int i = 0; i < static_cast<int>(size_in_gb); ++i) {
+                void *m = NULL;
+                if (this->Malloc(&m, (1 << 30)) != cudaSuccess) {
+                    cerr << "MemoryPool Init: OMM error!" << endl;
+                    abort();
+                }
+                pointers.push_back(m);
+            }
+            for (void* m : pointers) {
+                this->Free(m);
+            }
+        }
+    }
 
     string toString() const {
         Json::Value free_blocks_json;

@@ -9,6 +9,7 @@
 #define SPARSEPARAM_H_
 
 #include "BaseParam.h"
+#include <boost/format.hpp>
 
 // Notice: aux_square is an aux_squareiliary variable to help parameter updating
 // The in-out dimension definiation is different with dense parameters.
@@ -45,7 +46,7 @@ public:
 #endif
 
     // allow sparse and dense parameters have different parameter initization methods
-    void init(int outDim, int inDim) {
+    void init(int outDim, int inDim) override {
         //not in the aligned memory pool
 #if USE_GPU
         val.initOnMemoryAndDevice(outDim, inDim);
@@ -74,7 +75,7 @@ public:
 #endif
     }
 
-    void clearGrad() {
+    void clearGrad() override {
 #if USE_GPU
         n3ldg_cuda::Memset(grad.value, grad.size, 0.0f);
         n3ldg_cuda::Memset(dIndexers.value, grad.col, false);
@@ -93,7 +94,6 @@ public:
 #else
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
-            if (!indexers[index]) continue;
             for (int idx = 0; idx < grad.row; idx++) {
                 grad[index][idx] = 0;
             }
@@ -102,15 +102,15 @@ public:
 #endif
     }
 
-    int outDim() {
+    int outDim() override {
         return val.row;
     }
 
-    int inDim() {
+    int inDim() override {
         return val.col;
     }
 
-    void updateAdagrad(dtype alpha, dtype reg, dtype eps) {
+    void updateAdagrad(dtype alpha, dtype reg, dtype eps) override {
 #if USE_GPU
         n3ldg_cuda::UpdateAdagrad(val.value, grad.value, indexers.size(),
                 grad.col, aux_square.value, dIndexers.value, alpha, reg, eps);
@@ -140,7 +140,7 @@ public:
 #endif
     }
 
-    void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) {
+    void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override {
 #if USE_GPU
         n3ldg_cuda::UpdateAdam(val.value, grad.value, grad.row,
                 indexers.size(),
@@ -187,7 +187,11 @@ public:
 #endif
     }
 
-    void randpoint(int& idx, int &idy) {
+    void updateAdamW(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override {
+        updateAdam(belta1, belta2, alpha, reg, eps);
+    }
+
+    void randpoint(int& idx, int &idy) override {
         //select indexes randomly
         std::vector<int> idRows, idCols;
         int inDim = indexers.size();
@@ -246,7 +250,7 @@ public:
 #endif
     }
 
-    void rescaleGrad(dtype scale) {
+    void rescaleGrad(dtype scale) override {
 #if USE_GPU
         n3ldg_cuda::Rescale(grad.value, grad.size, scale);
 #if TEST_CUDA
@@ -307,7 +311,7 @@ public:
         }
     }
 
-    virtual Json::Value toJson() const {
+    virtual Json::Value toJson() const override {
         Json::Value json;
         json["val"] = val.toJson();
         json["aux_square"] = aux_square.toJson();
@@ -315,7 +319,7 @@ public:
         return json;
     }
 
-    virtual void fromJson(const Json::Value &json) {
+    virtual void fromJson(const Json::Value &json) override {
         val.fromJson(json["val"]);
         aux_square.fromJson(json["aux_square"]);
         aux_mean.fromJson(json["aux_mean"]);
