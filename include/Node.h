@@ -21,6 +21,8 @@
 #include <vector>
 #include "MyTensor.h"
 #include "MyLib.h"
+#include "profiler.h"
+#include <boost/format.hpp>
 #if USE_GPU
 #include "N3LDG_cuda.h"
 using n3ldg_cuda::Tensor1D;
@@ -287,15 +289,25 @@ public:
         return batch.at(batch.size() - 1)->getDim();
     }
 
+    string getNodeType() const {
+        return batch.front()->getNodeType();
+    }
+
     void forwardFully() {
+        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
+        profiler.BeginEvent(getNodeType() + " forward");
         forward();
+        profiler.EndCudaEvent();
         for (Node *node : batch) {
             node->setDegree(-1);
         }
     }
 
     void backwardFully() {
+        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
+        profiler.BeginEvent(getNodeType() + " backward");
         backward();
+        profiler.EndEvent();
     }
 
     virtual void backward() {

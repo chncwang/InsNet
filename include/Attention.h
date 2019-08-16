@@ -18,6 +18,88 @@
 #include <memory>
 #include <boost/format.hpp>
 
+struct DotAttentionParams : public N3LDGSerializable
+#if USE_GPU
+, public TransferableComponents
+#endif
+{
+    BiParams bi_atten;
+    int hidden_dim;
+    int guide_dim;
+
+    DotAttentionParams() = default;
+
+    void exportAdaParams(ModelUpdate& ada) {
+        bi_atten.exportAdaParams(ada);
+    }
+
+    void init(int nHidden, int nGuide) {
+        bi_atten.init(1, nHidden, nGuide, false);
+        hidden_dim = nHidden;
+        guide_dim = nGuide;
+    }
+
+    Json::Value toJson() const override {
+        Json::Value json;
+        json["bi_atten"] = bi_atten.toJson();
+        json["hidden_dim"] = hidden_dim;
+        json["guide_dim"] = guide_dim;
+        return json;
+    }
+
+    void fromJson(const Json::Value &json) override {
+        bi_atten.fromJson(json["bi_atten"]);
+        hidden_dim = json["hidden_dim"].asInt();
+        guide_dim = json["guide_dim"].asInt();
+    }
+
+#if USE_GPU
+    std::vector<Transferable *> transferablePtrs() override {
+        return {&bi_atten};
+    }
+
+    virtual std::string name() const {
+        return "AttentionParams";
+    }
+#endif
+};
+
+class DotAttentionBuilder {
+public:
+    vector<BiNode *> _weights;
+    AttentionSoftMaxNode* _hidden = new AttentionSoftMaxNode;
+
+    DotAttentionParams* _param = nullptr;
+
+    void init(DotAttentionParams &paramInit) {
+        _param = &paramInit;
+        _hidden->init(paramInit.hidden_dim);
+    }
+
+    void forward(Graph &cg, vector<Node *>& x, Node& guide) {
+        if (x.size() == 0) {
+            std::cerr << "empty inputs for lstm operation" << std::endl;
+            abort();
+        }
+
+        if (x.at(0)->getDim() != _param->hidden_dim || guide.getDim() != _param->guide_dim) {
+            std::cerr << "input dim does not match for attention  operation" << std::endl;
+            cerr << boost::format("x.at(0)->dim:%1%, _param->hidden_dim:%2% guide.dim:%3% _param->guide_dim:%4%") % x.at(0)->getDim() % _param->hidden_dim % guide.getDim() % _param->guide_dim << endl;
+            abort();
+        }
+
+        for (int idx = 0; idx < x.size(); idx++) {
+            BiNode* intermediate_node(new BiNode);
+            intermediate_node->init(1);
+            intermediate_node->setParam(_param->bi_atten);
+            intermediate_node->forward(cg, *x.at(idx), guide);
+            _weights.push_back(intermediate_node);
+        }
+        vector<Node *> weights = toNodePointers<BiNode>(_weights);
+        _hidden->forward(cg, x, weights);
+    }
+};
+
 struct AttentionParams : public N3LDGSerializable
 #if USE_GPU
 , public TransferableComponents

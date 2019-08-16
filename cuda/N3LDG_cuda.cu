@@ -1960,6 +1960,27 @@ void SumPoolBackward(PoolingEnum pooling, const std::vector<dtype*> &losses,
     CheckCudaError();
 }
 
+//__global_ void KernelCalculateNormalizedForAttention(const dtype** unnormeds, const int *in_counts,
+//        int max_in_count,
+//        int count,
+//        dtype** normalized_scalars) {
+//    __shared__ volatile extern dtype shared_arr[];
+//    int in_count = in_counts[blockIdx.x];
+//    int global_in_count_i = max_in_count * blockIdx.x + threadIdx.x;
+//    dtype exped_value = threadIdx.x < in_count ? cuda_exp(unnormeds[global_in_count_i][0]) : 0.0f;
+//    shared_arr[threadIdx.x] = exped_value;
+//    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+//        if (threadIdx.x < i) {
+//            int plus_i = threadIdx.x + i;
+//            shared_arr[threadIdx.x] += attention_shared_arr[plus_i];
+//        }
+//        __syncthreads();
+//    }
+//    if (threadIdx.x < in_count) {
+//        normalized_scalars[blockIdx.y][blockIdx.x * max_in_count + threadIdx.x] = mask;
+//    }
+//}
+
 __global__ void KernelScalarAttentionForward(const dtype** ins,
         const dtype **unnormeds,
         const int *in_counts,

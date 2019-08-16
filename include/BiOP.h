@@ -115,6 +115,11 @@ public:
 
     void setParam(BiParams& paramInit) {
         param = &paramInit;
+        if (getDim() != paramInit.W1.outDim()) {
+            cout << boost::format("self dim:%1% param out dim:%2%") % getDim() %
+                paramInit.W1.outDim() << endl;
+            abort();
+        }
     }
 
     void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {

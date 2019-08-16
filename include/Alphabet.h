@@ -113,6 +113,15 @@ public:
         }
     }
 
+    void init(const vector<string> &word_list) {
+        m_size = word_list.size();
+        m_id_to_string = word_list;
+        int i = 0;
+        for (const string &w : word_list) {
+            m_string_to_id.insert(make_pair(w, i++));
+        }
+    }
+
     void init(const unordered_map<string, int>& elem_stat, int cutOff = 0) {
         unordered_map<string, int>::const_iterator elem_iter;
         for (elem_iter = elem_stat.begin(); elem_iter != elem_stat.end(); elem_iter++) {

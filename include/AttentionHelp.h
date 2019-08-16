@@ -43,6 +43,8 @@ public:
         for (int i = 0; i < nSize; i++) {
             if (x.at(i)->val().dim != getDim() || a.at(i)->val().dim != 1) {
                 std::cerr << "input matrixes are not matched" << std::endl;
+                std::cerr << boost::format("x dim:%1% self dim:%2%") % x.at(i)->val().dim %
+                    getDim() << endl;
                 abort();
             }
             ins.push_back(x.at(i));
@@ -118,8 +120,6 @@ public:
     std::vector<dtype*> ins;
 
     void forward() {
-        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-        profiler.BeginEvent("attention forward");
         int count = batch.size();
         in_counts.reserve(count);
         masks.reserve(count);
@@ -166,12 +166,9 @@ public:
             n3ldg_cuda::Assert(n->val().verify("AttentionSoftMaxExecutor forward"));
         }
 #endif
-        profiler.EndCudaEvent();
     }
 
     void backward() {
-        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-        profiler.BeginEvent("attention backward");
         int count = batch.size();
         std::vector<dtype*> losses, in_losses, unnormed_losses;
         losses.reserve(count);
@@ -211,7 +208,6 @@ public:
             }
         }
 #endif
-        profiler.EndCudaEvent();
     }
 };
 #else
