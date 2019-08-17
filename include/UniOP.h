@@ -12,6 +12,7 @@
 
 #include "Param.h"
 #include "MyLib.h"
+#include "SparseParam.h"
 #include "Node.h"
 #include "Graph.h"
 #include "ModelUpdate.h"
@@ -676,18 +677,23 @@ PExecutor LinearNode::generate() {
     return exec;
 };
 
-struct LinearWordVectorNode : public Node {
-    Node *input;
-    SparseParam *param;
+class LinearWordVectorExecutor;
 
-    LinearWordVectorNode() : Node("linear_word_vector_node"), input(nullptr), param(nullptr) {}
+class LinearWordVectorNode : public Node {
+    LinearWordVectorNode() : Node("linear_word_vector_node") {}
 
-    void setParam(SparseParam &word_vectors) {
-        param = &word_vectors;
+    void setParam(SparseParam &word_vectors, int offset = 0) {
+        if (offset + getDim() > word_vectors.inDim()) {
+            cerr << boost::format("offset:%1% getDim():%2% word_vectors.inDim():%3%") % offset %
+                getDim() % word_vectors.inDim() << endl;
+            abort();
+        }
+        param_ = &word_vectors;
+        offset_ = offset;
     }
 
     void forward(Graph &graph, Node &in) {
-        input = &in;
+        input_ = &in;
         in.addParent(this);
         graph.addNode(this);
     }
@@ -703,24 +709,26 @@ struct LinearWordVectorNode : public Node {
     Executor* generate() override;
 
     bool typeEqual(PNode other) override {
-        bool result = Node::typeEqual(other);
-        if (!result) return false;
         LinearWordVectorNode* conv_other = (LinearWordVectorNode*)other;
-        if (param != conv_other->param) {
-            return false;
-        }
-
-        return true;
+        return Node::typeEqual(other) && param_ == conv_other->param_ &&
+            offset_ == conv_other->offset_;
     }
 
     size_t typeHashCode() const override {
-        return Node::typeHashCode() ^ ::typeHashCode(param);
+        return Node::typeHashCode() ^ ::typeHashCode(param_) ^ std::hash<int>{}(offset_);
     }
+
+private:
+    Node *input_ = nullptr;
+    SparseParam *param_ = nullptr;
+    friend class LinearWordVectorExecutor;
+    int offset_ = 0;
 };
 
 #if USE_GPU
 
-struct LinearWordVectorExecutor : public Executor {
+class LinearWordVectorExecutor : public Executor {
+public:
     Tensor2D x, y;
     int inDim, outDim;
     SparseParam *param;
@@ -835,7 +843,8 @@ struct LinearWordVectorExecutor : public Executor {
 
 #else
 
-struct LinearWordVectorExecutor : public Executor {
+class LinearWordVectorExecutor : public Executor {
+public:
     Tensor2D x, y;
     int inDim, outDim;
     SparseParam *param;
@@ -847,9 +856,11 @@ struct LinearWordVectorExecutor : public Executor {
 
         for (int i = 0; i < count; i++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
-            memcpy(x.v + i * inDim, ptr->input->val().v, inDim * sizeof(dtype));
+            memcpy(x.v + i * inDim, ptr->input_->val().v, inDim * sizeof(dtype));
         }
-        y.mat() = param->val.mat().transpose() * x.mat();
+        int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
+        Mat scoped_matrix(param->val.mat().data() + offset * inDim, inDim, outDim);
+        y.mat() = scoped_matrix.transpose() * x.mat();
 
         for (int i = 0; i < count; i++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[i];
@@ -868,6 +879,8 @@ struct LinearWordVectorExecutor : public Executor {
             memcpy(ly.v + idx * outDim, ptr->loss().v, outDim * sizeof(dtype));
         }
 
+        auto scoped_grad = x.mat() * ly.mat().transpose();
+
         param->grad.mat() += x.mat() * ly.mat().transpose();
 
         lx.mat() = param->val.mat() * ly.mat();
@@ -875,7 +888,7 @@ struct LinearWordVectorExecutor : public Executor {
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
             for (int idy = 0; idy < inDim; idy++) {
-                ptr->input->loss()[idy] += lx[idx][idy];
+                ptr->input_->loss()[idy] += lx[idx][idy];
             }
         }
     }
@@ -886,9 +899,9 @@ struct LinearWordVectorExecutor : public Executor {
 Executor* LinearWordVectorNode::generate() {
     LinearWordVectorExecutor* exec = new LinearWordVectorExecutor();
     exec->batch.push_back(this);
-    exec->inDim = param->outDim();
-    exec->outDim = param->inDim();
-    exec->param = param;
+    exec->inDim = param_->outDim();
+    exec->outDim = param_->inDim();
+    exec->param = param_;
     return exec;
 }
 

@@ -12,6 +12,7 @@
 #include "serializable.h"
 #include <boost/format.hpp>
 #include <iostream>
+#include <iostream>
 
 using namespace Eigen;
 
@@ -76,7 +77,10 @@ struct Tensor1D : public N3LDGSerializable {
     }
 
     dtype& operator[](const int i) {
-        assert(i < dim);
+        if (i >= dim) {
+            std::cerr << "i >= dim" << std::endl;
+            abort();
+        }
         return v[i];  // no boundary check?
     }
 

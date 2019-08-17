@@ -23,10 +23,7 @@ public:
     vector<int> inDims;
     vector<PNode> ins;
 
-    ConcatNode() : Node("concat") {
-        inDims.clear();
-        ins.clear();
-    }
+    ConcatNode() : Node("concat") {}
 
     void forward(Graph &cg, const vector<PNode>& x) {
         if (x.size() == 0) {
