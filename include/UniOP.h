@@ -680,6 +680,7 @@ PExecutor LinearNode::generate() {
 class LinearWordVectorExecutor;
 
 class LinearWordVectorNode : public Node {
+public:
     LinearWordVectorNode() : Node("linear_word_vector_node") {}
 
     void setParam(SparseParam &word_vectors, int offset = 0) {
@@ -879,7 +880,7 @@ public:
             memcpy(ly.v + idx * outDim, ptr->loss().v, outDim * sizeof(dtype));
         }
 
-        auto scoped_grad = x.mat() * ly.mat().transpose();
+//        auto scoped_grad = x.mat() * ly.mat().transpose();
 
         param->grad.mat() += x.mat() * ly.mat().transpose();
 
