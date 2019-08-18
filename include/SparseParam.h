@@ -9,6 +9,7 @@
 #define SPARSEPARAM_H_
 
 #include "BaseParam.h"
+#include "Node.h"
 #include <boost/format.hpp>
 
 // Notice: aux_square is an aux_squareiliary variable to help parameter updating

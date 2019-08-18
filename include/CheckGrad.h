@@ -4,6 +4,7 @@
 #include "MyLib.h"
 #include <Eigen/Dense>
 #include <functional>
+#include "Node.h"
 
 using namespace Eigen;
 

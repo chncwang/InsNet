@@ -10,9 +10,11 @@
 
 #include "Eigen/Dense"
 #include "BaseParam.h"
+#include "MyTensor.h"
 #if USE_GPU
 #include "N3LDG_cuda.h"
 #endif
+#include "Node.h"
 
 // Notice: aux is an auxiliary variable to help parameter updating
 class Param : public BaseParam {
