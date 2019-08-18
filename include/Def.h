@@ -5,7 +5,7 @@
 #include "Eigen/Dense"
 #include <unsupported/Eigen/CXX11/Tensor>
 
-//#define USE_DOUBLE 1
+#define USE_DOUBLE 1
 
 #if USE_DOUBLE
 #define USE_FLOAT 0
@@ -19,10 +19,12 @@ using namespace Eigen;
 typedef float dtype;
 typedef Eigen::TensorMap<Eigen::Tensor<float, 1>>  Vec;
 typedef Eigen::Map<Matrix<float, Dynamic, Dynamic, ColMajor> > Mat;
+typedef MatrixXf MatrixXdtype;
 #else
 typedef double dtype;
 typedef Eigen::TensorMap<Eigen::Tensor<double, 1>>  Vec;
 typedef Eigen::Map<Matrix<double, Dynamic, Dynamic, ColMajor> > Mat;
+typedef MatrixXd MatrixXdtype;
 #endif
 
 #endif
