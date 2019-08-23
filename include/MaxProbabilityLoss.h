@@ -3,12 +3,13 @@
 
 #include <vector>
 #include <utility>
+#include "Node.h"
 
 #include "MyLib.h"
 
 #if USE_GPU
 std::pair<dtype, std::vector<int>> MaxLogProbabilityLoss(const std::vector<Node*> &result_nodes,
-        const std::vector<int> ids,
+        const std::vector<int> &ids,
         int batchsize) {
     vector<const dtype *> vals;
     vector<dtype*> losses;

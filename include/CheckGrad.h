@@ -5,6 +5,7 @@
 #include <Eigen/Dense>
 #include <functional>
 #include "Node.h"
+#include "BaseParam.h"
 
 using namespace Eigen;
 
