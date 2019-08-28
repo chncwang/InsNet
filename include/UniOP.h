@@ -108,6 +108,10 @@ public:
 
 
     void setParam(UniParams& paramInit) {
+        if (paramInit.W.outDim() != getDim()) {
+            cerr << boost::format("W outDim:%1% dim:%2%") % paramInit.W.outDim() % getDim();
+            abort();
+        }
         param = &paramInit;
     }
 
@@ -117,13 +121,13 @@ public:
     }
 
     void forward(Graph &graph, Node &x) {
-        this->forward(&graph, &x);
-    }
-
-    void forward(Graph *cg, PNode x) {
-        in = x;
+        if (x.getDim() != param->W.inDim()) {
+            cerr << boost::format("x dim:%1% W dim:%2%") % x.getDim() % param->W.inDim() << endl;
+            abort();
+        }
+        in = &x;
         in->addParent(this);
-        cg->addNode(this);
+        graph.addNode(this);
     }
 
     void compute() override {
