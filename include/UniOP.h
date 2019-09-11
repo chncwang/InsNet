@@ -687,13 +687,14 @@ class LinearWordVectorNode : public Node {
 public:
     LinearWordVectorNode() : Node("linear_word_vector_node") {}
 
-    void setParam(SparseParam &word_vectors) {
-        if (getDim() > word_vectors.inDim()) {
-            cerr << boost::format("getDim():%1% word_vectors.inDim():%2%") % 
+    void setParam(SparseParam &word_vectors, int offset = 0) {
+        if (offset + getDim() > word_vectors.inDim()) {
+            cerr << boost::format("offset:%1% getDim():%2% word_vectors.inDim():%3%") % offset %
                 getDim() % word_vectors.inDim() << endl;
             abort();
         }
         param_ = &word_vectors;
+        offset_ = offset;
     }
 
     void forward(Graph &graph, Node &in) {
@@ -714,17 +715,23 @@ public:
 
     bool typeEqual(PNode other) override {
         LinearWordVectorNode* conv_other = (LinearWordVectorNode*)other;
-        return Node::typeEqual(other) && param_ == conv_other->param_;
+        return Node::typeEqual(other) && param_ == conv_other->param_ &&
+            offset_ == conv_other->offset_;
     }
 
     size_t typeHashCode() const override {
-        return Node::typeHashCode() ^ ::typeHashCode(param_);
+        return Node::typeHashCode() ^ ::typeHashCode(param_) ^ std::hash<int>{}(offset_);
+    }
+
+    int getOffset() const {
+        return offset_;
     }
 
 private:
     Node *input_ = nullptr;
     SparseParam *param_ = nullptr;
     friend class LinearWordVectorExecutor;
+    int offset_ = 0;
 };
 
 #if USE_GPU
@@ -860,7 +867,8 @@ public:
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
             memcpy(x.v + i * inDim, ptr->input_->val().v, inDim * sizeof(dtype));
         }
-        Mat scoped_matrix(param->val.mat().data(), inDim, outDim);
+        int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
+        Mat scoped_matrix(param->val.mat().data() + offset * inDim, inDim, outDim);
         y.mat() = scoped_matrix.transpose() * x.mat();
 
         for (int i = 0; i < count; i++) {
@@ -880,11 +888,17 @@ public:
             memcpy(ly.v + idx * outDim, ptr->loss().v, outDim * sizeof(dtype));
         }
 
-//        auto scoped_grad = x.mat() * ly.mat().transpose();
+        int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
+        auto scoped_grad = x.mat() * ly.mat().transpose();
+        MatrixXdtype full_grad(inDim, outDim), left(inDim, offset),
+                     right(inDim, param->inDim() - offset - outDim);
+        full_grad << left, scoped_grad, right;
+        param->grad.mat() += full_grad;
+        //        param->grad.mat() += scoped_grad;
 
-        param->grad.mat() += x.mat() * ly.mat().transpose();
-
-        lx.mat() = param->val.mat() * ly.mat();
+        Mat scoped_matrix(param->val.mat().data() + offset * inDim, inDim, outDim);
+        lx.mat() = scoped_matrix * ly.mat();
+        //        lx.mat() = param->val.mat() * ly.mat();
 
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
