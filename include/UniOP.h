@@ -872,7 +872,7 @@ public:
         y.mat() = scoped_matrix.transpose() * x.mat();
 
         for (int i = 0; i < count; i++) {
-            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[i];
+            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
             memcpy(ptr->val().v, y.v + i * outDim, outDim * sizeof(dtype));
         }
     }
@@ -890,7 +890,7 @@ public:
 
         int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
         auto scoped_grad = x.mat() * ly.mat().transpose();
-        MatrixXdtype full_grad(inDim, outDim), left(inDim, offset),
+        MatrixXdtype full_grad(inDim, param->inDim()), left(inDim, offset),
                      right(inDim, param->inDim() - offset - outDim);
         full_grad << left, scoped_grad, right;
         param->grad.mat() += full_grad;
@@ -915,7 +915,7 @@ Executor* LinearWordVectorNode::generate() {
     LinearWordVectorExecutor* exec = new LinearWordVectorExecutor();
     exec->batch.push_back(this);
     exec->inDim = param_->outDim();
-    exec->outDim = param_->inDim();
+    exec->outDim = getDim();
     exec->param = param_;
     return exec;
 }

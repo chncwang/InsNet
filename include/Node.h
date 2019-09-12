@@ -317,8 +317,11 @@ public:
     }
 
     virtual bool addNode(PNode in) {
+        if (in == nullptr) {
+            cerr << "in is nullptr" << endl;
+            abort();
+        }
         if (batch.empty()) {
-            std::cout << "empty batch, strange...." << std::endl;
             return false;
         }
 

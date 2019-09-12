@@ -90,6 +90,10 @@ public:
     }
 
     void addNode(Node *x) {
+        if (x == nullptr) {
+            cerr << "x is nullptr" << endl;
+            abort();
+        }
         static int index;
         x->setNodeIndex(index++);
         nodes.push_back(x);
