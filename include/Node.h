@@ -111,6 +111,12 @@ dtype fselu(const dtype& x) {
 }
 
 class Executor;
+class Node;
+
+class NodeContainer {
+public:
+    virtual void addNode(Node *node) = 0;
+};
 
 class Node {
 public:
@@ -219,6 +225,13 @@ public:
     const vector<Node*> getParents() const {
         return parents_;
     }
+protected:
+    void afterForward(NodeContainer &container, vector<Node*> &ins) {
+        for (Node *in : ins) {
+            in->addParent(this);
+        }
+        container.addNode(this);
+    }
 
 private:
     std::vector<Node*> parents_;
@@ -233,6 +246,31 @@ private:
 };
 
 typedef Node* PNode;
+
+class UniInputNode : public Node {
+public:
+    UniInputNode(const string &node_type) : Node(node_type) {}
+
+    void forward(NodeContainer &container, Node &input) {
+        if (!isDimLegal(input)) {
+            cerr << boost::format("dim:%1% input dim:%2%") % getDim() % input.getDim() << endl;
+            abort();
+        }
+        input_ = &input;
+        vector<Node*> ins = {input_};
+        afterForward(container, ins);
+    }
+
+protected:
+    Node *getInput() const {
+        return input_;
+    }
+
+    virtual bool isDimLegal(const Node &input) = 0;
+
+private:
+    Node *input_;
+};
 
 template<typename T>
 std::vector<Node*> toNodePointers(const std::vector<T *> &vec) {

@@ -706,9 +706,103 @@ PExecutor DropoutNode::generate() {
     return exec;
 }
 
-class MaxNode : public Node {
+class MaxScalarNode : public UniInputNode {
 public:
+    MaxScalarNode() : UniInputNode("max_scalar_node") {}
+
+    void initAsScalar() {
+        init(1);
+    }
+
+    void compute() override {
+        float max = getInput()->getVal()[0];
+        int max_i = 0;
+        for (int i = 1; i < getInput()->getDim(); ++i) {
+            if (getInput()->getVal()[0] > max) {
+                max = getInput()->getVal()[0];
+                max_i = i;
+            }
+        }
+        max_i_ = max_i;
+        val()[0] = max;
+    }
+
+    void backward() override {
+        getInput()->loss()[max_i_] += getLoss()[0];
+    }
+
+    Executor* generate() override;
+
+protected:
+    bool isDimLegal(const Node &input) override {
+        return true;
+    }
+
 private:
+    int max_i_;
 };
+
+class MaxScalarExecutor : public Executor {};
+
+Executor *MaxScalarNode::generate() {
+    MaxScalarExecutor * executor = new MaxScalarExecutor();
+    return executor;
+}
+
+class ScalarToVectorNode : public UniInputNode {
+public:
+    ScalarToVectorNode() : UniInputNode("scalar_to_vector") {}
+
+    void compute() override {
+        for (int i = 0; i < getDim(); ++i) {
+            val()[i] = getInput()->getVal()[0];
+        }
+    }
+
+    void backward() override {
+        getInput()->loss()[0] += getLoss()[0];
+    }
+
+    Executor* generate() override;
+
+protected:
+    bool isDimLegal(const Node &input) override {
+        return input.getDim() == 1;
+    }
+};
+
+class ScalarToVectorExecutor : public Executor {};
+
+Executor *ScalarToVectorNode::generate() {
+    ScalarToVectorExecutor * executor = new ScalarToVectorExecutor();
+    return executor;
+}
+
+class ExpNode : public UniInputNode {
+public:
+    ExpNode() : UniInputNode("exp") {}
+
+    Executor* generate() override;
+
+    void compute() override {
+        val().vec() = getInput()->getVal().vec().exp();
+    }
+
+    void backward() override {
+        getInput()->loss().vec() += getLoss().vec() * getVal().vec();
+    }
+
+protected:
+    bool isDimLegal(const Node &input) override {
+        return input.getDim() == getDim();
+    }
+};
+
+class ExpExecutor : public Executor {};
+
+Executor *ExpNode::generate() {
+    ExpExecutor * executor = new ExpExecutor();
+    return executor;
+}
 
 #endif

@@ -59,7 +59,7 @@ int Size(const NodeMap &map) {
     return sum;
 }
 
-class Graph {
+class Graph : public NodeContainer {
 protected:
     vector<PExecutor> execs;
     vector<Node *> nodes;
@@ -89,7 +89,7 @@ public:
         }
     }
 
-    void addNode(Node *x) {
+    void addNode(Node *x) override {
         if (x == nullptr) {
             cerr << "x is nullptr" << endl;
             abort();

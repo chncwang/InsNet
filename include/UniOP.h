@@ -861,7 +861,7 @@ public:
     int inDim, outDim;
     SparseParam *param;
 
-    void forward() {
+    void forward() override {
         int count = batch.size();
         x.init(inDim, count);
         y.init(outDim, count);
@@ -880,7 +880,7 @@ public:
         }
     }
 
-    void backward() {
+    void backward() override {
         Tensor2D lx, ly;
         int count = batch.size();
         lx.init(inDim, count);
