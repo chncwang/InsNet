@@ -27,8 +27,7 @@ std::pair<dtype, std::vector<int>> MaxLogProbabilityLoss(const std::vector<Node*
         }
     }
 #if TEST_CUDA
-    auto cpu_result = MaxLogProbabilityLoss(result_nodes, word_ids,
-            hyper_params.batch_size);
+    auto cpu_result = MaxLogProbabilityLoss(result_nodes, ids, batchsize);
     cout << format("result loss:%1% cpu_result loss:%2%") % result.first %
         cpu_result.first << endl;
     if (abs(result.first - cpu_result.first) > 0.001) {

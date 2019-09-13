@@ -706,4 +706,9 @@ PExecutor DropoutNode::generate() {
     return exec;
 }
 
+class MaxNode : public Node {
+public:
+private:
+};
+
 #endif

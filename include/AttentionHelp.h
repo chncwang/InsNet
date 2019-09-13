@@ -147,6 +147,10 @@ public:
             for (int i = 0; i < att->ins.size(); ++i) {
                 ins.push_back(att->ins.at(i)->val().value);
                 unnormeds.push_back(att->unnormeds.at(i)->val().value);
+#if TEST_CUDA
+                n3ldg_cuda::Assert(att->ins.at(i)->val().verify("attention in"));
+                n3ldg_cuda::Assert(att->unnormeds.at(i)->val().verify("attention unnormeds"));
+#endif
             }
             for (int i = 0; i < max_in_count - att->ins.size(); ++i) {
                 ins.push_back(NULL);
@@ -161,7 +165,9 @@ public:
         n3ldg_cuda::ScalarAttentionForward(ins, unnormeds, in_counts, count,
                 dim, raw_masks, vals);
 #if TEST_CUDA
+        int i = 0;
         for (Node *n : batch) {
+            cout << i++ << endl;
             n->compute();
             n3ldg_cuda::Assert(n->val().verify("AttentionSoftMaxExecutor forward"));
         }
