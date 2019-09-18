@@ -718,8 +718,8 @@ public:
         float max = getInput()->getVal()[0];
         int max_i = 0;
         for (int i = 1; i < getInput()->getDim(); ++i) {
-            if (getInput()->getVal()[0] > max) {
-                max = getInput()->getVal()[0];
+            if (getInput()->getVal()[i] > max) {
+                max = getInput()->getVal()[i];
                 max_i = i;
             }
         }
@@ -760,7 +760,12 @@ public:
     }
 
     void backward() override {
-        getInput()->loss().vec() += getLoss().vec().sum();
+        int dim = getDim();
+        dtype sum = 0;
+        for (int i = 0; i < dim; ++i) {
+            sum += getLoss()[i];
+        }
+        getInput()->loss()[0] += sum;
     }
 
     Executor* generate() override;
@@ -827,7 +832,11 @@ public:
     }
 
     void compute() override {
-        val().vec() = getInput()->getVal().vec().sum();
+        dtype sum = 0;
+        for (int i = 0; i < getInput()->getDim(); ++i) {
+            sum += getInput()->getVal()[i];
+        }
+        val()[0] = sum;
     }
 
     void backward() override {

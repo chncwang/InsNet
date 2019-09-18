@@ -46,7 +46,7 @@ public:
 
     void backward() override {
         for (int i = 0; i < getDim(); ++i) {
-            input_->val()[i + offset_] += val()[i];
+            input_->loss()[i + offset_] += getLoss()[i];
         }
     }
 

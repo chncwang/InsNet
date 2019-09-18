@@ -29,8 +29,11 @@ public:
     void backward() override {
         numerator_->loss().vec() += getLoss().vec() / denominator_->getVal()[0];
 
-        denominator_->loss().vec() -= (getLoss().vec() * numerator_->getVal().vec() /
-            denominator_->getVal().vec().square()).sum();
+        dtype square = denominator_->getVal()[0] * denominator_->getVal()[0];
+
+        for (int i = 0; i < getDim(); ++i) {
+            denominator_->loss()[0] -= getLoss()[i] * numerator_->getVal()[i] / square;
+        }
     }
 
     PExecutor generate() override;

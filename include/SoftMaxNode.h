@@ -21,7 +21,7 @@ Node* softmax(Graph &graph, Node &input) {
 
     ScalarToVectorNode *scalar_to_vector = new ScalarToVectorNode;
     scalar_to_vector->init(dim);
-    scalar_to_vector->forward(graph, input);
+    scalar_to_vector->forward(graph, *max_scalar);
 
     SubNode *subtracted = new SubNode;
     subtracted->init(dim);

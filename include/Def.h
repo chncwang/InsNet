@@ -5,7 +5,7 @@
 #include "Eigen/Dense"
 #include <unsupported/Eigen/CXX11/Tensor>
 
-//#define USE_DOUBLE 1
+#define USE_DOUBLE 1
 
 #if USE_DOUBLE
 #define USE_FLOAT 0
