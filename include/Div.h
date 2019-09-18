@@ -11,7 +11,7 @@ public:
     DivNode() : Node("div_node") {}
 
     void forward(Graph &graph, Node &numerator, Node &denominator) {
-        if (getDim() != numerator.getDim() || getDim() != denominator.getDim()) {
+        if (getDim() != numerator.getDim() || 1 != denominator.getDim()) {
             cerr << boost::format("dim:%1% minuend:%2% subtrahend:%3%") % getDim() %
                 numerator.getDim() % denominator.getDim() << endl;
             abort();
@@ -23,13 +23,14 @@ public:
     }
 
     void compute() override {
-        val().vec() = numerator_->getVal().vec() / denominator_->getVal().vec();
+        val().vec() = numerator_->getVal().vec() / denominator_->getVal()[0];
     }
 
     void backward() override {
-        numerator_->loss().vec() += getLoss().vec() / denominator_->getVal().vec();
-        denominator_->loss().vec() -= getLoss().vec() * numerator_->getVal().vec() /
-            denominator_->getVal().vec().square();
+        numerator_->loss().vec() += getLoss().vec() / denominator_->getVal()[0];
+
+        denominator_->loss().vec() -= (getLoss().vec() * numerator_->getVal().vec() /
+            denominator_->getVal().vec().square()).sum();
     }
 
     PExecutor generate() override;

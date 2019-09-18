@@ -106,6 +106,19 @@ public:
 
 };
 
+namespace n3ldg_plus {
+Node *concat(Graph &graph, const vector<Node*> inputs) {
+    int dim = 0;
+    for (Node *in : inputs) {
+        dim += in->getDim();
+    }
+    ConcatNode *concat = new ConcatNode;
+    concat->init(dim);
+    concat->forward(graph, inputs);
+    return concat;
+}
+}
+
 #if USE_GPU
 class ConcatExecutor : public Executor {
   public:

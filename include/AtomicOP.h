@@ -760,7 +760,7 @@ public:
     }
 
     void backward() override {
-        getInput()->loss()[0] += getLoss()[0];
+        getInput()->loss().vec() += getLoss().vec().sum();
     }
 
     Executor* generate() override;
@@ -770,6 +770,17 @@ protected:
         return input.getDim() == 1;
     }
 };
+
+namespace n3ldg_plus {
+
+Node *scalarToVector(Graph &graph, int dim, Node &input) {
+    ScalarToVectorNode *node = new ScalarToVectorNode;
+    node->init(dim);
+    node->forward(graph, input);
+    return node;
+}
+
+}
 
 class ScalarToVectorExecutor : public Executor {};
 
@@ -803,6 +814,39 @@ class ExpExecutor : public Executor {};
 Executor *ExpNode::generate() {
     ExpExecutor * executor = new ExpExecutor();
     return executor;
+}
+
+class SumNode : public UniInputNode {
+public:
+    SumNode(): UniInputNode("sum") {}
+
+    Executor* generate() override;
+
+    void initAsScalar() {
+        init(1);
+    }
+
+    void compute() override {
+        val().vec() = getInput()->getVal().vec().sum();
+    }
+
+    void backward() override {
+        for (int i = 0; i < getInput()->getDim(); ++i) {
+            getInput()->loss()[i] += getLoss()[0];
+        }
+    }
+
+protected:
+    bool isDimLegal(const Node &input) override {
+        return true;
+    }
+};
+
+class SumExecutor : public Executor {};
+
+Executor *SumNode::generate() {
+    SumExecutor *e = new SumExecutor();
+    return e;
 }
 
 #endif

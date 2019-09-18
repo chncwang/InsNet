@@ -55,6 +55,15 @@ private:
     int offset_ = 0;
 };
 
+namespace n3ldg_plus {
+Node* split(Graph &graph, int dim, Node &input, int offset) {
+    SplitNode *split = new SplitNode;
+    split->init(dim);
+    split->forward(graph, input, offset);
+    return split;
+}
+}
+
 class SplitExecutor : public Executor {};
 
 Executor *SplitNode::generate() {

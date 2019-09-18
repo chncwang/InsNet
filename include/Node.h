@@ -247,6 +247,28 @@ private:
 
 typedef Node* PNode;
 
+//class CompositionNode : public Node {
+//public:
+//    virtual void compute() {
+//        abort();
+//    }
+
+//    virtual void backward() {
+//        abort();
+//    }
+
+//    virtual Executor* generate() {
+//        return nullptr;
+//    }
+
+//    static unique_ptr<CompositionNode> instance() {
+//        return unique_ptr<CompositionNode>(new CompositionNode);
+//    }
+
+//private:
+//    CompositionNode() : Node("") {}
+//};
+
 class UniInputNode : public Node {
 public:
     UniInputNode(const string &node_type) : Node(node_type) {}

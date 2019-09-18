@@ -22,10 +22,10 @@ public:
 
     void forward(Graph &graph, Node &input1, Node &input2) {
         vector<Node *> inputs = {&input1, &input2};
-        this->forward(&graph, inputs);
+        this->forward(graph, inputs);
     }
 
-    void forward(Graph *cg, const vector<PNode>& x) {
+    void forward(Graph &cg, vector<PNode>& x) {
         if (x.size() == 0) {
             std::cout << "empty inputs for add" << std::endl;
             return;
@@ -46,7 +46,7 @@ public:
             ins[i]->addParent(this);
         }
 
-        cg->addNode(this);
+        cg.addNode(this);
     }
 
     void compute() override {
@@ -180,6 +180,21 @@ public:
     }
 #endif
 };
+
+Node *add(Graph &graph, vector<Node*> &inputs) {
+    int dim = inputs.front()->getDim();
+    for (int i = 1; i < inputs.size(); ++i) {
+        if (dim != inputs.at(i)->getDim()) {
+            cerr << boost::format("dim1:%1% dim2:%2%") % dim % inputs.at(i)->getDim() << endl;
+            abort();
+        }
+    }
+
+    PAddNode *node = new PAddNode;
+    node->init(dim);
+    node->forward(graph, inputs);
+    return node;
+}
 
 PExecutor PAddNode::generate() {
     PAddExecutor* exec = new PAddExecutor();
