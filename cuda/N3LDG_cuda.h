@@ -394,6 +394,9 @@ void SoftMaxLoss(const std::vector<dtype*> &vals, std::vector<dtype*> &losses,
         int batchsize,
         int count,
         int dim);
+void MaxScalarForward(const std::vector<const dtype*> &inputs, int count, int dim,
+        std::vector<dtype*> &results,
+        std::vector<int> &max_indexes);
 int Predict(const dtype* val, int dim);
 std::pair<dtype, std::vector<int>> SoftMaxLoss(const std::vector<const dtype *> &vals_vector,
         int count,

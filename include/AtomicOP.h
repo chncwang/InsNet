@@ -740,9 +740,50 @@ protected:
 
 private:
     int max_i_;
+    friend class MaxScalarExecutor;
 };
 
+#if USE_GPU
+class MaxScalarExecutor : public Executor {
+public:
+    void forward() override {
+        vector<const dtype*> inputs;
+        vector<dtype*> results;
+        vector<int> max_indexes;
+        max_indexes.resize(batch.size());
+        for (int i = 0; i < batch.size(); ++i) {
+            MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));
+            inputs.push_back(node->getInput()->getVal().value);
+            results.push_back(node->getVal().value);
+        }
+        int input_dim = static_cast<MaxScalarNode*>(batch.front())->getInput()->getDim();
+        n3ldg_cuda::MaxScalarForward(inputs, batch.size(), input_dim, results, max_indexes);
+
+        for (int i = 0; i < batch.size(); ++i) {
+            MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));
+            node->max_i_ = max_indexes.at(i);
+        }
+#if TEST_CUDA
+        Executor::forward();
+        int i = 0;
+        for (Node *node : batch) {
+            MaxScalarNode *max_scalar = static_cast<MaxScalarNode*>(node);
+            n3ldg_cuda::Assert(max_scalar->getInput()->getVal().verify("max scalar forward input"));
+            n3ldg_cuda::Assert(max_scalar->getVal().verify("max scalar forward"));
+            cout << boost::format("max_i cpu:%1% gpu:%2%") % max_scalar->max_i_ % max_indexes.at(i)
+                << endl;
+            ++i;
+        }
+#endif
+    }
+
+    void backward() override {
+
+    }
+};
+#else
 class MaxScalarExecutor : public Executor {};
+#endif
 
 Executor *MaxScalarNode::generate() {
     MaxScalarExecutor * executor = new MaxScalarExecutor();
