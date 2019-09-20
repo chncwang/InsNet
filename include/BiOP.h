@@ -103,7 +103,7 @@ public:
         in1 = in2 = NULL;
     }
 
-    void init(int ndim) {
+    void init(int ndim) override {
         Node::init(ndim);
         ty.init(ndim);
         lty.init(ndim);
@@ -139,7 +139,7 @@ public:
         this->forward(&cg, &x1, &x2);
     }
 
-    void compute() {
+    void compute() override {
         ty.mat() = param->W1.val.mat() * in1->val().mat() + param->W2.val.mat() * in2->val().mat();
         if (param->bUseB) {
             ty.vec() += param->b.val.vec();
@@ -147,7 +147,7 @@ public:
         val().vec() = ty.vec().unaryExpr(ptr_fun(activate));
     }
 
-    void backward() {
+    void backward() override {
         lty.vec() = loss().vec() * ty.vec().binaryExpr(val().vec(), ptr_fun(derivate));
 
         param->W1.grad.mat() += lty.mat() * in1->val().tmat();
@@ -162,7 +162,7 @@ public:
     }
 
   public:
-    PExecutor generate();
+    PExecutor generate() override;
 
     bool typeEqual(PNode other) override {
         bool result = Node::typeEqual(other);
@@ -179,11 +179,11 @@ public:
         return true;
     }
 
-    size_t typeHashCode() const override {
+    string typeHashCode() const override {
         void *act = reinterpret_cast<void*>(activate);
         void *de = reinterpret_cast<void*>(derivate);
-        return Node::typeHashCode() ^ ::typeHashCode(param) ^
-            ::typeHashCode(act) ^ (::typeHashCode(de) << 1);
+        return Node::typeHashCode() + "-" + addressToString(param) + "-" + addressToString(act) + 
+            + "-" + addressToString(de);
     }
 };
 

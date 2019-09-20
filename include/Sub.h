@@ -37,7 +37,15 @@ private:
     Node *subtrahend_;
 };
 
+#if USE_GPU
+class SubExecutor : public Executor {
+    void forward() override {
+        abort();
+    }
+};
+#else
 class SubExecutor : public Executor {};
+#endif
 
 Executor *SubNode::generate() {
     SubExecutor * executor = new SubExecutor();

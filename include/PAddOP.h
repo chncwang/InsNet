@@ -82,8 +82,8 @@ public:
         return ins.size() == add->ins.size();
     }
 
-    size_t typeHashCode() const override {
-        return (std::hash<int>{}(ins.size()) << 1) ^ Node::typeHashCode();
+    string typeHashCode() const override {
+        return Node::typeHashCode() + "-" + to_string(ins.size());
     }
 };
 

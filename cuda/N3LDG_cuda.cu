@@ -1566,6 +1566,7 @@ void ConcatForward(const std::vector<dtype*> &in_vals,
     IntArray in_dim_arr;
     in_dim_arr.init((int*)in_dims.data(), in_dims.size());
 
+    cout << boost::format("count:%1% in_count:%2% out_dim:%3%") % count % in_count % out_dim << endl;
     KernelConcatForward<<<block_count, TPB>>>(in_val_arr.value,
             in_dim_arr.value, val_arr.value, count, in_count, out_dim);
     CheckCudaError();
@@ -3153,9 +3154,12 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
 void MaxScalarForward(const vector<const dtype*> &inputs, int count, int dim,
         vector<dtype*> &results,
         vector<int> &max_indexes) {
+    cout << boost::format("dim:%1% TPB:%2%") % dim % TPB << endl;
     int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
     int block_y_count = (dim - 1 + thread_count) / thread_count;
     dim3 block_dim(count, block_y_count, 1);
+    cout << boost::format("thread_count:%1% block x:%2% block y:%3%") % thread_count % count %
+        block_y_count << endl;
 
     NumberArray block_maxes;
     block_maxes.init(block_y_count * count);
@@ -3177,6 +3181,30 @@ void MaxScalarForward(const vector<const dtype*> &inputs, int count, int dim,
 
     MyCudaMemcpy(max_indexes.data(), max_index_arr.value, count * sizeof(int),
             cudaMemcpyDeviceToHost);
+}
+
+__global__ void KernelScalarToVectorForward(const dtype* const* inputs, int count, int dim,
+        dtype *const *results) {
+    int count_i = blockIdx.x;
+    int dim_i = blockIdx.y * blockDim.x + threadIdx.x;
+    if (dim_i < dim) {
+        results[count_i][dim_i] = inputs[count_i][0];
+    }
+}
+
+void ScalarToVectorForward(const vector<const dtype*> &inputs, int count, int dim,
+        vector<dtype*> &results) {
+    int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
+    int block_y_count = (dim - 1 + thread_count) / thread_count;
+    dim3 block_dim(count, block_y_count, 1);
+
+    NumberPointerArray input_arr;
+    input_arr.init((dtype**)inputs.data(), inputs.size());
+    NumberPointerArray result_arr;
+    result_arr.init((dtype**)results.data(), inputs.size());
+
+    KernelScalarToVectorForward<<<block_dim, thread_count>>>(input_arr.value, count, dim,
+            result_arr.value);
 }
 
 __global__ void KernelSquareSum(const dtype *v, int len, dtype *global_sum,

@@ -596,8 +596,8 @@ public:
         return Node::typeEqual(other) && abs(drop_value_ - o->drop_value_) < 0.001f;
     }
 
-    size_t typeHashCode() const override {
-        return Node::typeHashCode() ^ (std::hash<int>{}((int)(10000 * drop_value_)) << 1);
+    string typeHashCode() const override {
+        return Node::typeHashCode() + "-" + to_string(drop_value_);
     }
 
     PExecutor generate() override;
@@ -764,16 +764,22 @@ public:
             node->max_i_ = max_indexes.at(i);
         }
 #if TEST_CUDA
+        for (Node *node : batch) {
+            MaxScalarNode *max_scalar = static_cast<MaxScalarNode*>(node);
+            cout << "cpu input:" << endl;
+            for (int i = 0; i < max_scalar->getInput()->getDim(); ++i) {
+                cout << max_scalar->getInput()->getVal()[i] << endl;
+            }
+        }
         Executor::forward();
         int i = 0;
         for (Node *node : batch) {
             MaxScalarNode *max_scalar = static_cast<MaxScalarNode*>(node);
             n3ldg_cuda::Assert(max_scalar->getInput()->getVal().verify("max scalar forward input"));
             n3ldg_cuda::Assert(max_scalar->getVal().verify("max scalar forward"));
-            cout << boost::format("max_i cpu:%1% gpu:%2%") % max_scalar->max_i_ % max_indexes.at(i)
-                << endl;
             ++i;
         }
+        cout << "tested:" << endl;
 #endif
     }
 
@@ -815,6 +821,9 @@ protected:
     bool isDimLegal(const Node &input) override {
         return input.getDim() == 1;
     }
+
+private:
+    friend class ScalarToVectorExecutor;
 };
 
 namespace n3ldg_plus {
@@ -828,7 +837,31 @@ Node *scalarToVector(Graph &graph, int dim, Node &input) {
 
 }
 
+#if USE_GPU
+class ScalarToVectorExecutor : public Executor {
+public:
+    void forward() override {
+        vector<const dtype*> inputs;
+        vector<dtype*> results;
+        for (Node *node : batch) {
+            ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(node);
+            inputs.push_back(n->getInput()->getVal().value);
+            results.push_back(n->getVal().value);
+        }
+        n3ldg_cuda::ScalarToVectorForward(inputs, batch.size(), getDim(), results);
+#if TEST_CUDA
+        Executor::forward();
+
+        for (int i = 0; i < batch.size(); ++i) {
+            ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(batch.at(i));
+            n3ldg_cuda::Assert(n->getVal().verify("ScalarToVectorNode forward"));
+        }
+#endif
+    }
+};
+#else
 class ScalarToVectorExecutor : public Executor {};
+#endif
 
 Executor *ScalarToVectorNode::generate() {
     ScalarToVectorExecutor * executor = new ScalarToVectorExecutor();

@@ -287,8 +287,8 @@ public:
         return true;
     }
 
-    size_t typeHashCode() const override {
-        return Node::typeHashCode() ^ ::typeHashCode(param);
+    string typeHashCode() const override {
+        return Node::typeHashCode() + "-" + addressToString(param);
     }
 
     // for which do no require merge

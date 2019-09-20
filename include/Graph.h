@@ -32,20 +32,14 @@ void DecreaseDegree(std::map<void*, int> &degree_map, PNode p) {
     }
 }
 
-struct SelfHash {
-    size_t operator()(size_t hash) const {
-        return hash;
-    }
-};
-
-typedef std::unordered_map<size_t, vector<PNode>, SelfHash> NodeMap;
+typedef std::unordered_map<string, vector<PNode>> NodeMap;
 
 void Insert(const PNode node, NodeMap& node_map) {
-    size_t x_hash = node->typeHashCode();
+    string x_hash = node->typeHashCode();
     auto it = node_map.find(x_hash);
     if (it == node_map.end()) {
         std::vector<PNode> v = {node};
-        node_map.insert(std::make_pair<size_t, std::vector<PNode>>(std::move(x_hash), std::move(v)));
+        node_map.insert(std::make_pair<string, std::vector<PNode>>(std::move(x_hash), std::move(v)));
     } else {
         it->second.push_back(node);
     }
@@ -64,7 +58,7 @@ protected:
     vector<PExecutor> execs;
     vector<Node *> nodes;
     NodeMap free_nodes;
-    std::map<size_t, std::pair<int, int>> node_type_depth;
+    std::map<string, std::pair<int, int>> node_type_depth;
     vector<PNode> finish_nodes;
     vector<PNode> all_nodes;
 
@@ -102,10 +96,10 @@ public:
         }
         all_nodes.push_back(x);
 
-        size_t x_type_hash = x->typeHashCode();
+        string x_type_hash = x->typeHashCode();
         auto it = node_type_depth.find(x_type_hash);
         if (it == node_type_depth.end()) {
-            node_type_depth.insert(std::pair<size_t, std::pair<int, int>>(
+            node_type_depth.insert(std::pair<string, std::pair<int, int>>(
                         x_type_hash, std::pair<int, int>(x->getDepth(), 1)));
         } else {
             it->second.first += x->getDepth();
@@ -117,9 +111,9 @@ public:
         while (Size(free_nodes) > 0) {
             float min_avg_depth = 100000000;
             std::vector<Node*> shallow_nodes;
-            size_t min_hash = 0;
+            string min_hash;
             for (auto it : free_nodes) {
-                size_t type_hash = it.first;
+                string type_hash = it.first;
                 auto depth_it = node_type_depth.find(type_hash);
                 float avg_depth = (float)depth_it->second.first /
                     depth_it->second.second;

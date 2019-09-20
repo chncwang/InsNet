@@ -165,11 +165,11 @@ public:
         return true;
     }
 
-    size_t typeHashCode() const override {
+    string typeHashCode() const override {
         void *act = reinterpret_cast<void*>(activate);
         void *de = reinterpret_cast<void*>(derivate);
-        return Node::typeHashCode() ^ ::typeHashCode(param) ^ ::typeHashCode(act) ^
-            (::typeHashCode(de) << 1);
+        return Node::typeHashCode() + "-" + addressToString(param) + "-" + addressToString(act) +
+            "-" + addressToString(de);
     }
 };
 
@@ -232,8 +232,8 @@ public:
         return true;
     }
 
-    size_t typeHashCode() const override {
-        return Node::typeHashCode() ^ ::typeHashCode(param);
+    string typeHashCode() const override {
+        return Node::typeHashCode() + "-" + addressToString(param);
     }
 };
 
@@ -719,8 +719,8 @@ public:
             offset_ == conv_other->offset_;
     }
 
-    size_t typeHashCode() const override {
-        return Node::typeHashCode() ^ ::typeHashCode(param_) ^ std::hash<int>{}(offset_);
+    string typeHashCode() const override {
+        return Node::typeHashCode() + "-" + addressToString(param_) + "-" + to_string(offset_);
     }
 
     int getOffset() const {

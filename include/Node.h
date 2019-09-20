@@ -118,6 +118,12 @@ public:
     virtual void addNode(Node *node) = 0;
 };
 
+string addressToString(const void* p) {
+    std::stringstream ss;
+    ss << p;  
+    return ss.str();
+}
+
 class Node {
 public:
     Node(const string &node_type, int dim = 0) : dim_(dim) {
@@ -162,8 +168,8 @@ public:
         return true;
     }
 
-    virtual size_t typeHashCode() const {
-        return std::hash<std::string>{}(node_type_) ^ std::hash<int>{}(dim_);
+    virtual string typeHashCode() const {
+        return node_type_ + "-" + std::to_string(dim_);
     }
 
     virtual void addParent(Node* parent) {
@@ -273,6 +279,15 @@ class UniInputNode : public Node {
 public:
     UniInputNode(const string &node_type) : Node(node_type) {}
 
+    virtual bool typeEqual(Node *other) override {
+        UniInputNode *o = static_cast<UniInputNode*>(other);
+        return Node::typeEqual(other) && input_->getDim() == o->input_->getDim();
+    }
+
+    virtual string typeHashCode() const override {
+        return Node::typeHashCode() + "-" + to_string(input_->getDim());
+    }
+
     void forward(NodeContainer &container, Node &input) {
         if (!isDimLegal(input)) {
             cerr << boost::format("dim:%1% input dim:%2%") % getDim() % input.getDim() << endl;
@@ -354,6 +369,15 @@ public:
     }
 
     void forwardFully() {
+        Node *first = batch.front();
+        for (int i = 1; i < batch.size(); ++i) {
+            if (!first->typeEqual(batch.at(i))) {
+                cerr << "type not equal in the same batch - node_type:" << first->getNodeType() <<
+                    endl;
+                abort();
+            }
+        }
+
         n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
         profiler.BeginEvent(getNodeType() + " forward");
         forward();

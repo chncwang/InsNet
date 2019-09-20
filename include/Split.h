@@ -34,8 +34,8 @@ public:
         return Node::typeEqual(other) && offset_ == s->offset_;
     }
 
-    size_t typeHashCode() const override {
-        return Node::typeHashCode() ^ std::hash<int>{}(offset_);
+    string typeHashCode() const override {
+        return Node::typeHashCode() + "-" + to_string(offset_);
     }
 
     void compute () override {

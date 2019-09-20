@@ -72,12 +72,10 @@ public:
         return true;
     }
 
-    size_t typeHashCode() const override {
-        size_t hash_code = Node::typeHashCode() ^
-            std::hash<int>{}(inDims.size());
-        int i = 0;
+    string typeHashCode() const override {
+        string hash_code = Node::typeHashCode() + "-" + to_string(inDims.size());
         for (int dim : inDims) {
-            hash_code ^= (dim << (i++ % 16));
+            hash_code += "-" + to_string(dim);
         }
         return hash_code;
     }
@@ -144,6 +142,7 @@ class ConcatExecutor : public Executor {
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
+            cout << batch.at(idx)->getDim() << endl;
             n3ldg_cuda::Assert(batch[idx]->val().verify("concat forward"));
         }
 #endif
