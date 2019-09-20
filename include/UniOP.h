@@ -165,10 +165,10 @@ public:
         return true;
     }
 
-    string typeHashCode() const override {
+    string typeSignature() const override {
         void *act = reinterpret_cast<void*>(activate);
         void *de = reinterpret_cast<void*>(derivate);
-        return Node::typeHashCode() + "-" + addressToString(param) + "-" + addressToString(act) +
+        return Node::typeSignature() + "-" + addressToString(param) + "-" + addressToString(act) +
             "-" + addressToString(de);
     }
 };
@@ -232,8 +232,8 @@ public:
         return true;
     }
 
-    string typeHashCode() const override {
-        return Node::typeHashCode() + "-" + addressToString(param);
+    string typeSignature() const override {
+        return Node::typeSignature() + "-" + addressToString(param);
     }
 };
 
@@ -719,8 +719,8 @@ public:
             offset_ == conv_other->offset_;
     }
 
-    string typeHashCode() const override {
-        return Node::typeHashCode() + "-" + addressToString(param_) + "-" + to_string(offset_);
+    string typeSignature() const override {
+        return Node::typeSignature() + "-" + addressToString(param_) + "-" + to_string(offset_);
     }
 
     int getOffset() const {

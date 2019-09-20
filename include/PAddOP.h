@@ -82,8 +82,8 @@ public:
         return ins.size() == add->ins.size();
     }
 
-    string typeHashCode() const override {
-        return Node::typeHashCode() + "-" + to_string(ins.size());
+    string typeSignature() const override {
+        return Node::typeSignature() + "-" + to_string(ins.size());
     }
 };
 

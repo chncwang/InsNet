@@ -179,10 +179,10 @@ public:
         return true;
     }
 
-    string typeHashCode() const override {
+    string typeSignature() const override {
         void *act = reinterpret_cast<void*>(activate);
         void *de = reinterpret_cast<void*>(derivate);
-        return Node::typeHashCode() + "-" + addressToString(param) + "-" + addressToString(act) + 
+        return Node::typeSignature() + "-" + addressToString(param) + "-" + addressToString(act) + 
             + "-" + addressToString(de);
     }
 };

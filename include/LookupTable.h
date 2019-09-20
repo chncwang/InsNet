@@ -287,8 +287,8 @@ public:
         return true;
     }
 
-    string typeHashCode() const override {
-        return Node::typeHashCode() + "-" + addressToString(param);
+    string typeSignature() const override {
+        return Node::typeSignature() + "-" + addressToString(param);
     }
 
     // for which do no require merge

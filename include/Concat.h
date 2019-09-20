@@ -72,8 +72,8 @@ public:
         return true;
     }
 
-    string typeHashCode() const override {
-        string hash_code = Node::typeHashCode() + "-" + to_string(inDims.size());
+    string typeSignature() const override {
+        string hash_code = Node::typeSignature() + "-" + to_string(inDims.size());
         for (int dim : inDims) {
             hash_code += "-" + to_string(dim);
         }

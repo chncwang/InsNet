@@ -35,7 +35,7 @@ void DecreaseDegree(std::map<void*, int> &degree_map, PNode p) {
 typedef std::unordered_map<string, vector<PNode>> NodeMap;
 
 void Insert(const PNode node, NodeMap& node_map) {
-    string x_hash = node->typeHashCode();
+    string x_hash = node->typeSignature();
     auto it = node_map.find(x_hash);
     if (it == node_map.end()) {
         std::vector<PNode> v = {node};
@@ -96,7 +96,7 @@ public:
         }
         all_nodes.push_back(x);
 
-        string x_type_hash = x->typeHashCode();
+        string x_type_hash = x->typeSignature();
         auto it = node_type_depth.find(x_type_hash);
         if (it == node_type_depth.end()) {
             node_type_depth.insert(std::pair<string, std::pair<int, int>>(

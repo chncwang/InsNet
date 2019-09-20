@@ -783,7 +783,7 @@ bool isEqual(dtype a, dtype b) {
     return c < 0.001 && c > -0.001;
 }
 
-size_t typeHashCode(void *p) {
+size_t typeSignature(void *p) {
     auto addr = reinterpret_cast<uintptr_t>(p);
 #if SIZE_MAX < UINTPTR_MAX
     addr %= SIZE_MAX;

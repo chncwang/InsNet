@@ -168,7 +168,7 @@ public:
         return true;
     }
 
-    virtual string typeHashCode() const {
+    virtual string typeSignature() const {
         return node_type_ + "-" + std::to_string(dim_);
     }
 
@@ -284,8 +284,8 @@ public:
         return Node::typeEqual(other) && input_->getDim() == o->input_->getDim();
     }
 
-    virtual string typeHashCode() const override {
-        return Node::typeHashCode() + "-" + to_string(input_->getDim());
+    virtual string typeSignature() const override {
+        return Node::typeSignature() + "-" + to_string(input_->getDim());
     }
 
     void forward(NodeContainer &container, Node &input) {

@@ -596,8 +596,8 @@ public:
         return Node::typeEqual(other) && abs(drop_value_ - o->drop_value_) < 0.001f;
     }
 
-    string typeHashCode() const override {
-        return Node::typeHashCode() + "-" + to_string(drop_value_);
+    string typeSignature() const override {
+        return Node::typeSignature() + "-" + to_string(drop_value_);
     }
 
     PExecutor generate() override;
