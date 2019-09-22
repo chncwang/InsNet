@@ -227,6 +227,8 @@ void TanhBackward(ActivatedEnum activated, const std::vector<dtype*> &losses,
         int count,
         int dim,
         std::vector<dtype*> &in_losses);
+void ExpForward(const std::vector<const dtype*> &inputs, int count, int dim,
+        std::vector<dtype*> &results);
 void DropoutForward(const std::vector<dtype*> &xs, int count, int dim,
         bool is_training,
         const dtype *drop_mask,
@@ -362,6 +364,11 @@ void PMultiForward(const std::vector<dtype*> &ins1,
         int count,
         int dim,
         std::vector<dtype*> &vals);
+void SubForward(const std::vector<const dtype*> &minuend,
+        const std::vector<const dtype*> &subtrahend,
+        int count,
+        int dim,
+        std::vector<dtype*> &results);
 void PMultiBackward(const std::vector<dtype*> &losses,
         const std::vector<dtype*> &in_vals1,
         const std::vector<dtype*> &in_vals2,

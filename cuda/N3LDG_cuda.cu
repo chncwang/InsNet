@@ -2444,6 +2444,34 @@ void PMultiForward(const std::vector<dtype*> &ins1,
     CheckCudaError();
 }
 
+__global__ void KernelSubForward(const dtype *const *minuend, const dtype *const *subtrahend,
+        int count,
+        int dim,
+        dtype **results) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+
+    for (int i = index; i < count * dim; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        results[count_i][dim_i] = minuend[count_i][dim_i] - subtrahend[count_i][dim_i];
+    }
+}
+
+void SubForward(const std::vector<const dtype*> &minuend,
+        const std::vector<const dtype*> &subtrahend,
+        int count,
+        int dim,
+        std::vector<dtype*> &results) {
+    int block_count = DefaultBlockCount(count * dim);
+    NumberPointerArray minuend_arr, subtrahend_arr, result_arr;
+    minuend_arr.init((dtype**)minuend.data(), count);
+    subtrahend_arr.init((dtype**)subtrahend.data(), count);
+    result_arr.init((dtype**)results.data(), count);
+    KernelSubForward<<<block_count, TPB>>>((const dtype* const*)minuend_arr.value,
+            (const dtype *const *)subtrahend_arr.value, count, dim, result_arr.value);
+}
+
 __global__ void KernelPMultiBackward(const dtype **losses,
         const dtype **in_vals1,
         const dtype **in_vals2,
@@ -2456,8 +2484,10 @@ __global__ void KernelPMultiBackward(const dtype **losses,
     for (int i = index; i < count * dim; i += step) {
         int count_i = i / dim;
         int dim_i = i % dim;
-        DeviceAtomicAdd(in_losses1[count_i] + dim_i, losses[count_i][dim_i] * in_vals2[count_i][dim_i]);
-        DeviceAtomicAdd(in_losses2[count_i] + dim_i, losses[count_i][dim_i] * in_vals1[count_i][dim_i]);
+        DeviceAtomicAdd(in_losses1[count_i] + dim_i,
+                losses[count_i][dim_i] * in_vals2[count_i][dim_i]);
+        DeviceAtomicAdd(in_losses2[count_i] + dim_i,
+                losses[count_i][dim_i] * in_vals1[count_i][dim_i]);
     }
 }
 
@@ -2935,6 +2965,28 @@ void Exp(const dtype *const *in, int count, int dim, const dtype *number_to_sub,
     //cout << format("Exp count:%1% dim:%2% block_count:%3%") % count % dim % block_count << endl;
     KernelExp<<<block_count, TPB>>>(in, count, dim, number_to_sub, out);
     CheckCudaError();
+}
+
+__global__ void KernelExpForward(const dtype* const *inputs, int count, int dim,
+        dtype *const *results) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+
+    for (int i = index; i < dim * count; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        results[count_i][dim_i] = cuda_exp(inputs[count_i][dim_i]);
+    }
+}
+
+void ExpForward(const vector<const dtype*> &inputs, int count, int dim, vector<dtype*> &results) {
+    NumberPointerArray input_arr, result_arr;
+    input_arr.init((dtype**)inputs.data(), inputs.size());
+    result_arr.init((dtype**)results.data(), results.size());
+
+    int block_count = DefaultBlockCount(dim * count);
+
+    KernelExpForward<<<block_count, TPB>>>(input_arr.value, count, dim, result_arr.value);
 }
 
 __global__ void KernelSum(const dtype *const *v, int count, int dim, dtype *block_sums,

@@ -423,6 +423,16 @@ protected:
             node->compute();
         }
     }
+
+#if TEST_CUDA
+    void testForward() {
+        Executor::forward();
+
+        for (Node *node : batch) {
+            n3ldg_cuda::Assert(node->getVal().verify((getNodeType() + " forward").c_str()));
+        }
+    }
+#endif
 };
 
 typedef  Executor* PExecutor;

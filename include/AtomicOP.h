@@ -888,7 +888,21 @@ protected:
     }
 };
 
+#if USE_GPU
+class ExpExecutor : public Executor {
+public:
+    void forward() override {
+        vector<dtype*> inputs, results;
+        for (Node *node : batch) {
+            ExpNode *expnode = static_cast<ExpNode*>(node);
+            inputs.push_back(expnode->getInput()->getVal().value);
+        }
+        KernelExpForward(
+    }
+};
+#else
 class ExpExecutor : public Executor {};
+#endif
 
 Executor *ExpNode::generate() {
     ExpExecutor * executor = new ExpExecutor();

@@ -35,12 +35,27 @@ public:
 private:
     Node *minuend_;
     Node *subtrahend_;
+
+    friend class SubExecutor;
 };
 
 #if USE_GPU
 class SubExecutor : public Executor {
     void forward() override {
-        abort();
+        vector<const dtype*> minuend, subtrahend;
+        vector<dtype*> results;
+
+        for (Node *node : batch) {
+            SubNode *sub = static_cast<SubNode*>(node);
+            minuend.push_back(sub->minuend_->getVal().value);
+            subtrahend.push_back(sub->subtrahend_->getVal().value);
+            results.push_back(sub->getVal().value);
+        }
+
+        n3ldg_cuda::SubForward(minuend, subtrahend, batch.size(), getDim(), results);
+#if TEST_CUDA
+        testForward();
+#endif
     }
 };
 #else
