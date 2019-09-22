@@ -3206,12 +3206,9 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
 void MaxScalarForward(const vector<const dtype*> &inputs, int count, int dim,
         vector<dtype*> &results,
         vector<int> &max_indexes) {
-    cout << boost::format("dim:%1% TPB:%2%") % dim % TPB << endl;
     int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
     int block_y_count = (dim - 1 + thread_count) / thread_count;
     dim3 block_dim(count, block_y_count, 1);
-    cout << boost::format("thread_count:%1% block x:%2% block y:%3%") % thread_count % count %
-        block_y_count << endl;
 
     NumberArray block_maxes;
     block_maxes.init(block_y_count * count);
@@ -3233,6 +3230,81 @@ void MaxScalarForward(const vector<const dtype*> &inputs, int count, int dim,
 
     MyCudaMemcpy(max_indexes.data(), max_index_arr.value, count * sizeof(int),
             cudaMemcpyDeviceToHost);
+}
+
+__global__ void KernelVectorSumForward(const dtype *const *v, int count, int dim,
+        dtype *block_sums,
+        int *block_counters,
+        dtype **results) {
+    __shared__ volatile dtype shared_sum[TPB];
+    __shared__ volatile bool is_last_block;
+    if (threadIdx.x == 0 && blockIdx.y == 0) {
+        block_counters[blockIdx.x] = 0;
+    }
+    if (threadIdx.x == 0) {
+        is_last_block = false;
+    }
+
+    int count_i = blockIdx.x;
+    int offset = blockIdx.y * blockDim.x + threadIdx.x;
+    shared_sum[threadIdx.x] = offset < dim ? v[count_i][offset] : 0.0f;
+    __syncthreads();
+
+    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+        shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+        __syncthreads();
+    }
+
+    int block_sums_offset = blockIdx.x * gridDim.y + blockIdx.y;
+    if (threadIdx.x == 0) {
+        block_sums[block_sums_offset] = shared_sum[0];
+        if (atomicAdd(block_counters + blockIdx.x, 1) == gridDim.y - 1) {
+            is_last_block = true;
+        }
+    }
+    __syncthreads();
+
+    if (is_last_block) {
+        dtype sum = 0.0f;
+        for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
+            int offset = blockIdx.x * gridDim.y + i;
+            sum += block_sums[offset];
+        }
+
+        shared_sum[threadIdx.x] = sum;
+        __syncthreads();
+
+        for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+            shared_sum[threadIdx.x] = shared_sum[threadIdx.x + i];
+            __syncthreads();
+        }
+
+        if (threadIdx.x == 0) {
+            results[count_i][0] = shared_sum[0];
+        }
+    }
+}
+
+
+void VectorSumForward(const vector<const dtype *> &inputs, int count, int dim,
+        vector<dtype*> &results) {
+    int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
+    int block_y_count = (dim - 1 + thread_count) / thread_count;
+    dim3 block_dim(count, block_y_count, 1);
+
+    NumberArray block_sums;
+    block_sums.init(block_y_count * count);
+    IntArray block_counters;
+    block_counters.init(count);
+
+    NumberPointerArray input_arr;
+    input_arr.init((dtype**)inputs.data(), inputs.size());
+    NumberPointerArray result_arr;
+    result_arr.init((dtype**)results.data(), results.size());
+
+    KernelVectorSumForward<<<block_dim, thread_count>>>(input_arr.value, count, dim,
+            block_sums.value, block_counters.value, result_arr.value);
+    CheckCudaError();
 }
 
 __global__ void KernelScalarToVectorForward(const dtype* const* inputs, int count, int dim,

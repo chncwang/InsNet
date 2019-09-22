@@ -886,18 +886,28 @@ protected:
     bool isDimLegal(const Node &input) override {
         return input.getDim() == getDim();
     }
+
+private:
+    friend class ExpExecutor;
 };
 
 #if USE_GPU
 class ExpExecutor : public Executor {
 public:
     void forward() override {
-        vector<dtype*> inputs, results;
+        vector<const dtype*> inputs;
+        vector<dtype*> results;
         for (Node *node : batch) {
             ExpNode *expnode = static_cast<ExpNode*>(node);
             inputs.push_back(expnode->getInput()->getVal().value);
+            results.push_back(expnode->getVal().value);
         }
-        KernelExpForward(
+        n3ldg_cuda::ExpForward(inputs, batch.size(), getDim(), results);
+#if TEST_CUDA
+        Executor::testForward();
+        cout << "exp forward tested" << endl;
+        abort();
+#endif
     }
 };
 #else
