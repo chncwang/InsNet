@@ -2444,6 +2444,32 @@ void PMultiForward(const std::vector<dtype*> &ins1,
     CheckCudaError();
 }
 
+__global__ void KernelDivForward(const dtype *const *numerators, const dtype *const *denominators,
+        int count,
+        int dim,
+        dtype **results) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * dim; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        results[count_i][dim_i] = numerators[count_i][dim_i] / denominators[count_i][0];
+    }
+}
+
+void DivForwartd(const vector<const dtype*> numerators, const vector<const dtype*> denominators,
+        int count,
+        int dim,
+        vector<dtype*> &results) {
+    int block_count = DefaultBlockCount(count * dim);
+    NumberPointerArray numerator_arr, denominator_arr, result_arr;
+    numerator_arr.init((dtype**)numerators.data(), count);
+    denominator_arr.init((dtype**)denominators.data(), count);
+    result_arr.init((dtype**)results.data(), count);
+    KernelDivForward<<<block_count, TPB>>>(numerator_arr.value, denominator_arr.value, count, dim,
+            result_arr.value);
+}
+
 __global__ void KernelSubForward(const dtype *const *minuend, const dtype *const *subtrahend,
         int count,
         int dim,
@@ -3275,7 +3301,7 @@ __global__ void KernelVectorSumForward(const dtype *const *v, int count, int dim
         __syncthreads();
 
         for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-            shared_sum[threadIdx.x] = shared_sum[threadIdx.x + i];
+            shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
             __syncthreads();
         }
 

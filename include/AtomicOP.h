@@ -906,7 +906,6 @@ public:
 #if TEST_CUDA
         Executor::testForward();
         cout << "exp forward tested" << endl;
-        abort();
 #endif
     }
 };
@@ -947,9 +946,32 @@ protected:
     bool isDimLegal(const Node &input) override {
         return true;
     }
+
+private:
+    friend class SumExecutor;
 };
 
+#if USE_GPU
+class SumExecutor : public Executor {
+    void forward() override {
+        vector<const dtype*> inputs;
+        vector<dtype*> results;
+        for (Node *node : batch) {
+            SumNode *sum = static_cast<SumNode*>(node);
+            inputs.push_back(sum->getInput()->getVal().value);
+            results.push_back(sum->getVal().value);
+        }
+        n3ldg_cuda::VectorSumForward(inputs, batch.size(),
+                static_cast<SumNode*>(batch.front())->getInput()->getDim(), results);
+#if TEST_CUDA
+        Executor::testForward();
+        cout << "sum tested" << endl;
+#endif
+    }
+};
+#else
 class SumExecutor : public Executor {};
+#endif
 
 Executor *SumNode::generate() {
     SumExecutor *e = new SumExecutor();

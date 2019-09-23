@@ -40,9 +40,32 @@ public:
 private:
     Node *numerator_;
     Node *denominator_;
+    friend class DivExecutor;
 };
 
+#if USE_GPU
+class DivExecutor : public Executor {
+    void forward() override {
+        vector<const dtype*> numerators, denominators;
+        vector<dtype*> results;
+        for (Node *node : batch) {
+            DivNode *div = static_cast<DivNode*>(node);
+            numerators.push_back(div->numerator_->getVal().value);
+            denominators.push_back(div->denominator_->getVal().value);
+            results.push_back(div->getVal().value);
+        }
+
+        n3ldg_cuda::DivForwartd(numerators, denominators, batch.size(), getDim(), results);
+#if TEST_CUDA
+        Executor::testForward();
+        cout << "div tested" << endl;
+        abort();
+#endif
+    }
+};
+#else
 class DivExecutor : public Executor {};
+#endif
 
 Executor *DivNode::generate() {
     DivExecutor * executor = new DivExecutor();

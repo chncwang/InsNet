@@ -364,6 +364,11 @@ void PMultiForward(const std::vector<dtype*> &ins1,
         int count,
         int dim,
         std::vector<dtype*> &vals);
+void DivForwartd(const std::vector<const dtype*> numerators,
+        const std::vector<const dtype*> denominators,
+        int count,
+        int dim,
+        std::vector<dtype*> &results);
 void SubForward(const std::vector<const dtype*> &minuend,
         const std::vector<const dtype*> &subtrahend,
         int count,
@@ -404,6 +409,8 @@ void SoftMaxLoss(const std::vector<dtype*> &vals, std::vector<dtype*> &losses,
 void MaxScalarForward(const std::vector<const dtype*> &inputs, int count, int dim,
         std::vector<dtype*> &results,
         std::vector<int> &max_indexes);
+void VectorSumForward(const std::vector<const dtype *> &inputs, int count, int dim,
+        std::vector<dtype*> &results);
 void ScalarToVectorForward(const std::vector<const dtype*> &inputs, int count, int dim,
         std::vector<dtype*> &results);
 int Predict(const dtype* val, int dim);
