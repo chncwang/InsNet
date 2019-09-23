@@ -2470,6 +2470,116 @@ void DivForwartd(const vector<const dtype*> numerators, const vector<const dtype
             result_arr.value);
 }
 
+__global__ void KernelDivNumeratorBackward(const dtype *const *losses,
+        const dtype *const *denominator_vals,
+        int count,
+        int dim,
+        dtype *const *numerator_losses) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+
+    for (int i = index; i < count * dim; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        atomicAdd(numerator_losses[count_i] + dim_i, losses[count_i][dim_i] /
+                denominator_vals[count_i][0]);
+    }
+}
+
+__global__ void KernelDivDenominatorBackward(const dtype *const *losses,
+        const dtype *const *numerator_vals,
+        const dtype *const *denominator_vals,
+        int count,
+        int dim,
+        dtype *block_sums,
+        int *block_counters,
+        dtype *const *denominator_losses) {
+    __shared__ volatile dtype shared_sum[TPB];
+    __shared__ volatile bool is_last_block;
+    __shared__ volatile dtype square;
+    if (threadIdx.x == 0 && blockIdx.y == 0) {
+        block_counters[blockIdx.x] = 0;
+    }
+    int count_i = blockIdx.x;
+    if (threadIdx.x == 0) {
+        is_last_block = false;
+        square = denominator_vals[count_i][0] * denominator_vals[count_i][0];
+    }
+
+    int offset = blockIdx.y * blockDim.x + threadIdx.x;
+
+    shared_sum[threadIdx.x] = offset < dim ? numerator_vals[count_i][offset] / square : 0.0f;
+    __syncthreads();
+
+    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+        shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+        __syncthreads();
+    }
+
+    int block_sums_offset = blockIdx.x * gridDim.y + blockIdx.y;
+    if (threadIdx.x == 0) {
+        block_sums[block_sums_offset] = shared_sum[0];
+        if (atomicAdd(block_counters + blockIdx.x, 1) == gridDim.y - 1) {
+            is_last_block = true;
+        }
+    }
+    __syncthreads();
+
+    if (is_last_block) {
+        dtype sum = 0.0f;
+        for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
+            int offset = blockIdx.x * gridDim.y + i;
+            sum += block_sums[offset];
+        }
+
+        shared_sum[threadIdx.x] = sum;
+        __syncthreads();
+
+        for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+            shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+            __syncthreads();
+        }
+
+        if (threadIdx.x == 0) {
+            atomicAdd(denominator_losses[count_i], -shared_sum[0]);
+        }
+    }
+}
+
+void DivBackward(const vector<const dtype*> &losses, const vector<const dtype*> &denominator_vals,
+        const vector<const dtype*> &numerator_vals,
+        int count,
+        int dim,
+        vector<const dtype*> &numerator_losses,
+        vector<const dtype*> &denominator_losses) {
+    NumberPointerArray loss_arr, denominator_val_arr, numerator_val_arr, numerator_loss_arr,
+        denominator_loss_arr;
+    loss_arr.init((dtype**)losses.data(), losses.size());
+    denominator_val_arr.init((dtype**)denominator_vals.data(), denominator_vals.size());
+    numerator_val_arr.init((dtype**)numerator_vals.data(), numerator_vals.size());
+    numerator_loss_arr.init((dtype**)numerator_losses.data(), numerator_losses.size());
+    denominator_loss_arr.init((dtype**)denominator_losses.data(), denominator_losses.size());
+
+    int block_count = DefaultBlockCount(count * dim);
+    KernelDivNumeratorBackward<<<block_count, TPB>>>(loss_arr.value, denominator_val_arr.value,
+            count,
+            dim,
+            numerator_loss_arr.value);
+
+    int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
+    int block_y_count = (dim - 1 + thread_count) / thread_count;
+    dim3 block_dim(count, block_y_count, 1);
+
+    NumberArray block_sums;
+    block_sums.init(block_y_count * count);
+    IntArray block_counters;
+    block_counters.init(count);
+
+    KernelDivDenominatorBackward<<<block_dim , thread_count>>>(loss_arr.value,
+            numerator_val_arr.value, denominator_val_arr.value, count, dim, block_sums.value,
+            block_counters.value, denominator_loss_arr.value);
+}
+
 __global__ void KernelSubForward(const dtype *const *minuend, const dtype *const *subtrahend,
         int count,
         int dim,
