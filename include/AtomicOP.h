@@ -774,12 +774,13 @@ public:
         Executor::forward();
         int i = 0;
         for (Node *node : batch) {
+            cout << "node addr:" << node << endl;
             MaxScalarNode *max_scalar = static_cast<MaxScalarNode*>(node);
             n3ldg_cuda::Assert(max_scalar->getInput()->getVal().verify("max scalar forward input"));
             n3ldg_cuda::Assert(max_scalar->getVal().verify("max scalar forward"));
             ++i;
         }
-        cout << "tested:" << endl;
+        cout << "max scalar tested:" << endl;
 #endif
     }
 
@@ -838,24 +839,23 @@ Node *scalarToVector(Graph &graph, int dim, Node &input) {
 }
 
 #if USE_GPU
-class ScalarToVectorExecutor : public Executor {
+class ScalarToVectorExecutor : public UniInputExecutor {
 public:
     void forward() override {
+#if TEST_CUDA
+        UniInputExecutor::testForwardInpputs();
+#endif
         vector<const dtype*> inputs;
         vector<dtype*> results;
         for (Node *node : batch) {
             ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(node);
+            cout << "input addr:" << n->getInput() << endl;
             inputs.push_back(n->getInput()->getVal().value);
             results.push_back(n->getVal().value);
         }
         n3ldg_cuda::ScalarToVectorForward(inputs, batch.size(), getDim(), results);
 #if TEST_CUDA
-        Executor::forward();
-
-        for (int i = 0; i < batch.size(); ++i) {
-            ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(batch.at(i));
-            n3ldg_cuda::Assert(n->getVal().verify("ScalarToVectorNode forward"));
-        }
+        Executor::testForward();
 #endif
     }
 };
@@ -952,7 +952,7 @@ private:
 };
 
 #if USE_GPU
-class SumExecutor : public Executor {
+class SumExecutor : public UniInputExecutor {
     void forward() override {
         vector<const dtype*> inputs;
         vector<dtype*> results;
@@ -966,6 +966,22 @@ class SumExecutor : public Executor {
 #if TEST_CUDA
         Executor::testForward();
         cout << "sum tested" << endl;
+#endif
+    }
+
+    void backward() override {
+        vector<const dtype*> losses;
+        vector<dtype*> input_losses;
+        for (Node *node : batch) {
+            losses.push_back(node->getLoss().value);
+            SumNode *sum = static_cast<SumNode*>(node);
+            input_losses.push_back(sum->getInput()->getLoss().value);
+        }
+
+        int dim = static_cast<SumNode*>(batch.front())->getInput()->getDim();
+        n3ldg_cuda::VectorSumBackward(losses, batch.size(), dim, input_losses);
+#if TEST_CUDA
+        UniInputExecutor::testBackward();
 #endif
     }
 };

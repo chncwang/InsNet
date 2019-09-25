@@ -23,6 +23,8 @@
 #include <numeric>
 #include <memory>
 #include "profiler.h"
+#include "Memory_cuda.h"
+#include "MyTensor-def.h"
 
 namespace n3ldg_cuda {
 
@@ -707,7 +709,7 @@ __global__ void KernelTanhBackward(ActivatedEnum activated,
             v = losses[count_i][dim_i] * (1 - vals[count_i][dim_i]) *
                 vals[count_i][dim_i];
         }
-        atomicAdd(in_losses[count_i] + dim_i, v);
+        DeviceAtomicAdd(in_losses[count_i] + dim_i, v);
     }
 }
 
@@ -780,10 +782,11 @@ __global__ void KernelDropoutBackward(const dtype **losses, const dtype **vals,
         int dim_i = i % dim;
         if (is_training) {
             if (drop_mask[i] >= drop_factor) {
-                atomicAdd(in_losses[count_i] + dim_i, losses[count_i][dim_i]);
+                DeviceAtomicAdd(in_losses[count_i] + dim_i, losses[count_i][dim_i]);
             }
         } else {
-            atomicAdd(in_losses[count_i] + dim_i, (1 - drop_factor) * losses[count_i][dim_i]);
+            DeviceAtomicAdd(in_losses[count_i] + dim_i,
+                    (1 - drop_factor) * losses[count_i][dim_i]);
         }
     }
 }
@@ -1930,7 +1933,7 @@ __global__ void KernelSumBackward(PoolingEnum pooling, const dtype **losses,
         dtype **in_losses) {
     int global_in_count_i = blockIdx.x * max_in_count + blockIdx.y;
     if (blockIdx.y < in_counts[blockIdx.x] && threadIdx.x < dim) {
-        atomicAdd(in_losses[global_in_count_i] + threadIdx.x,
+        DeviceAtomicAdd(in_losses[global_in_count_i] + threadIdx.x,
                 pooling == PoolingEnum::SUM ?
                 losses[blockIdx.x][threadIdx.x] :
             losses[blockIdx.x][threadIdx.x] / in_counts[blockIdx.x]);
@@ -2082,7 +2085,7 @@ __global__ void KernelScalarAttentionMaskAndInLoss(const dtype **losses,
         return;
     }
     for (int i = threadIdx.x; i < dim; i += blockDim.x) {
-        atomicAdd(in_losses[global_in_count_i] + i, losses[blockIdx.y][i] *
+        DeviceAtomicAdd(in_losses[global_in_count_i] + i, losses[blockIdx.y][i] *
                 masks[blockIdx.y][max_in_count * threadIdx.x + blockIdx.x]);
     }
     att_mask_loss_shared_arr[threadIdx.x] = 0.0f;
@@ -2138,7 +2141,7 @@ __global__ void KernelScalarAttentionBackward(const dtype** masks,
     int global_in_count_i = max_in_count * blockIdx.x + threadIdx.x;
     int in_count = in_counts[blockIdx.x];
     if (threadIdx.x < in_count && blockIdx.y == 0) {
-        atomicAdd(unnormed_losses[global_in_count_i],
+        DeviceAtomicAdd(unnormed_losses[global_in_count_i],
                 masks[blockIdx.x][blockIdx.y * max_in_count + threadIdx.x] *
                 mask_losses[global_in_count_i]);
     }
@@ -2154,7 +2157,7 @@ __global__ void KernelScalarAttentionBackward(const dtype** masks,
         __syncthreads();
     }
     if (threadIdx.x < in_count && blockIdx.y == 0) {
-        atomicAdd(unnormed_losses[global_in_count_i],
+        DeviceAtomicAdd(unnormed_losses[global_in_count_i],
                 -shared_att_bckwrd_arr[0] * masks[blockIdx.x][threadIdx.x]);
     }
 }
@@ -2298,7 +2301,7 @@ __global__ void KernelVectorAttentionMaskAndInLoss(const dtype **losses,
         return;
     }
     for (int i = threadIdx.x; i < dim; i += blockDim.x) {
-        atomicAdd(in_losses[global_in_count_i] + i, losses[blockIdx.y][i] *
+        DeviceAtomicAdd(in_losses[global_in_count_i] + i, losses[blockIdx.y][i] *
                 masks[blockIdx.y][max_in_count * i + blockIdx.x]);
         mask_losses[blockIdx.y][max_in_count * i + blockIdx.x] =
             losses[blockIdx.y][i] * in_vals[global_in_count_i][i];
@@ -2340,7 +2343,7 @@ __global__ void KernelVectorAttentionBackward(const dtype** masks,
     int global_in_count_i = max_in_count * blockIdx.x + threadIdx.x;
     int in_count = in_counts[blockIdx.x];
     if (threadIdx.x < in_count) {
-        atomicAdd(unnormed_losses[global_in_count_i] + blockIdx.y,
+        DeviceAtomicAdd(unnormed_losses[global_in_count_i] + blockIdx.y,
                 masks[blockIdx.x][blockIdx.y * max_in_count + threadIdx.x] *
                 mask_losses[blockIdx.x][blockIdx.y * max_in_count +
                 threadIdx.x]);
@@ -2358,7 +2361,7 @@ __global__ void KernelVectorAttentionBackward(const dtype** masks,
         __syncthreads();
     }
     if (threadIdx.x < in_count) {
-        atomicAdd(unnormed_losses[global_in_count_i] + blockIdx.y,
+        DeviceAtomicAdd(unnormed_losses[global_in_count_i] + blockIdx.y,
                 -shared_att_bckwrd_arr[0] * masks[blockIdx.x][blockIdx.y *
                 max_in_count + threadIdx.x]);
     }
@@ -2481,7 +2484,7 @@ __global__ void KernelDivNumeratorBackward(const dtype *const *losses,
     for (int i = index; i < count * dim; i += step) {
         int count_i = i / dim;
         int dim_i = i % dim;
-        atomicAdd(numerator_losses[count_i] + dim_i, losses[count_i][dim_i] /
+        DeviceAtomicAdd(numerator_losses[count_i] + dim_i, losses[count_i][dim_i] /
                 denominator_vals[count_i][0]);
     }
 }
@@ -2541,7 +2544,7 @@ __global__ void KernelDivDenominatorBackward(const dtype *const *losses,
         }
 
         if (threadIdx.x == 0) {
-            atomicAdd(denominator_losses[count_i], -shared_sum[0]);
+            DeviceAtomicAdd(denominator_losses[count_i], -shared_sum[0]);
         }
     }
 }
@@ -2719,9 +2722,9 @@ __global__ void KernelPDotBackward(const dtype **losses,
     for (int i = index; i < count * dim; i += step) {
         int count_i = i / dim;
         int dim_i = i % dim;
-        atomicAdd(in_losses1[count_i] + dim_i,
+        DeviceAtomicAdd(in_losses1[count_i] + dim_i,
                 losses[count_i][0] * in_vals2[count_i][dim_i]);
-        atomicAdd(in_losses2[count_i] + dim_i,
+        DeviceAtomicAdd(in_losses2[count_i] + dim_i,
                 losses[count_i][0] * in_vals1[count_i][dim_i]);
     }
 }
@@ -3443,27 +3446,49 @@ void VectorSumForward(const vector<const dtype *> &inputs, int count, int dim,
     CheckCudaError();
 }
 
+__global__ void KernelVectorSumBackward(const dtype *const *losses, int count, int dim,
+        dtype * *const input_losses) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * dim; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+
+        DeviceAtomicAdd(input_losses[count_i] + dim_i, losses[count_i][0]);
+    }
+}
+
+void VectorSumBackward(const vector<const dtype*> &losses, int count, int dim,
+        vector<dtype*> &input_losses) {
+    int block_count = DefaultBlockCount(count * dim);
+    NumberPointerArray loss_arr, input_loss_arr;
+    loss_arr.init((dtype**)losses.data(), losses.size());
+    input_loss_arr.init((dtype**)input_losses.data(), input_losses.size());
+    KernelVectorSumBackward<<<block_count, TPB>>>(loss_arr.value, count, dim,
+            input_loss_arr.value);
+}
+
 __global__ void KernelScalarToVectorForward(const dtype* const* inputs, int count, int dim,
         dtype *const *results) {
-    int count_i = blockIdx.x;
-    int dim_i = blockIdx.y * blockDim.x + threadIdx.x;
-    if (dim_i < dim) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * dim; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
         results[count_i][dim_i] = inputs[count_i][0];
     }
 }
 
 void ScalarToVectorForward(const vector<const dtype*> &inputs, int count, int dim,
         vector<dtype*> &results) {
-    int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
-    int block_y_count = (dim - 1 + thread_count) / thread_count;
-    dim3 block_dim(count, block_y_count, 1);
-
+    int block_count = DefaultBlockCount(dim * count);
+    cout << "block_count:" << block_count << endl;
     NumberPointerArray input_arr;
     input_arr.init((dtype**)inputs.data(), inputs.size());
     NumberPointerArray result_arr;
     result_arr.init((dtype**)results.data(), inputs.size());
 
-    KernelScalarToVectorForward<<<block_dim, thread_count>>>(input_arr.value, count, dim,
+    KernelScalarToVectorForward<<<block_count, TPB>>>(input_arr.value, count, dim,
             result_arr.value);
 }
 

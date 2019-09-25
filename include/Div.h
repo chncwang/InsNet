@@ -62,7 +62,6 @@ public:
 #if TEST_CUDA
         Executor::testForward();
         cout << "div tested" << endl;
-        abort();
 #endif
     }
 
@@ -78,6 +77,14 @@ public:
         n3ldg_cuda::DivBackward(losses, denominators, numerators, batch.size(), getDim(),
                 numerator_losses, denominator_losses);
 #if TEST_CUDA
+        auto get_inputs = [](Node &node) {
+            DivNode &div = static_cast<DivNode&>(node);
+            vector<Node*> results = {div.denominator_, div.numerator_};
+            return results;
+        };
+        Executor::testBackward(get_inputs);
+        cout << "div backward tested" << endl;
+        abort();
 #endif
     }
 

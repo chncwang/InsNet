@@ -177,6 +177,9 @@ public:
             parents_.push_back(parent);
             parent->degree_++;
             parent->depth_ = std::max(depth_ + 1, parent->depth_);
+        } else {
+            cerr << "degree:" << degree_ << endl;
+            abort();
         }
     }
 
@@ -298,15 +301,16 @@ public:
         afterForward(container, ins);
     }
 
-protected:
     Node *getInput() const {
         return input_;
     }
 
+protected:
     virtual bool isDimLegal(const Node &input) = 0;
 
 private:
     Node *input_;
+    friend class UniInputExecutor;
 };
 
 template<typename T>
@@ -380,7 +384,9 @@ public:
 
         n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
         profiler.BeginEvent(getNodeType() + " forward");
+        cout << "begin forward - exec type:" << getNodeType() << endl;
         forward();
+        cout << "end forward - exec type:" << getNodeType() << endl;
         profiler.EndCudaEvent();
         for (Node *node : batch) {
             node->setDegree(-1);
@@ -428,11 +434,62 @@ protected:
     void testForward() {
         Executor::forward();
 
+        int i = 0;
         for (Node *node : batch) {
+            cout << "test forward i:" << i++ << endl;
             n3ldg_cuda::Assert(node->getVal().verify((getNodeType() + " forward").c_str()));
         }
     }
+
+    void testForwardInpputs(const function<vector<Node*>(Node &node)> &get_inputs) {
+        for (Node *node : batch) {
+            vector<Node*> inputs = get_inputs(*node);
+            for (Node *input : inputs) {
+                n3ldg_cuda::Assert(input->getVal().verify((getNodeType() +
+                                " forward input").c_str()));
+            }
+        }
+    }
+
+    void testBackward(const function<vector<Node*>(Node &node)> &get_inputs) {
+        Executor::backward();
+
+        for (Node *node : batch) {
+            vector<Node*> inputs = get_inputs(*node);
+            for (Node *input : inputs) {
+                n3ldg_cuda::Assert(input->getLoss().verify((getNodeType() + " backward").c_str()));
+            }
+        }
+    }
 #endif
+};
+
+auto get_inputs = [](Node &node) {
+    UniInputNode &uni_input = static_cast<UniInputNode&>(node);
+    vector<Node*> inputs = {uni_input.getInput()};
+    return inputs;
+};
+
+class UniInputExecutor : public Executor {
+protected:
+    void testForwardInpputs() {
+        for (Node *node : batch) {
+            vector<Node*> inputs = get_inputs(*node);
+            for (Node *input : inputs) {
+                n3ldg_cuda::Assert(input->getVal().verify((getNodeType() +
+                                " forward input").c_str()));
+            }
+        }
+    }
+
+    void testBackward() {
+        auto get_inputs = [](Node &node) {
+            UniInputNode &uni_input = static_cast<UniInputNode&>(node);
+            vector<Node*> inputs = {uni_input.input_};
+            return inputs;
+        };
+        Executor::testBackward(get_inputs);
+    }
 };
 
 typedef  Executor* PExecutor;

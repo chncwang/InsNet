@@ -2,7 +2,6 @@
 #define N3LDG_CUDA_N3LDG_CUDA_H
 
 #include "Def.h"
-#include "../include/MyTensor.h"
 
 #include <iostream>
 #include <cassert>
@@ -418,6 +417,8 @@ void MaxScalarForward(const std::vector<const dtype*> &inputs, int count, int di
         std::vector<int> &max_indexes);
 void VectorSumForward(const std::vector<const dtype *> &inputs, int count, int dim,
         std::vector<dtype*> &results);
+void VectorSumBackward(const std::vector<const dtype*> &losses, int count, int dim,
+        std::vector<dtype*> &input_losses);
 void ScalarToVectorForward(const std::vector<const dtype*> &inputs, int count, int dim,
         std::vector<dtype*> &results);
 int Predict(const dtype* val, int dim);
