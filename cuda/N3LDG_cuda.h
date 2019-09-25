@@ -369,6 +369,13 @@ void DivForwartd(const std::vector<const dtype*> numerators,
         int count,
         int dim,
         std::vector<dtype*> &results);
+void DivBackward(const std::vector<const dtype*> &losses,
+        const std::vector<const dtype*> &denominator_vals,
+        const std::vector<const dtype*> &numerator_vals,
+        int count,
+        int dim,
+        std::vector<dtype*> &numerator_losses,
+        std::vector<dtype*> &denominator_losses);
 void SubForward(const std::vector<const dtype*> &minuend,
         const std::vector<const dtype*> &subtrahend,
         int count,

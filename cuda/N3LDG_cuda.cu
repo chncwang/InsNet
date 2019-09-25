@@ -2550,8 +2550,8 @@ void DivBackward(const vector<const dtype*> &losses, const vector<const dtype*> 
         const vector<const dtype*> &numerator_vals,
         int count,
         int dim,
-        vector<const dtype*> &numerator_losses,
-        vector<const dtype*> &denominator_losses) {
+        vector<dtype*> &numerator_losses,
+        vector<dtype*> &denominator_losses) {
     NumberPointerArray loss_arr, denominator_val_arr, numerator_val_arr, numerator_loss_arr,
         denominator_loss_arr;
     loss_arr.init((dtype**)losses.data(), losses.size());

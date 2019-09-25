@@ -45,8 +45,11 @@ private:
 
 #if USE_GPU
 class DivExecutor : public Executor {
+public:
+    vector<const dtype*> numerators;
+    vector<const dtype*> denominators;
+
     void forward() override {
-        vector<const dtype*> numerators, denominators;
         vector<dtype*> results;
         for (Node *node : batch) {
             DivNode *div = static_cast<DivNode*>(node);
@@ -62,6 +65,22 @@ class DivExecutor : public Executor {
         abort();
 #endif
     }
+
+    void backward() override {
+        vector<const dtype*> losses;
+        vector<dtype*> numerator_losses, denominator_losses;
+        for (Node *node : batch) {
+            DivNode *div = static_cast<DivNode*>(node);
+            losses.push_back(node->getLoss().value);
+            numerator_losses.push_back(div->numerator_->getLoss().value);
+        }
+
+        n3ldg_cuda::DivBackward(losses, denominators, numerators, batch.size(), getDim(),
+                numerator_losses, denominator_losses);
+#if TEST_CUDA
+#endif
+    }
+
 };
 #else
 class DivExecutor : public Executor {};
