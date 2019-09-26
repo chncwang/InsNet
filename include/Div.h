@@ -37,6 +37,7 @@ public:
     }
 
     PExecutor generate() override;
+
 private:
     Node *numerator_;
     Node *denominator_;
@@ -72,6 +73,7 @@ public:
             DivNode *div = static_cast<DivNode*>(node);
             losses.push_back(node->getLoss().value);
             numerator_losses.push_back(div->numerator_->getLoss().value);
+            denominator_losses.push_back(div->denominator_->getLoss().value);
         }
 
         n3ldg_cuda::DivBackward(losses, denominators, numerators, batch.size(), getDim(),
@@ -79,12 +81,12 @@ public:
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {
             DivNode &div = static_cast<DivNode&>(node);
-            vector<Node*> results = {div.denominator_, div.numerator_};
+            vector<pair<Node*, string>> results = {make_pair(div.denominator_, "denominator"),
+                    make_pair(div.numerator_, "numerator")};
             return results;
         };
         Executor::testBackward(get_inputs);
         cout << "div backward tested" << endl;
-        abort();
 #endif
     }
 

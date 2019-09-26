@@ -139,10 +139,6 @@ public:
                     if (parent_it->getDegree() <= 0) {
                         abort();
                     }
-                    if (parent_it->getNodeType() == "sub") {
-                        cout << "minus degree related node:" << free_node->getNodeType() << endl;
-                        cout << "exec type:" << cur_exec->getNodeType() << endl;
-                    }
                     parent_it->setDegree(parent_it->getDegree() - 1);
                     if (parent_it->getDegree() == 0) {
                         Insert(parent_it, free_nodes);

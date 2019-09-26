@@ -27,8 +27,8 @@ public:
 
     void forward(Graph &cg, vector<PNode>& x) {
         if (x.size() == 0) {
-            std::cout << "empty inputs for add" << std::endl;
-            return;
+            std::cerr << "empty inputs for add" << std::endl;
+            abort();
         }
 
         ins.clear();

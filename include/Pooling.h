@@ -42,7 +42,7 @@ class PoolNode : public Node {
         ins.clear();
         for (int i = 0; i < nSize; i++) {
             if (x[i]->val().dim != getDim()) {
-                std::cout << "input matrixes are not matched" << std::endl;
+                std::cerr << "input matrixes are not matched" << std::endl;
                 abort();
             }
             ins.push_back(x[i]);
@@ -608,8 +608,8 @@ public:
 
     void forward(Graph *cg, const vector<PNode>& x) {
         if (x.size() == 0) {
-            std::cout << "empty inputs for add" << std::endl;
-            return;
+            std::cerr << "empty inputs for add" << std::endl;
+            abort();
         }
 
         ins.clear();
@@ -617,7 +617,8 @@ public:
             if (x[i]->val().dim == getDim()) {
                 ins.push_back(x[i]);
             } else {
-                std::cout << "dim does not match" << std::endl;
+                std::cerr << "dim does not match" << std::endl;
+                abort();
             }
         }
 

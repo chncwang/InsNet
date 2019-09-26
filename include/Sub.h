@@ -20,7 +20,6 @@ public:
         subtrahend_ = &subtrahend;
         vector<Node*> ins = {minuend_, subtrahend_};
         afterForward(graph, ins);
-        cout << "after forward sub degree:" << getDegree() << endl;
     }
 
     void compute() override {
@@ -51,15 +50,12 @@ class SubExecutor : public Executor {
             minuend.push_back(sub->minuend_->getVal().value);
             subtrahend.push_back(sub->subtrahend_->getVal().value);
             results.push_back(sub->getVal().value);
-            cout << boost::format("minuend:%1% subtrahend:%2% ") % sub->minuend_->getNodeType() %
-                sub->subtrahend_->getNodeType() << endl;
-            cout << "sub degree:" << sub->getDegree() << endl;
         }
 
         n3ldg_cuda::SubForward(minuend, subtrahend, batch.size(), getDim(), results);
 #if TEST_CUDA
         testForward();
-        cout << "sub tested" << endl;
+        cout << "sub forward tested" << endl;
 #endif
     }
 };

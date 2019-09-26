@@ -29,15 +29,6 @@ public:
 
     Executor *generate() override;
 
-    bool typeEqual(Node *other) override {
-        SplitNode *s = static_cast<SplitNode*>(other);
-        return Node::typeEqual(other) && offset_ == s->offset_;
-    }
-
-    string typeSignature() const override {
-        return Node::typeSignature() + "-" + to_string(offset_);
-    }
-
     void compute () override {
         for (int i = 0; i < getDim(); ++i) {
             val()[i] = input_->val()[i + offset_];
@@ -53,6 +44,7 @@ public:
 private:
     Node *input_ = nullptr;
     int offset_ = 0;
+    friend class SplitExecutor;
 };
 
 namespace n3ldg_plus {
@@ -64,7 +56,29 @@ Node* split(Graph &graph, int dim, Node &input, int offset) {
 }
 }
 
+#if USE_GPU
+class SplitExecutor : public Executor {
+public:
+    void forward() override {
+        vector<const dtype*> inputs;
+        vector<int> offsets;
+        vector<dtype*> results;
+        for (Node *node : batch) {
+            SplitNode *split = static_cast<SplitNode*>(node);
+            inputs.push_back(split->input_->getVal().value);
+            offsets.push_back(split->offset_);
+            results.push_back(split->getVal().value);
+        }
+        n3ldg_cuda::SplitForward(inputs, offsets, batch.size(), getDim(), results);
+#if TEST_CUDA
+        testForward();
+        cout << "split tested" << endl;
+#endif
+    }
+};
+#else
 class SplitExecutor : public Executor {};
+#endif
 
 Executor *SplitNode::generate() {
     SplitExecutor * executor = new SplitExecutor;

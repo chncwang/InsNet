@@ -171,6 +171,9 @@ public:
         return Node::typeSignature() + "-" + addressToString(param) + "-" + addressToString(act) +
             "-" + addressToString(de);
     }
+
+private:
+    friend class UniExecutor;
 };
 
 
@@ -382,8 +385,11 @@ class UniExecutor :public Executor {
         }
 
 #if TEST_CUDA
-        n3ldg_cuda::Assert(
-                param->b.grad.verify("uni backward param b init"));
+        if (static_cast<UniNode*>(batch.front())->param->bUseB) {
+            cout << "node id:" << batch.front()->getNodeIndex() << endl;
+            n3ldg_cuda::Assert(
+                    param->b.grad.verify("uni backward param b init"));
+        }
 #endif
         n3ldg_cuda::AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(
                 lty.value, lx.value, param->b.grad.value, losses, count,
@@ -411,7 +417,9 @@ class UniExecutor :public Executor {
                 }
             }
         }
-        n3ldg_cuda::Assert(param->b.grad.verify("backward b grad"));
+        if (param->bUseB) {
+            n3ldg_cuda::Assert(param->b.grad.verify("backward b grad"));
+        }
 
         lx.mat() += param->W.val.mat().transpose() * lty.mat();
         n3ldg_cuda::Assert(lx.verify("backward lx"));

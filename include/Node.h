@@ -222,6 +222,10 @@ public:
     void setNodeIndex(int node_index) {
         node_index_ = node_index;
     }
+    
+    int getNodeIndex() const {
+        return node_index_;
+    }
 
     int getDepth() const {
         return depth_;
@@ -306,7 +310,7 @@ public:
     }
 
 protected:
-    virtual bool isDimLegal(const Node &input) = 0;
+    virtual bool isDimLegal(const Node &input) const = 0;
 
 private:
     Node *input_;
@@ -384,9 +388,7 @@ public:
 
         n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
         profiler.BeginEvent(getNodeType() + " forward");
-        cout << "begin forward - exec type:" << getNodeType() << endl;
         forward();
-        cout << "end forward - exec type:" << getNodeType() << endl;
         profiler.EndCudaEvent();
         for (Node *node : batch) {
             node->setDegree(-1);
@@ -434,9 +436,7 @@ protected:
     void testForward() {
         Executor::forward();
 
-        int i = 0;
         for (Node *node : batch) {
-            cout << "test forward i:" << i++ << endl;
             n3ldg_cuda::Assert(node->getVal().verify((getNodeType() + " forward").c_str()));
         }
     }
@@ -451,13 +451,14 @@ protected:
         }
     }
 
-    void testBackward(const function<vector<Node*>(Node &node)> &get_inputs) {
+    void testBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
         Executor::backward();
 
         for (Node *node : batch) {
-            vector<Node*> inputs = get_inputs(*node);
-            for (Node *input : inputs) {
-                n3ldg_cuda::Assert(input->getLoss().verify((getNodeType() + " backward").c_str()));
+            auto inputs = get_inputs(*node);
+            for (pair<Node*, string> &input : inputs) {
+                n3ldg_cuda::Assert(input.first->getLoss().verify((getNodeType() +
+                                " backward " + input.second).c_str()));
             }
         }
     }
@@ -485,7 +486,7 @@ protected:
     void testBackward() {
         auto get_inputs = [](Node &node) {
             UniInputNode &uni_input = static_cast<UniInputNode&>(node);
-            vector<Node*> inputs = {uni_input.input_};
+            vector<pair<Node*, string>> inputs = {make_pair(uni_input.input_, "input")};
             return inputs;
         };
         Executor::testBackward(get_inputs);

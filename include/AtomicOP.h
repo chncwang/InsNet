@@ -574,17 +574,11 @@ public:
         } else {
             drop_mask_ = 1 - drop_value_;
         }
-//        cout << boost::format("compute is_training:%1%\n") % is_training_;
-//        std::cout << "before compute:" << in_->val().toString() << std::endl;
         val().vec() = in_->val().vec() * drop_mask_.vec();
-//        std::cout << "after compute:" << val().toString() << std::endl;
     }
 
     void backward() override {
-//        cout << boost::format("backward is_training:%1%\n") % is_training_;
-//        std::cout << "before backward:" << loss().toString() << std::endl;
         in_->loss().vec() += loss().vec() * drop_mask_.vec();
-//        std::cout << "after backward:" << in_->loss().toString() << std::endl;
     }
 
     bool typeEqual(Node *other) override {
@@ -734,7 +728,7 @@ public:
     Executor* generate() override;
 
 protected:
-    bool isDimLegal(const Node &input) override {
+    bool isDimLegal(const Node &input) const override {
         return true;
     }
 
@@ -764,17 +758,9 @@ public:
             node->max_i_ = max_indexes.at(i);
         }
 #if TEST_CUDA
-        for (Node *node : batch) {
-            MaxScalarNode *max_scalar = static_cast<MaxScalarNode*>(node);
-            cout << "cpu input:" << endl;
-            for (int i = 0; i < max_scalar->getInput()->getDim(); ++i) {
-                cout << max_scalar->getInput()->getVal()[i] << endl;
-            }
-        }
         Executor::forward();
         int i = 0;
         for (Node *node : batch) {
-            cout << "node addr:" << node << endl;
             MaxScalarNode *max_scalar = static_cast<MaxScalarNode*>(node);
             n3ldg_cuda::Assert(max_scalar->getInput()->getVal().verify("max scalar forward input"));
             n3ldg_cuda::Assert(max_scalar->getVal().verify("max scalar forward"));
@@ -819,7 +805,7 @@ public:
     Executor* generate() override;
 
 protected:
-    bool isDimLegal(const Node &input) override {
+    bool isDimLegal(const Node &input) const override {
         return input.getDim() == 1;
     }
 
@@ -849,13 +835,13 @@ public:
         vector<dtype*> results;
         for (Node *node : batch) {
             ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(node);
-            cout << "input addr:" << n->getInput() << endl;
             inputs.push_back(n->getInput()->getVal().value);
             results.push_back(n->getVal().value);
         }
         n3ldg_cuda::ScalarToVectorForward(inputs, batch.size(), getDim(), results);
 #if TEST_CUDA
         Executor::testForward();
+        cout << "scalarToVector tested" << endl;
 #endif
     }
 };
@@ -883,7 +869,7 @@ public:
     }
 
 protected:
-    bool isDimLegal(const Node &input) override {
+    bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
     }
 
@@ -907,6 +893,10 @@ public:
         Executor::testForward();
         cout << "exp forward tested" << endl;
 #endif
+    }
+
+    void backward() override {
+        abort();
     }
 };
 #else
@@ -943,7 +933,7 @@ public:
     }
 
 protected:
-    bool isDimLegal(const Node &input) override {
+    bool isDimLegal(const Node &input) const override {
         return true;
     }
 
@@ -983,6 +973,7 @@ class SumExecutor : public UniInputExecutor {
 #if TEST_CUDA
         UniInputExecutor::testBackward();
 #endif
+        cout << "sum backward tested" << endl;
     }
 };
 #else

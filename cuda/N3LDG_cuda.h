@@ -375,6 +375,10 @@ void DivBackward(const std::vector<const dtype*> &losses,
         int dim,
         std::vector<dtype*> &numerator_losses,
         std::vector<dtype*> &denominator_losses);
+void SplitForward(const std::vector<const dtype*> &inputs, const std::vector<int> &offsets,
+        int count,
+        int dim,
+        std::vector<dtype*> &results);
 void SubForward(const std::vector<const dtype*> &minuend,
         const std::vector<const dtype*> &subtrahend,
         int count,

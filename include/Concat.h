@@ -27,7 +27,7 @@ public:
 
     void forward(Graph &cg, const vector<PNode>& x) {
         if (x.size() == 0) {
-            std::cout << "empty inputs for concat" << std::endl;
+            std::cerr << "empty inputs for concat" << std::endl;
             abort();
         }
 
@@ -142,9 +142,9 @@ class ConcatExecutor : public Executor {
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
-            cout << batch.at(idx)->getDim() << endl;
             n3ldg_cuda::Assert(batch[idx]->val().verify("concat forward"));
         }
+        cout << "concat forward tested" << endl;
 #endif
     }
 
