@@ -228,6 +228,10 @@ void TanhBackward(ActivatedEnum activated, const std::vector<dtype*> &losses,
         std::vector<dtype*> &in_losses);
 void ExpForward(const std::vector<const dtype*> &inputs, int count, int dim,
         std::vector<dtype*> &results);
+void ExpBackward(const std::vector<const dtype*> &losses, const std::vector<const dtype*> &vals,
+        int count,
+        int dim,
+        std::vector<dtype*> input_losses);
 void DropoutForward(const std::vector<dtype*> &xs, int count, int dim,
         bool is_training,
         const dtype *drop_mask,

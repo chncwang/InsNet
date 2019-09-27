@@ -880,15 +880,16 @@ private:
 #if USE_GPU
 class ExpExecutor : public Executor {
 public:
+    vector<dtype*> vals;
+
     void forward() override {
         vector<const dtype*> inputs;
-        vector<dtype*> results;
         for (Node *node : batch) {
             ExpNode *expnode = static_cast<ExpNode*>(node);
             inputs.push_back(expnode->getInput()->getVal().value);
-            results.push_back(expnode->getVal().value);
+            vals.push_back(expnode->getVal().value);
         }
-        n3ldg_cuda::ExpForward(inputs, batch.size(), getDim(), results);
+        n3ldg_cuda::ExpForward(inputs, batch.size(), getDim(), vals);
 #if TEST_CUDA
         Executor::testForward();
         cout << "exp forward tested" << endl;
@@ -896,7 +897,14 @@ public:
     }
 
     void backward() override {
-        abort();
+        vector<const dtype*> losses;
+        vector<dtype*> input_losses;
+
+        for (Node *node : batch) {
+            ExpNode *exp = static_cast<ExpNode*>(node);
+            losses.push_back(exp->getLoss().value);
+            input_losses.push_back(exp->getInput()->getLoss().value);
+        }
     }
 };
 #else
