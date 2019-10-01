@@ -878,7 +878,7 @@ private:
 };
 
 #if USE_GPU
-class ExpExecutor : public Executor {
+class ExpExecutor : public UniInputExecutor {
 public:
     vector<dtype*> vals;
 
@@ -897,14 +897,21 @@ public:
     }
 
     void backward() override {
-        vector<const dtype*> losses;
+        vector<const dtype*> losses, vals;
         vector<dtype*> input_losses;
 
         for (Node *node : batch) {
             ExpNode *exp = static_cast<ExpNode*>(node);
+            vals.push_back(node->getVal().value);
             losses.push_back(exp->getLoss().value);
             input_losses.push_back(exp->getInput()->getLoss().value);
         }
+
+        n3ldg_cuda::ExpBackward(losses, vals, batch.size(), getDim(), input_losses);
+#if TEST_CUDA
+        UniInputExecutor::testBackward();
+        cout << "exp backward tested" << endl;
+#endif
     }
 };
 #else

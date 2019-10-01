@@ -2645,6 +2645,32 @@ void SubForward(const std::vector<const dtype*> &minuend,
     CheckCudaError();
 }
 
+__global__ void KernelSubBackward(const dtype *const *losses, int count, int dim,
+        dtype *const *minuend_losses,
+        dtype *const *subtrahend_losses) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * dim; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        DeviceAtomicAdd(minuend_losses[count_i] + dim_i, losses[count_i][dim_i]);
+        DeviceAtomicAdd(subtrahend_losses[count_i] + dim_i, -losses[count_i][dim_i]);
+    }
+}
+
+void SubBackward(const std::vector<const dtype*> &losses, int count, int dim,
+        std::vector<dtype*> &minuend_losses,
+        std::vector<dtype*> &subtrahend_losses) {
+    int block_count = DefaultBlockCount(count * dim);
+    NumberPointerArray loss_arr, minuend_loss_arr, subtrahend_loss_arr;
+    loss_arr.init((dtype**)losses.data(), losses.size());
+    minuend_loss_arr.init((dtype**)minuend_losses.data(), minuend_losses.size());
+    subtrahend_loss_arr.init((dtype**)subtrahend_losses.data(), subtrahend_losses.size());
+    KernelSubBackward<<<block_count, TPB>>>((const dtype *const *)loss_arr.value, count, dim,
+            (dtype *const *)minuend_loss_arr.value, (dtype *const *)subtrahend_loss_arr.value);
+    CheckCudaError();
+}
+
 __global__ void KernelPMultiBackward(const dtype **losses,
         const dtype **in_vals1,
         const dtype **in_vals2,

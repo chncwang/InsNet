@@ -388,6 +388,9 @@ void SubForward(const std::vector<const dtype*> &minuend,
         int count,
         int dim,
         std::vector<dtype*> &results);
+void SubBackward(const std::vector<const dtype*> &losses, int count, int dim,
+        std::vector<dtype*> &minuend_losses,
+        std::vector<dtype*> &subtrahend_losses);
 void PMultiBackward(const std::vector<dtype*> &losses,
         const std::vector<dtype*> &in_vals1,
         const std::vector<dtype*> &in_vals2,

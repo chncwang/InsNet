@@ -58,6 +58,29 @@ class SubExecutor : public Executor {
         cout << "sub forward tested" << endl;
 #endif
     }
+
+    void backward() override {
+        std::vector<const dtype*> losses;
+        std::vector<dtype*> minuend_losses, subtrahend_losses;
+        for (Node *n : batch) {
+            SubNode *sub = static_cast<SubNode*>(n);
+            losses.push_back(sub->loss().value);
+            minuend_losses.push_back(sub->minuend_->loss().value);
+            subtrahend_losses.push_back(sub->subtrahend_->loss().value);
+        }
+        int count = batch.size();
+        n3ldg_cuda::SubBackward(losses, count, getDim(), minuend_losses, subtrahend_losses);
+#if TEST_CUDA
+        auto get_inputs = [](Node &node) {
+            SubNode &sub = static_cast<SubNode&>(node);
+            vector<pair<Node*, string>> inputs = {make_pair(sub.minuend_, "minuend"),
+                make_pair(sub.subtrahend_, "subtrahend")};
+            return inputs;
+        };
+        Executor::testBackward(get_inputs);
+        cout << "sub tested" << endl;
+#endif
+    }
 };
 #else
 class SubExecutor : public Executor {};
