@@ -383,6 +383,10 @@ void SplitForward(const std::vector<const dtype*> &inputs, const std::vector<int
         int count,
         int dim,
         std::vector<dtype*> &results);
+void SplitBackward(const std::vector<const dtype*> &losses, const std::vector<int> offsets,
+        int count,
+        int dim,
+        const std::vector<dtype*> &input_losses);
 void SubForward(const std::vector<const dtype*> &minuend,
         const std::vector<const dtype*> &subtrahend,
         int count,
@@ -426,12 +430,17 @@ void SoftMaxLoss(const std::vector<dtype*> &vals, std::vector<dtype*> &losses,
 void MaxScalarForward(const std::vector<const dtype*> &inputs, int count, int dim,
         std::vector<dtype*> &results,
         std::vector<int> &max_indexes);
+void MaxScalarBackward(const std::vector<const dtype *> &losses, const std::vector<int> &indexes,
+        int count,
+        const std::vector<dtype*> &input_losses);
 void VectorSumForward(const std::vector<const dtype *> &inputs, int count, int dim,
         std::vector<dtype*> &results);
 void VectorSumBackward(const std::vector<const dtype*> &losses, int count, int dim,
         std::vector<dtype*> &input_losses);
 void ScalarToVectorForward(const std::vector<const dtype*> &inputs, int count, int dim,
         std::vector<dtype*> &results);
+void ScalarToVectorBackward(const std::vector<const dtype*> &losses, int count, int dim,
+        std::vector<dtype*> &input_losses);
 int Predict(const dtype* val, int dim);
 std::pair<dtype, std::vector<int>> SoftMaxLoss(const std::vector<const dtype *> &vals_vector,
         int count,

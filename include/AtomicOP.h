@@ -738,12 +738,11 @@ private:
 };
 
 #if USE_GPU
-class MaxScalarExecutor : public Executor {
+class MaxScalarExecutor : public UniInputExecutor {
 public:
     void forward() override {
         vector<const dtype*> inputs;
         vector<dtype*> results;
-        vector<int> max_indexes;
         max_indexes.resize(batch.size());
         for (int i = 0; i < batch.size(); ++i) {
             MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));
@@ -771,8 +770,24 @@ public:
     }
 
     void backward() override {
+        vector<const dtype*> losses;
+        vector<dtype *> input_losses;
 
+        for (Node *node : batch) {
+            MaxScalarNode *max_scalar = static_cast<MaxScalarNode*>(node);
+            losses.push_back(max_scalar->getLoss().value);
+            input_losses.push_back(max_scalar->getInput()->getLoss().value);
+        }
+
+        n3ldg_cuda::MaxScalarBackward(losses, max_indexes, batch.size(), input_losses);
+#if TEST_CUDA
+        UniInputExecutor::testBackward();
+        cout << "tested" << endl;
+#endif
     }
+
+private:
+    vector<int> max_indexes;
 };
 #else
 class MaxScalarExecutor : public Executor {};
@@ -842,6 +857,21 @@ public:
 #if TEST_CUDA
         Executor::testForward();
         cout << "scalarToVector tested" << endl;
+#endif
+    }
+
+    void backward() override {
+        vector<const dtype*> losses;
+        vector<dtype*> input_losses;
+        for (Node *node : batch) {
+            ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(node);
+            losses.push_back(n->getLoss().value);
+            input_losses.push_back(n->getInput()->getLoss().value);
+        }
+        n3ldg_cuda::ScalarToVectorBackward(losses, batch.size(), getDim(), input_losses);
+#if TEST_CUDA
+        UniInputExecutor::testBackward();
+        cout << "ScalarToVectorNode backward tested" << endl;
 #endif
     }
 };
@@ -987,8 +1017,8 @@ class SumExecutor : public UniInputExecutor {
         n3ldg_cuda::VectorSumBackward(losses, batch.size(), dim, input_losses);
 #if TEST_CUDA
         UniInputExecutor::testBackward();
-#endif
         cout << "sum backward tested" << endl;
+#endif
     }
 };
 #else

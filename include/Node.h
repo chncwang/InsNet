@@ -483,6 +483,7 @@ protected:
         }
     }
 
+#if TEST_CUDA
     void testBackward() {
         auto get_inputs = [](Node &node) {
             UniInputNode &uni_input = static_cast<UniInputNode&>(node);
@@ -491,6 +492,7 @@ protected:
         };
         Executor::testBackward(get_inputs);
     }
+#endif
 };
 
 typedef  Executor* PExecutor;
