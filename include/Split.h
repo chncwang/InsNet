@@ -61,7 +61,6 @@ class SplitExecutor : public Executor {
 public:
     void forward() override {
         vector<const dtype*> inputs;
-        vector<int> offsets;
         vector<dtype*> results;
         for (Node *node : batch) {
             SplitNode *split = static_cast<SplitNode*>(node);
@@ -75,6 +74,31 @@ public:
         cout << "split tested" << endl;
 #endif
     }
+
+    void backward() override {
+        vector<const dtype*> losses;
+        vector<dtype *> input_losses;
+
+        for (Node *node : batch) {
+            SplitNode *split = static_cast<SplitNode*>(node);
+            losses.push_back(split->getLoss().value);
+            input_losses.push_back(split->input_->getLoss().value);
+        }
+
+        n3ldg_cuda::SplitBackward(losses, offsets, batch.size(), getDim(), input_losses);
+#if TEST_CUDA
+        auto get_inputs = [](Node &node) {
+            SplitNode &split = static_cast<SplitNode&>(node);
+            vector<pair<Node *, string>> inputs = {make_pair(split.input_, "input")};
+            return inputs;
+        };
+        Executor::testBackward(get_inputs);
+        cout << "split backward tested" << endl;
+#endif
+    }
+
+private:
+        vector<int> offsets;
 };
 #else
 class SplitExecutor : public Executor {};
