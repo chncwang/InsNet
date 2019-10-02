@@ -473,6 +473,7 @@ auto get_inputs = [](Node &node) {
 
 class UniInputExecutor : public Executor {
 protected:
+#if TEST_CUDA
     void testForwardInpputs() {
         for (Node *node : batch) {
             vector<Node*> inputs = get_inputs(*node);
@@ -483,7 +484,6 @@ protected:
         }
     }
 
-#if TEST_CUDA
     void testBackward() {
         auto get_inputs = [](Node &node) {
             UniInputNode &uni_input = static_cast<UniInputNode&>(node);
