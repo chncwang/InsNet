@@ -106,7 +106,7 @@ cublasHandle_t& GetCublasHandle() {
 cudaError_t MyCudaMemcpy(void *dest, const void *src, size_t count,
         cudaMemcpyKind kind) {
     cudaError_t e;
-    e = cudaMemcpy(dest, src, count, kind);
+    e = cudaMemcpyAsync(dest, src, count, kind);
     CallCuda(e);
     return e;
 }
@@ -3377,6 +3377,16 @@ std::pair<dtype, std::vector<int>> SoftMaxLoss(const std::vector<const dtype *> 
 
     vector<int> answers(count);
     MyCudaMemcpy(answers.data(), answer_arr.value, count * sizeof(int), cudaMemcpyDeviceToHost);
+
+    for (int word_id : answers) {
+        if (word_id < 0) {
+            for (int id : answers) {
+                cerr << id << " ";
+            }
+            cerr << endl;
+            abort();
+        }
+    }
 
     vector<dtype> loss_vector(count);
     MyCudaMemcpy(loss_vector.data(), loss_arr.value, count * sizeof(dtype), cudaMemcpyDeviceToHost);

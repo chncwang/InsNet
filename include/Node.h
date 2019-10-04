@@ -396,6 +396,7 @@ public:
     }
 
     void backwardFully() {
+        cout << "backward:" << getNodeType() << endl;
         n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
         profiler.BeginEvent(getNodeType() + " backward");
         backward();

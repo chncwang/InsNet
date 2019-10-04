@@ -176,6 +176,16 @@ private:
     friend class UniExecutor;
 };
 
+namespace n3ldg_plus {
+    Node *uni(Graph &graph, int dim, UniParams &params, Node &input) {
+        UniNode *uni(new UniNode);
+        uni->init(dim);
+        uni->setParam(params);
+        uni->forward(graph, input);
+        return uni;
+    }
+}
+
 
 // non-linear feed-forward node
 // input nodes should be specified by forward function
@@ -691,9 +701,13 @@ PExecutor LinearNode::generate() {
 
 class LinearWordVectorExecutor;
 
-class LinearWordVectorNode : public Node {
+class LinearWordVectorNode : public UniInputNode {
 public:
-    LinearWordVectorNode() : Node("linear_word_vector_node") {}
+    LinearWordVectorNode() : UniInputNode("linear_word_vector_node") {}
+
+    bool isDimLegal(const Node &input) const override {
+        return input.getDim() == param_->outDim();
+    }
 
     void setParam(SparseParam &word_vectors, int offset = 0) {
         if (offset + getDim() > word_vectors.inDim()) {
@@ -703,12 +717,6 @@ public:
         }
         param_ = &word_vectors;
         offset_ = offset;
-    }
-
-    void forward(Graph &graph, Node &in) {
-        input_ = &in;
-        in.addParent(this);
-        graph.addNode(this);
     }
 
     void compute() override {
@@ -736,7 +744,6 @@ public:
     }
 
 private:
-    Node *input_ = nullptr;
     SparseParam *param_ = nullptr;
     friend class LinearWordVectorExecutor;
     int offset_ = 0;
@@ -744,7 +751,7 @@ private:
 
 #if USE_GPU
 
-class LinearWordVectorExecutor : public Executor {
+class LinearWordVectorExecutor : public UniInputExecutor {
 public:
     Tensor2D x, y;
     int inDim, outDim;
@@ -760,9 +767,9 @@ public:
         ys.reserve(batch.size());
 
         for (int i = 0; i < batch.size(); ++i) {
-            LinearNode *n = static_cast<LinearNode*>(batch.at(i));
+            LinearWordVectorNode *n = static_cast<LinearWordVectorNode*>(batch.at(i));
 
-            xs.push_back(n->in->val().value);
+            xs.push_back(n->getInput()->val().value);
             ys.push_back(n->val().value);
         }
 
@@ -782,7 +789,7 @@ public:
 #if TEST_CUDA
         for (int i = 0; i < count; i++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
-            memcpy(x.v + i * inDim, ptr->input_->val().v, inDim * sizeof(dtype));
+            memcpy(x.v + i * inDim, ptr->getInput()->val().v, inDim * sizeof(dtype));
         }
         Mat scoped_matrix(param->val.mat().data() + offset * inDim, inDim, outDim);
         y.mat() = scoped_matrix.transpose() * x.mat();
@@ -796,6 +803,7 @@ public:
             }
             n3ldg_cuda::Assert(ptr->val().verify("linear forward val"));
         }
+        cout << "LinearWordVectorExecutor forward tested" << endl;
 #endif
     }
 
@@ -808,7 +816,7 @@ public:
         std::vector<dtype*> ly_vec;
         ly_vec.reserve(count);
         for (int i = 0; i < count; ++i) {
-            UniNode* ptr = (UniNode*)batch[i];
+            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[i];
             ly_vec.push_back(ptr->loss().value);
         }
         n3ldg_cuda::CopyFromMultiVectorsToOneVector(ly_vec, ly.value, count, outDim);
@@ -820,8 +828,8 @@ public:
         std::vector<dtype*> losses;
         losses.reserve(count);
         for (int idx = 0; idx < count; idx++) {
-            UniNode* ptr = (UniNode*)batch[idx];
-            losses.push_back(ptr->in->loss().value);
+            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
+            losses.push_back(ptr->getInput()->loss().value);
         }
 
         n3ldg_cuda::AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(ly.value, lx.value,
@@ -833,7 +841,7 @@ public:
         }
 
         n3ldg_cuda::Assert(x.verify("backward x"));
-        n3ldg_cuda::Assert(ly.verify("backward x"));
+        n3ldg_cuda::Assert(ly.verify("backward ly"));
 
         auto scoped_grad = x.mat() * ly.mat().transpose();
         MatrixXdtype full_grad(inDim, param->inDim()), left(inDim, offset),
@@ -849,14 +857,15 @@ public:
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
             for (int idy = 0; idy < inDim; idy++) {
-                ptr->input_->loss()[idy] += lx[idx][idy];
+                ptr->getInput()->loss()[idy] += lx[idx][idy];
             }
         }
 
         for (Node * n : batch) {
             LinearWordVectorNode *ptr = static_cast<LinearWordVectorNode *>(n);
-            n3ldg_cuda::Assert(ptr->input_->loss().verify("backward loss"));
+            n3ldg_cuda::Assert(ptr->getInput()->loss().verify("backward loss"));
         }
+        cout << "LinearWordVectorNode backward tested" << endl;
 #endif
     }
 };
