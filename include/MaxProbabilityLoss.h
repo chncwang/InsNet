@@ -7,7 +7,7 @@
 
 #include "MyLib.h"
 
-std::pair<dtype, std::vector<int>> MaxLogProbabilityLoss(std::vector<Node *> &nodes,
+std::pair<dtype, std::vector<int>> cpuMaxLogProbabilityLoss(std::vector<Node *> &nodes,
         const std::vector<int> &answers,
         int batchsize) {
     dtype loss = 0.0f;
@@ -33,6 +33,26 @@ std::pair<dtype, std::vector<int>> MaxLogProbabilityLoss(std::vector<Node *> &no
     }
 
     return std::make_pair(loss, std::move(results));
+}
+
+std::pair<dtype, std::vector<int>> maxLogProbabilityLoss(std::vector<Node *> &nodes,
+        const std::vector<int> &answers,
+        int batchsize) {
+#if USE_GPU
+    vector<const dtype*> vals;
+    vector<dtype*> losses;
+    for (Node *node : nodes) {
+        vals.push_back(node->getVal().value);
+        losses.push_back(node->getLoss().value);
+    }
+#if TEST_CUDA
+    cpuMaxLogProbabilityLoss(nodes, answers, batchsize);
+#endif
+    return n3ldg_cuda::SoftMaxLoss(vals, nodes.size(),
+            nodes.front()->getDim(), answers, batchsize, losses);
+#else
+    return cpuMaxLogProbabilityLoss(nodes, answers, batchsize);
+#endif
 }
 
 #endif

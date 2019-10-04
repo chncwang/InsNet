@@ -450,7 +450,7 @@ public:
 
     SumPoolNode() : Node("sum-pool") {}
 
-    void forward(Graph *cg, const vector<PNode>& x) {
+    void forward(Graph &cg, const vector<PNode>& x) {
         if (x.size() == 0) {
             std::cerr << "empty inputs for add" << std::endl;
             abort();
@@ -469,7 +469,7 @@ public:
             ins[i]->addParent(this);
         }
 
-        cg->addNode(this);
+        cg.addNode(this);
     }
 
     void compute() {
@@ -751,6 +751,22 @@ PExecutor AvgPoolNode::generate() {
     exec->dim = getDim();
 #endif
     return exec;
+}
+
+namespace n3ldg_plus {
+    Node *sumPool(Graph &graph, vector<Node *> &inputs) {
+        int dim = inputs.front()->getDim();
+        for (int i = 1; i < inputs.size(); ++i) {
+            if (dim != inputs.at(i)->getDim()) {
+                cerr << "dim not equal" << endl;
+                abort();
+            }
+        }
+        SumPoolNode *pool = new SumPoolNode;
+        pool->init(dim);
+        pool->forward(graph, inputs);
+        return pool;
+    }
 }
 
 #endif

@@ -23,39 +23,44 @@ struct DotAttentionParams : public N3LDGSerializable
 , public TransferableComponents
 #endif
 {
-    BiParams bi_atten;
+    UniParams uni1;
+    UniParams uni2;
     int hidden_dim;
     int guide_dim;
 
     DotAttentionParams() = default;
 
     void exportAdaParams(ModelUpdate& ada) {
-        bi_atten.exportAdaParams(ada);
+        uni1.exportAdaParams(ada);
+        uni2.exportAdaParams(ada);
     }
 
     void init(int nHidden, int nGuide) {
-        bi_atten.init(1, nHidden, nGuide, false);
+        uni1.init(1, nHidden, false);
+        uni2.init(1, nGuide, false);
         hidden_dim = nHidden;
         guide_dim = nGuide;
     }
 
     Json::Value toJson() const override {
         Json::Value json;
-        json["bi_atten"] = bi_atten.toJson();
+        json["uni1"] = uni1.toJson();
+        json["uni2"] = uni2.toJson();
         json["hidden_dim"] = hidden_dim;
         json["guide_dim"] = guide_dim;
         return json;
     }
 
     void fromJson(const Json::Value &json) override {
-        bi_atten.fromJson(json["bi_atten"]);
+        uni1.fromJson(json["uni1"]);
+        uni2.fromJson(json["uni2"]);
         hidden_dim = json["hidden_dim"].asInt();
         guide_dim = json["guide_dim"].asInt();
     }
 
 #if USE_GPU
     std::vector<Transferable *> transferablePtrs() override {
-        return {&bi_atten};
+        return {&uni1, &uni2};
     }
 
     virtual std::string name() const {
@@ -66,7 +71,7 @@ struct DotAttentionParams : public N3LDGSerializable
 
 class DotAttentionBuilder {
 public:
-    vector<BiNode *> _weights;
+    vector<Node *> _weights;
     Node* _hidden;
 
     DotAttentionParams* _param = nullptr;
@@ -89,14 +94,16 @@ public:
         }
 
         for (int idx = 0; idx < x.size(); idx++) {
-            BiNode* intermediate_node(new BiNode);
-            intermediate_node->init(1);
-            intermediate_node->setParam(_param->bi_atten);
-            intermediate_node->forward(cg, *x.at(idx), guide);
-            _weights.push_back(intermediate_node);
+//            BiNode* intermediate_node(new BiNode);
+//            intermediate_node->init(1);
+//            intermediate_node->setParam(_param->bi_atten);
+//            intermediate_node->forward(cg, *x.at(idx), guide);
+            Node *uni1 = n3ldg_plus::uni(cg, 1, _param->uni1, *x.at(idx));
+            Node *uni2 = n3ldg_plus::uni(cg, 1, _param->uni2, guide);
+
+            _weights.push_back(n3ldg_plus::add(cg, {uni1, uni2}));
         }
-        vector<Node *> weights = toNodePointers<BiNode>(_weights);
-        _hidden = attention(cg, x, weights);
+        _hidden = attention(cg, x, _weights);
     }
 };
 

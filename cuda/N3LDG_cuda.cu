@@ -3378,6 +3378,16 @@ std::pair<dtype, std::vector<int>> SoftMaxLoss(const std::vector<const dtype *> 
     vector<int> answers(count);
     MyCudaMemcpy(answers.data(), answer_arr.value, count * sizeof(int), cudaMemcpyDeviceToHost);
 
+    for (int word_id : answers) {
+        if (word_id < 0) {
+            for (int id : answers) {
+                cerr << id << " ";
+            }
+            cerr << endl;
+            abort();
+        }
+    }
+
     vector<dtype> loss_vector(count);
     MyCudaMemcpy(loss_vector.data(), loss_arr.value, count * sizeof(dtype), cudaMemcpyDeviceToHost);
     dtype loss_sum = accumulate(loss_vector.begin(), loss_vector.end(), 0.0f);

@@ -87,6 +87,22 @@ public:
     }
 };
 
+namespace n3ldg_plus {
+    Node *add(Graph &graph, vector<Node*> inputs) {
+        for (int i = 1; i < inputs.size(); ++i) {
+            if (inputs.front()->getDim() != inputs.at(i)->getDim()) {
+                cerr << "input dims not equal" << endl;
+                abort();
+            }
+        }
+
+        int dim = inputs.front()->getDim();
+        PAddNode *result = new PAddNode;
+        result->init(dim);
+        result->forward(graph, inputs);
+        return result;
+    }
+}
 
 class PAddExecutor : public Executor {
 public:
@@ -180,21 +196,6 @@ public:
     }
 #endif
 };
-
-Node *add(Graph &graph, vector<Node*> &inputs) {
-    int dim = inputs.front()->getDim();
-    for (int i = 1; i < inputs.size(); ++i) {
-        if (dim != inputs.at(i)->getDim()) {
-            cerr << boost::format("dim1:%1% dim2:%2%") % dim % inputs.at(i)->getDim() << endl;
-            abort();
-        }
-    }
-
-    PAddNode *node = new PAddNode;
-    node->init(dim);
-    node->forward(graph, inputs);
-    return node;
-}
 
 PExecutor PAddNode::generate() {
     PAddExecutor* exec = new PAddExecutor();

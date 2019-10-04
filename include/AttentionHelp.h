@@ -17,6 +17,7 @@
 #include "Split.h"
 #include "PMultiOP.h"
 #include "PAddOP.h"
+#include "Pooling.h"
 #include <memory>
 
 namespace n3ldg_plus {
@@ -67,7 +68,8 @@ Node* attention(Graph &graph, vector<Node *>& inputs, vector<Node *>& scores) {
         multiplied_nodes.push_back(node);
     }
 
-    Node *result = add(graph, multiplied_nodes);
+    Node *result = n3ldg_plus::sumPool(graph, multiplied_nodes);
+
     return result;
 }
 
