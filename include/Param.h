@@ -28,7 +28,7 @@ public:
     Param(bool is_bias) : BaseParam(is_bias) {}
 
     // allow sparse and dense parameters have different parameter initialization methods
-    void init(int outDim, int inDim) {
+    void init(int outDim, int inDim) override {
 #if USE_GPU
         val.initOnMemoryAndDevice(outDim, inDim);
         aux_square.initOnMemoryAndDevice(outDim, inDim);
@@ -54,7 +54,7 @@ public:
     }
 
 #if USE_GPU
-    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() {
+    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
         auto v = BaseParam::transferablePtrs();
         v.push_back(&aux_square);
         v.push_back(&aux_mean);

@@ -186,11 +186,6 @@ namespace n3ldg_plus {
     }
 }
 
-
-// non-linear feed-forward node
-// input nodes should be specified by forward function
-// for input variables, we exploit column vector,
-// which means a concrete input vector x_i is represented by x(0, i), x(1, i), ..., x(n, i)
 class LinearNode : public Node {
 public:
     PNode in;
@@ -214,8 +209,9 @@ public:
 
     void forward(Graph &graph, Node &x) {
         if (x.getDim() != param->W.inDim()) {
-            cerr << boost::format("input dim:%1% node in dim:%2%") % x.getDim() % param->W.inDim() << endl;
-           abort();
+            cerr << boost::format("input dim:%1% node in dim:%2%") % x.getDim() % param->W.inDim()
+                << endl;
+            abort();
         }
         in = &x;
         in->addParent(this);
@@ -223,17 +219,15 @@ public:
     }
 
     void compute() override {
-        val().mat() = param->W.val.mat() * in->val().mat();
+        abort();
     }
 
     void backward() override {
-        param->W.grad.mat() += loss().mat() * in->val().tmat();
-        in->loss().mat() += param->W.val.mat().transpose() * loss().mat();
+        abort();
     }
 
     PExecutor generate() override;
 
-    // better to rewrite for deep understanding
     bool typeEqual(PNode other) override {
         bool result = Node::typeEqual(other);
         if (!result) return false;
@@ -293,6 +287,7 @@ class UniExecutor :public Executor {
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             UniNode* ptr = (UniNode*)batch[idx];
+            ptr->in->val().copyFromDeviceToHost();
             n3ldg_cuda::Assert(ptr->in->val().verify("Uni forward in"));
             for (int idy = 0; idy < inDim; idy++) {
                 x[idx][idy] = ptr->in->getVal()[idy];
@@ -305,6 +300,7 @@ class UniExecutor :public Executor {
         }
         n3ldg_cuda::Assert(x.verify("forward x"));
 
+        param->W.val.copyFromDeviceToHost();
         ty.mat() = param->W.val.mat() * x.mat();
 
         if (param->bUseB) {
@@ -326,6 +322,7 @@ class UniExecutor :public Executor {
 
         n3ldg_cuda::Assert(ty.verify("forward ty"));
         n3ldg_cuda::Assert(y.verify("Uni forward y"));
+        y.copyFromDeviceToHost();
 #endif
 #else
         n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
@@ -406,19 +403,32 @@ class UniExecutor :public Executor {
                 outDim, inDim, param->bUseB);
 
 #if TEST_CUDA
+        param->W.grad.copyFromDeviceToHost();
+
         for (int idx = 0; idx < count; idx++) {
             UniNode* ptr = (UniNode*)batch[idx];
+            ptr->loss().copyFromDeviceToHost();
             for (int idy = 0; idy < outDim; idy++) {
                 ly[idx][idy] = ptr->getLoss()[idy];
             }
         }
 
         n3ldg_cuda::Assert(x.verify("backward x"));
+        x.copyFromDeviceToHost();
         lty.vec() = ly.vec() * ty.vec().binaryExpr(y.vec(), ptr_fun(derivate));
         n3ldg_cuda::Assert(lty.verify("backward lty"));
+        lty.copyFromDeviceToHost();
 
         param->W.grad.mat() += lty.mat() * x.mat().transpose();
-        n3ldg_cuda::Assert(param->W.grad.verify("backward W grad"));
+
+        auto print = [&]() {
+            cout << "cpu:" << endl;
+            cout << param->W.grad.toString();
+            cout << endl << "gpu:" << endl;
+            param->W.grad.print();
+        };
+
+        n3ldg_cuda::Assert(param->W.grad.verify("uni backward W grad"), "", print);
 
         if (param->bUseB) {
             for (int idx = 0; idx < count; idx++) {
@@ -838,6 +848,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
             memcpy(ly.v + idx * outDim, ptr->loss().v, outDim * sizeof(dtype));
+            ptr->loss().copyFromDeviceToHost();
         }
 
         n3ldg_cuda::Assert(x.verify("backward x"));
@@ -848,11 +859,16 @@ public:
                      right(inDim, param->inDim() - offset - outDim);
         full_grad << left, scoped_grad, right;
         param->grad.mat() += full_grad;
-        n3ldg_cuda::Assert(param->grad.verify("LinearExecutor backward W grad"));
+        function<void(void)> print = [&]()->void {
+            cerr << "cpu:" << endl << param->grad.toString() << endl << "gpu:" << endl;
+            param->grad.print();
+        };
+        n3ldg_cuda::Assert(param->grad.verify("LinearWordVectorExecutor backward W grad"), "",
+                print);
 
         Mat scoped_matrix(param->val.mat().data() + offset * inDim, inDim, outDim);
         lx.mat() = scoped_matrix * ly.mat();
-        n3ldg_cuda::Assert(lx.verify("linear execute backward lx"));
+        n3ldg_cuda::Assert(lx.verify("linear word vector execute backward lx"));
 
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
@@ -885,7 +901,7 @@ public:
 
         for (int i = 0; i < count; i++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
-            memcpy(x.v + i * inDim, ptr->input_->val().v, inDim * sizeof(dtype));
+            memcpy(x.v + i * inDim, ptr->getInput()->val().v, inDim * sizeof(dtype));
         }
         int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
         Mat scoped_matrix(param->val.mat().data() + offset * inDim, inDim, outDim);
@@ -921,7 +937,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
             for (int idy = 0; idy < inDim; idy++) {
-                ptr->input_->loss()[idy] += lx[idx][idy];
+                ptr->getInput()->loss()[idy] += lx[idx][idy];
             }
         }
     }

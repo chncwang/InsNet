@@ -348,6 +348,8 @@ std::tuple<std::unique_ptr<Tensor1D>, std::pair<int, dtype>, dtype> toExp(const 
 
 #if USE_GPU
 void clearNodes(std::vector<Node*> &nodes, int dim) {
+    n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
+    profiler.BeginEvent("clearNodes");
     std::vector<dtype*> val_and_losses;
     val_and_losses.reserve(2 * nodes.size());
     for (Node *n : nodes) {
@@ -356,6 +358,7 @@ void clearNodes(std::vector<Node*> &nodes, int dim) {
     }
     n3ldg_cuda::BatchMemset(val_and_losses, val_and_losses.size(), dim,
             0.0f);
+    profiler.EndEvent();
 }
 #endif
 
@@ -396,7 +399,6 @@ public:
     }
 
     void backwardFully() {
-        cout << "backward:" << getNodeType() << endl;
         n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
         profiler.BeginEvent(getNodeType() + " backward");
         backward();

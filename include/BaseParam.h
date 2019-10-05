@@ -17,6 +17,12 @@
 #include "MyTensor.h"
 
 #if USE_GPU
+typedef n3ldg_cuda::Tensor2D Tensor2D;
+#else
+typedef n3ldg_cpu::Tensor2D Tensor2D;
+#endif
+
+#if USE_GPU
 class TransferableComponents : public n3ldg_cuda::Transferable
 {
 public:

@@ -175,7 +175,8 @@ struct BoolArray {
 bool Verify(bool *host, bool *device, int len, const char* message);
 bool Verify(int *host, int *device, int len, const char* message);
 
-void Assert(bool v, const std::string &message = "");
+void Assert(bool v, const std::string &message = "",
+        const std::function<void(void)> &call = []() {});
 void Memset(dtype *p, int len, dtype value);
 void Memset(bool *p, int len, bool value);
 void *Malloc(int size);
