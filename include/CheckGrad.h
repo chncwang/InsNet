@@ -10,20 +10,9 @@
 using namespace Eigen;
 
 class CheckGrad {
-
-  public:
+public:
     vector<BaseParam*> _params;
     vector<string> _names;
-
-  public:
-    CheckGrad() {
-        clear();
-    }
-
-    void clear() {
-        _params.clear();
-        _names.clear();
-    }
 
     void add(BaseParam &param, const std::string &name) {
         this->add(&param, name);
@@ -34,7 +23,6 @@ class CheckGrad {
         _names.push_back(name);
     }
 
-  public:
     template<typename Sample>
     struct Classifier {
         std::function<dtype(const Sample &sample)> loss;
@@ -91,9 +79,6 @@ class CheckGrad {
             _params[i]->val[idx][idy] = orginValue;
         }
     }
-
 };
-
-
 
 #endif /*CHECKGREAD_H_*/

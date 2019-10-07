@@ -19,7 +19,7 @@
 #include <cstdlib>
 #include "profiler.h"
 
-class UniParams : public N3LDGSerializable
+class UniParams : public N3LDGSerializable, public TunableCombination<BaseParam>
 #if USE_GPU
 , public TransferableComponents 
 #endif
@@ -29,14 +29,7 @@ public:
     Param b;
     bool bUseB = true;
 
-    UniParams() : b(true) {}
-
-    void exportAdaParams(ModelUpdate& ada) {
-        ada.addParam(&W);
-        if (bUseB) {
-            ada.addParam(&b);
-        }
-    }
+    UniParams(const string &name) : W(name + "-W"), b(name + "-b", true) {}
 
     void init(int nOSize, int nISize, bool useB = true) {
         W.init(nOSize, nISize);
@@ -78,6 +71,15 @@ public:
         return "UniParams";
     }
 #endif
+
+protected:
+    virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
+        if (bUseB) {
+            return {&W, &b};
+        } else {
+            return {&W};
+        }
+    }
 };
 
 

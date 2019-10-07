@@ -23,9 +23,7 @@ public:
     Tensor2D aux_mean;
     int iter;
 
-    Param() = default;
-
-    Param(bool is_bias) : BaseParam(is_bias) {}
+    Param(const string &name, bool is_bias = false) : BaseParam(name, is_bias) {}
 
     // allow sparse and dense parameters have different parameter initialization methods
     void init(int outDim, int inDim) override {

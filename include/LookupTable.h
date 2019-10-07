@@ -20,7 +20,7 @@
 
 using boost::format;
 
-class LookupTable : public N3LDGSerializable
+class LookupTable : public N3LDGSerializable, public TunableCombination<BaseParam>
 #if USE_GPU
 , public TransferableComponents
 #endif
@@ -34,7 +34,7 @@ public:
     int nUNKId;
     bool inited = false;
 
-    LookupTable() {
+    LookupTable(const string &name = "embedding") : E(name) {
         nVSize = 0;
         nDim = 0;
         nUNKId = -1;
@@ -42,7 +42,7 @@ public:
     }
 
 #if USE_GPU
-    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() {
+    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
         return {&E};
     }
 
@@ -194,12 +194,13 @@ public:
 #endif
     }
 
-    void exportAdaParams(ModelUpdate& ada) {
+    std::vector<Tunable<BaseParam>*> tunableComponents() override {
         if (bFineTune) {
-            ada.addParam(&E);
+            return {&E};
+        } else {
+            return {};
         }
     }
-
 
     int getElemId(const string& strFeat) const {
         return elems.find_string(strFeat) ? elems.from_string(strFeat) : nUNKId;
@@ -209,7 +210,7 @@ public:
         return elems.find_string(str);
     }
 
-    Json::Value toJson() const {
+    Json::Value toJson() const override {
         Json::Value json;
         json["e"] = E.toJson();
         json["finetune"] = bFineTune;
@@ -220,7 +221,7 @@ public:
         return json;
     }
 
-    void fromJson(const Json::Value &json) {
+    void fromJson(const Json::Value &json) override {
         bFineTune = json["finetune"].asBool();
         nDim = json["dim"].asInt();
         nVSize = json["vocabulary_size"].asInt();

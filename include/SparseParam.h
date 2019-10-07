@@ -21,6 +21,8 @@ public:
     NRVec<bool> indexers;
     NRVec<int> last_update;
 
+    SparseParam(const string &name = "sparse") : BaseParam(name) {}
+
 #if USE_GPU
     n3ldg_cuda::BoolArray dIndexers;
     n3ldg_cuda::IntArray dIters;
