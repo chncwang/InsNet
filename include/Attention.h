@@ -93,10 +93,6 @@ public:
         }
 
         for (int idx = 0; idx < x.size(); idx++) {
-//            BiNode* intermediate_node(new BiNode);
-//            intermediate_node->init(1);
-//            intermediate_node->setParam(_param->bi_atten);
-//            intermediate_node->forward(cg, *x.at(idx), guide);
             Node *uni1 = n3ldg_plus::uni(cg, 1, _param->uni1, *x.at(idx));
             Node *uni2 = n3ldg_plus::uni(cg, 1, _param->uni2, guide);
 

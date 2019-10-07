@@ -54,16 +54,8 @@ int Size(const NodeMap &map) {
 }
 
 class Graph : public NodeContainer {
-protected:
-    vector<PExecutor> execs;
-    vector<Node *> nodes;
-    NodeMap free_nodes;
-    std::map<string, std::pair<int, int>> node_type_depth;
-    vector<PNode> finish_nodes;
-    vector<PNode> all_nodes;
-
 public:
-    Graph() = default;
+    Graph(bool eager = false) : eager_(eager) {}
 
     virtual ~Graph() {
         int count = execs.size();
@@ -104,6 +96,10 @@ public:
         } else {
             it->second.first += x->getDepth();
             it->second.second++;
+        }
+
+        if (eager_) {
+            compute();
         }
     }
 
@@ -166,6 +162,17 @@ public:
             abort();
         }
     }
+
+protected:
+    vector<PExecutor> execs;
+    vector<Node *> nodes;
+    NodeMap free_nodes;
+    std::map<string, std::pair<int, int>> node_type_depth;
+    vector<PNode> finish_nodes;
+    vector<PNode> all_nodes;
+
+private:
+    bool eager_ = false;
 };
 
 #endif

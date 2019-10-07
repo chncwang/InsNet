@@ -14,13 +14,11 @@ public:
     vector<BaseParam*> _params;
     vector<string> _names;
 
-    void add(BaseParam &param, const std::string &name) {
-        this->add(&param, name);
-    }
-
-    void add(BaseParam* param, const string& name) {
-        _params.push_back(param);
-        _names.push_back(name);
+    void init(const vector<BaseParam*> &params) {
+        for (BaseParam *param : params) {
+            _params.push_back(param);
+            _names.push_back(param->getParamName());
+        }
     }
 
     template<typename Sample>

@@ -177,9 +177,6 @@ public:
             parents_.push_back(parent);
             parent->degree_++;
             parent->depth_ = std::max(depth_ + 1, parent->depth_);
-        } else {
-            cerr << "degree:" << degree_ << endl;
-            abort();
         }
     }
 
