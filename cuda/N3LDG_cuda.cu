@@ -1967,7 +1967,6 @@ void SumPoolBackward(PoolingEnum pooling, const std::vector<dtype*> &losses,
     in_count_arr.init((int*)in_counts.data(), in_counts.size());
     NumberPointerArray in_loss_arr;
     in_loss_arr.init((dtype**)in_losses.data(), in_losses.size());
-    cout << "block_dim:" << block_dim.x << ", " << block_dim.y << " thread:" << thread_count << endl;
     KernelSumBackward<<<block_dim, thread_count>>>(pooling,
             (const dtype**)loss_arr.value, (const int*)in_count_arr.value,
             max_in_count, count, dim, in_loss_arr.value);
