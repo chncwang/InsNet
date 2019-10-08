@@ -175,7 +175,8 @@ struct BoolArray {
 bool Verify(bool *host, bool *device, int len, const char* message);
 bool Verify(int *host, int *device, int len, const char* message);
 
-void Assert(bool v, const std::string &message = "");
+void Assert(bool v, const std::string &message = "",
+        const std::function<void(void)> &call = []() {});
 void Memset(dtype *p, int len, dtype value);
 void Memset(bool *p, int len, bool value);
 void *Malloc(int size);
@@ -197,14 +198,6 @@ void CopyFromHostToDevice(const std::vector<dtype*> &src,
         std::vector<dtype*> &dest, int count, int dim);
 void CopyFromDeviceToHost(const std::vector<dtype*> &src,
         std::vector<dtype*> &dest, int count, int dim);
-
-enum ActivatedEnum {
-    TANH,
-    SIGMOID,
-    RELU,
-    LEAKY_RELU,
-    SELU
-};
 
 enum PoolingEnum {
     MAX,

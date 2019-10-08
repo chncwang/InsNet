@@ -42,8 +42,12 @@ void n3ldg_cpu::Tensor1D::zero() {
     }
 }
 
-std::string n3ldg_cpu::Tensor1D::toString() {
+std::string n3ldg_cpu::Tensor1D::toString() const {
     return toJson().toStyledString();
+}
+
+void n3ldg_cpu::Tensor1D::print() const {
+    std::cout << toString() << std::endl;
 }
 
 const Mat n3ldg_cpu::Tensor1D::mat() const {
@@ -155,6 +159,14 @@ void n3ldg_cpu::Tensor2D::zero() {
     for (int i = 0; i < size; ++i) {
         v[i] = 0;
     }
+}
+
+std::string n3ldg_cpu::Tensor2D::toString() const {
+    return toJson().toStyledString();
+}
+
+void n3ldg_cpu::Tensor2D::print() const {
+    std::cout << toString() << std::endl;
 }
 
 const Mat n3ldg_cpu::Tensor2D::mat() const {

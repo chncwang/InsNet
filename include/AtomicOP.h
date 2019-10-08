@@ -77,46 +77,24 @@ PExecutor ActivateNode::generate() {
     return exec;
 };
 
-class TanhNode :public Node {
-  public:
-    Node* in;
+class TanhNode : public UniInputNode {
+public:
+    TanhNode() : UniInputNode("tanh") {}
 
-  public:
-    TanhNode() : Node("tanh") {
-        in = nullptr;
-    }
-
-    ~TanhNode() {
-        in = nullptr;
-    }
-
-  public:
-    void forward(Graph &graph, Node &input) {
-        this->forward(&graph, &input);
-    }
-
-    void forward(Graph *cg, Node* x) {
-        in = x;
-        in->addParent(this);
-        cg->addNode(this);
-    }
-
-  public:
     void compute() {
-        val().vec() = in->val().vec().unaryExpr(ptr_fun(ftanh));
+        val().vec() = getInput()->val().vec().unaryExpr(ptr_fun(ftanh));
     }
 
     void backward() {
-        in->loss().vec() += loss().vec() * in->val().vec().binaryExpr(val().vec(), ptr_fun(dtanh));
+        getInput()->loss().vec() += loss().vec() * getInput()->val().vec().binaryExpr(val().vec(),
+                ptr_fun(dtanh));
     }
 
-  public:
     PExecutor generate();
 
-    // better to rewrite for deep understanding
-    bool typeEqual(Node* other) {
-        bool result = Node::typeEqual(other);
-        return result;
+protected:
+    virtual bool isDimLegal(const Node &input) const {
+        return input.getDim() == getDim();
     }
 };
 
@@ -135,13 +113,13 @@ public:
         for (Node *n : batch) {
             TanhNode *tanh = static_cast<TanhNode*>(n);
 #if TEST_CUDA
-            tanh->in->val().copyFromHostToDevice();
+            tanh->getInput()->val().copyFromHostToDevice();
 #endif
-            xs.push_back(tanh->in->val().value);
+            xs.push_back(tanh->getInput()->val().value);
             ys.push_back(tanh->val().value);
         }
 
-        n3ldg_cuda::TanhForward(n3ldg_cuda::ActivatedEnum::TANH, xs, count, dim, ys);
+        n3ldg_cuda::TanhForward(ActivatedEnum::TANH, xs, count, dim, ys);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -165,7 +143,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             TanhNode* ptr = (TanhNode*)batch[idx];
             for (int idy = 0; idy < ptr->getDim(); idy++) {
-                x[offset + idy] = ptr->in->val()[idy];
+                x[offset + idy] = ptr->getInput()->val()[idy];
             }
             offset += ptr->getDim();
         }
@@ -194,13 +172,13 @@ public:
             TanhNode *tanh = static_cast<TanhNode*>(n);
 #if TEST_CUDA
             tanh->loss().copyFromHostToDevice();
-            tanh->in->loss().copyFromHostToDevice();
+            tanh->getInput()->loss().copyFromHostToDevice();
 #endif
             vals.push_back(tanh->val().value);
             losses.push_back(tanh->loss().value);
-            in_losses.push_back(tanh->in->loss().value);
+            in_losses.push_back(tanh->getInput()->loss().value);
         }
-        n3ldg_cuda::TanhBackward(n3ldg_cuda::ActivatedEnum::TANH, losses, vals, count, dim,
+        n3ldg_cuda::TanhBackward(ActivatedEnum::TANH, losses, vals, count, dim,
                 in_losses);
 #if TEST_CUDA
         for (Node *n : batch) {
@@ -208,7 +186,7 @@ public:
         }
         for (Node *n : batch) {
             TanhNode *tanh = static_cast<TanhNode*>(n);
-            n3ldg_cuda::Assert(tanh->in->getLoss().verify("TanhExecutor backward"));
+            n3ldg_cuda::Assert(tanh->getInput()->getLoss().verify("TanhExecutor backward"));
         }
 #endif
     }
@@ -235,7 +213,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             TanhNode* ptr = (TanhNode*)batch[idx];
             for (int idy = 0; idy < ptr->getDim(); idy++) {
-                ptr->in->loss()[idy] += lx[offset + idy];
+                ptr->getInput()->loss()[idy] += lx[offset + idy];
             }
             offset += ptr->getDim();
         }
@@ -251,45 +229,24 @@ PExecutor TanhNode::generate() {
 };
 
 
-class SigmoidNode :public Node {
+class SigmoidNode :public UniInputNode {
 public:
-    Node* in;
+    SigmoidNode() : UniInputNode("sigmoid") {}
 
-    SigmoidNode() : Node("sigmoid") {
-        in = nullptr;
-    }
-
-    ~SigmoidNode() {
-        in = nullptr;
-    }
-
-    void forward(Graph &graph, Node &input) {
-        this->forward(&graph, &input);
-    }
-
-    void forward(Graph *cg, Node* x) {
-        in = x;
-        in->addParent(this);
-        cg->addNode(this);
-    }
-
-  public:
     void compute() {
-        val().vec() = in->val().vec().unaryExpr(ptr_fun(fsigmoid));
+        val().vec() = getInput()->val().vec().unaryExpr(ptr_fun(fsigmoid));
     }
 
     void backward() {
-        in->loss().vec() += loss().vec() * in->val().vec().binaryExpr(val().vec(),
+        getInput()->loss().vec() += loss().vec() * getInput()->val().vec().binaryExpr(val().vec(),
                 ptr_fun(dsigmoid));
     }
 
-  public:
     PExecutor generate();
 
-    // better to rewrite for deep understanding
-    bool typeEqual(Node* other) {
-        bool result = Node::typeEqual(other);
-        return result;
+protected:
+    virtual bool isDimLegal(const Node &input) const {
+        return input.getDim() == getDim();
     }
 };
 
@@ -310,13 +267,13 @@ public:
         for (Node *n : batch) {
             SigmoidNode *tanh = static_cast<SigmoidNode*>(n);
 #if TEST_CUDA
-            tanh->in->val().copyFromHostToDevice();
+            tanh->getInput()->val().copyFromHostToDevice();
 #endif
-            xs.push_back(tanh->in->val().value);
+            xs.push_back(tanh->getInput()->val().value);
             ys.push_back(tanh->val().value);
         }
 
-        n3ldg_cuda::TanhForward(n3ldg_cuda::ActivatedEnum::SIGMOID, xs, count, dim, ys);
+        n3ldg_cuda::TanhForward(ActivatedEnum::SIGMOID, xs, count, dim, ys);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -338,13 +295,13 @@ public:
             SigmoidNode *tanh = static_cast<SigmoidNode*>(n);
 #if TEST_CUDA
             tanh->loss().copyFromHostToDevice();
-            tanh->in->loss().copyFromHostToDevice();
+            tanh->getInput()->loss().copyFromHostToDevice();
 #endif
             vals.push_back(tanh->val().value);
             losses.push_back(tanh->loss().value);
-            in_losses.push_back(tanh->in->loss().value);
+            in_losses.push_back(tanh->getInput()->loss().value);
         }
-        n3ldg_cuda::TanhBackward(n3ldg_cuda::ActivatedEnum::SIGMOID, losses, vals, count, dim,
+        n3ldg_cuda::TanhBackward(ActivatedEnum::SIGMOID, losses, vals, count, dim,
                 in_losses);
 #if TEST_CUDA
         for (Node *n : batch) {
@@ -352,7 +309,7 @@ public:
         }
         for (Node *n : batch) {
             SigmoidNode *tanh = static_cast<SigmoidNode*>(n);
-            n3ldg_cuda::Assert(tanh->in->getLoss().verify("SigmoidExecutor backward"));
+            n3ldg_cuda::Assert(tanh->getInput()->getLoss().verify("SigmoidExecutor backward"));
         }
 #endif
     }
@@ -986,6 +943,17 @@ private:
     friend class SumExecutor;
 };
 
+namespace n3ldg_plus {
+
+Node *vectorSum(Graph &graph, Node &input) {
+    SumNode *sum = new SumNode;
+    sum->initAsScalar();
+    sum->forward(graph, input);
+    return sum;
+}
+
+}
+
 #if USE_GPU
 class SumExecutor : public UniInputExecutor {
     void forward() override {
@@ -1008,6 +976,9 @@ class SumExecutor : public UniInputExecutor {
         vector<const dtype*> losses;
         vector<dtype*> input_losses;
         for (Node *node : batch) {
+#if TEST_CUDA
+            node->loss().copyFromDeviceToHost();
+#endif
             losses.push_back(node->getLoss().value);
             SumNode *sum = static_cast<SumNode*>(node);
             input_losses.push_back(sum->getInput()->getLoss().value);

@@ -21,6 +21,8 @@ public:
     NRVec<bool> indexers;
     NRVec<int> last_update;
 
+    SparseParam(const string &name = "sparse") : BaseParam(name) {}
+
 #if USE_GPU
     n3ldg_cuda::BoolArray dIndexers;
     n3ldg_cuda::IntArray dIters;
@@ -218,6 +220,7 @@ public:
                 indexers.size(), val.row);
         return result;
 #elif USE_GPU && TEST_CUDA
+        grad.copyFromDeviceToHost();
         dtype sumNorm = 0.0;
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
@@ -226,6 +229,7 @@ public:
                 sumNorm += grad[index][idx] * grad[index][idx];
             }
         }
+
 
         n3ldg_cuda::Assert(n3ldg_cuda::Verify(indexers.c_buf(),
                     dIndexers.value,

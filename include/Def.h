@@ -5,8 +5,6 @@
 #include "Eigen/Dense"
 #include <unsupported/Eigen/CXX11/Tensor>
 
-//#define USE_DOUBLE 1
-
 #if USE_DOUBLE
 #define USE_FLOAT 0
 #else
@@ -26,5 +24,14 @@ typedef Eigen::TensorMap<Eigen::Tensor<double, 1>>  Vec;
 typedef Eigen::Map<Matrix<double, Dynamic, Dynamic, ColMajor> > Mat;
 typedef MatrixXd MatrixXdtype;
 #endif
+
+enum ActivatedEnum {
+    TANH,
+    SIGMOID,
+    RELU,
+    LEAKY_RELU,
+    SELU
+};
+
 
 #endif

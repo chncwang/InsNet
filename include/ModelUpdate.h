@@ -13,7 +13,7 @@
 
 
 class ModelUpdate {
-  public:
+public:
     vector<BaseParam*> _params;
 
     dtype _reg, _alpha, _eps;
@@ -40,10 +40,9 @@ class ModelUpdate {
         _params.push_back(param);
     }
 
-    void addParam(const vector<BaseParam*>& params) {
-        for (int idx = 0; idx < params.size(); idx++) {
-            addParam(params.at(idx));
-        }
+    void setParams(const vector<BaseParam *> &params) {
+        cout << "setParams - params size:" << params.size() << endl;
+        _params = params;
     }
 
     void update() {

@@ -20,7 +20,7 @@
 
 #include <memory>
 
-struct LSTM1Params : public N3LDGSerializable
+struct LSTM1Params : public N3LDGSerializable, TunableCombination<BaseParam>
 #if USE_GPU
 , public TransferableComponents
 #endif
@@ -34,7 +34,11 @@ struct LSTM1Params : public N3LDGSerializable
     UniParams cell_hidden;
     UniParams cell_input;
 
-    LSTM1Params() = default;
+    LSTM1Params(const string &name) : input_hidden(name + "-input_hidden"),
+    input_input(name + "-input_input"), output_hidden(name + "-output_hidden"),
+    output_input(name + "-output_input"), forget_hidden(name + "-forget_hidden"),
+    forget_input(name + "-forget_input"), cell_hidden(name + "-cell_hidden"),
+    cell_input(name + "-cell_input") {}
 
     Json::Value toJson() const override {
         Json::Value json;
@@ -58,17 +62,6 @@ struct LSTM1Params : public N3LDGSerializable
         forget_input.fromJson(json["forget_input"]);
         cell_hidden.fromJson(json["cell_hidden"]);
         cell_input.fromJson(json["cell_input"]);
-    }
-
-    void exportAdaParams(ModelUpdate& ada) {
-        input_hidden.exportAdaParams(ada);
-        input_input.exportAdaParams(ada);
-        output_hidden.exportAdaParams(ada);
-        output_input.exportAdaParams(ada);
-        forget_hidden.exportAdaParams(ada);
-        forget_input.exportAdaParams(ada);
-        cell_hidden.exportAdaParams(ada);
-        cell_input.exportAdaParams(ada);
     }
 
     void init(int nOSize, int nISize) {
@@ -102,6 +95,12 @@ struct LSTM1Params : public N3LDGSerializable
         return "LSTM1Params";
     }
 #endif
+
+protected:
+    std::vector<Tunable<BaseParam> *> tunableComponents() override {
+        return {&input_hidden, &input_input, &output_hidden, &output_input, &forget_hidden,
+            &forget_input, &cell_hidden, &cell_input};
+    }
 };
 
 struct DynamicLSTMBuilder {

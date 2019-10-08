@@ -9,32 +9,20 @@
 
 using namespace Eigen;
 
-class CheckGrad {
+constexpr float CHECK_GRAD_STEP = 1e-3;
 
-  public:
+class CheckGrad {
+public:
     vector<BaseParam*> _params;
     vector<string> _names;
 
-  public:
-    CheckGrad() {
-        clear();
+    void init(const vector<BaseParam*> &params) {
+        for (BaseParam *param : params) {
+            _params.push_back(param);
+            _names.push_back(param->getParamName());
+        }
     }
 
-    void clear() {
-        _params.clear();
-        _names.clear();
-    }
-
-    void add(BaseParam &param, const std::string &name) {
-        this->add(&param, name);
-    }
-
-    void add(BaseParam* param, const string& name) {
-        _params.push_back(param);
-        _names.push_back(name);
-    }
-
-  public:
     template<typename Sample>
     struct Classifier {
         std::function<dtype(const Sample &sample)> loss;
@@ -57,43 +45,42 @@ class CheckGrad {
     }
 
     template<typename Example, typename Classifier>
-    void check(Classifier* classifier, const vector<Example>& examples, const string& description) {
-        dtype orginValue, lossAdd, lossPlus;
+    void check(Classifier* classifier, const vector<Example>& examples,
+            const string& description) {
+        dtype orginValue, plused_loss, minused_loss;
         int idx, idy;
         dtype mockGrad, computeGrad;
         for (int i = 0; i < _params.size(); i++) {
             _params[i]->randpoint(idx, idy);
+            printf("%s, Checking gradient for %s[%d][%d]:\n", description.c_str(),
+                    _names[i].c_str(), idx, idy);
             orginValue = _params[i]->val[idx][idy];
 
-            _params[i]->val[idx][idy] = orginValue + 0.001;
-            lossAdd = 0.0;
+            _params[i]->val[idx][idy] = orginValue + CHECK_GRAD_STEP;
+            plused_loss = 0.0;
             cout << "add 0.001" << endl;
             for (int j = 0; j < examples.size(); j++) {
-                lossAdd += classifier->cost(examples[j]);
+                plused_loss += classifier->cost(examples[j]);
             }
 
             cout << "minus 0.001" << endl;
-            _params[i]->val[idx][idy] = orginValue - 0.001;
-            lossPlus = 0.0;
+            _params[i]->val[idx][idy] = orginValue - CHECK_GRAD_STEP;
+            minused_loss = 0.0;
             for (int j = 0; j < examples.size(); j++) {
-                lossPlus += classifier->cost(examples[j]);
+                minused_loss += classifier->cost(examples[j]);
             }
 
-            mockGrad = (lossAdd - lossPlus) / 0.002;
+            printf("plused_loss:%.10f, minused_loss:%.10f\n", plused_loss, minused_loss);
+
+            mockGrad = (plused_loss - minused_loss) * 0.5 / CHECK_GRAD_STEP;
             mockGrad = mockGrad / examples.size();
             computeGrad = _params[i]->grad[idx][idy];
 
-
-            printf("%s, Checking gradient for %s[%d][%d]:\t", description.c_str(),
-                   _names[i].c_str(), idx, idy);
-            printf("mock grad = %.18f, computed grad = %.18f\n", mockGrad, computeGrad);
+            printf("    mock grad = %.10f,\ncomputed grad = %.10f\n", mockGrad, computeGrad);
 
             _params[i]->val[idx][idy] = orginValue;
         }
     }
-
 };
-
-
 
 #endif /*CHECKGREAD_H_*/

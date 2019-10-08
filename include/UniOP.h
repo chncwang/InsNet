@@ -17,9 +17,10 @@
 #include "Graph.h"
 #include "ModelUpdate.h"
 #include <cstdlib>
+#include "AtomicOP.h"
 #include "profiler.h"
 
-class UniParams : public N3LDGSerializable
+class UniParams : public N3LDGSerializable, public TunableCombination<BaseParam>
 #if USE_GPU
 , public TransferableComponents 
 #endif
@@ -29,14 +30,7 @@ public:
     Param b;
     bool bUseB = true;
 
-    UniParams() : b(true) {}
-
-    void exportAdaParams(ModelUpdate& ada) {
-        ada.addParam(&W);
-        if (bUseB) {
-            ada.addParam(&b);
-        }
-    }
+    UniParams(const string &name) : W(name + "-W"), b(name + "-b", true) {}
 
     void init(int nOSize, int nISize, bool useB = true) {
         W.init(nOSize, nISize);
@@ -78,119 +72,17 @@ public:
         return "UniParams";
     }
 #endif
+
+protected:
+    virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
+        if (bUseB) {
+            return {&W, &b};
+        } else {
+            return {&W};
+        }
+    }
 };
 
-
-class UniNode : public Node {
-public:
-    PNode in;
-    UniParams* param;
-    dtype(*activate)(const dtype&);   // activation function
-    dtype(*derivate)(const dtype&, const dtype&);  // derivation function of activation function
-    Tensor1D ty, lty;
-
-    UniNode() : Node("uni") {
-        in = NULL;
-        activate = ftanh;
-        derivate = dtanh;
-        param = NULL;
-    }
-
-    ~UniNode() {
-        in = NULL;
-    }
-
-    void init(int ndim) override {
-        Node::init(ndim);
-        ty.init(ndim);
-        lty.init(ndim);
-    }
-
-
-    void setParam(UniParams& paramInit) {
-        if (paramInit.W.outDim() != getDim()) {
-            cerr << boost::format("W outDim:%1% dim:%2%") % paramInit.W.outDim() % getDim();
-            abort();
-        }
-        param = &paramInit;
-    }
-
-    void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
-        activate = f;
-        derivate = f_deri;
-    }
-
-    void forward(Graph &graph, Node &x) {
-        if (x.getDim() != param->W.inDim()) {
-            cerr << boost::format("x dim:%1% W dim:%2%") % x.getDim() % param->W.inDim() << endl;
-            abort();
-        }
-        in = &x;
-        in->addParent(this);
-        graph.addNode(this);
-    }
-
-    void compute() override {
-        ty.mat() = param->W.val.mat() * in->val().mat();
-        if (param->bUseB) {
-            ty.vec() += param->b.val.vec();
-        }
-        val().vec() = ty.vec().unaryExpr(ptr_fun(activate));
-    }
-
-    void backward() override {
-        lty.vec() = loss().vec() * ty.vec().binaryExpr(val().vec(), ptr_fun(derivate));
-        param->W.grad.mat() += lty.mat() * in->val().tmat();
-        if (param->bUseB) {
-            param->b.grad.vec() += lty.vec();
-        }
-        in->loss().mat() += param->W.val.mat().transpose() * lty.mat();
-    }
-
-    PExecutor generate() override;
-
-    // better to rewrite for deep understanding
-    bool typeEqual(PNode other) override {
-        bool result = Node::typeEqual(other);
-        if (!result) return false;
-
-        UniNode* conv_other = (UniNode*)other;
-        if (param != conv_other->param) {
-            return false;
-        }
-        if (activate != conv_other->activate || derivate != conv_other->derivate) {
-            return false;
-        }
-
-        return true;
-    }
-
-    string typeSignature() const override {
-        void *act = reinterpret_cast<void*>(activate);
-        void *de = reinterpret_cast<void*>(derivate);
-        return Node::typeSignature() + "-" + addressToString(param) + "-" + addressToString(act) +
-            "-" + addressToString(de);
-    }
-
-private:
-    friend class UniExecutor;
-};
-
-namespace n3ldg_plus {
-    Node *uni(Graph &graph, int dim, UniParams &params, Node &input) {
-        UniNode *uni(new UniNode);
-        uni->init(dim);
-        uni->setParam(params);
-        uni->forward(graph, input);
-        return uni;
-    }
-}
-
-
-// non-linear feed-forward node
-// input nodes should be specified by forward function
-// for input variables, we exploit column vector,
-// which means a concrete input vector x_i is represented by x(0, i), x(1, i), ..., x(n, i)
 class LinearNode : public Node {
 public:
     PNode in;
@@ -214,8 +106,9 @@ public:
 
     void forward(Graph &graph, Node &x) {
         if (x.getDim() != param->W.inDim()) {
-            cerr << boost::format("input dim:%1% node in dim:%2%") % x.getDim() % param->W.inDim() << endl;
-           abort();
+            cerr << boost::format("input dim:%1% node in dim:%2%") % x.getDim() % param->W.inDim()
+                << endl;
+            abort();
         }
         in = &x;
         in->addParent(this);
@@ -223,17 +116,15 @@ public:
     }
 
     void compute() override {
-        val().mat() = param->W.val.mat() * in->val().mat();
+        abort();
     }
 
     void backward() override {
-        param->W.grad.mat() += loss().mat() * in->val().tmat();
-        in->loss().mat() += param->W.val.mat().transpose() * loss().mat();
+        abort();
     }
 
     PExecutor generate() override;
 
-    // better to rewrite for deep understanding
     bool typeEqual(PNode other) override {
         bool result = Node::typeEqual(other);
         if (!result) return false;
@@ -250,245 +141,6 @@ public:
     }
 };
 
-
-class UniExecutor :public Executor {
-  public:
-    Tensor2D x, ty, y, b;
-    int inDim, outDim;
-    UniParams* param;
-    dtype(*activate)(const dtype&);   // activation function
-    dtype(*derivate)(const dtype&, const dtype&);  // derivation function of activation function
-
-    void  forward() {
-        int count = batch.size();
-        ty.init(outDim, count);
-        x.init(inDim, count);
-        y.init(outDim, count);
-#if TEST_CUDA || !USE_GPU
-        b.init(outDim, count);
-#endif
-
-#if USE_GPU
-        std::vector<dtype*> xs, ys;
-        xs.reserve(batch.size());
-        ys.reserve(batch.size());
-
-
-        for (int i = 0; i < batch.size(); ++i) {
-            UniNode *n = static_cast<UniNode*>(batch.at(i));
-
-            xs.push_back(n->in->val().value);
-            ys.push_back(n->val().value);
-        }
-
-        n3ldg_cuda::CopyForUniNodeForward(xs, param->b.val.value,
-                x.value, ty.value, count, inDim, outDim, param->bUseB);
-
-        n3ldg_cuda::MatrixMultiplyMatrix(param->W.val.value, x.value,
-                ty.value, outDim, inDim, count, param->bUseB);
-
-        n3ldg_cuda::ActivatedEnum activatedEnum = ToActivatedEnum(activate);
-        n3ldg_cuda::Activated(activatedEnum, ty.value, ys, y.value, outDim);
-
-#if TEST_CUDA
-        for (int idx = 0; idx < count; idx++) {
-            UniNode* ptr = (UniNode*)batch[idx];
-            n3ldg_cuda::Assert(ptr->in->val().verify("Uni forward in"));
-            for (int idy = 0; idy < inDim; idy++) {
-                x[idx][idy] = ptr->in->getVal()[idy];
-            }
-            if (param->bUseB) {
-                for (int idy = 0; idy < outDim; idy++) {
-                    b[idx][idy] = param->b.val.v[idy];
-                }
-            }
-        }
-        n3ldg_cuda::Assert(x.verify("forward x"));
-
-        ty.mat() = param->W.val.mat() * x.mat();
-
-        if (param->bUseB) {
-            ty.vec() = ty.vec() + b.vec();
-        }
-
-        y.vec() = ty.vec().unaryExpr(ptr_fun(activate));
-
-        for (int idx = 0; idx < count; idx++) {
-            UniNode* ptr = (UniNode*)batch[idx];
-            for (int idy = 0; idy < outDim; idy++) {
-                ptr->val()[idy] = y[idx][idy];
-            }
-        }
-
-        for (int i = 0; i < count; ++i) {
-            n3ldg_cuda::Assert(batch[i]->val().verify("forward batch i val"));
-        }
-
-        n3ldg_cuda::Assert(ty.verify("forward ty"));
-        n3ldg_cuda::Assert(y.verify("Uni forward y"));
-#endif
-#else
-        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-        profiler.BeginEvent("uni forward");
-        profiler.BeginEvent("uni merge");
-        for (int idx = 0; idx < count; idx++) {
-            UniNode* ptr = (UniNode*)batch[idx];
-            memcpy(x.v + idx * inDim, ptr->in->val().v, inDim * sizeof(dtype));
-            if (param->bUseB) {
-                memcpy(b.v + idx * outDim, param->b.val.v, outDim * sizeof(dtype));
-            }
-        }
-        profiler.EndEvent();
-
-        ty.mat() = param->W.val.mat() * x.mat();
-
-        if (param->bUseB) {
-            ty.vec() = ty.vec() + b.vec();
-        }
-
-        y.vec() = ty.vec().unaryExpr(ptr_fun(activate));
-
-        profiler.BeginEvent("uni split");
-        for (int idx = 0; idx < count; idx++) {
-            UniNode* ptr = (UniNode*)batch[idx];
-            memcpy(ptr->val().v, y.v + idx * outDim, outDim * sizeof(dtype));
-        }
-        profiler.EndEvent();
-
-        profiler.EndEvent();
-#endif
-    }
-
-    void backward() {
-        int count = batch.size();
-        Tensor2D lx, lty, ly;
-#if USE_GPU
-        lx.init(inDim, count);
-        lty.init(outDim, count);
-        ly.init(outDim, count);
-
-        std::vector<dtype*> ly_vec;
-        ly_vec.reserve(count);
-        for (int i = 0; i < count; ++i) {
-            UniNode* ptr = (UniNode*)batch[i];
-            ly_vec.push_back(ptr->loss().value);
-        }
-        n3ldg_cuda::ActivatedEnum activatedEnum = ToActivatedEnum(activate);
-        n3ldg_cuda::CalculateLtyForUniBackward(activatedEnum, ly_vec, ty.value,
-                y.value, lty.value, count, outDim);
-#if TEST_CUDA
-        n3ldg_cuda::Assert(param->W.grad.verify(
-                    "uni backward W grad init"));
-#endif
-        n3ldg_cuda::MatrixMultiplyMatrix(lty.value, x.value,
-                param->W.grad.value, outDim, count, inDim, true, true, false);
-#if TEST_CUDA
-        n3ldg_cuda::Assert(param->W.val.verify("uni W.val init"));
-#endif
-        n3ldg_cuda::MatrixMultiplyMatrix(param->W.val.value, lty.value,
-                lx.value, inDim, outDim, count, false, false, true);
-        std::vector<dtype*> losses;
-        losses.reserve(count);
-        for (int idx = 0; idx < count; idx++) {
-            UniNode* ptr = (UniNode*)batch[idx];
-            losses.push_back(ptr->in->loss().value);
-        }
-
-#if TEST_CUDA
-        if (static_cast<UniNode*>(batch.front())->param->bUseB) {
-            cout << "node id:" << batch.front()->getNodeIndex() << endl;
-            n3ldg_cuda::Assert(
-                    param->b.grad.verify("uni backward param b init"));
-        }
-#endif
-        n3ldg_cuda::AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(
-                lty.value, lx.value, param->b.grad.value, losses, count,
-                outDim, inDim, param->bUseB);
-
-#if TEST_CUDA
-        for (int idx = 0; idx < count; idx++) {
-            UniNode* ptr = (UniNode*)batch[idx];
-            for (int idy = 0; idy < outDim; idy++) {
-                ly[idx][idy] = ptr->getLoss()[idy];
-            }
-        }
-
-        n3ldg_cuda::Assert(x.verify("backward x"));
-        lty.vec() = ly.vec() * ty.vec().binaryExpr(y.vec(), ptr_fun(derivate));
-        n3ldg_cuda::Assert(lty.verify("backward lty"));
-
-        param->W.grad.mat() += lty.mat() * x.mat().transpose();
-        n3ldg_cuda::Assert(param->W.grad.verify("backward W grad"));
-
-        if (param->bUseB) {
-            for (int idx = 0; idx < count; idx++) {
-                for (int idy = 0; idy < outDim; idy++) {
-                    param->b.grad.v[idy] += lty[idx][idy];
-                }
-            }
-        }
-        if (param->bUseB) {
-            n3ldg_cuda::Assert(param->b.grad.verify("backward b grad"));
-        }
-
-        lx.mat() += param->W.val.mat().transpose() * lty.mat();
-        n3ldg_cuda::Assert(lx.verify("backward lx"));
-
-        for (int idx = 0; idx < count; idx++) {
-            UniNode* ptr = (UniNode*)batch[idx];
-            for (int idy = 0; idy < inDim; idy++) {
-                ptr->in->loss()[idy] += lx[idx][idy];
-            }
-        }
-
-        for (Node * n : batch) {
-            UniNode *ptr = static_cast<UniNode *>(n);
-            n3ldg_cuda::Assert(ptr->in->loss().verify("uni backward loss"));
-        }
-#endif
-#else
-        lx.init(inDim, count);
-        lty.init(outDim, count);
-        ly.init(outDim, count);
-        for (int idx = 0; idx < count; idx++) {
-            UniNode* ptr = (UniNode*)batch[idx];
-            memcpy(ly.v + idx * outDim, ptr->loss().v, outDim * sizeof(dtype));
-        }
-
-        lty.vec() = ly.vec() * ty.vec().binaryExpr(y.vec(), ptr_fun(derivate));
-        param->W.grad.mat() += lty.mat() * x.mat().transpose();
-
-        if (param->bUseB) {
-            for (int idy = 0; idy < outDim; idy++) {
-                for (int idx = 0; idx < count; idx++) {
-                    param->b.grad.v[idy] += lty[idx][idy];
-                }
-            }
-        }
-
-        lx.mat() += param->W.val.mat().transpose() * lty.mat();
-
-        for (int idx = 0; idx < count; idx++) {
-            UniNode* ptr = (UniNode*)batch[idx];
-            for (int idy = 0; idy < inDim; idy++) {
-                ptr->in->loss()[idy] += lx[idx][idy];
-            }
-        }
-#endif
-    }
-};
-
-PExecutor UniNode::generate() {
-    UniExecutor* exec = new UniExecutor();
-    exec->batch.push_back(this);
-    exec->inDim = param->W.inDim();
-    exec->outDim = param->W.outDim();
-    exec->param = param;
-    exec->activate = activate;
-    exec->derivate = derivate;
-    return exec;
-};
-
 #if USE_GPU
 class LinearExecutor :public Executor {
 public:
@@ -498,6 +150,12 @@ public:
 
     void  forward() {
         int count = batch.size();
+#if TEST_CUDA
+        param->W.val.copyFromDeviceToHost();
+        if (param->bUseB) {
+            param->b.val.copyFromDeviceToHost();
+        }
+#endif
 
         x.init(inDim, count);
         y.init(outDim, count);
@@ -513,6 +171,9 @@ public:
 
             xs.push_back(n->in->val().value);
             ys.push_back(n->val().value);
+#if TEST_CUDA
+            n->in->val().copyFromDeviceToHost();
+#endif
         }
 
         n3ldg_cuda::CopyForUniNodeForward(xs, param->b.val.value,
@@ -838,6 +499,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
             memcpy(ly.v + idx * outDim, ptr->loss().v, outDim * sizeof(dtype));
+            ptr->loss().copyFromDeviceToHost();
         }
 
         n3ldg_cuda::Assert(x.verify("backward x"));
@@ -848,11 +510,16 @@ public:
                      right(inDim, param->inDim() - offset - outDim);
         full_grad << left, scoped_grad, right;
         param->grad.mat() += full_grad;
-        n3ldg_cuda::Assert(param->grad.verify("LinearExecutor backward W grad"));
+        function<void(void)> print = [&]()->void {
+            cerr << "cpu:" << endl << param->grad.toString() << endl << "gpu:" << endl;
+            param->grad.print();
+        };
+        n3ldg_cuda::Assert(param->grad.verify("LinearWordVectorExecutor backward W grad"), "",
+                print);
 
         Mat scoped_matrix(param->val.mat().data() + offset * inDim, inDim, outDim);
         lx.mat() = scoped_matrix * ly.mat();
-        n3ldg_cuda::Assert(lx.verify("linear execute backward lx"));
+        n3ldg_cuda::Assert(lx.verify("linear word vector execute backward lx"));
 
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
@@ -885,7 +552,7 @@ public:
 
         for (int i = 0; i < count; i++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
-            memcpy(x.v + i * inDim, ptr->input_->val().v, inDim * sizeof(dtype));
+            memcpy(x.v + i * inDim, ptr->getInput()->val().v, inDim * sizeof(dtype));
         }
         int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
         Mat scoped_matrix(param->val.mat().data() + offset * inDim, inDim, outDim);
@@ -921,7 +588,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
             for (int idy = 0; idy < inDim; idy++) {
-                ptr->input_->loss()[idy] += lx[idx][idy];
+                ptr->getInput()->loss()[idy] += lx[idx][idy];
             }
         }
     }
@@ -936,6 +603,35 @@ Executor* LinearWordVectorNode::generate() {
     exec->outDim = getDim();
     exec->param = param_;
     return exec;
+}
+
+namespace n3ldg_plus {
+
+Node *uni(Graph &graph, UniParams &params, Node &input, ActivatedEnum activated_type =
+        ActivatedEnum::TANH) {
+    int dim = params.W.outDim();
+
+    LinearNode *uni(new LinearNode);
+    uni->init(dim);
+    uni->setParam(params);
+    uni->forward(graph, input);
+
+    UniInputNode *activated;
+    if (activated_type == ActivatedEnum::TANH) {
+        activated = new TanhNode;
+    } else if (activated_type == ActivatedEnum::SIGMOID) {
+        activated = new SigmoidNode;
+    } else {
+        cerr << "unsupported activated " << activated << endl;
+        abort();
+    }
+
+    activated->init(dim);
+    activated->forward(graph, *uni);
+
+    return activated;
+}
+
 }
 
 #endif /* UNIOP_H_ */

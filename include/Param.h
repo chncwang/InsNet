@@ -23,12 +23,10 @@ public:
     Tensor2D aux_mean;
     int iter;
 
-    Param() = default;
-
-    Param(bool is_bias) : BaseParam(is_bias) {}
+    Param(const string &name, bool is_bias = false) : BaseParam(name, is_bias) {}
 
     // allow sparse and dense parameters have different parameter initialization methods
-    void init(int outDim, int inDim) {
+    void init(int outDim, int inDim) override {
 #if USE_GPU
         val.initOnMemoryAndDevice(outDim, inDim);
         aux_square.initOnMemoryAndDevice(outDim, inDim);
@@ -54,7 +52,7 @@ public:
     }
 
 #if USE_GPU
-    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() {
+    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
         auto v = BaseParam::transferablePtrs();
         v.push_back(&aux_square);
         v.push_back(&aux_mean);
@@ -167,7 +165,6 @@ public:
     }
 
     void randpoint(int& idx, int &idy) override {
-        //select indexes randomly
         std::vector<int> idRows, idCols;
         for (int i = 0; i < val.row; i++)
             idRows.push_back(i);

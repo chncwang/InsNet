@@ -67,7 +67,6 @@ void CallCuda(cudaError_t status) {
     }
 }
 
-#if TEST_CUDA
 void CheckCudaError() {
     cudaDeviceSynchronize();
     cudaError_t error = cudaGetLastError();
@@ -77,9 +76,6 @@ void CheckCudaError() {
         abort();
     }
 }
-#else
-#define CheckCudaError()
-#endif
 
 void CallCnmem(cnmemStatus_t status) {
     assert(status == CNMEM_STATUS_SUCCESS);
@@ -315,6 +311,11 @@ Tensor1D::~Tensor1D() {
     }
 }
 
+void Tensor1D::print() const {
+    cout << "dim:" << dim << endl;
+    PrintNums(value, dim);
+}
+
 void Tensor1D::copyFromHostToDevice() {
     assert(v != NULL);
     assert(value != NULL);
@@ -361,6 +362,11 @@ Tensor2D::~Tensor2D() {
     }
 }
 
+void Tensor2D::print() const {
+    cout << "row:" << row << " col:" << col << endl;
+    PrintNums(value, size);
+}
+
 void Tensor2D::copyFromHostToDevice() {
     CallCuda(MyCudaMemcpy(value, v, size * sizeof(dtype), cudaMemcpyHostToDevice));
 }
@@ -369,10 +375,11 @@ void Tensor2D::copyFromDeviceToHost() {
     CallCuda(MyCudaMemcpy(v, value, size * sizeof(dtype), cudaMemcpyDeviceToHost));
 }
 
-void Assert(bool v, const std::string &message) {
+void Assert(bool v, const std::string &message, const function<void(void)> &call) {
 #if TEST_CUDA
     if (!v) {
         std::cerr << message << std::endl;
+        call();
         abort();
     }
 #endif
@@ -485,7 +492,7 @@ __global__ void PrintPointers(void **p, int len) {
 
 __global__ void KernelPrintNums(const dtype* p, int len) {
     for (int i = 0; i < len; ++i) {
-        printf("%f\n", p[i]);
+        printf("%d %f\n", i, p[i]);
     }
 }
 
@@ -965,12 +972,11 @@ void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y, int row, int col,
 __global__ void KernelVerify(dtype *host, dtype *device, int len,
         const char *message, bool *success) {
     int index = DeviceDefaultIndex();
-    if (index < len) {
+    int step = DeviceDefaultStep();
+    for (int i = index; i < len; i += step) {
         dtype loss = host[index] - device[index];
         if (DeviceAbs(loss) > 0.001 && DeviceAbs(loss) > 0.001 * DeviceAbs(host[index])) {
             *success = false;
-            printf("KernelVerify %s: host:%f device:%f loss:%f index:%d\n",
-                    message, host[index], device[index], loss, index);
             KernelPrintLine("KernelVerify: host:%f device:%f loss:%f",
                     host[index],
                     device[index],
@@ -982,7 +988,7 @@ __global__ void KernelVerify(dtype *host, dtype *device, int len,
 bool Verify(dtype *host, dtype *device, int len, const char* message) {
     NumberArray arr;
     arr.init(host, len);
-    int block_count = (len + TPB - 1) / TPB;
+    int block_count = DefaultBlockCount(len);
     char *m = NULL;
     CallCuda(MemoryPool::Ins().Malloc((void**)&m,
                 (strlen(message) + 1) * sizeof(char)));
@@ -1001,6 +1007,9 @@ bool Verify(dtype *host, dtype *device, int len, const char* message) {
     MemoryPool::Ins().Free(m);
     cudaDeviceSynchronize();
     cudaPrintfDisplay(stdout, true);
+    if (!success) {
+        cout << message << endl;
+    }
     return success;
 }
 
@@ -1931,11 +1940,11 @@ __global__ void KernelSumBackward(PoolingEnum pooling, const dtype **losses,
         int dim,
         dtype **in_losses) {
     int global_in_count_i = blockIdx.x * max_in_count + blockIdx.y;
-    if (blockIdx.y < in_counts[blockIdx.x] && threadIdx.x < dim) {
-        DeviceAtomicAdd(in_losses[global_in_count_i] + threadIdx.x,
-                pooling == PoolingEnum::SUM ?
-                losses[blockIdx.x][threadIdx.x] :
-            losses[blockIdx.x][threadIdx.x] / in_counts[blockIdx.x]);
+    for (int i = threadIdx.x; i < dim; i += blockDim.x) {
+        if (blockIdx.y < in_counts[blockIdx.x]) {
+            DeviceAtomicAdd(in_losses[global_in_count_i] + i, pooling == PoolingEnum::SUM ?
+                    losses[blockIdx.x][i] : losses[blockIdx.x][i] / in_counts[blockIdx.x]);
+        }
     }
 }
 
@@ -1948,6 +1957,7 @@ void SumPoolBackward(PoolingEnum pooling, const std::vector<dtype*> &losses,
     while (thread_count < dim) {
         thread_count <<= 1;
     }
+    thread_count = std::min(TPB, thread_count);
 
     int max_in_count = *std::max_element(in_counts.begin(), in_counts.end());
     dim3 block_dim(count, max_in_count, 1);
@@ -3849,6 +3859,7 @@ __global__ void KernelSquareSum(const dtype *v, const bool *indexers,
 
 dtype SquareSum(const dtype *v, const bool *indexers, int count, int dim) {
     int block_count = DefaultBlockCountWithoutLimit(count * dim);
+    cout << "block_count:" << block_count << endl;
     NumberArray global_sum;
     global_sum.init(block_count);
     DeviceInt block_counter;

@@ -27,7 +27,7 @@ struct Tensor1D : public N3LDGSerializable {
 
     void zero();
 
-    std::string toString();
+    std::string toString() const;
 
     const Mat mat() const;
 
@@ -56,6 +56,8 @@ struct Tensor1D : public N3LDGSerializable {
     virtual Json::Value toJson() const;
 
     virtual void fromJson(const Json::Value &json);
+
+    virtual void print() const;
 };
 
 struct Tensor2D : public N3LDGSerializable {
@@ -67,6 +69,10 @@ struct Tensor2D : public N3LDGSerializable {
     virtual ~Tensor2D();
 
     virtual void init(int nrow, int ncol);
+
+    virtual void print() const;
+
+    std::string toString() const;
 
     void zero();
 
@@ -130,6 +136,8 @@ struct Tensor1D : public n3ldg_cpu::Tensor1D, public Transferable {
 
     Tensor1D& operator=(dtype v);
 
+    void print() const override;
+
     void random(dtype bound) override;
 
     bool verify(const char *message) const;
@@ -152,6 +160,8 @@ struct Tensor2D : public n3ldg_cpu::Tensor2D, public Transferable {
     void init(int row, int col) override;
 
     virtual std::string name() const;
+
+    void print() const override;
 
     void zero();
 

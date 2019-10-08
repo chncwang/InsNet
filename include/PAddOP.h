@@ -26,24 +26,23 @@ public:
     }
 
     void forward(Graph &cg, vector<PNode>& x) {
-        if (x.size() == 0) {
+        if (x.empty()) {
             std::cerr << "empty inputs for add" << std::endl;
             abort();
         }
 
-        ins.clear();
         for (int i = 0; i < x.size(); i++) {
-            if (x[i]->val().dim == getDim()) {
-                ins.push_back(x[i]);
-            } else {
+            if (x[i]->val().dim != getDim()) {
                 std::cerr << "dim does not match" << std::endl;
                 abort();
             }
         }
 
+        ins = x;
+
         int nSize = ins.size();
         for (int i = 0; i < nSize; ++i) {
-            ins[i]->addParent(this);
+            ins.at(i)->addParent(this);
         }
 
         cg.addNode(this);
@@ -54,7 +53,7 @@ public:
         val().zero();
         for (int i = 0; i < nSize; ++i) {
             for (int idx = 0; idx < getDim(); idx++) {
-                val()[idx] += ins[i]->val()[idx];
+                val()[idx] += ins.at(i)->val()[idx];
             }
         }
     }
@@ -64,7 +63,7 @@ public:
         int nSize = ins.size();
         for (int i = 0; i < nSize; ++i) {
             for (int idx = 0; idx < getDim(); idx++) {
-                ins[i]->loss()[idx] += loss()[idx];
+                ins.at(i)->loss()[idx] += loss()[idx];
             }
         }
     }
