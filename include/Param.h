@@ -165,7 +165,6 @@ public:
     }
 
     void randpoint(int& idx, int &idy) override {
-        //select indexes randomly
         std::vector<int> idRows, idCols;
         for (int i = 0; i < val.row; i++)
             idRows.push_back(i);

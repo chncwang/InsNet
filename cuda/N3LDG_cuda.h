@@ -199,14 +199,6 @@ void CopyFromHostToDevice(const std::vector<dtype*> &src,
 void CopyFromDeviceToHost(const std::vector<dtype*> &src,
         std::vector<dtype*> &dest, int count, int dim);
 
-enum ActivatedEnum {
-    TANH,
-    SIGMOID,
-    RELU,
-    LEAKY_RELU,
-    SELU
-};
-
 enum PoolingEnum {
     MAX,
     MIN,

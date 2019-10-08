@@ -1940,11 +1940,11 @@ __global__ void KernelSumBackward(PoolingEnum pooling, const dtype **losses,
         int dim,
         dtype **in_losses) {
     int global_in_count_i = blockIdx.x * max_in_count + blockIdx.y;
-    if (blockIdx.y < in_counts[blockIdx.x] && threadIdx.x < dim) {
-        DeviceAtomicAdd(in_losses[global_in_count_i] + threadIdx.x,
-                pooling == PoolingEnum::SUM ?
-                losses[blockIdx.x][threadIdx.x] :
-            losses[blockIdx.x][threadIdx.x] / in_counts[blockIdx.x]);
+    for (int i = threadIdx.x; i < dim; i += blockDim.x) {
+        if (blockIdx.y < in_counts[blockIdx.x]) {
+            DeviceAtomicAdd(in_losses[global_in_count_i] + i, pooling == PoolingEnum::SUM ?
+                    losses[blockIdx.x][i] : losses[blockIdx.x][i] / in_counts[blockIdx.x]);
+        }
     }
 }
 
@@ -1957,6 +1957,7 @@ void SumPoolBackward(PoolingEnum pooling, const std::vector<dtype*> &losses,
     while (thread_count < dim) {
         thread_count <<= 1;
     }
+    thread_count = std::min(TPB, thread_count);
 
     int max_in_count = *std::max_element(in_counts.begin(), in_counts.end());
     dim3 block_dim(count, max_in_count, 1);
@@ -1966,6 +1967,7 @@ void SumPoolBackward(PoolingEnum pooling, const std::vector<dtype*> &losses,
     in_count_arr.init((int*)in_counts.data(), in_counts.size());
     NumberPointerArray in_loss_arr;
     in_loss_arr.init((dtype**)in_losses.data(), in_losses.size());
+    cout << "block_dim:" << block_dim.x << ", " << block_dim.y << " thread:" << thread_count << endl;
     KernelSumBackward<<<block_dim, thread_count>>>(pooling,
             (const dtype**)loss_arr.value, (const int*)in_count_arr.value,
             max_in_count, count, dim, in_loss_arr.value);

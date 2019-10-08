@@ -25,4 +25,13 @@ typedef Eigen::Map<Matrix<double, Dynamic, Dynamic, ColMajor> > Mat;
 typedef MatrixXd MatrixXdtype;
 #endif
 
+enum ActivatedEnum {
+    TANH,
+    SIGMOID,
+    RELU,
+    LEAKY_RELU,
+    SELU
+};
+
+
 #endif

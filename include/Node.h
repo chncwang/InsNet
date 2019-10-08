@@ -500,8 +500,7 @@ typedef  Executor* PExecutor;
 #if USE_GPU
 
 typedef dtype N3LDGActivated(const dtype &x);
-n3ldg_cuda::ActivatedEnum ToActivatedEnum(N3LDGActivated func) {
-    using n3ldg_cuda::ActivatedEnum;
+ActivatedEnum ToActivatedEnum(N3LDGActivated func) {
     if (func == ftanh) {
         return ActivatedEnum::TANH;
     } else if (func == fsigmoid) {
