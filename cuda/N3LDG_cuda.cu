@@ -502,6 +502,18 @@ void PrintNums(const dtype* p, int len) {
     CheckCudaError();
 }
 
+__global__ void KernelPrintNums(const dtype *const *p, int index, int len) {
+    for (int i = 0; i < len; ++i) {
+        printf("%d %f\n", i, p[index][i]);
+    }
+}
+
+void PrintNums(const dtype *const *p, int count_i, int len) {
+    KernelPrintNums<<<1, 1>>>(p, count_i, len);
+    cudaDeviceSynchronize();
+    CheckCudaError();
+}
+
 __global__ void KernelPrintInts(const int* p, int len) {
     for (int i = 0; i < len; ++i) {
         printf("%d\n", p[i]);
@@ -3174,6 +3186,7 @@ void Max(const dtype *const *v, int count, int dim, int *max_indexes, dtype *max
         if (max_indexer_target.at(i) != max_indexer_gold.at(i)) {
             cerr << format("max_indexer_target:%1% max_indexer_gold:%2%") % max_indexer_target.at(i)
                 % max_indexer_gold.at(i) << endl;
+            PrintNums(v, i, dim);
             abort();
         }
     }

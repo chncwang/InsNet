@@ -426,10 +426,15 @@ public:
         std::vector<dtype*> xs, ys;
         xs.reserve(batch.size());
         ys.reserve(batch.size());
+#if TEST_CUDA
+        param->val.copyFromDeviceToHost();
+#endif
 
         for (int i = 0; i < batch.size(); ++i) {
             LinearWordVectorNode *n = static_cast<LinearWordVectorNode*>(batch.at(i));
-
+#if TEST_CUDA
+            n->getInput()->val().copyFromDeviceToHost();
+#endif
             xs.push_back(n->getInput()->val().value);
             ys.push_back(n->val().value);
         }
@@ -473,11 +478,18 @@ public:
         Tensor2D lx, ly;
         lx.init(inDim, count);
         ly.init(outDim, count);
+#if TEST_CUDA
+        param->grad.copyFromDeviceToHost();
+#endif
 
         std::vector<dtype*> ly_vec;
         ly_vec.reserve(count);
         for (int i = 0; i < count; ++i) {
-            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[i];
+            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
+#if TEST_CUDA
+            ptr->loss().copyFromDeviceToHost();
+            ptr->val().copyFromDeviceToHost();
+#endif
             ly_vec.push_back(ptr->loss().value);
         }
         n3ldg_cuda::CopyFromMultiVectorsToOneVector(ly_vec, ly.value, count, outDim);
@@ -511,8 +523,10 @@ public:
         full_grad << left, scoped_grad, right;
         param->grad.mat() += full_grad;
         function<void(void)> print = [&]()->void {
-            cerr << "cpu:" << endl << param->grad.toString() << endl << "gpu:" << endl;
-            param->grad.print();
+            cerr << "outdim:" << outDim << " param indim:" << param->inDim() << " offset:" <<
+                offset << " indim:" << inDim << endl;
+//            cerr << "cpu:" << endl << param->grad.toString() << endl << "gpu:" << endl;
+//            param->grad.print();
         };
         n3ldg_cuda::Assert(param->grad.verify("LinearWordVectorExecutor backward W grad"), "",
                 print);
