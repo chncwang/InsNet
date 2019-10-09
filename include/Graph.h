@@ -104,7 +104,14 @@ public:
     }
 
     void compute() {
-        while (Size(free_nodes) > 0) {
+        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
+
+        while (true) {
+            profiler.BeginEvent("computation plan");
+            if (Size(free_nodes) <= 0) {
+                profiler.EndEvent();
+                break;
+            }
             float min_avg_depth = 100000000;
             std::vector<Node*> shallow_nodes;
             string min_hash;
@@ -113,6 +120,7 @@ public:
                 auto depth_it = node_type_depth.find(type_hash);
                 float avg_depth = (float)depth_it->second.first /
                     depth_it->second.second;
+//                cout << "sig:" << type_hash << " avg_depth:" << avg_depth << endl;
                 if (avg_depth < min_avg_depth) {
                     min_avg_depth = avg_depth;
                     shallow_nodes = it.second;
@@ -123,10 +131,16 @@ public:
             PExecutor cur_exec = first_node->generate();
             cur_exec->batch = std::move(shallow_nodes);
             free_nodes.erase(min_hash);
+            profiler.EndEvent();
 #if USE_GPU
+            profiler.BeginEvent("clear nodes");
             clearNodes(cur_exec->batch, cur_exec->getDim());
+            profiler.EndCudaEvent();
 #endif
+//            cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl << endl;
+
             cur_exec->forwardFully();
+            profiler.BeginEvent("computation plan");
             execs.push_back(cur_exec);
 
             for (Node* free_node : cur_exec->batch) {
@@ -141,6 +155,7 @@ public:
                     }
                 }
             }
+            profiler.EndEvent();
         }
 
         if (finish_nodes.size() != all_nodes.size()) {

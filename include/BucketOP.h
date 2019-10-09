@@ -67,6 +67,17 @@ private:
     friend class BucketExecutor;
 };
 
+namespace n3ldg_plus {
+
+Node *bucket(Graph &graph, int dim, float v) {
+    BucketNode *bucket = new BucketNode;
+    bucket->init(dim);
+    bucket->forward(graph, v);
+    return bucket;
+}
+
+}
+
 class BucketExecutor : public Executor {
 public:
     void forward() override {
