@@ -1642,6 +1642,50 @@ void ConcatBackward(const std::vector<dtype*> &in_losses,
     CheckCudaError();
 }
 
+__global__ void KernelScalarConcatForward(const dtype *const *const *ins, int count,
+        const int *dims,
+        int max_dim,
+        dtype *const *results) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < max_dim * count; i += step) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+        if (dim_i < dims[count_i]) {
+            results[count_i][dim_i] = ins[count_i][dim_i][0];
+        }
+    }
+}
+
+void ScalarConcatForward(const vector<const dtype *> &ins, int count, const vector<int> &dims,
+        int max_dim,
+        const vector<dtype *> &results) {
+    NumberPointerArray result_arr;
+    result_arr.init((dtype**)results.data(), results.size());
+    NumberPointerPointerArray in_arr;
+    in_arr.init((dtype***)ins.data(), ins.size());
+    IntArray dim_arr;
+    dim_arr.init((int *)dims.data(), dims.size());
+
+    int block_count = DefaultBlockCount(count * max_dim);
+    KernelScalarConcatForward<<<block_count, TPB>>>(in_arr.value, count, dim_arr.value, max_dim,
+            result_arr.value);
+}
+
+__global__ void KernelScalarConcatBackward(const dtype *const *losses, int count, const int *dims,
+        int max_dim,
+        dtype *const *input_losses) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < max_dim * count; i += step) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+        if (dim_i < dims[count_i]) {
+            DeviceAtomicAdd(input_losses[count_i], losses[count_i]
+        }
+    }
+}
+
 __global__ void KernelMemset(dtype *p, int len, dtype value) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
