@@ -376,6 +376,10 @@ public:
         return batch.front()->getNodeType();
     }
 
+    string getSignature() const {
+        return batch.front()->typeSignature();
+    }
+
     void forwardFully() {
         Node *first = batch.front();
         for (int i = 1; i < batch.size(); ++i) {

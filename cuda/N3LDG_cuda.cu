@@ -1300,7 +1300,7 @@ cudaError_t MemoryPool::Free(void *p) {
 }
 
 void Profiler::EndCudaEvent() {
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
     EndEvent();
 }
 
@@ -3872,7 +3872,6 @@ __global__ void KernelSquareSum(const dtype *v, const bool *indexers,
 
 dtype SquareSum(const dtype *v, const bool *indexers, int count, int dim) {
     int block_count = DefaultBlockCountWithoutLimit(count * dim);
-    cout << "block_count:" << block_count << endl;
     NumberArray global_sum;
     global_sum.init(block_count);
     DeviceInt block_counter;
