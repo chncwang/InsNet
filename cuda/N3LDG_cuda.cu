@@ -1681,7 +1681,7 @@ __global__ void KernelScalarConcatBackward(const dtype *const *losses, int count
         int count_i = i / max_dim;
         int dim_i = i % max_dim;
         if (dim_i < dims[count_i]) {
-            DeviceAtomicAdd(input_losses[count_i], losses[count_i]
+            //DeviceAtomicAdd(input_losses[count_i], losses[count_i] TODO
         }
     }
 }
