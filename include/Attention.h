@@ -23,20 +23,20 @@ public:
     vector<Node *> _weights;
     Node* _hidden;
 
-    void forward(Graph &cg, vector<Node *>& x, Node& guide) {
+    void forward(Graph &cg, vector<Node*> &keys, vector<Node *>& values, Node& guide) {
         using namespace n3ldg_plus;
-        if (x.empty()) {
+        if (values.empty()) {
             std::cerr << "empty inputs for attention operation" << std::endl;
             abort();
         }
 
-        for (int idx = 0; idx < x.size(); idx++) {
-            Node *pro = n3ldg_plus::pointwiseMultiply(cg, *x.at(idx), guide);
+        for (int idx = 0; idx < values.size(); idx++) {
+            Node *pro = n3ldg_plus::pointwiseMultiply(cg, *keys.at(idx), guide);
             Node *sum = n3ldg_plus::vectorSum(cg, *pro);
             _weights.push_back(sum);
         }
 
-        _hidden = attention(cg, x, _weights);
+        _hidden = attention(cg, values, _weights);
     }
 };
 
