@@ -621,6 +621,15 @@ Executor* LinearWordVectorNode::generate() {
 
 namespace n3ldg_plus {
 
+Node *linear(Graph &graph, UniParams &params, Node &input) {
+    int dim = params.W.outDim();
+    LinearNode *uni(new LinearNode);
+    uni->init(dim);
+    uni->setParam(params);
+    uni->forward(graph, input);
+    return uni;
+}
+
 Node *uni(Graph &graph, UniParams &params, Node &input, ActivatedEnum activated_type =
         ActivatedEnum::TANH) {
     int dim = params.W.outDim();

@@ -98,6 +98,17 @@ protected:
     }
 };
 
+namespace n3ldg_plus {
+
+Node *tanh(Graph &graph, Node &input) {
+    TanhNode *result = new TanhNode;
+    result->init(input.getDim());
+    result->forward(graph, input);
+    return result;
+}
+
+}
+
 class TanhExecutor :public Executor {
 public:
     int dim;

@@ -71,6 +71,8 @@ public:
 
     void initWeights(int dim, bool tune) {
         if (dim <=0 || nVSize == 0 || (nVSize == 1 && nUNKId >= 0)) {
+            std::cerr << boost::format("LookupTable initWeights - dim:%1% size:%2%") % dim % nVSize
+                << endl;
             std::cerr << "please check the alphabet" << std::endl;
             abort();
         }
