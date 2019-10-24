@@ -65,10 +65,10 @@ struct AdditiveAttentionParams : public N3LDGSerializable, TunableCombination<Ba
     }
 
     void init(int k_size, int q_size) {
-        int sum = k_size + q_size;
-        k.init(sum, k_size, false);
-        q.init(sum, q_size, false);
-        w3t.init(1, sum, false);
+        int out = std::max(k_size, q_size);
+        k.init(out, k_size, false);
+        q.init(out, q_size, false);
+        w3t.init(1, out, false);
     }
 
 #if USE_GPU
