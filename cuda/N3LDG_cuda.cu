@@ -3290,7 +3290,8 @@ __global__ void KernelExpBackward(const dtype* const *losses, const dtype* const
     for (int i = index; i < dim * count; i += step) {
         int count_i = i / dim;
         int dim_i = i % dim;
-        DeviceAtomicAdd(input_losses[count_i], losses[count_i][dim_i] * vals[count_i][dim_i]);
+        DeviceAtomicAdd(input_losses[count_i] + dim_i,
+                losses[count_i][dim_i] * vals[count_i][dim_i]);
     }
 }
 
