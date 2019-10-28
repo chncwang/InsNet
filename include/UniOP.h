@@ -377,7 +377,8 @@ public:
             abort();
         }
         param_ = &word_vectors;
-        offset_ = offset;
+//        offset_ = offset;
+        offset_ = 0;
     }
 
     void compute() override {
@@ -409,6 +410,17 @@ private:
     friend class LinearWordVectorExecutor;
     int offset_ = 0;
 };
+
+namespace n3ldg_plus {
+    Node *linearWordVector(Graph &graph, int dim, SparseParam &word_vectors, Node &input,
+            int offset = 0) {
+        LinearWordVectorNode *node =  new LinearWordVectorNode;
+        node->init(dim);
+        node->setParam(word_vectors, offset);
+        node->forward(graph, input);
+        return node;
+    }
+}
 
 #if USE_GPU
 
