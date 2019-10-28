@@ -377,8 +377,8 @@ public:
             abort();
         }
         param_ = &word_vectors;
-//        offset_ = offset;
-        offset_ = 0;
+        offset_ = offset;
+//        offset_ = 0;
     }
 
     void compute() override {
@@ -532,6 +532,8 @@ public:
         auto scoped_grad = x.mat() * ly.mat().transpose();
         MatrixXdtype full_grad(inDim, param->inDim()), left(inDim, offset),
                      right(inDim, param->inDim() - offset - outDim);
+        left.setZero();
+        right.setZero();
         full_grad << left, scoped_grad, right;
         param->grad.mat() += full_grad;
         function<void(void)> print = [&]()->void {
@@ -605,7 +607,16 @@ public:
         auto scoped_grad = x.mat() * ly.mat().transpose();
         MatrixXdtype full_grad(inDim, param->inDim()), left(inDim, offset),
                      right(inDim, param->inDim() - offset - outDim);
+        left.setZero();
+        right.setZero();
         full_grad << left, scoped_grad, right;
+//        cout << boost::format("inDim:%1% param->inDim():%2% offset:%3% outDim:%4% full_grad row:%5% cols:%6%")
+//            % inDim % param->inDim() % offset % outDim % full_grad.rows() % full_grad.cols()
+//            << endl;
+//        cout << "left:\n" << left << endl;
+//        cout << "center:\n" << scoped_grad << endl;
+//        cout << "right:\n" << right << endl;
+//        cout << "full:\n" << full_grad << endl;
         param->grad.mat() += full_grad;
 
         Mat scoped_matrix(param->val.mat().data() + offset * inDim, inDim, outDim);
