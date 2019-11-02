@@ -45,16 +45,22 @@ std::pair<dtype, std::vector<int>> maxLogProbabilityLoss(std::vector<Node *> &no
         vals.push_back(node->getVal().value);
         losses.push_back(node->getLoss().value);
     }
+    auto result = n3ldg_cuda::SoftMaxLoss(vals, nodes.size(),
+            nodes.front()->getDim(), answers, batchsize, losses);
 #if TEST_CUDA
-    cpuMaxLogProbabilityLoss(nodes, answers, batchsize);
+    auto cpu_result = cpuMaxLogProbabilityLoss(nodes, answers, batchsize);
     for (Node *node : nodes) {
         n3ldg_cuda::Assert(node->loss().verify("maxLogProbabilityLoss"),
                 (boost::format("node count:%1% dim:%2%") % nodes.size() %
                  nodes.front()->getDim()).str());
     }
+    if (abs((cpu_result.first - result.first) / result.first) >= 1e-3) {
+        cerr << boost::format("gpu loss is %1%, while cpu is %2%") % result.first %
+            cpu_result.first << endl;
+        abort();
+    }
 #endif
-    return n3ldg_cuda::SoftMaxLoss(vals, nodes.size(),
-            nodes.front()->getDim(), answers, batchsize, losses);
+    return result;
 #else
     return cpuMaxLogProbabilityLoss(nodes, answers, batchsize);
 #endif
