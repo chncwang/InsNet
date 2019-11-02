@@ -47,6 +47,11 @@ std::pair<dtype, std::vector<int>> maxLogProbabilityLoss(std::vector<Node *> &no
     }
 #if TEST_CUDA
     cpuMaxLogProbabilityLoss(nodes, answers, batchsize);
+    for (Node *node : nodes) {
+        n3ldg_cuda::Assert(node->loss().verify("maxLogProbabilityLoss"),
+                (boost::format("node count:%1% dim:%2%") % nodes.size() %
+                 nodes.front()->getDim()).str());
+    }
 #endif
     return n3ldg_cuda::SoftMaxLoss(vals, nodes.size(),
             nodes.front()->getDim(), answers, batchsize, losses);
