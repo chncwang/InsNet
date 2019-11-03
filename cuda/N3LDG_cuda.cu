@@ -3280,6 +3280,7 @@ vector<int> Predict(const vector<dtype*> &vals, int count, int dim) {
     return max_index_arr.toCpu();
 }
 
+
 __global__ void KernelExp(const dtype *const *in, int count, int dim, const dtype *number_to_sub,
         dtype *const *out) {
     int index = DeviceDefaultIndex();

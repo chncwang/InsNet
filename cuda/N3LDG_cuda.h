@@ -442,6 +442,7 @@ void ScalarToVectorBackward(const std::vector<const dtype*> &losses, int count, 
         std::vector<dtype*> &input_losses);
 vector<int> Predict(const vector<dtype*> &vals, int count, int dim);
 int Predict(const dtype* val, int dim);
+void Max(const dtype *const *v, int count, int dim, int *max_indexes, dtype *max_vals);
 std::pair<dtype, std::vector<int>> SoftMaxLoss(const std::vector<const dtype *> &vals_vector,
         int count,
         int dim,
