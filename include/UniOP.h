@@ -414,6 +414,18 @@ private:
 namespace n3ldg_plus {
     Node *linearWordVector(Graph &graph, int dim, SparseParam &word_vectors, Node &input,
             int offset = 0) {
+        if (dim + offset > word_vectors.inDim()) {
+            cerr << boost::format("linearWordVector - dim:%1% offset%2% vocabulary_size:%3%") %
+                dim % offset % word_vectors.inDim() << endl;
+            abort();
+        }
+
+        if (input.getDim() != word_vectors.outDim()) {
+            cerr << boost::format("LinearWordVectorNode - input dim:%1% word vector dim:%2%") %
+                input.getDim() % word_vectors.outDim() << endl;
+            abort();
+        }
+
         LinearWordVectorNode *node =  new LinearWordVectorNode;
         node->init(dim);
         node->setParam(word_vectors, offset);

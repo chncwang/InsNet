@@ -253,6 +253,13 @@ IntArray::~IntArray() {
     }
 }
 
+vector<int> IntArray::toCpu() const {
+    vector<int> result;
+    result.resize(len);
+    CallCuda(MyCudaMemcpy(result.data(), value, sizeof(int) * len, cudaMemcpyDeviceToHost));
+    return result;
+}
+
 void BoolArray::init(bool *host_arr, int len) {
     if (value != NULL) {
         CallCuda(MemoryPool::Ins().Free(value));
@@ -3053,6 +3060,29 @@ void SoftMaxLoss(const std::vector<dtype*> &vals, std::vector<dtype*> &losses,
     CheckCudaError();
 }
 
+__global__ void KernelCrossEntropyLoss(const dtype *const *vals, const int *answers, int count,
+        int dim,
+        dtype *const *losses) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count; i += step) {
+        int answer = answers[i];
+        losses[i][answer] = - 1 / vals[i][answer];
+    }
+}
+
+void CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, int count, int dim,
+        vector<dtype *> &losses) {
+    NumberPointerArray val_arr, loss_arr;
+    val_arr.init((dtype**)vals.data(), vals.size());
+    loss_arr.init((dtype**)losses.data(), losses.size());
+    IntArray answer_arr;
+    answer_arr.init((int*)answers.data(), answers.size());
+
+    KernelCrossEntropyLoss<<<DefaultBlockCount(count), TPB>>>(val_arr.value, answer_arr.value,
+            count, dim, loss_arr.value);
+}
+
 __global__ void Predict(const dtype *val, int dim, int *result) {
     __shared__ volatile dtype shared_vals[TPB];
     __shared__ volatile dtype shared_indexes[TPB];
@@ -3237,6 +3267,17 @@ void Max(const dtype *const *v, int count, int dim, int *max_indexes, dtype *max
 #endif
 
     CheckCudaError();
+}
+
+vector<int> Predict(const vector<dtype*> &vals, int count, int dim) {
+    NumberPointerArray val_arr;
+    val_arr.init((dtype**)vals.data(), vals.size());
+    IntArray max_index_arr;
+    max_index_arr.init(vals.size());
+    NumberArray max_val_arr;
+    max_val_arr.init(vals.size());
+    Max(val_arr.value, count, dim, max_index_arr.value, max_val_arr.value);
+    return max_index_arr.toCpu();
 }
 
 __global__ void KernelExp(const dtype *const *in, int count, int dim, const dtype *number_to_sub,

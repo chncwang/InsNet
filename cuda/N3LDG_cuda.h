@@ -11,6 +11,8 @@
 #include <vector>
 #include <cmath>
 
+using std::vector;
+
 namespace n3ldg_cuda {
 
 struct NumberPointerArray {
@@ -135,6 +137,8 @@ struct IntArray {
     }
     void init(int *host_arr, int len);
     void init(int len);
+
+    vector<int> toCpu() const;
     ~IntArray();
 };
 
@@ -420,6 +424,8 @@ void SoftMaxLoss(const std::vector<dtype*> &vals, std::vector<dtype*> &losses,
         int batchsize,
         int count,
         int dim);
+void CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, int count, int dim,
+        vector<dtype *> &losses);
 void MaxScalarForward(const std::vector<const dtype*> &inputs, int count, int dim,
         std::vector<dtype*> &results,
         std::vector<int> &max_indexes);
@@ -434,6 +440,7 @@ void ScalarToVectorForward(const std::vector<const dtype*> &inputs, int count, i
         std::vector<dtype*> &results);
 void ScalarToVectorBackward(const std::vector<const dtype*> &losses, int count, int dim,
         std::vector<dtype*> &input_losses);
+vector<int> Predict(const vector<dtype*> &vals, int count, int dim);
 int Predict(const dtype* val, int dim);
 std::pair<dtype, std::vector<int>> SoftMaxLoss(const std::vector<const dtype *> &vals_vector,
         int count,

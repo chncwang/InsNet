@@ -255,6 +255,25 @@ private:
     int node_index_;
 };
 
+void validateEqualNodeDims(const vector<Node *> &nodes) {
+    for (int i = 1; i < nodes.size(); ++i) {
+        if (nodes.at(i)->getDim() != nodes.front()->getDim()) {
+            cerr << boost::format(
+                    "validateEqualNodeDims - first node size is %1%, but %2%st is %3%") %
+                nodes.size() % i % nodes.front()->getDim() << endl;
+            abort();
+        }
+    }
+}
+
+auto get_node_val = [](Node *node) {
+    return node->val();
+};
+
+auto get_node_loss = [](Node *node) {
+    return node->loss();
+};
+
 typedef Node* PNode;
 
 //class CompositionNode : public Node {
