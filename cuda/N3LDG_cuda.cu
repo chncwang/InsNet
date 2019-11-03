@@ -3053,6 +3053,29 @@ void SoftMaxLoss(const std::vector<dtype*> &vals, std::vector<dtype*> &losses,
     CheckCudaError();
 }
 
+__global__ void KernelCrossEntropyLoss(const dtype *const *vals, const int *answers, int count,
+        int dim,
+        dtype *const *losses) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count; i += step) {
+        int answer = answers[i];
+        losses[i][answer] = - 1 / vals[i][answer];
+    }
+}
+
+void CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, int count, int dim,
+        vector<dtype *> &losses) {
+    NumberPointerArray val_arr, loss_arr;
+    val_arr.init((dtype**)vals.data(), vals.size());
+    loss_arr.init((dtype**)losses.data(), losses.size());
+    IntArray answer_arr;
+    answer_arr.init((dtype**)answers.data(), answers.size());
+
+    KernelCrossEntropyLoss<<<DefaultBlockCount(count), TPB>>>(val_arr.value, answer_arr.value,
+            count, dim, loss_arr.value);
+}
+
 __global__ void Predict(const dtype *val, int dim, int *result) {
     __shared__ volatile dtype shared_vals[TPB];
     __shared__ volatile dtype shared_indexes[TPB];
@@ -3238,6 +3261,7 @@ void Max(const dtype *const *v, int count, int dim, int *max_indexes, dtype *max
 
     CheckCudaError();
 }
+
 
 __global__ void KernelExp(const dtype *const *in, int count, int dim, const dtype *number_to_sub,
         dtype *const *out) {

@@ -27,7 +27,7 @@ std::pair<dtype, std::vector<int>> cpuMaxLogProbabilityLoss(std::vector<Node *> 
         loss_tensor.vec() = exp.vec() / sum;
         int answer = answers.at(i);
         loss_tensor.v[answer] -= 1.0f;
-        node.loss().vec() = loss_tensor.vec().unaryExpr(
+        node.loss().vec() += loss_tensor.vec().unaryExpr(
                 [=](dtype x)->dtype {return x * reverse_batchsize;});
         loss += (log(sum) - node.getVal().v[answer] + max_pair.second) * reverse_batchsize;
     }
@@ -39,6 +39,18 @@ std::pair<dtype, std::vector<int>> maxLogProbabilityLoss(std::vector<Node *> &no
         const std::vector<int> &answers,
         int batchsize) {
 #if USE_GPU
+#if TEST_CUDA
+    for (Node *node : nodes) {
+        cout << "node dim:" << node->getDim() << " ";
+        n3ldg_cuda::Assert(node->val().verify("maxLogProbabilityLoss input"),
+                (boost::format("node count:%1% dim:%2%") % nodes.size() %
+                 nodes.front()->getDim()).str());
+    }
+    cout << endl;
+    for (int answer : answers) {
+        cout << answer << " ";
+    }
+#endif
     vector<const dtype*> vals;
     vector<dtype*> losses;
     for (Node *node : nodes) {

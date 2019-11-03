@@ -255,6 +255,14 @@ private:
     int node_index_;
 };
 
+auto get_node_val = [](Node *node) {
+    return node->val();
+};
+
+auto get_node_loss = [](Node *node) {
+    return node->loss();
+};
+
 typedef Node* PNode;
 
 //class CompositionNode : public Node {
