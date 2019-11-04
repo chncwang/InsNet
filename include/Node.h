@@ -357,7 +357,7 @@ std::vector<Node*> toNodePointers(const std::vector<T *> &vec) {
 /* *
  * return tuple<exp, pair<max_i, max>, sum>
  * */
-std::tuple<std::unique_ptr<Tensor1D>, std::pair<int, dtype>, dtype> toExp(const Node &node) {
+std::tuple<std::unique_ptr<n3ldg_cpu::Tensor1D>, std::pair<int, dtype>, dtype> toExp(const Node &node) {
     dtype max = node.getVal().v[0];
     int max_j = 0;
     for (int j = 1; j < node.getDim(); ++j) {
@@ -367,7 +367,7 @@ std::tuple<std::unique_ptr<Tensor1D>, std::pair<int, dtype>, dtype> toExp(const 
         }
     }
 
-    std::unique_ptr<Tensor1D> exp(new Tensor1D);
+    std::unique_ptr<n3ldg_cpu::Tensor1D> exp(new n3ldg_cpu::Tensor1D);
     exp->init(node.getDim());
     exp->vec() = (node.getVal().vec() - max).exp();
     dtype sum = static_cast<Eigen::Tensor<dtype, 0>>(exp->vec().sum())(0);
