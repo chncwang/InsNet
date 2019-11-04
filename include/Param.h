@@ -228,6 +228,18 @@ public:
         aux_mean.fromJson(json["aux_mean"]);
         iter = json["iter"].asInt();
     }
+
+    void value(const int& featId, Tensor1D& out) {
+        assert(out.dim == val.row);
+        memcpy(out.v, val[featId], val.row * sizeof(dtype));
+    }
+
+    void loss(const int& featId, const Tensor1D& loss) {
+        assert(loss.dim == val.row);
+        for (int idx = 0; idx < val.row; idx++) {
+            grad[featId][idx] += loss[idx];
+        }
+    }
 };
 
 #endif /* PARAM_H_ */

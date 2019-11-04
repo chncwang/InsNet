@@ -370,7 +370,7 @@ public:
         return input.getDim() == param_->outDim();
     }
 
-    void setParam(SparseParam &word_vectors, int offset = 0) {
+    void setParam(Param &word_vectors, int offset = 0) {
         if (offset + getDim() > word_vectors.inDim()) {
             cerr << boost::format("offset:%1% getDim():%2% word_vectors.inDim():%3%") % offset %
                 getDim() % word_vectors.inDim() << endl;
@@ -406,13 +406,13 @@ public:
     }
 
 private:
-    SparseParam *param_ = nullptr;
+    Param *param_ = nullptr;
     friend class LinearWordVectorExecutor;
     int offset_ = 0;
 };
 
 namespace n3ldg_plus {
-    Node *linearWordVector(Graph &graph, int dim, SparseParam &word_vectors, Node &input,
+    Node *linearWordVector(Graph &graph, int dim, Param &word_vectors, Node &input,
             int offset = 0) {
         if (dim + offset > word_vectors.inDim()) {
             cerr << boost::format("linearWordVector - dim:%1% offset%2% vocabulary_size:%3%") %
@@ -440,7 +440,7 @@ class LinearWordVectorExecutor : public UniInputExecutor {
 public:
     Tensor2D x, y;
     int inDim, outDim;
-    SparseParam *param;
+    Param *param;
 
     void forward() {
         int count = batch.size();
@@ -583,7 +583,7 @@ class LinearWordVectorExecutor : public Executor {
 public:
     Tensor2D x, y;
     int inDim, outDim;
-    SparseParam *param;
+    Param *param;
 
     void forward() override {
         int count = batch.size();

@@ -1829,6 +1829,49 @@ void LookupBackward(const std::vector<int> &xids, int unknown_id,
     CheckCudaError();
 }
 
+__global__ void KernelLookupBackward(const int *xids, int unknown_id,
+        bool fine_tune,
+        const dtype** losses,
+        int count,
+        int dim,
+        dtype *grad) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * dim; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        int xid = xids[count_i];
+        if (xid == unknown_id || fine_tune) {
+            assert(xid >= 0);
+            DeviceAtomicAdd(grad + xid * dim + dim_i, losses[count_i][dim_i]);
+        }
+    }
+}
+
+void LookupBackward(const std::vector<int> &xids, int unknown_id,
+        bool fine_tune,
+        const std::vector<dtype*> &losses,
+        int count,
+        int dim,
+        dtype *grad) {
+    int block_count = std::min((count * dim - 1 + TPB) / TPB, BLOCK_COUNT);
+    IntArray pl_arr;
+    pl_arr.init((int*)xids.data(), xids.size());
+    IntArray xid_arr;
+    xid_arr.init((int*)pl_arr.value, xids.size());
+    NumberPointerArray loss_arr;
+    loss_arr.init((dtype**)losses.data(), losses.size());
+    KernelLookupBackward<<<block_count, TPB>>>(
+            const_cast<const int *>(xid_arr.value),
+            unknown_id,
+            fine_tune,
+            const_cast<const dtype**>(loss_arr.value),
+            count,
+            dim,
+            grad);
+    CheckCudaError();
+}
+
 __global__ void KernelPoolForward(PoolingEnum pooling, dtype **ins,
         int *in_counts, int max_in_count, dtype **outs, int count, int dim,
         int* hit_inputs) {

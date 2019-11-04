@@ -313,6 +313,12 @@ void LookupBackward(const std::vector<int> &xids, int unknown_id,
         int dim,
         dtype *grad,
         bool *indexers);
+void LookupBackward(const std::vector<int> &xids, int unknown_id,
+        bool fine_tune,
+        const std::vector<dtype*> &losses,
+        int count,
+        int dim,
+        dtype *grad);
 void PoolForward(PoolingEnum pooling, const std::vector<dtype*> &in_vals,
         std::vector<dtype*> &vals,
         int count,
