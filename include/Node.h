@@ -266,12 +266,20 @@ void validateEqualNodeDims(const vector<Node *> &nodes) {
     }
 }
 
-auto get_node_val = [](Node *node) {
-    return node->val();
+auto cpu_get_node_val = [](Node *node) {
+    return node->val().v;
 };
 
-auto get_node_loss = [](Node *node) {
-    return node->loss();
+auto gpu_get_node_val = [](Node *node) {
+    return node->val().value;
+};
+
+auto cpu_get_node_loss = [](Node *node) {
+    return node->loss().v;
+};
+
+auto gpu_get_node_loss = [](Node *node) {
+    return node->loss().value;
 };
 
 typedef Node* PNode;

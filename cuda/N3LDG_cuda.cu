@@ -3061,17 +3061,75 @@ void SoftMaxLoss(const std::vector<dtype*> &vals, std::vector<dtype*> &losses,
 }
 
 __global__ void KernelCrossEntropyLoss(const dtype *const *vals, const int *answers, int count,
-        int dim,
+        int batchsize,
         dtype *const *losses) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
     for (int i = index; i < count; i += step) {
         int answer = answers[i];
-        losses[i][answer] = - 1 / vals[i][answer];
+        losses[i][answer] = - 1 / vals[i][answer] / batchsize;
     }
 }
 
-void CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, int count, int dim,
+__global__ void KernelCrossEntropgyLossValue(const dtype *const *vals, const int *answers,
+        int count,
+        dtype *global_sum,
+        int *block_counter, dtype *result) {
+    __shared__ volatile dtype shared_sum[TPB];
+    __shared__ volatile bool is_last_block;
+    int index = DeviceDefaultIndex();
+    if (index == 0) {
+        *block_counter = 0;
+    }
+    if (threadIdx.x == 0) {
+        is_last_block = false;
+    }
+    shared_sum[threadIdx.x] = 0.0f;
+    for (int i = index; i < count; i += blockDim.x * gridDim.x) {
+        int answer_offset = answers[i];
+        shared_sum[threadIdx.x] += vals[i][answer_offset];
+    }
+
+    __syncthreads();
+    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+        if (threadIdx.x < i) {
+            shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+        }
+        __syncthreads();
+    }
+
+    if (threadIdx.x == 0) {
+        global_sum[blockIdx.x] = shared_sum[0];
+        if (atomicAdd(block_counter, 1) == gridDim.x - 1) {
+            is_last_block = true;
+        }
+    }
+    __syncthreads();
+
+    if (is_last_block) {
+        dtype sum = 0.0f;
+        for (int i = threadIdx.x; i < gridDim.x; i += blockDim.x) {
+            sum += global_sum[i];
+        }
+
+        shared_sum[threadIdx.x] = sum;
+        __syncthreads();
+
+        for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+            if (threadIdx.x < i) {
+                shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+            }
+            __syncthreads();
+        }
+
+        if (threadIdx.x == 0) {
+            *result = shared_sum[0];
+        }
+    }
+}
+
+dtype CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, int count,
+        int batchsize,
         vector<dtype *> &losses) {
     NumberPointerArray val_arr, loss_arr;
     val_arr.init((dtype**)vals.data(), vals.size());
@@ -3080,7 +3138,20 @@ void CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, i
     answer_arr.init((int*)answers.data(), answers.size());
 
     KernelCrossEntropyLoss<<<DefaultBlockCount(count), TPB>>>(val_arr.value, answer_arr.value,
-            count, dim, loss_arr.value);
+            count, batchsize, loss_arr.value);
+
+    int block_count = DefaultBlockCount(count);
+    NumberArray global_sum;
+    global_sum.init(block_count);
+    DeviceInt block_counter;
+    block_counter.init();
+    DeviceNumber result;
+    result.init();
+    KernelCrossEntropgyLossValue<<<block_count, TPB>>>(val_arr.value, answer_arr.value, count,
+            global_sum.value, block_counter.value, result.value);
+    CheckCudaError();
+    result.copyFromDeviceToHost();
+    return result.v / batchsize;
 }
 
 __global__ void Predict(const dtype *val, int dim, int *result) {

@@ -424,7 +424,8 @@ void SoftMaxLoss(const std::vector<dtype*> &vals, std::vector<dtype*> &losses,
         int batchsize,
         int count,
         int dim);
-void CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, int count, int dim,
+dtype CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, int count,
+        int batchsize,
         vector<dtype *> &losses);
 void MaxScalarForward(const std::vector<const dtype*> &inputs, int count, int dim,
         std::vector<dtype*> &results,
