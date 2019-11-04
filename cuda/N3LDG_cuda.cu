@@ -299,6 +299,11 @@ void Tensor1D::initOnDevice(int dim) {
     this->dim = dim;
 }
 
+void Tensor1D::initOnMemory(int len) {
+    v = new dtype[dim];
+    zero();
+}
+
 Tensor1D::Tensor1D(const Tensor1D &t) {
     dim = t.dim;
     memcpy(v, t.v, dim *sizeof(dtype));

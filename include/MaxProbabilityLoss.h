@@ -20,9 +20,9 @@ std::pair<dtype, std::vector<int>> cpuMaxLogProbabilityLoss(std::vector<Node *> 
         std::pair<int, dtype> &max_pair = std::get<1>(tuple);
         results.push_back(max_pair.first);
         dtype sum = std::get<2>(tuple);
-        Tensor1D &exp = *std::get<0>(tuple);
+        n3ldg_cpu::Tensor1D &exp = *std::get<0>(tuple);
 
-        Tensor1D loss_tensor;
+        n3ldg_cpu::Tensor1D loss_tensor;
         loss_tensor.init(node.getDim());
         loss_tensor.vec() = exp.vec() / sum;
         int answer = answers.at(i);

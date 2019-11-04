@@ -17,12 +17,6 @@
 
 using namespace Eigen;
 
-
-n3ldg_cpu::Tensor1D::Tensor1D() {
-    dim = 0;
-    v = NULL;
-}
-
 n3ldg_cpu::Tensor1D::~Tensor1D() {
     if (v) {
         delete[] v;
@@ -129,6 +123,13 @@ void n3ldg_cpu::Tensor1D::fromJson(const Json::Value &json) {
     for (int i = 0; i < dim; ++i) {
         v[i] = json_arr[i].asFloat();
     }
+}
+
+std::vector<dtype> n3ldg_cpu::Tensor1D::toCpu() const {
+    std::vector<dtype> result;
+    result.resize(dim);
+    memcpy(result.data(), v, sizeof(dtype) * dim);
+    return result;
 }
 
 n3ldg_cpu::Tensor2D::Tensor2D() {
