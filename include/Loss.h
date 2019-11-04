@@ -47,11 +47,15 @@ vector<int> cpuPredict(const vector<Node *> &nodes) {
     return result;
 }
 
+#if USE_GPU
+
 vector<int> gpuPredict(const vector<Node *> &nodes) {
     vector<dtype*> vals;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     return n3ldg_cuda::Predict(vals, nodes.size(), nodes.front()->getDim());
 }
+
+#endif
 
 vector<int> predict(const vector<Node *> &nodes) {
     validateEqualNodeDims(nodes);

@@ -270,17 +270,21 @@ auto cpu_get_node_val = [](Node *node) {
     return node->val().v;
 };
 
-auto gpu_get_node_val = [](Node *node) {
-    return node->val().value;
-};
-
 auto cpu_get_node_loss = [](Node *node) {
     return node->loss().v;
+};
+
+#if USE_GPU
+
+auto gpu_get_node_val = [](Node *node) {
+    return node->val().value;
 };
 
 auto gpu_get_node_loss = [](Node *node) {
     return node->loss().value;
 };
+
+#endif
 
 typedef Node* PNode;
 
