@@ -2590,7 +2590,9 @@ __global__ void KernelDivDenominatorBackward(const dtype *const *losses,
     __syncthreads();
 
     for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-        shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+        if (threadIdx.x < i) {
+            shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+        }
         __syncthreads();
     }
 
@@ -2614,7 +2616,9 @@ __global__ void KernelDivDenominatorBackward(const dtype *const *losses,
         __syncthreads();
 
         for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-            shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+            if (threadIdx.x < i) {
+                shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+            }
             __syncthreads();
         }
 
@@ -3087,7 +3091,7 @@ __global__ void KernelCrossEntropgyLossValue(const dtype *const *vals, const int
     shared_sum[threadIdx.x] = 0.0f;
     for (int i = index; i < count; i += blockDim.x * gridDim.x) {
         int answer_offset = answers[i];
-        shared_sum[threadIdx.x] += vals[i][answer_offset];
+        shared_sum[threadIdx.x] -= cuda_log(vals[i][answer_offset]);
     }
 
     __syncthreads();

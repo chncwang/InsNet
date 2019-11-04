@@ -29,7 +29,7 @@ dtype crossEntropyLoss(vector<Node *> &nodes, const vector<int> &answers, int ba
 #if TEST_CUDA
     dtype cpu_loss = cpuCrossEntropyLoss(nodes, answers, batchsize);
     for (Node *node : nodes) {
-        n3ldg_cuda::Assert(node->val().verify("crossEntropyLoss"));
+        n3ldg_cuda::Assert(node->loss().verify("crossEntropyLoss"));
     }
     cout << boost::format("cpu loss:%1% gpu:%2%") % cpu_loss % loss << endl;
 #endif
