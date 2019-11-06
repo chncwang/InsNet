@@ -68,7 +68,7 @@ void CallCuda(cudaError_t status) {
 }
 
 void CheckCudaError() {
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
     cudaError_t error = cudaGetLastError();
     if (error != cudaSuccess) {
         std::cerr << "cuda error:" << cudaGetErrorName(error) << std::endl;
@@ -336,6 +336,41 @@ void Tensor1D::copyFromHostToDevice() {
 
 void Tensor1D::copyFromDeviceToHost() {
     CallCuda(MyCudaMemcpy(v, value, dim * sizeof(dtype), cudaMemcpyDeviceToHost));
+}
+
+__device__ int DeviceDefaultIndex();
+__device__ int DeviceDefaultStep();
+int DefaultBlockCount(int len);
+
+__global__ void KernelCheckIsNumber(const dtype *v, int dim, int *error) {
+    if (threadIdx.x == 0 && blockIdx.x == 0) {
+        *error = 0;
+    }
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < dim; i += step) {
+        if (v[i] != v[i]) {
+            *error = 1;
+            return;
+        }
+    }
+}
+
+void CheckIsNumber(const dtype *v, int dim) {
+    int block_count = DefaultBlockCount(dim);
+    DeviceInt error;
+    error.init();
+    KernelCheckIsNumber<<<block_count, TPB>>>(v, dim, error.value);
+    CheckCudaError();
+    error.copyFromDeviceToHost();
+    if (error.v != 0) {
+        cerr << "nan checked!" << endl;
+        abort();
+    }
+}
+
+void Tensor1D::checkIsNumber() const {
+    n3ldg_cuda::CheckIsNumber(value, dim);
 }
 
 void Tensor2D::initOnMemoryAndDevice(int row, int col) {
@@ -1682,6 +1717,7 @@ void ScalarConcatForward(const vector<const dtype *> &ins, int count, const vect
     int block_count = DefaultBlockCount(count * max_dim);
     KernelScalarConcatForward<<<block_count, TPB>>>(in_arr.value, count, dim_arr.value, max_dim,
             result_arr.value);
+    CheckCudaError();
 }
 
 __global__ void KernelScalarConcatBackward(const dtype *const *losses, int count, const int *dims,
@@ -2083,27 +2119,6 @@ void SumPoolBackward(PoolingEnum pooling, const std::vector<dtype*> &losses,
             max_in_count, count, dim, in_loss_arr.value);
     CheckCudaError();
 }
-
-//__global_ void KernelCalculateNormalizedForAttention(const dtype** unnormeds, const int *in_counts,
-//        int max_in_count,
-//        int count,
-//        dtype** normalized_scalars) {
-//    __shared__ volatile extern dtype shared_arr[];
-//    int in_count = in_counts[blockIdx.x];
-//    int global_in_count_i = max_in_count * blockIdx.x + threadIdx.x;
-//    dtype exped_value = threadIdx.x < in_count ? cuda_exp(unnormeds[global_in_count_i][0]) : 0.0f;
-//    shared_arr[threadIdx.x] = exped_value;
-//    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-//        if (threadIdx.x < i) {
-//            int plus_i = threadIdx.x + i;
-//            shared_arr[threadIdx.x] += attention_shared_arr[plus_i];
-//        }
-//        __syncthreads();
-//    }
-//    if (threadIdx.x < in_count) {
-//        normalized_scalars[blockIdx.y][blockIdx.x * max_in_count + threadIdx.x] = mask;
-//    }
-//}
 
 __global__ void KernelScalarAttentionForward(const dtype** ins,
         const dtype **unnormeds,
@@ -3191,6 +3206,7 @@ dtype CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, 
 
     KernelCrossEntropyLoss<<<DefaultBlockCount(count), TPB>>>(val_arr.value, answer_arr.value,
             count, batchsize, loss_arr.value);
+    CheckCudaError();
 
     int block_count = DefaultBlockCount(count);
     NumberArray global_sum;
@@ -3206,52 +3222,13 @@ dtype CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, 
     return result.v / batchsize;
 }
 
-__global__ void Predict(const dtype *val, int dim, int *result) {
-    __shared__ volatile dtype shared_vals[TPB];
-    __shared__ volatile dtype shared_indexes[TPB];
-
-    shared_indexes[threadIdx.x] = threadIdx.x;
-    if (threadIdx.x < dim) {
-        shared_vals[threadIdx.x] = val[threadIdx.x];
-    } else {
-        shared_vals[threadIdx.x] = -10000000.0f;
-    }
-    __syncthreads();
-
-    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-        if (shared_vals[threadIdx.x] < shared_vals[threadIdx.x + i]) {
-            shared_vals[threadIdx.x] = shared_vals[threadIdx.x + i];
-            shared_indexes[threadIdx.x] = shared_indexes[threadIdx.x + i];
-        }
-        __syncthreads();
-    }
-
-    if (threadIdx.x == 0) {
-        *result = shared_indexes[0];
-    }
-}
-
-int Predict(const dtype* val, int dim) {
-    if (dim > TPB) {
-        abort();
-    }
-
-    int thread_count = NextTwoIntegerPowerNumber(dim);
-    DeviceInt result;
-    result.init();
-    Predict<<<1, thread_count>>>(val, dim, result.value);
-    CheckCudaError();
-    result.copyFromDeviceToHost();
-    return result.v;
-}
-
 __global__ void KernelMax(const dtype *const *v, int count, int dim, dtype *block_maxes,
         int *block_max_is,
         int *block_counters,
         int *max_indexes,
         dtype *max_vals) {
     __shared__ volatile dtype shared_max[TPB];
-    __shared__ volatile dtype shared_max_i[TPB];
+    __shared__ volatile int shared_max_i[TPB];
     __shared__ volatile bool is_last_block;
     if (threadIdx.x == 0 && blockIdx.y == 0) {
         block_counters[blockIdx.x] = 0;
@@ -3278,10 +3255,6 @@ __global__ void KernelMax(const dtype *const *v, int count, int dim, dtype *bloc
     if (threadIdx.x == 0) {
         block_maxes[block_maxes_offset] = shared_max[0];
         block_max_is[block_maxes_offset] = shared_max_i[0];
-        //if (shared_max_i[0] >= dim) {
-        //    KernelPrintLine("dim:%d shared_max_i[0]:%d shared_max[0]:%f", dim, shared_max_i[0],
-        //            shared_max[0]);
-        //}
         if (atomicAdd(block_counters + blockIdx.x, 1) == gridDim.y - 1) {
             is_last_block = true;
         }
@@ -3291,39 +3264,22 @@ __global__ void KernelMax(const dtype *const *v, int count, int dim, dtype *bloc
     if (is_last_block) {
         dtype max = -INFINITY;
         int max_i = 100000;
-        //if (threadIdx.x == 0) {
-        //    for (int i = 0; i < gridDim.y; ++i) {
-        //        int offset = blockIdx.x * gridDim.y + i;
-        //        KernelPrintLine("i:%d block_maxes[%d]:%f", i, offset, block_maxes[offset]);
-        //    }
-        //}
         for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
             int offset = blockIdx.x * gridDim.y + i;
             if (block_maxes[offset] > max) {
                 max = block_maxes[offset];
                 max_i = block_max_is[offset];
-                //if (max_i >= dim) {
-                //    KernelPrintLine("max_i:%d blockIdx.x:%d gridDim.y:%d i:%d offset:%d",
-                //            max_i, blockIdx.x, gridDim.y, i, offset);
-                //}
             }
         }
 
         shared_max[threadIdx.x] = max;
         shared_max_i[threadIdx.x] = max_i;
-        //if (max_i >= dim) {
-        //    KernelPrintLine("count_i:%d dim:%d max_i:%d", count_i, dim, max_i);
-        //}
         __syncthreads();
 
         for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
             if (threadIdx.x < i && shared_max[threadIdx.x + i] > shared_max[threadIdx.x]) {
                 shared_max[threadIdx.x] = shared_max[threadIdx.x + i];
                 shared_max_i[threadIdx.x] = shared_max_i[threadIdx.x + i];
-                //if (shared_max_i[threadIdx.x] >= dim) {
-                //    KernelPrintLine("index:%d v:%f" shared_max_i[threadIdx.x],
-                //            shared_max[threadIdx.x]);
-                //}
             }
             __syncthreads();
         }
@@ -3634,7 +3590,7 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
         int *max_indexes,
         dtype **max_vals) {
     __shared__ volatile dtype shared_max[TPB];
-    __shared__ volatile dtype shared_max_i[TPB];
+    __shared__ volatile int shared_max_i[TPB];
     __shared__ volatile bool is_last_block;
     if (threadIdx.x == 0 && blockIdx.y == 0) {
         block_counters[blockIdx.x] = 0;
@@ -3661,6 +3617,8 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
     if (threadIdx.x == 0) {
         block_maxes[block_maxes_offset] = shared_max[0];
         block_max_is[block_maxes_offset] = shared_max_i[0];
+//        printf("threadIdx.x == 0 block_maxes[offset]:%f block_max_is[offset]:%d\n",
+//                block_maxes[offset], block_max_is[offset]);
         if (atomicAdd(block_counters + blockIdx.x, 1) == gridDim.y - 1) {
             is_last_block = true;
         }
@@ -3672,6 +3630,8 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
         int max_i = 100000;
         for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
             int offset = blockIdx.x * gridDim.y + i;
+//            printf("is_last_block block_maxes[offset]:%f block_max_is[offset]:%d\n",
+//                    block_maxes[offset], block_max_is[offset]);
             if (block_maxes[offset] > max) {
                 max = block_maxes[offset];
                 max_i = block_max_is[offset];
@@ -3680,6 +3640,7 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
 
         shared_max[threadIdx.x] = max;
         shared_max_i[threadIdx.x] = max_i;
+//        printf("max:%f max_i:%d\n", max, max_i);
         __syncthreads();
 
         for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
@@ -3693,6 +3654,8 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
         if (threadIdx.x == 0) {
             max_vals[count_i][0] = shared_max[0];
             max_indexes[count_i] = shared_max_i[0];
+//            printf("max_i:%d count_i:%d max_val:%f\n", max_indexes[count_i], count_i,
+//                    max_vals[count_i][0]);
         }
     }
 }
@@ -3702,6 +3665,8 @@ void MaxScalarForward(const vector<const dtype*> &inputs, int count, int dim,
         vector<int> &max_indexes) {
     int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
     int block_y_count = (dim - 1 + thread_count) / thread_count;
+    cout << boost::format("count:%1% block_y_count:%2% thread:%3% dim:%4%") % count % block_y_count %
+        thread_count % dim << endl;
     dim3 block_dim(count, block_y_count, 1);
 
     NumberArray block_maxes;
@@ -3717,13 +3682,22 @@ void MaxScalarForward(const vector<const dtype*> &inputs, int count, int dim,
     IntArray max_index_arr;
     max_index_arr.init(max_indexes.size());
 
+    static int i;
+
     KernelMaxScalarForward<<<block_dim, thread_count>>>(input_arr.value, count, dim,
             block_maxes.value, block_max_is.value, block_counters.value, max_index_arr.value,
             result_arr.value);
+//    cudaDeviceSynchronize();
+//    cudaPrintfDisplay(stdout, true);
     CheckCudaError();
-
     MyCudaMemcpy(max_indexes.data(), max_index_arr.value, count * sizeof(int),
             cudaMemcpyDeviceToHost);
+//    if (i == 265) {
+//        cout << max_indexes.front() << endl;
+//        PrintNums(inputs.front(), dim);
+//        abort();
+//    }
+//    cout << "MaxScalarForward - i:" << i++ << endl;
 }
 
 __global__ void KernelMaxScalarBackward(const dtype *const *losses, const int *indexes, int count,
@@ -3745,6 +3719,7 @@ void MaxScalarBackward(const vector<const dtype *> &losses, const vector<int> &i
     index_arr.init((int*)indexes.data(), indexes.size());
     KernelMaxScalarBackward<<<block_count, TPB>>>(loss_arr.value, index_arr.value, count,
             input_loss_arr.value);
+    CheckCudaError();
 }
 
 __global__ void KernelVectorSumForward(const dtype *const *v, int count, int dim,

@@ -424,6 +424,7 @@ public:
         n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
         profiler.BeginEvent(getNodeType() + " forward");
         forward();
+
         profiler.EndCudaEvent();
         for (Node *node : batch) {
             node->setDegree(-1);

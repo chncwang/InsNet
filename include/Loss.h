@@ -42,7 +42,8 @@ dtype crossEntropyLoss(vector<Node *> &nodes, const vector<int> &answers, int ba
 vector<int> cpuPredict(const vector<Node *> &nodes) {
     vector<int> result;
     for (Node *node : nodes) {
-        result.push_back(*std::max(node->getVal().v, node->getVal().v + node->getDim()));
+        result.push_back(std::max_element(node->getVal().v,
+                    node->getVal().v + node->getDim()) - node->getVal().v);
     }
     return result;
 }

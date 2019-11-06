@@ -60,6 +60,8 @@ struct Tensor1D : public N3LDGSerializable {
     virtual void print() const;
 
     virtual std::vector<dtype> toCpu() const;
+
+    virtual void checkIsNumber() const;
 };
 
 struct Tensor2D : public N3LDGSerializable {
@@ -147,6 +149,7 @@ struct Tensor1D : public n3ldg_cpu::Tensor1D, public Transferable {
 
     void copyFromHostToDevice() override;
     void copyFromDeviceToHost() override;
+    void checkIsNumber() const override;
 
 private:
     void initOnDevice(int len);

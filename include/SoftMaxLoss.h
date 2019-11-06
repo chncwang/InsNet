@@ -75,34 +75,6 @@ dtype softMaxLoss(const std::vector<PNode> &x, const std::vector<int> &answers,
 }
 #endif
 
-#if USE_GPU
-void softMaxPredict(PNode x, int &y) {
-    y = n3ldg_cuda::Predict(x->val().value, x->getDim());
-}
-#else
-dtype predict(PNode x, int& y) {
-    int nDim = x->getDim();
-
-    int optLabel = -1;
-    for (int i = 0; i < nDim; ++i) {
-        if (optLabel < 0 || x->val()[i] >  x->val()[optLabel])
-            optLabel = i;
-    }
-
-    dtype prob = 0.0;
-    dtype sum = 0.0;
-    NRVec<dtype> scores(nDim);
-    dtype maxScore = x->val()[optLabel];
-    for (int i = 0; i < nDim; ++i) {
-        scores[i] = exp(x->val()[i] - maxScore);
-        sum += scores[i];
-    }
-    prob = scores[optLabel] / sum;
-    y = optLabel;
-    return prob;
-}
-#endif
-
 dtype cost(PNode x, const vector<dtype> &answer, int batchsize = 1) {
     int nDim = x->getDim();
     int labelsize = answer.size();

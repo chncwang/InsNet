@@ -722,6 +722,12 @@ public:
 
         for (int i = 0; i < batch.size(); ++i) {
             MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));
+            if (max_indexes.at(i) > 100000 || max_indexes.at(i) < 0) {
+                cerr << "illegal max index returned " << max_indexes.at(i) << endl;
+                node->getInput()->getVal().print();
+                node->getVal().print();
+                abort();
+            }
             node->max_i_ = max_indexes.at(i);
         }
 #if TEST_CUDA

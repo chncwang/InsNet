@@ -140,6 +140,12 @@ public:
 //            cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl << endl;
 
             cur_exec->forwardFully();
+            if (eager_) {
+                for (Node *node : cur_exec->batch) {
+                    node->getVal().checkIsNumber();
+                }
+            }
+
             profiler.BeginEvent("computation plan");
             execs.push_back(cur_exec);
 

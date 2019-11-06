@@ -132,6 +132,15 @@ std::vector<dtype> n3ldg_cpu::Tensor1D::toCpu() const {
     return result;
 }
 
+void n3ldg_cpu::Tensor1D::checkIsNumber() const {
+    for (int i = 0; i < dim; ++i) {
+        if (v[i] != v[i]) {
+            std::cerr << "checkIsNumber - nan detected" << std::endl;
+            abort();
+        }
+    }
+}
+
 n3ldg_cpu::Tensor2D::Tensor2D() {
     col = row = 0;
     size = 0;
