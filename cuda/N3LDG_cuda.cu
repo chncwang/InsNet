@@ -1406,7 +1406,7 @@ __global__ void KernelAddLtyToParamBiasAndAddLxToInputLossesForUniBackward(
         int count,
         int out_dim,
         int in_dim,
-        dtype *block_sums,
+        volatile dtype *block_sums,
         int *global_block_count,
         bool use_b) {
     __shared__ volatile dtype shared_arr[TPB];
@@ -1480,7 +1480,7 @@ __global__ void KernelAddLtyToParamBiasAndAddLxToInputLossesForBiBackward(
         int in_dim1,
         int in_dim2,
         bool use_b,
-        dtype *block_sums,
+        volatile dtype *block_sums,
         int *global_block_count) {
     __shared__ volatile dtype shared_arr[TPB];
 
@@ -1927,7 +1927,7 @@ __global__ void KernelPoolForward(PoolingEnum pooling, dtype **ins,
             in_count_i][dim_i];
     } else {
         pool_shared_arr[threadIdx.x] = pooling == PoolingEnum::MAX ?
-            -INFINITY : INFINITY;
+            -1e10 : 1e10;
     }
     shared_indexers[threadIdx.x] = threadIdx.x;
     __syncthreads();
@@ -2630,7 +2630,7 @@ __global__ void KernelDivDenominatorBackward(const dtype *const *losses,
         const dtype *const *denominator_vals,
         int count,
         int dim,
-        dtype *block_sums,
+        volatile dtype *block_sums,
         int *block_counters,
         dtype *const *denominator_losses) {
     __shared__ volatile dtype shared_sum[TPB];
@@ -3062,7 +3062,7 @@ __global__ void KernelSoftMaxLoss(const dtype **vals, dtype **losses,
     if (count_i == 0 && dim_i == 0) {
         *correct_count = 0;
     }
-    shared_val[dim_i] = dim_i < dim ? vals[count_i][dim_i] : -INFINITY;
+    shared_val[dim_i] = dim_i < dim ? vals[count_i][dim_i] : -1e10;
     max_indexes[dim_i] = dim_i;
     __syncthreads();
 
@@ -3222,8 +3222,8 @@ dtype CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, 
     return result.v / batchsize;
 }
 
-__global__ void KernelMax(const dtype *const *v, int count, int dim, dtype *block_maxes,
-        int *block_max_is,
+__global__ void KernelMax(const dtype *const *v, int count, int dim, volatile dtype *block_maxes,
+        volatile int *block_max_is,
         int *block_counters,
         int *max_indexes,
         dtype *max_vals) {
@@ -3239,7 +3239,7 @@ __global__ void KernelMax(const dtype *const *v, int count, int dim, dtype *bloc
 
     int count_i = blockIdx.x;
     int offset = blockIdx.y * blockDim.x + threadIdx.x;
-    shared_max[threadIdx.x] = offset < dim ? v[count_i][offset] : -INFINITY;
+    shared_max[threadIdx.x] = offset < dim ? v[count_i][offset] : -1e10;
     shared_max_i[threadIdx.x] = offset;
     __syncthreads();
 
@@ -3262,7 +3262,7 @@ __global__ void KernelMax(const dtype *const *v, int count, int dim, dtype *bloc
     __syncthreads();
 
     if (is_last_block) {
-        dtype max = -INFINITY;
+        dtype max = -1e10;
         int max_i = 100000;
         for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
             int offset = blockIdx.x * gridDim.y + i;
@@ -3295,7 +3295,7 @@ __global__ void KernelSingleMax(const dtype *const *v, int count, int dim,
         int *max_indexes,
         dtype *max_vals) {
     for (int count_i = 0; count_i < count; ++count_i) {
-        dtype max_val = -INFINITY;
+        dtype max_val = -1e10;
         int max_i;
         for (int dim_i = 0; dim_i < dim; ++ dim_i) {
             if (v[count_i][dim_i] > max_val) {
@@ -3322,7 +3322,6 @@ void Max(const dtype *const *v, int count, int dim, int *max_indexes, dtype *max
 
     KernelMax<<<block_dim, thread_count>>>(v, count, dim, block_maxes.value, block_max_is.value,
             block_counters.value, max_indexes, max_vals);
-    cudaPrintfDisplay(stdout, true);
     CheckCudaError();
 #if TEST_CUDA
     NumberArray max_val_arr;
@@ -3429,7 +3428,7 @@ void ExpBackward(const vector<const dtype*> &losses, const vector<const dtype*> 
     CheckCudaError();
 }
 
-__global__ void KernelSum(const dtype *const *v, int count, int dim, dtype *block_sums,
+__global__ void KernelSum(const dtype *const *v, int count, int dim, volatile dtype *block_sums,
         int *block_counters,
         dtype *sum_vals) {
     __shared__ volatile dtype shared_sum[TPB];
@@ -3584,8 +3583,8 @@ std::pair<dtype, std::vector<int>> SoftMaxLoss(const std::vector<const dtype *> 
 }
 
 __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim,
-        dtype *block_maxes,
-        int *block_max_is,
+        volatile dtype *block_maxes,
+        volatile int *block_max_is,
         int *block_counters,
         int *max_indexes,
         dtype **max_vals) {
@@ -3601,7 +3600,7 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
 
     int count_i = blockIdx.x;
     int offset = blockIdx.y * blockDim.x + threadIdx.x;
-    shared_max[threadIdx.x] = offset < dim ? v[count_i][offset] : -INFINITY;
+    shared_max[threadIdx.x] = offset < dim ? v[count_i][offset] : -1e10;
     shared_max_i[threadIdx.x] = offset;
     __syncthreads();
 
@@ -3613,8 +3612,13 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
         __syncthreads();
     }
 
-    int block_maxes_offset = blockIdx.x * gridDim.y + blockIdx.y;
     if (threadIdx.x == 0) {
+        int block_maxes_offset = blockIdx.x * gridDim.y + blockIdx.y;
+        int max_ii = shared_max_i[0];
+        if (max_ii < 0 || max_ii >= dim) {
+            printf("threadIdx.x == 0 after first reduce max_ii:%d v:%f\n", max_ii, shared_max[0]);
+            assert(false);
+        }
         block_maxes[block_maxes_offset] = shared_max[0];
         block_max_is[block_maxes_offset] = shared_max_i[0];
 //        printf("threadIdx.x == 0 block_maxes[offset]:%f block_max_is[offset]:%d\n",
@@ -3626,12 +3630,16 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
     __syncthreads();
 
     if (is_last_block) {
-        dtype max = -INFINITY;
+        dtype max = -1e10;
         int max_i = 100000;
         for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
             int offset = blockIdx.x * gridDim.y + i;
-//            printf("is_last_block block_maxes[offset]:%f block_max_is[offset]:%d\n",
-//                    block_maxes[offset], block_max_is[offset]);
+            int max_ii = block_max_is[offset];
+            if (max_ii < 0 || max_ii >= dim) {
+                printf("offset:%d is_last_block block_maxes[offset]:%f block_max_is[offset]:%d\n",
+                        offset, block_maxes[offset], block_max_is[offset]);
+                assert(false);
+            }
             if (block_maxes[offset] > max) {
                 max = block_maxes[offset];
                 max_i = block_max_is[offset];
@@ -3654,8 +3662,12 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
         if (threadIdx.x == 0) {
             max_vals[count_i][0] = shared_max[0];
             max_indexes[count_i] = shared_max_i[0];
-//            printf("max_i:%d count_i:%d max_val:%f\n", max_indexes[count_i], count_i,
-//                    max_vals[count_i][0]);
+            int max_ii = max_indexes[count_i];
+            if (max_ii < 0 || max_ii >= dim) {
+                printf("threadIdx.x == 0 max_i:%d count_i:%d max_val:%f\n", max_indexes[count_i],
+                        count_i, max_vals[count_i][0]);
+                assert(false);
+            }
         }
     }
 }
@@ -3665,8 +3677,6 @@ void MaxScalarForward(const vector<const dtype*> &inputs, int count, int dim,
         vector<int> &max_indexes) {
     int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
     int block_y_count = (dim - 1 + thread_count) / thread_count;
-    cout << boost::format("count:%1% block_y_count:%2% thread:%3% dim:%4%") % count % block_y_count %
-        thread_count % dim << endl;
     dim3 block_dim(count, block_y_count, 1);
 
     NumberArray block_maxes;
@@ -3723,7 +3733,7 @@ void MaxScalarBackward(const vector<const dtype *> &losses, const vector<int> &i
 }
 
 __global__ void KernelVectorSumForward(const dtype *const *v, int count, int dim,
-        dtype *block_sums,
+        volatile dtype *block_sums,
         int *block_counters,
         dtype **results) {
     __shared__ volatile dtype shared_sum[TPB];
@@ -3849,7 +3859,7 @@ void ScalarToVectorForward(const vector<const dtype*> &inputs, int count, int di
 }
 
 __global__ void KernelScalarToVectorBackward(const dtype *const *losses, int count, int dim,
-        dtype *block_sums,
+        volatile dtype *block_sums,
         int *block_counters,
         dtype *const *input_losses) {
     __shared__ volatile dtype shared_sum[TPB];
