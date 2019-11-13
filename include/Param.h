@@ -25,7 +25,6 @@ public:
 
     Param(const string &name, bool is_bias = false) : BaseParam(name, is_bias) {}
 
-    // allow sparse and dense parameters have different parameter initialization methods
     void init(int outDim, int inDim) override {
 #if USE_GPU
         val.initOnMemoryAndDevice(outDim, inDim);
@@ -45,6 +44,7 @@ public:
         }
         iter = 0;
 #if USE_GPU
+        val.copyFromHostToDevice();
         n3ldg_cuda::Memset(grad.value, outDim * inDim, 0.0f);
         n3ldg_cuda::Memset(aux_square.value, outDim * inDim, 0.0f);
         n3ldg_cuda::Memset(aux_mean.value, outDim * inDim, 0.0f);
