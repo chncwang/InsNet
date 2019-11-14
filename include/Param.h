@@ -26,6 +26,10 @@ public:
     Param(const string &name, bool is_bias = false) : BaseParam(name, is_bias) {}
 
     void init(int outDim, int inDim) override {
+        init(outDim, inDim, nullptr);
+    }
+
+    void init(int outDim, int inDim, const std::function<float(int, int)> *cal_bound) {
 #if USE_GPU
         val.initOnMemoryAndDevice(outDim, inDim);
         aux_square.initOnMemoryAndDevice(outDim, inDim);
@@ -39,12 +43,12 @@ public:
         if (isBias()) {
             val.assignAll(0.0f);
         } else {
-            dtype bound = sqrt(6.0 / (outDim + inDim + 1));
+            dtype bound = cal_bound == nullptr ? sqrt(6.0 / (outDim + inDim + 1)) :
+                (*cal_bound)(outDim, inDim);
             val.random(bound);
         }
         iter = 0;
 #if USE_GPU
-        val.copyFromHostToDevice();
         n3ldg_cuda::Memset(grad.value, outDim * inDim, 0.0f);
         n3ldg_cuda::Memset(aux_square.value, outDim * inDim, 0.0f);
         n3ldg_cuda::Memset(aux_mean.value, outDim * inDim, 0.0f);

@@ -32,8 +32,9 @@ public:
 
     UniParams(const string &name) : W(name + "-W"), b(name + "-b", true) {}
 
-    void init(int nOSize, int nISize, bool useB = true) {
-        W.init(nOSize, nISize);
+    void init(int nOSize, int nISize, bool useB = true,
+            const std::function<float(int, int)> *bound = nullptr) {
+        W.init(nOSize, nISize, bound);
 
         bUseB = useB;
         if (bUseB) {

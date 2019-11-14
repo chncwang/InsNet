@@ -261,6 +261,16 @@ protected:
     }
 };
 
+namespace n3ldg_plus {
+
+Node *sigmoid(Graph &graph, Node &input) {
+    SigmoidNode *result = new SigmoidNode;
+    result->init(input.getDim());
+    result->forward(graph, input);
+    return result;
+}
+
+}
 
 class SigmoidExecutor :public Executor {
   public:
@@ -349,10 +359,10 @@ class ReluNode :public Node {
         in = nullptr;
     }
 
-    void forward(Graph *cg, Node* x) {
-        in = x;
+    void forward(Graph &cg, Node& x) {
+        in = &x;
         in->addParent(this);
-        cg->addNode(this);
+        cg.addNode(this);
     }
 
   public:
@@ -373,6 +383,18 @@ class ReluNode :public Node {
         return result;
     }
 };
+
+namespace n3ldg_plus {
+
+Node *relu(Graph &graph, Node &input) {
+    ReluNode *result = new ReluNode;
+    result->init(input.getDim());
+    result->forward(graph, input);
+    return result;
+}
+
+}
+
 
 class ReluExecutor :public Executor {};
 

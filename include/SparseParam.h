@@ -71,7 +71,6 @@ public:
 #if USE_GPU
         dIndexers.init(indexers.c_buf(), indexers.size());
         dIters.init(last_update.c_buf(), last_update.size());
-        val.copyFromHostToDevice();
         n3ldg_cuda::Memset(grad.value, grad.size, 0.0f);
         n3ldg_cuda::Memset(aux_square.value, inDim * outDim, 0.0f);
         n3ldg_cuda::Memset(aux_mean.value, inDim * outDim, 0.0f);
