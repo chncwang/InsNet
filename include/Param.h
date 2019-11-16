@@ -22,6 +22,7 @@ public:
     Tensor2D aux_square;
     Tensor2D aux_mean;
     int iter;
+    bool is_fixed = false;
 
     Param(const string &name, bool is_bias = false) : BaseParam(name, is_bias) {}
 
@@ -89,6 +90,9 @@ public:
     }
 
     void updateAdagrad(dtype alpha, dtype reg, dtype eps) override {
+        if (is_fixed) {
+            return;
+        }
 #if USE_GPU
         n3ldg_cuda::UpdateAdagrad(val.value, grad.value, val.row, val.col,
                 aux_square.value, alpha, reg, eps);
@@ -106,6 +110,9 @@ public:
     }
 
     void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override {
+        if (is_fixed) {
+            return;
+        }
 #if USE_GPU
 #if TEST_CUDA
         n3ldg_cuda::Assert(val.verify("Param adam begin val"));
@@ -141,6 +148,9 @@ public:
     }
 
     void updateAdamW(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override {
+        if (is_fixed) {
+            return;
+        }
 #if USE_GPU
 #if TEST_CUDA
         n3ldg_cuda::Assert(val.verify("Param adam begin val"));
@@ -223,6 +233,7 @@ public:
         json["aux_square"] = aux_square.toJson();
         json["aux_mean"] = aux_mean.toJson();
         json["iter"] = iter;
+        json["is_fixed"] = is_fixed;
         return json;
     }
 
@@ -231,6 +242,7 @@ public:
         aux_square.fromJson(json["aux_square"]);
         aux_mean.fromJson(json["aux_mean"]);
         iter = json["iter"].asInt();
+        is_fixed = json["is_fixed"].asBool();
     }
 
     void value(const int& featId, Tensor1D& out) {

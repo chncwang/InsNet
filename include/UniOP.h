@@ -107,7 +107,7 @@ public:
 
     void forward(Graph &graph, Node &x) {
         if (x.getDim() != param->W.inDim()) {
-            cerr << boost::format("input dim:%1% node in dim:%2%") % x.getDim() % param->W.inDim()
+            cerr << boost::format("input dim:%1% preset in dim:%2%") % x.getDim() % param->W.inDim()
                 << endl;
             abort();
         }

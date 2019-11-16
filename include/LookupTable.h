@@ -313,6 +313,18 @@ public:
     }
 };
 
+namespace n3ldg_plus {
+
+template <typename ParamType>
+Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, int dim, const string &word) {
+    LookupNode<ParamType>* input_lookup(new LookupNode<ParamType>);
+    input_lookup->init(dim);
+    input_lookup->setParam(lookup);
+    input_lookup->forward(graph, word);
+    return input_lookup;
+}
+
+}
 
 template<typename ParamType>
 #if USE_GPU
