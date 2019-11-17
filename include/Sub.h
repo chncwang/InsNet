@@ -39,6 +39,23 @@ private:
     friend class SubExecutor;
 };
 
+namespace n3ldg_plus {
+
+Node *sub(Graph &graph, Node &minuend, Node &subtrahend) {
+    if (minuend.getDim() != subtrahend.getDim()) {
+        cerr << boost::format("sub - minuend dim is %1%, but subtrahend is %2%") % minuend.getDim()
+            % subtrahend.getDim() << endl;
+        abort();
+    }
+
+    SubNode *result = new SubNode;
+    result->init(minuend.getDim());
+    result->forward(graph, minuend, subtrahend);
+    return result;
+}
+
+}
+
 #if USE_GPU
 class SubExecutor : public Executor {
     void forward() override {

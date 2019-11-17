@@ -1913,6 +1913,30 @@ void LookupBackward(const std::vector<int> &xids, int unknown_id,
     CheckCudaError();
 }
 
+__global__ void KernelParamRowForward(const dtype *param, int row_index, int param_row_count,
+        int count,
+        int dim,
+        dtype *const *vals) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < dim * count; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        int param_offset = dim_i * param_row_count + row_index;
+        vals[count_i][dim_i] = param[param_offset];
+    }
+}
+
+void ParamRowForward(const dtype *param, int row_index, int param_row_count, int count, int dim,
+        vector<dtype*> &vals) {
+    NumberPointerArray val_arr;
+    val_arr.init((dtype**)vals.data(), vals.size());
+    int block_count = DefaultBlockCount(count * dim);
+    KernelParamRowForward<<<block_count, TPB>>>(param, row_index, param_row_count, count, dim,
+            val_arr.value);
+    CheckCudaError();
+}
+
 __global__ void KernelPoolForward(PoolingEnum pooling, dtype **ins,
         int *in_counts, int max_in_count, dtype **outs, int count, int dim,
         int* hit_inputs) {

@@ -319,6 +319,8 @@ void LookupBackward(const std::vector<int> &xids, int unknown_id,
         int count,
         int dim,
         dtype *grad);
+void ParamRowForward(const dtype *param, int row_index, int param_row_count, int count, int dim,
+        vector<dtype*> &vals);
 void PoolForward(PoolingEnum pooling, const std::vector<dtype*> &in_vals,
         std::vector<dtype*> &vals,
         int count,

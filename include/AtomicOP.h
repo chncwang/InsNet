@@ -1,24 +1,6 @@
 #ifndef ATOMICIOP_H_
 #define ATOMICIOP_H_
 
-/*
-*  AtomicOP.h:
-*  a list of atomic operations
-*
-*  Created on: June 11, 2017
-*      Author: yue_zhang(suda), mszhang
-*/
-
-/*
-ActivateNode
-TanhNode
-SigmoidNode
-ReluNode
-IndexNode
-PSubNode
-PDotNode
-*/
-
 #include "Param.h"
 #include "MyLib.h"
 #include "Node.h"
