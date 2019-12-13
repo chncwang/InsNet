@@ -3158,7 +3158,7 @@ __global__ void KernelCrossEntropyLoss(const dtype *const *vals, const int *answ
     int step = DeviceDefaultStep();
     for (int i = index; i < count; i += step) {
         int answer = answers[i];
-        losses[i][answer] = - 1 / vals[i][answer] / batchsize;
+        DeviceAtomicAdd(losses[i] + answer, - 1 / vals[i][answer] / batchsize);
     }
 }
 

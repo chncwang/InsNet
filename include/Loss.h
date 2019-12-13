@@ -7,10 +7,10 @@ dtype cpuCrossEntropyLoss(vector<Node *> &nodes, const vector<int> &answers, int
     dtype loss = 0;
     for (int i = 0; i < nodes.size(); ++i) {
         int answer = answers.at(i);
-        nodes.at(i)->loss()[answer] = - 1 / nodes.at(i)->getVal()[answer] / batchsize;
+        nodes.at(i)->loss()[answer] -= 1 / nodes.at(i)->getVal()[answer] / batchsize;
         loss -= log(nodes.at(i)->getVal()[answer]);
     }
-    return loss / batchsize;
+    return loss;
 }
 
 dtype crossEntropyLoss(vector<Node *> &nodes, const vector<int> &answers, int batchsize) {
