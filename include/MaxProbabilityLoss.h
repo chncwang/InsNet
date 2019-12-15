@@ -10,8 +10,8 @@
 
 std::pair<dtype, std::vector<int>> maxLogProbabilityLoss(std::vector<Node *> &nodes,
         const std::vector<int> &answers,
-        int batchsize) {
-    dtype loss = crossEntropyLoss(nodes, answers, batchsize);
+        dtype factor) {
+    dtype loss = crossEntropyLoss(nodes, answers, factor);
     vector<int> predicted_ids = predict(nodes);
     return make_pair(loss, predicted_ids);
 }

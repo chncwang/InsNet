@@ -3,6 +3,7 @@
 
 #include "Def.h"
 
+#include "Memory_cuda.h"
 #include <iostream>
 #include <cassert>
 #include <cuda.h>
@@ -15,79 +16,77 @@ using std::vector;
 
 namespace n3ldg_cuda {
 
-struct NumberPointerArray {
-    dtype **value = nullptr;
+template<typename T>
+struct GPUArray {
+    T *value = nullptr;
     int len = 0;
 
-    NumberPointerArray() = default;
-    NumberPointerArray(NumberPointerArray&&) {
+    GPUArray() = default;
+    GPUArray(GPUArray<T>&&) {
         abort();
     }
-    NumberPointerArray(const NumberPointerArray &) {
+    GPUArray(const GPUArray &) {
         abort();
     }
-    void init(dtype **host_arr, int len);
-    ~NumberPointerArray();
-};
 
-struct PageLockedNumberPointerArray {
-    dtype **value = nullptr;
-    int len = 0;
-
-    PageLockedNumberPointerArray() = default;
-    PageLockedNumberPointerArray(PageLockedNumberPointerArray&&) {
-        abort();
-    }
-    PageLockedNumberPointerArray(const PageLockedNumberPointerArray &) {
-        abort();
-    }
-    void init(dtype **host_arr, int len);
-    ~PageLockedNumberPointerArray();
-
-    dtype **GetDevicePointer() const;
-};
-
-struct NumberPointerPointerArray {
-    dtype ***value = nullptr;
-    int len = 0;
-
-    NumberPointerPointerArray() = default;
-    NumberPointerPointerArray(NumberPointerPointerArray&&) {
-        abort();
-    }
-    NumberPointerPointerArray(const NumberPointerPointerArray &) {
-        abort();
-    }
-    void init(dtype ***host_arr, int len);
-    ~NumberPointerPointerArray();
-};
-
-struct NumberArray {
-    dtype *value = nullptr;
-    int len = 0;
-
-    NumberArray() = default;
-    NumberArray(NumberArray&&) {
-        abort();
-    }
-    NumberArray(const NumberArray &) = delete;
-    void init(dtype *host_arr, int len);
+    void init(const T *host_arr, int len);
     void init(int len);
-    ~NumberArray();
+    ~GPUArray();
+
+    vector<T> toCpu() const;
 };
 
-struct IntPointerArray {
-    int **value = nullptr;
-    int len = 0;
+cudaError_t MyCudaMemcpy(void *dest, const void *src, size_t count, cudaMemcpyKind kind);
+void CallCuda(cudaError_t status);
 
-    IntPointerArray() = default;
-    IntPointerArray(IntPointerArray&&) {
+template <typename T>
+void GPUArray<T>::init(const T *host_arr, int len) {
+    if (value != nullptr) {
+        CallCuda(MemoryPool::Ins().Free(value));
+        value = nullptr;
+    }
+    CallCuda(MemoryPool::Ins().Malloc((void**)&value, len * sizeof(T)));
+    CallCuda(MyCudaMemcpy(value, host_arr, len * sizeof(T), cudaMemcpyHostToDevice));
+    this->len = len;
+}
+
+template <typename T>
+void GPUArray<T>::init(int len) {
+    if (value != nullptr) {
+        CallCuda(MemoryPool::Ins().Free(value));
+        value = nullptr;
+    }
+    CallCuda(MemoryPool::Ins().Malloc((void**)&value, len * sizeof(T)));
+    this->len = len;
+}
+
+template <typename T>
+vector<T> GPUArray<T>::toCpu() const {
+    vector<T> result;
+    result.resize(len);
+    if (value == nullptr) {
+        cerr << "GPUArray::toCpu - value is nullptr" << endl;
         abort();
     }
-    IntPointerArray(const IntPointerArray &) = delete;
-    void init(int **host_arr, int len);
-    ~IntPointerArray();
-};
+    CallCuda(MyCudaMemcpy(result.data(), value, sizeof(T) * len, cudaMemcpyDeviceToHost));
+    return result;
+}
+
+template <typename T>
+GPUArray<T>::~GPUArray() {
+    if (value != nullptr) {
+        CallCuda(MemoryPool::Ins().Free(value));
+        value = nullptr;
+    }
+}
+
+typedef GPUArray<dtype> NumberArray;
+typedef GPUArray<bool> BoolArray;
+typedef GPUArray<const bool *> BoolPointerArray;
+typedef GPUArray<const dtype *> NumberPointerArray;
+typedef GPUArray<const dtype *const *> NumberPointerPointerArray;
+typedef GPUArray<int> IntArray;
+typedef GPUArray<const int *> IntPointerArray;
 
 struct DeviceNumber {
     dtype *value = nullptr;
@@ -124,58 +123,6 @@ struct DeviceInt {
     ~DeviceInt();
 };
 
-struct IntArray {
-    int *value = nullptr;
-    int len = 0;
-
-    IntArray() = default;
-    IntArray(IntArray&&) {
-        abort();
-    }
-    IntArray(const IntArray &) {
-        abort();
-    }
-    void init(int *host_arr, int len);
-    void init(int len);
-
-    vector<int> toCpu() const;
-    ~IntArray();
-};
-
-struct PageLockedIntArray {
-    int *value = nullptr;
-    int len = 0;
-
-    PageLockedIntArray() = default;
-    PageLockedIntArray(PageLockedIntArray&&) {
-        abort();
-    }
-    PageLockedIntArray(const PageLockedIntArray &) {
-        abort();
-    }
-    void init(int *host_arr, int len);
-    void init(int len);
-    ~PageLockedIntArray();
-};
-
-struct BoolArray {
-    bool *value = nullptr;
-    bool *v = nullptr;
-    int len = 0;
-
-    BoolArray() = default;
-    BoolArray(BoolArray&&) {
-        abort();
-    }
-    BoolArray(const BoolArray &) {
-        abort();
-    }
-    void init(bool *host_arr, int len);
-    void copyFromHost(bool *host_arr);
-    void copyToHost(bool *host_arr);
-    ~BoolArray();
-};
-
 bool Verify(bool *host, bool *device, int len, const char* message);
 bool Verify(int *host, int *device, int len, const char* message);
 
@@ -192,7 +139,6 @@ void PrintInts(const int* p, int len);
 void InitCuda(int device_id = 0, float memory_in_gb = 0.0f);
 void EndCuda();
 
-cudaError_t MyCudaMemcpy(void *dest, const void *src, size_t count, cudaMemcpyKind kind);
 void CopyFromMultiVectorsToOneVector(const std::vector<dtype*> &src, dtype *dest, int count,
         int len);
 void CopyFromOneVectorToMultiVals(const dtype *src, std::vector<dtype*> &vals,
@@ -343,30 +289,6 @@ void SumPoolBackward(PoolingEnum pooling, const std::vector<dtype*> &losses,
         int count,
         int dim,
         std::vector<dtype*> &in_losses);
-void ScalarAttentionForward(const std::vector<dtype*> &ins,
-        const std::vector<dtype*> &unnormeds,
-        const std::vector<int> &in_counts, int count, int dim,
-        std::vector<dtype*> &masks, std::vector<dtype*> &vals);
-void ScalarAttentionBackward(const std::vector<dtype*> &losses,
-        const std::vector<dtype*> &in_vals,
-        const std::vector<dtype*> &masks,
-        const std::vector<int> &in_counts,
-        int count,
-        int dim,
-        std::vector<dtype*> &in_losses,
-        std::vector<dtype*> &unnormed_losses);
-void VectorAttentionForward(const std::vector<dtype*> &ins,
-        const std::vector<dtype*> &unnormeds,
-        const std::vector<int> &in_counts, int count, int dim,
-        std::vector<dtype*> &masks, std::vector<dtype*> &vals);
-void VectorAttentionBackward(const std::vector<dtype*> &losses,
-        const std::vector<dtype*> &in_vals,
-        const std::vector<dtype*> &masks,
-        const std::vector<int> &in_counts,
-        int count,
-        int dim,
-        std::vector<dtype*> &in_losses,
-        std::vector<dtype*> &unnormed_losses);
 void PMultiForward(const std::vector<dtype*> &ins1,
         const std::vector<dtype*> &ins2,
         int count,
@@ -433,8 +355,13 @@ void SoftMaxLoss(const std::vector<dtype*> &vals, std::vector<dtype*> &losses,
         int count,
         int dim);
 dtype CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, int count,
-        int batchsize,
+        dtype batchsize,
         vector<dtype *> &losses);
+dtype MultiCrossEntropyLoss(const vector<dtype*> &vals, const vector<vector<int>> &answers,
+        int count,
+        int dim,
+        dtype factor,
+        const vector<dtype*> &losses);
 void MaxScalarForward(const std::vector<const dtype*> &inputs, int count, int dim,
         std::vector<dtype*> &results,
         std::vector<int> &max_indexes);
