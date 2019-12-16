@@ -26,7 +26,7 @@ public:
 
     Param(const string &name, bool is_bias = false) : BaseParam(name, is_bias) {}
 
-    void init(int outDim, int inDim) override {
+    virtual void init(int outDim, int inDim) override {
         init(outDim, inDim, nullptr);
     }
 
@@ -196,6 +196,7 @@ public:
 #if USE_GPU && !TEST_CUDA
         return n3ldg_cuda::SquareSum(grad.value, grad.size);
 #elif USE_GPU && TEST_CUDA
+        cout << "squareGradNorm - param name:" << this->getParamName() << endl;
         n3ldg_cuda::Assert(grad.verify("squareGradNorm grad"));
         dtype cuda = n3ldg_cuda::SquareSum(grad.value, grad.size);
         dtype sumNorm = 0.0;

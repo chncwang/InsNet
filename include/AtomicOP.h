@@ -63,19 +63,19 @@ class TanhNode : public UniInputNode {
 public:
     TanhNode() : UniInputNode("tanh") {}
 
-    void compute() {
+    void compute() override {
         val().vec() = getInput()->val().vec().unaryExpr(ptr_fun(ftanh));
     }
 
-    void backward() {
+    void backward() override {
         getInput()->loss().vec() += loss().vec() * getInput()->val().vec().binaryExpr(val().vec(),
                 ptr_fun(dtanh));
     }
 
-    PExecutor generate();
+    PExecutor generate() override;
 
 protected:
-    virtual bool isDimLegal(const Node &input) const {
+    virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
     }
 };
@@ -743,7 +743,7 @@ public:
             n3ldg_cuda::Assert(max_scalar->getVal().verify("max scalar forward"));
             ++i;
         }
-        cout << "max scalar tested:" << endl;
+        cout << "max scalar forward tested:" << endl;
 #endif
     }
 
@@ -760,7 +760,7 @@ public:
         n3ldg_cuda::MaxScalarBackward(losses, max_indexes, batch.size(), input_losses);
 #if TEST_CUDA
         UniInputExecutor::testBackward();
-        cout << "tested" << endl;
+        cout << "max scalar backward tested" << endl;
 #endif
     }
 

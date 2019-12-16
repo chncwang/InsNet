@@ -3194,12 +3194,14 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
         int max_ii = shared_max_i[0];
         if (max_ii < 0 || max_ii >= dim) {
             printf("threadIdx.x == 0 after first reduce max_ii:%d v:%f\n", max_ii, shared_max[0]);
+            for (int i = 0; i < TPB; ++i) {
+                printf("shared_max[%d]:%f shared_max_i[%d]:%d\n", i, shared_max[i], i,
+                        shared_max_i[i]);
+            }
             assert(false);
         }
         block_maxes[block_maxes_offset] = shared_max[0];
         block_max_is[block_maxes_offset] = shared_max_i[0];
-//        printf("threadIdx.x == 0 block_maxes[offset]:%f block_max_is[offset]:%d\n",
-//                block_maxes[offset], block_max_is[offset]);
         if (atomicAdd(block_counters + blockIdx.x, 1) == gridDim.y - 1) {
             is_last_block = true;
         }
@@ -3503,6 +3505,51 @@ void ScalarToVectorBackward(const vector<const dtype*> &losses, int count, int d
             count, dim, block_sums.value, block_counters.value,
             (dtype *const *)input_loss_arr.value);
     CheckCudaError();
+}
+
+__global__ void KernelBiasForward(const dtype *const *in_vals, const dtype *bias, int count,
+        int dim,
+        dtype *const *vals) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * dim; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        vals[count_i][dim_i] = in_vals[count_i][dim_i] + bias[dim_i];
+    }
+}
+
+void BiasForward(const vector<dtype*> &in_vals, const dtype *bias, int count, int dim,
+        const vector<dtype *> &vals) {
+    int block_count = DefaultBlockCount(count * dim);
+    NumberPointerArray in_arr, val_arr;
+    in_arr.init(in_vals.data(), in_vals.size());
+    val_arr.init(vals.data(), vals.size());
+    KernelBiasForward<<<block_count, TPB>>>(in_arr.value, bias, count, dim,
+            (dtype *const *)val_arr.value);
+}
+
+__global__ void KernelBiasBackward(const dtype *const *losses, int count, int dim,
+        dtype *bias_losses,
+        dtype *const *in_losses) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * dim; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        DeviceAtomicAdd(bias_losses + dim_i, losses[count_i][dim_i]);
+        DeviceAtomicAdd(in_losses[count_i] + dim_i, losses[count_i][dim_i]);
+    }
+}
+
+void BiasBackward(const vector<dtype *> &losses, int count, int dim, dtype *bias_loss,
+        const vector<dtype *> input_losses) {
+    int block_count = DefaultBlockCount(count * dim);
+    NumberPointerArray loss_arr, input_loss_arr;
+    loss_arr.init(losses.data(), losses.size());
+    input_loss_arr.init(input_losses.data(), input_losses.size());
+    KernelBiasBackward<<<block_count, TPB>>>(loss_arr.value, count, dim, bias_loss,
+            (dtype *const *)input_loss_arr.value);
 }
 
 __global__ void KernelSquareSum(const dtype *v, int len, dtype *global_sum,

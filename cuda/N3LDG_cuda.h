@@ -376,6 +376,10 @@ void ScalarToVectorForward(const std::vector<const dtype*> &inputs, int count, i
         std::vector<dtype*> &results);
 void ScalarToVectorBackward(const std::vector<const dtype*> &losses, int count, int dim,
         std::vector<dtype*> &input_losses);
+void BiasForward(const vector<dtype*> &in_vals, const dtype *bias, int count, int dim,
+        const vector<dtype *> &vals);
+void BiasBackward(const vector<dtype *> &losses, int count, int dim, dtype *bias_loss,
+        const vector<dtype *> input_losses);
 vector<int> Predict(const vector<dtype*> &vals, int count, int dim);
 int Predict(const dtype* val, int dim);
 void Max(const dtype *const *v, int count, int dim, int *max_indexes, dtype *max_vals);
