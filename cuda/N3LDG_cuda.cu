@@ -1219,7 +1219,7 @@ __global__ void KernelAddLtyToParamBiasAndAddLxToInputLossesForUniBackward(
         int out_dim,
         int in_dim,
         volatile dtype *block_sums,
-        volatile int *global_block_count,
+        int *global_block_count,
         bool use_b) {
     __shared__ volatile dtype shared_arr[TPB];
 
@@ -1293,7 +1293,7 @@ __global__ void KernelAddLtyToParamBiasAndAddLxToInputLossesForBiBackward(
         int in_dim2,
         bool use_b,
         volatile dtype *block_sums,
-        volatile int *global_block_count) {
+        int *global_block_count) {
     __shared__ volatile dtype shared_arr[TPB];
 
     int count_i = blockIdx.y * blockDim.x + threadIdx.x;
@@ -2031,7 +2031,7 @@ __global__ void KernelDivDenominatorBackward(const dtype *const *losses,
         int count,
         int dim,
         volatile dtype *block_sums,
-        volatile int *block_counters,
+        int *block_counters,
         dtype *const *denominator_losses) {
     __shared__ volatile dtype shared_sum[TPB];
     __shared__ volatile bool is_last_block;
@@ -2539,7 +2539,7 @@ __global__ void KernelCrossEntropyLoss(const dtype *const *vals, const int *answ
 __global__ void KernelCrossEntropgyLossValue(const dtype *const *vals, const int *answers,
         int count,
         volatile dtype *global_sum,
-        volatile int *block_counter,
+        int *block_counter,
         dtype *result) {
     __shared__ volatile dtype shared_sum[TPB];
     __shared__ volatile bool is_last_block;
@@ -2730,7 +2730,7 @@ dtype MultiCrossEntropyLoss(const vector<dtype*> &vals, const vector<vector<int>
 
 __global__ void KernelMax(const dtype *const *v, int count, int dim, volatile dtype *block_maxes,
         volatile int *block_max_is,
-        volatile int *block_counters,
+        int *block_counters,
         int *max_indexes,
         dtype *max_vals) {
     __shared__ volatile dtype shared_max[TPB];
@@ -2936,7 +2936,7 @@ void ExpBackward(const vector<const dtype*> &losses, const vector<const dtype*> 
 }
 
 __global__ void KernelSum(const dtype *const *v, int count, int dim, volatile dtype *block_sums,
-        volatile int *block_counters,
+        int *block_counters,
         dtype *sum_vals) {
     __shared__ volatile dtype shared_sum[TPB];
     __shared__ volatile bool is_last_block;
@@ -3095,7 +3095,7 @@ std::pair<dtype, std::vector<int>> SoftMaxLoss(const std::vector<const dtype *> 
 __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim,
         volatile dtype *block_maxes,
         volatile int *block_max_is,
-        volatile int *block_counters,
+        int *block_counters,
         int *max_indexes,
         dtype *const *max_vals) {
     __shared__ volatile dtype shared_max[TPB];
@@ -3237,7 +3237,7 @@ void MaxScalarBackward(const vector<const dtype *> &losses, const vector<int> &i
 
 __global__ void KernelVectorSumForward(const dtype *const *v, int count, int dim,
         volatile dtype *block_sums,
-        volatile int *block_counters,
+        int *block_counters,
         dtype *const *results) {
     __shared__ volatile dtype shared_sum[TPB];
     __shared__ volatile bool is_last_block;
@@ -3363,7 +3363,7 @@ void ScalarToVectorForward(const vector<const dtype*> &inputs, int count, int di
 
 __global__ void KernelScalarToVectorBackward(const dtype *const *losses, int count, int dim,
         volatile dtype *block_sums,
-        volatile int *block_counters,
+        int *block_counters,
         dtype *const *input_losses) {
     __shared__ volatile dtype shared_sum[TPB];
     __shared__ volatile bool is_last_block;
@@ -3486,7 +3486,7 @@ void BiasBackward(const vector<dtype *> &losses, int count, int dim, dtype *bias
 }
 
 __global__ void KernelSquareSum(const dtype *v, int len, volatile dtype *global_sum,
-        volatile int *block_counter, dtype *result) {
+        int *block_counter, dtype *result) {
     __shared__ volatile dtype shared_sum[TPB];
     __shared__ volatile bool is_last_block;
     int index = DeviceDefaultIndex();
@@ -3558,7 +3558,7 @@ __global__ void KernelSquareSum(const dtype *v, const bool *indexers,
         int count,
         int dim,
         volatile dtype *global_sum,
-        volatile int *block_counter,
+        int *block_counter,
         dtype *result) {
     __shared__ volatile dtype shared_sum[TPB];
     __shared__ volatile bool is_last_block;
