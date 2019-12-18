@@ -821,74 +821,6 @@ void CopyForUniNodeForward(const std::vector<dtype*> &xs, const dtype* b,
     CheckCudaError();
 }
 
-__global__ void KernelCopyForBiNodeForward(const dtype **x1s,
-        const dtype **x2s,
-        const dtype *b,
-        dtype *x1s_dest,
-        dtype *x2s_dest,
-        dtype *b_dest,
-        int count,
-        int x1_len,
-        int x2_len,
-        bool use_b,
-        int b_len) {
-    int index = DeviceDefaultIndex();
-    int step = DeviceDefaultStep();
-    int x1_total_len = count * x1_len;
-    int x2_total_len = count * x2_len;
-    int b_total_len = use_b ? count * b_len : 0;
-
-    int total_len = x1_total_len + x2_total_len + b_total_len;
-
-    for (int i = index; i < total_len; i += step) {
-        if (i < x2_total_len) {
-            int len_i = i % x2_len;
-            int count_i = i / x2_len;
-            x2s_dest[i] = x2s[count_i][len_i];
-        } else if (i >= x2_total_len && i < x1_total_len + x2_total_len) {
-            int len_i = (i - x2_total_len) % x1_len;
-            int count_i = (i - x2_total_len) / x1_len;
-            x1s_dest[i - x2_total_len] = x1s[count_i][len_i];
-        } else {
-            int b_i = (i - x1_total_len - x2_total_len);
-            int len_i = b_i % b_len;
-            b_dest[b_i] = b[len_i];
-        }
-    }
-}
-
-
-void CopyForBiNodeForward(const std::vector<dtype*>& x1s,
-        const std::vector<dtype *>& x2s,
-        const dtype *b,
-        dtype *x1s_dest,
-        dtype *x2s_dest,
-        dtype *b_dest,
-        int count,
-        int x1_len,
-        int x2_len,
-        bool use_b,
-        int b_len) {
-    int len = x1_len + x2_len + b_len;
-    int block_count = DefaultBlockCount(count * len);
-    NumberPointerArray x1_arr, x2_arr;
-    x1_arr.init((dtype**)x1s.data(), x1s.size());
-    x2_arr.init((dtype**)x2s.data(), x2s.size());
-    KernelCopyForBiNodeForward<<<block_count, TPB>>>(
-            (const dtype**)x1_arr.value,
-            (const dtype**)x2_arr.value,
-            b,
-            x1s_dest,
-            x2s_dest,
-            b_dest,
-            count,
-            x1_len,
-            x2_len,
-            use_b,
-            b_len);
-    CheckCudaError();
-}
-
 void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y, int row, int col,
         int count, bool useb, bool should_x_transpose,
         bool should_W_transpose) {
@@ -1287,7 +1219,7 @@ __global__ void KernelAddLtyToParamBiasAndAddLxToInputLossesForUniBackward(
         int out_dim,
         int in_dim,
         volatile dtype *block_sums,
-        int *global_block_count,
+        volatile int *global_block_count,
         bool use_b) {
     __shared__ volatile dtype shared_arr[TPB];
 
@@ -1361,7 +1293,7 @@ __global__ void KernelAddLtyToParamBiasAndAddLxToInputLossesForBiBackward(
         int in_dim2,
         bool use_b,
         volatile dtype *block_sums,
-        int *global_block_count) {
+        volatile int *global_block_count) {
     __shared__ volatile dtype shared_arr[TPB];
 
     int count_i = blockIdx.y * blockDim.x + threadIdx.x;
@@ -2099,7 +2031,7 @@ __global__ void KernelDivDenominatorBackward(const dtype *const *losses,
         int count,
         int dim,
         volatile dtype *block_sums,
-        int *block_counters,
+        volatile int *block_counters,
         dtype *const *denominator_losses) {
     __shared__ volatile dtype shared_sum[TPB];
     __shared__ volatile bool is_last_block;
@@ -2606,8 +2538,9 @@ __global__ void KernelCrossEntropyLoss(const dtype *const *vals, const int *answ
 
 __global__ void KernelCrossEntropgyLossValue(const dtype *const *vals, const int *answers,
         int count,
-        dtype *global_sum,
-        int *block_counter, dtype *result) {
+        volatile dtype *global_sum,
+        volatile int *block_counter,
+        dtype *result) {
     __shared__ volatile dtype shared_sum[TPB];
     __shared__ volatile bool is_last_block;
     int index = DeviceDefaultIndex();
@@ -2797,7 +2730,7 @@ dtype MultiCrossEntropyLoss(const vector<dtype*> &vals, const vector<vector<int>
 
 __global__ void KernelMax(const dtype *const *v, int count, int dim, volatile dtype *block_maxes,
         volatile int *block_max_is,
-        int *block_counters,
+        volatile int *block_counters,
         int *max_indexes,
         dtype *max_vals) {
     __shared__ volatile dtype shared_max[TPB];
@@ -3003,7 +2936,7 @@ void ExpBackward(const vector<const dtype*> &losses, const vector<const dtype*> 
 }
 
 __global__ void KernelSum(const dtype *const *v, int count, int dim, volatile dtype *block_sums,
-        int *block_counters,
+        volatile int *block_counters,
         dtype *sum_vals) {
     __shared__ volatile dtype shared_sum[TPB];
     __shared__ volatile bool is_last_block;
@@ -3162,7 +3095,7 @@ std::pair<dtype, std::vector<int>> SoftMaxLoss(const std::vector<const dtype *> 
 __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim,
         volatile dtype *block_maxes,
         volatile int *block_max_is,
-        int *block_counters,
+        volatile int *block_counters,
         int *max_indexes,
         dtype *const *max_vals) {
     __shared__ volatile dtype shared_max[TPB];
@@ -3304,7 +3237,7 @@ void MaxScalarBackward(const vector<const dtype *> &losses, const vector<int> &i
 
 __global__ void KernelVectorSumForward(const dtype *const *v, int count, int dim,
         volatile dtype *block_sums,
-        int *block_counters,
+        volatile int *block_counters,
         dtype *const *results) {
     __shared__ volatile dtype shared_sum[TPB];
     __shared__ volatile bool is_last_block;
@@ -3430,7 +3363,7 @@ void ScalarToVectorForward(const vector<const dtype*> &inputs, int count, int di
 
 __global__ void KernelScalarToVectorBackward(const dtype *const *losses, int count, int dim,
         volatile dtype *block_sums,
-        int *block_counters,
+        volatile int *block_counters,
         dtype *const *input_losses) {
     __shared__ volatile dtype shared_sum[TPB];
     __shared__ volatile bool is_last_block;
@@ -3552,8 +3485,8 @@ void BiasBackward(const vector<dtype *> &losses, int count, int dim, dtype *bias
             (dtype *const *)input_loss_arr.value);
 }
 
-__global__ void KernelSquareSum(const dtype *v, int len, dtype *global_sum,
-        int *block_counter, dtype *result) {
+__global__ void KernelSquareSum(const dtype *v, int len, volatile dtype *global_sum,
+        volatile int *block_counter, dtype *result) {
     __shared__ volatile dtype shared_sum[TPB];
     __shared__ volatile bool is_last_block;
     int index = DeviceDefaultIndex();
@@ -3624,8 +3557,8 @@ dtype SquareSum(const dtype *v, int len) {
 __global__ void KernelSquareSum(const dtype *v, const bool *indexers,
         int count,
         int dim,
-        dtype *global_sum,
-        int *block_counter,
+        volatile dtype *global_sum,
+        volatile int *block_counter,
         dtype *result) {
     __shared__ volatile dtype shared_sum[TPB];
     __shared__ volatile bool is_last_block;
