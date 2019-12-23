@@ -2728,6 +2728,102 @@ dtype MultiCrossEntropyLoss(const vector<dtype*> &vals, const vector<vector<int>
     return ce_loss_sum;
 }
 
+__global__ void KernelKLCrossEntropyLoss(const dtype *const *vals, const dtype *const *answers,
+        int count,
+        int dim,
+        dtype factor,
+        dtype *const *losses) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * dim; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        dtype val = vals[count_i][dim_i];
+        dtype grad = -answers[count_i][dim_i] / val * factor;
+        DeviceAtomicAdd(losses[count_i] + dim_i, grad);
+    }
+}
+
+__global__ void KernelKLCrossEntropyLossVector(const dtype *const *in_vals,
+        const dtype *const *answers,
+        int count,
+        int dim,
+        dtype *const *result) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * dim; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        dtype in_val = in_vals[count_i][dim_i];
+        dtype v = -answers[count_i][dim_i] * cuda_log(in_val);
+        result[count_i][dim_i] = v;
+    }
+}
+
+dtype KLCrossEntropyLoss(const vector<dtype*> &vals,
+        const vector<shared_ptr<vector<dtype>>> &answers,
+        int count,
+        int dim,
+        dtype factor,
+        const vector<dtype*> &losses) {
+    int block_count = DefaultBlockCount(count * dim);
+    NumberPointerArray val_arr, loss_arr;
+    val_arr.init((dtype**)vals.data(), count);
+    loss_arr.init((dtype**)losses.data(), count);
+
+    vector<shared_ptr<NumberArray>> answer_gpus;
+    vector<dtype *> answer_gpu_pointers;
+    for (auto &answer : answers) {
+        shared_ptr<NumberArray> answer_gpu(new NumberArray);
+        answer_gpu->init(answer->data(), answer->size());
+        answer_gpus.push_back(answer_gpu);
+        answer_gpu_pointers.push_back(answer_gpu->value);
+    }
+
+    NumberPointerArray answer_arr;
+    answer_arr.init((dtype**)answer_gpu_pointers.data(), count);
+    KernelKLCrossEntropyLoss<<<block_count, TPB>>>(val_arr.value, answer_arr.value, count, dim,
+            factor, (dtype *const *)loss_arr.value);
+    CheckCudaError();
+
+    vector<shared_ptr<NumberArray>> nums;
+    vector<dtype *> logged_vec = GPUArrayVectors(nums, count, dim);
+
+    NumberPointerArray logged_arr;
+    logged_arr.init(logged_vec.data(), count);
+
+    KernelKLCrossEntropyLossVector<<<block_count, TPB>>>(val_arr.value, answer_arr.value, count,
+            dim, (dtype *const *)logged_arr.value);
+    CheckCudaError();
+
+    vector<shared_ptr<NumberArray>> ce_loss_arrs;
+    vector<dtype *> ce_losses = GPUArrayVectors(ce_loss_arrs, count, 1);
+    for (auto &ptr : ce_loss_arrs) {
+        vector<dtype> vec = ptr->toCpu();
+    }
+    vector<const dtype *> const_logged_arr;
+    auto return_const = [](dtype *v) -> const dtype* {
+        return const_cast<const dtype*>(v);
+    };
+    transform(logged_vec.begin(), logged_vec.end(), back_inserter(const_logged_arr), return_const);
+
+    VectorSumForward(const_logged_arr, count, dim, ce_losses);
+
+    dtype ce_loss_sum = 0.0f;
+
+    for (auto &ptr : ce_loss_arrs) {
+        vector<dtype> vec = ptr->toCpu();
+        if (vec.size() != 1) {
+            cerr << "vec size is not 1" << endl;
+            abort();
+        }
+        dtype l = vec.front() * factor;
+        ce_loss_sum += l;
+    }
+
+    return ce_loss_sum;
+}
+
 __global__ void KernelMax(const dtype *const *v, int count, int dim, volatile dtype *block_maxes,
         volatile int *block_max_is,
         int *block_counters,

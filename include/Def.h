@@ -22,7 +22,7 @@ typedef MatrixXf MatrixXdtype;
 typedef double dtype;
 typedef Eigen::TensorMap<Eigen::Tensor<double, 1>>  Vec;
 typedef Eigen::Map<Matrix<double, Dynamic, Dynamic, ColMajor> > Mat;
-typedef MatrixXd MatrixXdtype;
+typedef Matrix<double, Dynamic, Dynamic> MatrixXdtype;
 #endif
 
 enum ActivatedEnum {

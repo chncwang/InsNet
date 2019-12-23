@@ -111,7 +111,7 @@ Json::Value n3ldg_cpu::Tensor1D::toJson() const {
     json["dim"] = dim;
     Json::Value json_arr;
     for (int i = 0; i < dim; ++i) {
-        json_arr.append(v[i]);
+        json_arr.append((float)v[i]);
     }
     json["value"] = json_arr;
     return json;
@@ -262,7 +262,7 @@ Json::Value n3ldg_cpu::Tensor2D::toJson() const {
     json["col"] = col;
     Json::Value json_arr;
     for (int i = 0; i < row * col; ++i) {
-        json_arr.append(v[i]);
+        json_arr.append((float)v[i]);
     }
     json["value"] = json_arr;
     return json;

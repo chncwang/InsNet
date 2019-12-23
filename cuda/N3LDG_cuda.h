@@ -351,6 +351,12 @@ dtype MultiCrossEntropyLoss(const vector<dtype*> &vals, const vector<vector<int>
         int dim,
         dtype factor,
         const vector<dtype*> &losses);
+dtype KLCrossEntropyLoss(const vector<dtype*> &vals,
+        const vector<shared_ptr<vector<dtype>>> &answers,
+        int count,
+        int dim,
+        dtype factor,
+        const vector<dtype*> &losses);
 void MaxScalarForward(const std::vector<const dtype*> &inputs, int count, int dim,
         std::vector<dtype*> &results,
         std::vector<int> &max_indexes);
