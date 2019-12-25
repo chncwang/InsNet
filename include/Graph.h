@@ -69,10 +69,13 @@ public:
     }
 
     void backward() {
+        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
+        profiler.BeginEvent("computation backward");
         int count = execs.size();
         for (int idx = count - 1; idx >= 0; idx--) {
             execs.at(idx)->backwardFully();
         }
+        profiler.EndCudaEvent();
     }
 
     void addNode(Node *x) override {
@@ -139,12 +142,14 @@ public:
 #endif
 //            cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl << endl;
 
+            profiler.BeginEvent("computation forward");
             cur_exec->forwardFully();
             if (eager_) {
                 for (Node *node : cur_exec->batch) {
                     node->getVal().checkIsNumber();
                 }
             }
+            profiler.EndEvent();
 
             profiler.BeginEvent("computation plan");
             execs.push_back(cur_exec);
