@@ -26,11 +26,12 @@ typedef Matrix<double, Dynamic, Dynamic> MatrixXdtype;
 #endif
 
 enum ActivatedEnum {
-    TANH,
-    SIGMOID,
-    RELU,
-    LEAKY_RELU,
-    SELU
+    EXP = 0,
+    TANH = 1,
+    SIGMOID = 2,
+    RELU = 3,
+    LEAKY_RELU = 4,
+    SELU = 5
 };
 
 

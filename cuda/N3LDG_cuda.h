@@ -156,25 +156,15 @@ enum PoolingEnum {
     AVG
 };
 
-void Activated(ActivatedEnum activated, const dtype *src,
-        const std::vector<dtype*>& dest,
-        dtype* dest2,
-        int len);
-void TanhForward(ActivatedEnum activated, const std::vector<dtype*> &xs,
+void ActivationForward(ActivatedEnum activated, const std::vector<const dtype*> &xs,
         int count,
         int dim,
         std::vector<dtype*> &ys);
-void TanhBackward(ActivatedEnum activated, const std::vector<dtype*> &losses,
+void ActivationBackward(ActivatedEnum activated, const std::vector<const dtype*> &losses,
         const std::vector<dtype*> &vals,
         int count,
         int dim,
         std::vector<dtype*> &in_losses);
-void ExpForward(const std::vector<const dtype*> &inputs, int count, int dim,
-        std::vector<dtype*> &results);
-void ExpBackward(const std::vector<const dtype*> &losses, const std::vector<const dtype*> &vals,
-        int count,
-        int dim,
-        std::vector<dtype*> input_losses);
 void DropoutForward(const std::vector<dtype*> &xs, int count, int dim,
         bool is_training,
         const dtype *drop_mask,
@@ -201,15 +191,6 @@ void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y, int row, int col,
         bool useb,
         bool should_x_transpose = false,
         bool should_W_transpose = false);
-
-
-void CalculateLtyForUniBackward(ActivatedEnum activated,
-        const std::vector<dtype*> &ly,
-        const dtype *ty,
-        const dtype *y,
-        dtype *lty,
-        int count,
-        int dim);
 void AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(const dtype *lty,
         const dtype *lx, dtype *b, std::vector<dtype*> &losses, int count,
         int out_dim, int in_dim, bool use_b);
@@ -337,12 +318,6 @@ void PAddForward(const std::vector<std::vector<dtype*>> &ins, int count,
 void PAddBackward(const std::vector<dtype*> &losses, int count, int dim,
         int in_count,
         std::vector<std::vector<dtype*>> &in_losses);
-void SoftMaxLoss(const std::vector<dtype*> &vals, std::vector<dtype*> &losses,
-        int *correct_count,
-        const std::vector<int> &answers,
-        int batchsize,
-        int count,
-        int dim);
 dtype CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, int count,
         dtype batchsize,
         vector<dtype *> &losses);

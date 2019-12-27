@@ -794,8 +794,10 @@ Node *uni(Graph &graph, UniParams &params, Node &input, ActivatedEnum activated_
         activated = new TanhNode;
     } else if (activated_type == ActivatedEnum::SIGMOID) {
         activated = new SigmoidNode;
+    } else if (activated_type == ActivatedEnum::RELU) {
+        activated = new ReluNode;
     } else {
-        cerr << "unsupported activated " << activated << endl;
+        cerr << "uni - unsupported activated " << activated << endl;
         abort();
     }
 

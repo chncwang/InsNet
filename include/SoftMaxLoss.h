@@ -62,16 +62,8 @@ dtype softMaxLoss(Node &node, int answer, Metric &metric, int batchsize) {
 dtype softMaxLoss(const std::vector<PNode> &x, const std::vector<int> &answers,
         n3ldg_cuda::DeviceInt &correct,
         int batchsize = 1) {
-    std::vector<dtype*> vals, losses;
-    vals.reserve(x.size());
-    losses.reserve(x.size());
-    for (PNode n : x) {
-        vals.push_back(n->val().value);
-        losses.push_back(n->loss().value);
-    }
-    n3ldg_cuda::SoftMaxLoss(vals, losses, correct.value, answers,
-            batchsize, x.size(), x.at(0)->getDim());
-    return -1.0f;
+    cerr << "unsupported operation" << endl;
+    abort();
 }
 #endif
 
