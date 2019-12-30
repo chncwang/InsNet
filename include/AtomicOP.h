@@ -73,17 +73,6 @@ protected:
     }
 };
 
-namespace n3ldg_plus {
-
-Node *tanh(Graph &graph, Node &input) {
-    TanhNode *result = new TanhNode;
-    result->init(input.getDim());
-    result->forward(graph, input);
-    return result;
-}
-
-}
-
 PExecutor TanhNode::generate() {
     return new ActivationExecutor<ActivatedEnum::TANH>;
 };
@@ -112,17 +101,6 @@ protected:
     }
 };
 
-namespace n3ldg_plus {
-
-Node *sigmoid(Graph &graph, Node &input) {
-    SigmoidNode *result = new SigmoidNode;
-    result->init(input.getDim());
-    result->forward(graph, input);
-    return result;
-}
-
-}
-
 class ReluNode :public UniInputNode {
 public:
     ReluNode() : UniInputNode("relu") {}
@@ -145,17 +123,6 @@ protected:
         return input.getDim() == getDim();
     }
 };
-
-namespace n3ldg_plus {
-
-Node *relu(Graph &graph, Node &input) {
-    ReluNode *result = new ReluNode;
-    result->init(input.getDim());
-    result->forward(graph, input);
-    return result;
-}
-
-}
 
 class PDotNode : public Node {
 public:
@@ -576,17 +543,6 @@ private:
     friend class ScalarToVectorExecutor;
 };
 
-namespace n3ldg_plus {
-
-Node *scalarToVector(Graph &graph, int dim, Node &input) {
-    ScalarToVectorNode *node = new ScalarToVectorNode;
-    node->init(dim);
-    node->forward(graph, input);
-    return node;
-}
-
-}
-
 #if USE_GPU
 class ScalarToVectorExecutor : public UniInputExecutor {
 public:
@@ -690,17 +646,6 @@ private:
     friend class SumExecutor;
 };
 
-namespace n3ldg_plus {
-
-Node *vectorSum(Graph &graph, Node &input) {
-    SumNode *sum = new SumNode;
-    sum->initAsScalar();
-    sum->forward(graph, input);
-    return sum;
-}
-
-}
-
 #if USE_GPU
 class SumExecutor : public UniInputExecutor {
     void forward() override {
@@ -747,5 +692,52 @@ Executor *SumNode::generate() {
     SumExecutor *e = new SumExecutor();
     return e;
 }
+
+namespace n3ldg_plus {
+
+Node *tanh(Graph &graph, Node &input) {
+    TanhNode *result = new TanhNode;
+    result->init(input.getDim());
+    result->forward(graph, input);
+    return result;
+}
+
+Node *sigmoid(Graph &graph, Node &input) {
+    SigmoidNode *result = new SigmoidNode;
+    result->init(input.getDim());
+    result->forward(graph, input);
+    return result;
+}
+
+Node *relu(Graph &graph, Node &input) {
+    ReluNode *result = new ReluNode;
+    result->init(input.getDim());
+    result->forward(graph, input);
+    return result;
+}
+
+Node *scalarToVector(Graph &graph, int dim, Node &input) {
+    ScalarToVectorNode *node = new ScalarToVectorNode;
+    node->init(dim);
+    node->forward(graph, input);
+    return node;
+}
+
+Node *vectorSum(Graph &graph, Node &input) {
+    SumNode *sum = new SumNode;
+    sum->initAsScalar();
+    sum->forward(graph, input);
+    return sum;
+}
+
+Node *dropout(Graph &graph, Node &input, dtype dropout, bool is_training) {
+    DropoutNode *node = new DropoutNode(dropout, is_training);
+    node->init(input.getDim());
+    node->forward(graph, input);
+    return node;
+}
+
+}
+
 
 #endif
