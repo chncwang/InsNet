@@ -88,7 +88,7 @@ float cpuKLLoss(vector<Node *> &nodes, const vector<shared_ptr<vector<dtype>>> &
     for (int i = 0; i < nodes.size(); ++i) {
         Node *node = nodes.at(i);
         const auto &answer = answers.at(i);
-        if (answer->size() != node->getDim()) {
+        if (answer->size() < node->getDim()) {
             cerr << boost::format("cpuKLLoss - answer size is %1%, but node dim is %2%") %
                 answer->size() % node->getDim() << endl;
             abort();
