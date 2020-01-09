@@ -259,4 +259,69 @@ public:
     }
 };
 
+template<typename ParamType>
+struct ParamArray : public N3LDGSerializable, public TunableCombination<BaseParam>
+#if USE_GPU
+, public TransferableComponents
+#endif
+{
+    ParamArray(const string &nam) : name(nam) {}
+
+    vector<shared_ptr<ParamType>> params;
+    string name;
+
+    vector<ParamType *> ptrs() {
+        vector<ParamType *> results;
+        for (auto &p : params) {
+            results.push_back(p.get());
+        }
+        return results;
+    }
+
+    void init(int layer, int out_dim, int in_dim) {
+        for (int i = 0; i < layer; ++i) {
+            shared_ptr<ParamType> param(new ParamType(name + std::to_string(i)));
+            param->init(out_dim, i == 0 ? in_dim : out_dim);
+            params.push_back(param);
+        }
+    }
+
+    Json::Value toJson() const override {
+        Json::Value json;
+        json[name + "-size"] = params.size();
+        for (int i = 0; i < params.size(); ++i) {
+            json[name + std::to_string(i)];
+        }
+        return json;
+    }
+
+    void fromJson(const Json::Value &json) override {
+        int size = json[name + "-size"].asInt();
+        for (int i = 0; i < size; ++i) {
+            shared_ptr<ParamType> param(new ParamType(name + std::to_string(i)));
+            param->fromJson(json[name + std::to_string(i)]);
+            params.push_back(param);
+        }
+    }
+
+#if USE_GPU
+    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
+        std::vector<n3ldg_cuda::Transferable *> results;
+        for (auto &p : params) {
+            results.push_back(p.get());
+        }
+        return results;
+    }
+#endif
+
+protected:
+    virtual std::vector<Tunable<BaseParam> *> tunableComponents() override {
+        std::vector<Tunable<BaseParam> *> results;
+        for (auto &p : params) {
+            results.push_back(p.get());
+        }
+        return results;
+    }
+};
+
 #endif /* PARAM_H_ */
