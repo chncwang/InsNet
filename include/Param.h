@@ -290,7 +290,7 @@ struct ParamArray : public N3LDGSerializable, public TunableCombination<BasePara
         Json::Value json;
         json[name + "-size"] = params.size();
         for (int i = 0; i < params.size(); ++i) {
-            json[name + std::to_string(i)];
+            json[name + std::to_string(i)] = params.at(i)->toJson();
         }
         return json;
     }
@@ -298,9 +298,8 @@ struct ParamArray : public N3LDGSerializable, public TunableCombination<BasePara
     void fromJson(const Json::Value &json) override {
         int size = json[name + "-size"].asInt();
         for (int i = 0; i < size; ++i) {
-            shared_ptr<ParamType> param(new ParamType(name + std::to_string(i)));
+            ParamType *param = params.at(i).get();
             param->fromJson(json[name + std::to_string(i)]);
-            params.push_back(param);
         }
     }
 
