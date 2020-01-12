@@ -1,14 +1,6 @@
 #ifndef LSTM1
 #define LSTM1
 
-/*
-*  LSTM1.h:
-*  LSTM variation 1
-*
-*  Created on: June 13, 2017
-*      Author: mszhang, chncwang
-*/
-
 #include "MyLib.h"
 #include "Node.h"
 #include "AtomicOP.h"

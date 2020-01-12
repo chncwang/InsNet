@@ -22,6 +22,7 @@
 #include "Windowlized.h"
 #include "UniOP.h"
 #include "LSTM1.h"
+#include "GRU.h"
 #include "SoftMaxLoss.h"
 #include "AttentionHelp.h"
 #include "Attention.h"
