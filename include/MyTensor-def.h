@@ -16,10 +16,10 @@ using namespace Eigen;
 namespace n3ldg_cpu {
 
 struct Tensor1D : public N3LDGSerializable {
-    dtype *v;
-    int dim;
+    dtype *v = nullptr;
+    int dim = 0;
 
-    Tensor1D();
+    Tensor1D() = default;
 
     virtual ~Tensor1D();
 
@@ -58,6 +58,10 @@ struct Tensor1D : public N3LDGSerializable {
     virtual void fromJson(const Json::Value &json);
 
     virtual void print() const;
+
+    virtual std::vector<dtype> toCpu() const;
+
+    virtual void checkIsNumber() const;
 };
 
 struct Tensor2D : public N3LDGSerializable {
@@ -128,6 +132,7 @@ struct Tensor1D : public n3ldg_cpu::Tensor1D, public Transferable {
     Tensor1D(Tensor1D &&);
     void init(int len) override;
     void initOnMemoryAndDevice(int len);
+    void initOnMemory(int len);
     ~Tensor1D();
 
     virtual std::string name() const;
@@ -144,6 +149,7 @@ struct Tensor1D : public n3ldg_cpu::Tensor1D, public Transferable {
 
     void copyFromHostToDevice() override;
     void copyFromDeviceToHost() override;
+    void checkIsNumber() const override;
 
 private:
     void initOnDevice(int len);

@@ -1,242 +1,80 @@
 #ifndef ATOMICIOP_H_
 #define ATOMICIOP_H_
 
-/*
-*  AtomicOP.h:
-*  a list of atomic operations
-*
-*  Created on: June 11, 2017
-*      Author: yue_zhang(suda), mszhang
-*/
-
-/*
-ActivateNode
-TanhNode
-SigmoidNode
-ReluNode
-IndexNode
-PSubNode
-PDotNode
-*/
-
 #include "Param.h"
 #include "MyLib.h"
 #include "Node.h"
 #include "Graph.h"
 #include "ModelUpdate.h"
 
-class ActivateNode :public Node {
+#if USE_GPU
+template<ActivatedEnum activation>
+class ActivationExecutor : public UniInputExecutor {
 public:
-    Node* in;
-    dtype(*activate)(const dtype&);
-    dtype(*derivate)(const dtype&, const dtype&);
+    vector<dtype*> vals;
 
-    ActivateNode() : Node("activate") {
-        in = nullptr;
-        activate = ftanh;
-        derivate = dtanh;
+    void forward() override {
+        vector<const dtype*> inputs;
+        for (Node *node : batch) {
+            UniInputNode *expnode = static_cast<UniInputNode*>(node);
+            inputs.push_back(expnode->getInput()->getVal().value);
+            vals.push_back(expnode->getVal().value);
+        }
+        n3ldg_cuda::ActivationForward(activation, inputs, batch.size(), getDim(), vals);
+#if TEST_CUDA
+        Executor::testForward();
+        cout << "exp forward tested" << endl;
+#endif
     }
 
-    ~ActivateNode() = default;
+    void backward() override {
+        vector<const dtype*> losses;
+        vector<dtype*> vals;
+        vector<dtype*> input_losses;
 
-    void setFunctions(dtype(*f)(const dtype&), dtype(*f_deri)(const dtype&, const dtype&)) {
-        activate = f;
-        derivate = f_deri;
-    }
+        for (Node *node : batch) {
+            UniInputNode *exp = static_cast<UniInputNode*>(node);
+            vals.push_back(node->getVal().value);
+            losses.push_back(exp->getLoss().value);
+            input_losses.push_back(exp->getInput()->getLoss().value);
+        }
 
-    void forward(Graph *cg, Node* x) {
-        in = x;
-        in->addParent(this);
-        cg->addNode(this);
-    }
-
-    void compute() {
-        val().vec() = in->val().vec().unaryExpr(ptr_fun(activate));
-    }
-
-    void backward() {
-        in->loss().vec() += loss().vec() * in->val().vec().binaryExpr(val().vec(),
-                ptr_fun(derivate));
-    }
-
-    PExecutor generate();
-
-    bool typeEqual(Node* other) {
-        bool result = Node::typeEqual(other);
-        return result;
+        n3ldg_cuda::ActivationBackward(activation, losses, vals, batch.size(), getDim(),
+                input_losses);
+#if TEST_CUDA
+        UniInputExecutor::testBackward();
+        cout << "exp backward tested" << endl;
+#endif
     }
 };
-
-
-class ActivateExecutor :public Executor {
-};
-
-PExecutor ActivateNode::generate() {
-    ActivateExecutor* exec = new ActivateExecutor();
-    exec->batch.push_back(this);
-    return exec;
-};
+#else
+template<ActivatedEnum activation>
+class ActivationExecutor : public UniInputExecutor {};
+#endif
 
 class TanhNode : public UniInputNode {
 public:
     TanhNode() : UniInputNode("tanh") {}
 
-    void compute() {
+    void compute() override {
         val().vec() = getInput()->val().vec().unaryExpr(ptr_fun(ftanh));
     }
 
-    void backward() {
+    void backward() override {
         getInput()->loss().vec() += loss().vec() * getInput()->val().vec().binaryExpr(val().vec(),
                 ptr_fun(dtanh));
     }
 
-    PExecutor generate();
+    PExecutor generate() override;
 
 protected:
-    virtual bool isDimLegal(const Node &input) const {
+    virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
     }
 };
 
-namespace n3ldg_plus {
-
-Node *tanh(Graph &graph, Node &input) {
-    TanhNode *result = new TanhNode;
-    result->init(input.getDim());
-    result->forward(graph, input);
-    return result;
-}
-
-}
-
-class TanhExecutor :public Executor {
-public:
-    int dim;
-    Tensor1D y, x;
-    int sumDim;
-
-#if USE_GPU
-    void forward() {
-        int count = batch.size();
-        std::vector<dtype*> xs, ys;
-        xs.reserve(count);
-        ys.reserve(count);
-        for (Node *n : batch) {
-            TanhNode *tanh = static_cast<TanhNode*>(n);
-#if TEST_CUDA
-            tanh->getInput()->val().copyFromHostToDevice();
-#endif
-            xs.push_back(tanh->getInput()->val().value);
-            ys.push_back(tanh->val().value);
-        }
-
-        n3ldg_cuda::TanhForward(ActivatedEnum::TANH, xs, count, dim, ys);
-#if TEST_CUDA
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->compute();
-            n3ldg_cuda::Assert(batch.at(idx)->getVal().verify("Tanh forward"));
-        }
-#endif
-    }
-#else
-    void  forward() {
-        int count = batch.size();
-        //#pragma omp parallel for  
-        sumDim = 0;
-        for (int idx = 0; idx < count; idx++) {
-            sumDim += batch[idx]->getDim();
-        }
-
-        x.init(sumDim);
-        y.init(sumDim);
-
-        int offset = 0;
-        for (int idx = 0; idx < count; idx++) {
-            TanhNode* ptr = (TanhNode*)batch[idx];
-            for (int idy = 0; idy < ptr->getDim(); idy++) {
-                x[offset + idy] = ptr->getInput()->val()[idy];
-            }
-            offset += ptr->getDim();
-        }
-
-        y.vec() = x.vec().unaryExpr(ptr_fun(ftanh));
-
-        offset = 0;
-        for (int idx = 0; idx < count; idx++) {
-            TanhNode* ptr = (TanhNode*)batch[idx];
-            for (int idy = 0; idy < ptr->getDim(); idy++) {
-                ptr->val()[idy] = y[offset + idy];
-            }
-            offset += ptr->getDim();
-        }
-    }
-#endif
-
-#if USE_GPU
-    void backward() {
-        int count = batch.size();
-        std::vector<dtype*> vals, losses, in_losses;
-        vals.reserve(count);
-        losses.reserve(count);
-        in_losses.reserve(count);
-        for (Node *n : batch) {
-            TanhNode *tanh = static_cast<TanhNode*>(n);
-#if TEST_CUDA
-            tanh->loss().copyFromHostToDevice();
-            tanh->getInput()->loss().copyFromHostToDevice();
-#endif
-            vals.push_back(tanh->val().value);
-            losses.push_back(tanh->loss().value);
-            in_losses.push_back(tanh->getInput()->loss().value);
-        }
-        n3ldg_cuda::TanhBackward(ActivatedEnum::TANH, losses, vals, count, dim,
-                in_losses);
-#if TEST_CUDA
-        for (Node *n : batch) {
-            n->backward();
-        }
-        for (Node *n : batch) {
-            TanhNode *tanh = static_cast<TanhNode*>(n);
-            n3ldg_cuda::Assert(tanh->getInput()->getLoss().verify("TanhExecutor backward"));
-        }
-#endif
-    }
-#else
-    void backward() {
-        int count = batch.size();
-        //#pragma omp parallel for
-        Tensor1D lx, ly;
-        lx.init(sumDim);
-        ly.init(sumDim);
-
-        int offset = 0;
-        for (int idx = 0; idx < count; idx++) {
-            TanhNode* ptr = (TanhNode*)batch[idx];
-            for (int idy = 0; idy < ptr->getDim(); idy++) {
-                ly[offset + idy] = ptr->loss()[idy];
-            }
-            offset += ptr->getDim();
-        }
-
-        lx.vec() = ly.vec() * x.vec().binaryExpr(y.vec(), ptr_fun(dtanh));
-
-        offset = 0;
-        for (int idx = 0; idx < count; idx++) {
-            TanhNode* ptr = (TanhNode*)batch[idx];
-            for (int idy = 0; idy < ptr->getDim(); idy++) {
-                ptr->getInput()->loss()[idy] += lx[offset + idy];
-            }
-            offset += ptr->getDim();
-        }
-    }
-#endif
-};
-
 PExecutor TanhNode::generate() {
-    TanhExecutor* exec = new TanhExecutor();
-    exec->batch.push_back(this);
-    exec->dim = getDim();
-    return exec;
+    return new ActivationExecutor<ActivatedEnum::TANH>;
 };
 
 
@@ -253,7 +91,9 @@ public:
                 ptr_fun(dsigmoid));
     }
 
-    PExecutor generate();
+    PExecutor generate() {
+        return new ActivationExecutor<ActivatedEnum::SIGMOID>;
+    }
 
 protected:
     virtual bool isDimLegal(const Node &input) const {
@@ -261,127 +101,28 @@ protected:
     }
 };
 
-
-class SigmoidExecutor :public Executor {
-  public:
-    int dim;
+class ReluNode :public UniInputNode {
 public:
-    Tensor1D x, y;
-    int sumDim;
+    ReluNode() : UniInputNode("relu") {}
 
-#if USE_GPU
-    void forward() {
-        int count = batch.size();
-        std::vector<dtype*> xs, ys;
-        xs.reserve(count);
-        ys.reserve(count);
-        for (Node *n : batch) {
-            SigmoidNode *tanh = static_cast<SigmoidNode*>(n);
-#if TEST_CUDA
-            tanh->getInput()->val().copyFromHostToDevice();
-#endif
-            xs.push_back(tanh->getInput()->val().value);
-            ys.push_back(tanh->val().value);
-        }
-
-        n3ldg_cuda::TanhForward(ActivatedEnum::SIGMOID, xs, count, dim, ys);
-#if TEST_CUDA
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->compute();
-            n3ldg_cuda::Assert(batch.at(idx)->getVal().verify("Sigmoid forward"));
-        }
-#endif
-    }
-#else
-#endif
-
-#if USE_GPU
-    void backward() {
-        int count = batch.size();
-        std::vector<dtype*> vals, losses, in_losses;
-        vals.reserve(count);
-        losses.reserve(count);
-        in_losses.reserve(count);
-        for (Node *n : batch) {
-            SigmoidNode *tanh = static_cast<SigmoidNode*>(n);
-#if TEST_CUDA
-            tanh->loss().copyFromHostToDevice();
-            tanh->getInput()->loss().copyFromHostToDevice();
-#endif
-            vals.push_back(tanh->val().value);
-            losses.push_back(tanh->loss().value);
-            in_losses.push_back(tanh->getInput()->loss().value);
-        }
-        n3ldg_cuda::TanhBackward(ActivatedEnum::SIGMOID, losses, vals, count, dim,
-                in_losses);
-#if TEST_CUDA
-        for (Node *n : batch) {
-            n->backward();
-        }
-        for (Node *n : batch) {
-            SigmoidNode *tanh = static_cast<SigmoidNode*>(n);
-            n3ldg_cuda::Assert(tanh->getInput()->getLoss().verify("SigmoidExecutor backward"));
-        }
-#endif
-    }
-#else
-#endif
-};
-
-PExecutor SigmoidNode::generate() {
-    SigmoidExecutor* exec = new SigmoidExecutor();
-    exec->batch.push_back(this);
-    exec->dim = getDim();
-    return exec;
-};
-
-
-class ReluNode :public Node {
-  public:
-    Node* in;
-
-  public:
-    ReluNode() : Node("relu") {
-        in = nullptr;
+    void compute() override {
+        val().vec() = getInput()->val().vec().unaryExpr(ptr_fun(frelu));
     }
 
-    ~ReluNode() {
-        in = nullptr;
+    void backward() override {
+        getInput()->loss().vec() += loss().vec() * getInput()->val().vec().binaryExpr(val().vec(),
+                ptr_fun(drelu));
     }
 
-    void forward(Graph *cg, Node* x) {
-        in = x;
-        in->addParent(this);
-        cg->addNode(this);
+    PExecutor generate() override {
+        return new ActivationExecutor<ActivatedEnum::RELU>;
     }
 
-  public:
-    void compute() {
-        val().vec() = in->val().vec().unaryExpr(ptr_fun(frelu));
-    }
-
-    void backward() {
-        in->loss().vec() += loss().vec() * in->val().vec().binaryExpr(val().vec(), ptr_fun(drelu));
-    }
-
-  public:
-    PExecutor generate();
-
-    // better to rewrite for deep understanding
-    bool typeEqual(Node* other) {
-        bool result = Node::typeEqual(other);
-        return result;
+protected:
+    virtual bool isDimLegal(const Node &input) const override {
+        return input.getDim() == getDim();
     }
 };
-
-class ReluExecutor :public Executor {};
-
-PExecutor ReluNode::generate() {
-    ReluExecutor* exec = new ReluExecutor();
-    exec->batch.push_back(this);
-    return exec;
-};
-
 
 class PDotNode : public Node {
 public:
@@ -722,6 +463,12 @@ public:
 
         for (int i = 0; i < batch.size(); ++i) {
             MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));
+            if (max_indexes.at(i) > 100000 || max_indexes.at(i) < 0) {
+                cerr << "illegal max index returned " << max_indexes.at(i) << endl;
+                node->getInput()->getVal().print();
+                node->getVal().print();
+                abort();
+            }
             node->max_i_ = max_indexes.at(i);
         }
 #if TEST_CUDA
@@ -733,7 +480,7 @@ public:
             n3ldg_cuda::Assert(max_scalar->getVal().verify("max scalar forward"));
             ++i;
         }
-        cout << "max scalar tested:" << endl;
+        cout << "max scalar forward tested:" << endl;
 #endif
     }
 
@@ -750,7 +497,7 @@ public:
         n3ldg_cuda::MaxScalarBackward(losses, max_indexes, batch.size(), input_losses);
 #if TEST_CUDA
         UniInputExecutor::testBackward();
-        cout << "tested" << endl;
+        cout << "max scalar backward tested" << endl;
 #endif
     }
 
@@ -795,17 +542,6 @@ protected:
 private:
     friend class ScalarToVectorExecutor;
 };
-
-namespace n3ldg_plus {
-
-Node *scalarToVector(Graph &graph, int dim, Node &input) {
-    ScalarToVectorNode *node = new ScalarToVectorNode;
-    node->init(dim);
-    node->forward(graph, input);
-    return node;
-}
-
-}
 
 #if USE_GPU
 class ScalarToVectorExecutor : public UniInputExecutor {
@@ -856,7 +592,9 @@ class ExpNode : public UniInputNode {
 public:
     ExpNode() : UniInputNode("exp") {}
 
-    Executor* generate() override;
+    Executor* generate() override {
+        return new ActivationExecutor<ActivatedEnum::EXP>;
+    }
 
     void compute() override {
         val().vec() = getInput()->getVal().vec().exp();
@@ -874,52 +612,6 @@ protected:
 private:
     friend class ExpExecutor;
 };
-
-#if USE_GPU
-class ExpExecutor : public UniInputExecutor {
-public:
-    vector<dtype*> vals;
-
-    void forward() override {
-        vector<const dtype*> inputs;
-        for (Node *node : batch) {
-            ExpNode *expnode = static_cast<ExpNode*>(node);
-            inputs.push_back(expnode->getInput()->getVal().value);
-            vals.push_back(expnode->getVal().value);
-        }
-        n3ldg_cuda::ExpForward(inputs, batch.size(), getDim(), vals);
-#if TEST_CUDA
-        Executor::testForward();
-        cout << "exp forward tested" << endl;
-#endif
-    }
-
-    void backward() override {
-        vector<const dtype*> losses, vals;
-        vector<dtype*> input_losses;
-
-        for (Node *node : batch) {
-            ExpNode *exp = static_cast<ExpNode*>(node);
-            vals.push_back(node->getVal().value);
-            losses.push_back(exp->getLoss().value);
-            input_losses.push_back(exp->getInput()->getLoss().value);
-        }
-
-        n3ldg_cuda::ExpBackward(losses, vals, batch.size(), getDim(), input_losses);
-#if TEST_CUDA
-        UniInputExecutor::testBackward();
-        cout << "exp backward tested" << endl;
-#endif
-    }
-};
-#else
-class ExpExecutor : public Executor {};
-#endif
-
-Executor *ExpNode::generate() {
-    ExpExecutor * executor = new ExpExecutor();
-    return executor;
-}
 
 class SumNode : public UniInputNode {
 public:
@@ -953,17 +645,6 @@ protected:
 private:
     friend class SumExecutor;
 };
-
-namespace n3ldg_plus {
-
-Node *vectorSum(Graph &graph, Node &input) {
-    SumNode *sum = new SumNode;
-    sum->initAsScalar();
-    sum->forward(graph, input);
-    return sum;
-}
-
-}
 
 #if USE_GPU
 class SumExecutor : public UniInputExecutor {
@@ -1011,5 +692,52 @@ Executor *SumNode::generate() {
     SumExecutor *e = new SumExecutor();
     return e;
 }
+
+namespace n3ldg_plus {
+
+Node *tanh(Graph &graph, Node &input) {
+    TanhNode *result = new TanhNode;
+    result->init(input.getDim());
+    result->forward(graph, input);
+    return result;
+}
+
+Node *sigmoid(Graph &graph, Node &input) {
+    SigmoidNode *result = new SigmoidNode;
+    result->init(input.getDim());
+    result->forward(graph, input);
+    return result;
+}
+
+Node *relu(Graph &graph, Node &input) {
+    ReluNode *result = new ReluNode;
+    result->init(input.getDim());
+    result->forward(graph, input);
+    return result;
+}
+
+Node *scalarToVector(Graph &graph, int dim, Node &input) {
+    ScalarToVectorNode *node = new ScalarToVectorNode;
+    node->init(dim);
+    node->forward(graph, input);
+    return node;
+}
+
+Node *vectorSum(Graph &graph, Node &input) {
+    SumNode *sum = new SumNode;
+    sum->initAsScalar();
+    sum->forward(graph, input);
+    return sum;
+}
+
+Node *dropout(Graph &graph, Node &input, dtype dropout, bool is_training) {
+    DropoutNode *node = new DropoutNode(dropout, is_training);
+    node->init(input.getDim());
+    node->forward(graph, input);
+    return node;
+}
+
+}
+
 
 #endif

@@ -62,44 +62,8 @@ dtype softMaxLoss(Node &node, int answer, Metric &metric, int batchsize) {
 dtype softMaxLoss(const std::vector<PNode> &x, const std::vector<int> &answers,
         n3ldg_cuda::DeviceInt &correct,
         int batchsize = 1) {
-    std::vector<dtype*> vals, losses;
-    vals.reserve(x.size());
-    losses.reserve(x.size());
-    for (PNode n : x) {
-        vals.push_back(n->val().value);
-        losses.push_back(n->loss().value);
-    }
-    n3ldg_cuda::SoftMaxLoss(vals, losses, correct.value, answers,
-            batchsize, x.size(), x.at(0)->getDim());
-    return -1.0f;
-}
-#endif
-
-#if USE_GPU
-void softMaxPredict(PNode x, int &y) {
-    y = n3ldg_cuda::Predict(x->val().value, x->getDim());
-}
-#else
-dtype predict(PNode x, int& y) {
-    int nDim = x->getDim();
-
-    int optLabel = -1;
-    for (int i = 0; i < nDim; ++i) {
-        if (optLabel < 0 || x->val()[i] >  x->val()[optLabel])
-            optLabel = i;
-    }
-
-    dtype prob = 0.0;
-    dtype sum = 0.0;
-    NRVec<dtype> scores(nDim);
-    dtype maxScore = x->val()[optLabel];
-    for (int i = 0; i < nDim; ++i) {
-        scores[i] = exp(x->val()[i] - maxScore);
-        sum += scores[i];
-    }
-    prob = scores[optLabel] / sum;
-    y = optLabel;
-    return prob;
+    cerr << "unsupported operation" << endl;
+    abort();
 }
 #endif
 

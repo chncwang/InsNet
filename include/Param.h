@@ -22,11 +22,15 @@ public:
     Tensor2D aux_square;
     Tensor2D aux_mean;
     int iter;
+    bool is_fixed = false;
 
     Param(const string &name, bool is_bias = false) : BaseParam(name, is_bias) {}
 
-    // allow sparse and dense parameters have different parameter initialization methods
-    void init(int outDim, int inDim) override {
+    virtual void init(int outDim, int inDim) override {
+        init(outDim, inDim, nullptr);
+    }
+
+    void init(int outDim, int inDim, const std::function<float(int, int)> *cal_bound) {
 #if USE_GPU
         val.initOnMemoryAndDevice(outDim, inDim);
         aux_square.initOnMemoryAndDevice(outDim, inDim);
@@ -40,7 +44,8 @@ public:
         if (isBias()) {
             val.assignAll(0.0f);
         } else {
-            dtype bound = sqrt(6.0 / (outDim + inDim + 1));
+            dtype bound = cal_bound == nullptr ? sqrt(6.0 / (outDim + inDim + 1)) :
+                (*cal_bound)(outDim, inDim);
             val.random(bound);
         }
         iter = 0;
@@ -85,6 +90,9 @@ public:
     }
 
     void updateAdagrad(dtype alpha, dtype reg, dtype eps) override {
+        if (is_fixed) {
+            return;
+        }
 #if USE_GPU
         n3ldg_cuda::UpdateAdagrad(val.value, grad.value, val.row, val.col,
                 aux_square.value, alpha, reg, eps);
@@ -102,6 +110,9 @@ public:
     }
 
     void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override {
+        if (is_fixed) {
+            return;
+        }
 #if USE_GPU
 #if TEST_CUDA
         n3ldg_cuda::Assert(val.verify("Param adam begin val"));
@@ -137,6 +148,9 @@ public:
     }
 
     void updateAdamW(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override {
+        if (is_fixed) {
+            return;
+        }
 #if USE_GPU
 #if TEST_CUDA
         n3ldg_cuda::Assert(val.verify("Param adam begin val"));
@@ -182,6 +196,7 @@ public:
 #if USE_GPU && !TEST_CUDA
         return n3ldg_cuda::SquareSum(grad.value, grad.size);
 #elif USE_GPU && TEST_CUDA
+        cout << "squareGradNorm - param name:" << this->getParamName() << endl;
         n3ldg_cuda::Assert(grad.verify("squareGradNorm grad"));
         dtype cuda = n3ldg_cuda::SquareSum(grad.value, grad.size);
         dtype sumNorm = 0.0;
@@ -219,6 +234,7 @@ public:
         json["aux_square"] = aux_square.toJson();
         json["aux_mean"] = aux_mean.toJson();
         json["iter"] = iter;
+        json["is_fixed"] = is_fixed;
         return json;
     }
 
@@ -227,6 +243,83 @@ public:
         aux_square.fromJson(json["aux_square"]);
         aux_mean.fromJson(json["aux_mean"]);
         iter = json["iter"].asInt();
+        is_fixed = json["is_fixed"].asBool();
+    }
+
+    void value(const int& featId, Tensor1D& out) {
+        assert(out.dim == val.row);
+        memcpy(out.v, val[featId], val.row * sizeof(dtype));
+    }
+
+    void loss(const int& featId, const Tensor1D& loss) {
+        assert(loss.dim == val.row);
+        for (int idx = 0; idx < val.row; idx++) {
+            grad[featId][idx] += loss[idx];
+        }
+    }
+};
+
+template<typename ParamType>
+struct ParamArray : public N3LDGSerializable, public TunableCombination<BaseParam>
+#if USE_GPU
+, public TransferableComponents
+#endif
+{
+    ParamArray(const string &nam) : name(nam) {}
+
+    vector<shared_ptr<ParamType>> params;
+    string name;
+
+    vector<ParamType *> ptrs() {
+        vector<ParamType *> results;
+        for (auto &p : params) {
+            results.push_back(p.get());
+        }
+        return results;
+    }
+
+    void init(int layer, int out_dim, int in_dim) {
+        for (int i = 0; i < layer; ++i) {
+            shared_ptr<ParamType> param(new ParamType(name + std::to_string(i)));
+            param->init(out_dim, i == 0 ? in_dim : out_dim);
+            params.push_back(param);
+        }
+    }
+
+    Json::Value toJson() const override {
+        Json::Value json;
+        json[name + "-size"] = params.size();
+        for (int i = 0; i < params.size(); ++i) {
+            json[name + std::to_string(i)] = params.at(i)->toJson();
+        }
+        return json;
+    }
+
+    void fromJson(const Json::Value &json) override {
+        int size = json[name + "-size"].asInt();
+        for (int i = 0; i < size; ++i) {
+            ParamType *param = params.at(i).get();
+            param->fromJson(json[name + std::to_string(i)]);
+        }
+    }
+
+#if USE_GPU
+    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
+        std::vector<n3ldg_cuda::Transferable *> results;
+        for (auto &p : params) {
+            results.push_back(p.get());
+        }
+        return results;
+    }
+#endif
+
+protected:
+    virtual std::vector<Tunable<BaseParam> *> tunableComponents() override {
+        std::vector<Tunable<BaseParam> *> results;
+        for (auto &p : params) {
+            results.push_back(p.get());
+        }
+        return results;
     }
 };
 

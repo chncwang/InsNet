@@ -17,9 +17,11 @@
 #include "ModelUpdate.h"
 #include "profiler.h"
 #include "boost/format.hpp"
+#include "Param.h"
 
 using boost::format;
 
+template<typename ParamType>
 class LookupTable : public N3LDGSerializable, public TunableCombination<BaseParam>
 #if USE_GPU
 , public TransferableComponents
@@ -27,7 +29,7 @@ class LookupTable : public N3LDGSerializable, public TunableCombination<BasePara
 {
 public:
     Alphabet elems;
-    SparseParam E;
+    ParamType E;
     bool bFineTune;
     int nDim;
     int nVSize;
@@ -234,10 +236,10 @@ public:
     }
 };
 
-
+template <typename ParamType>
 class LookupNode : public Node {
 public:
-    LookupTable* param;
+    LookupTable<ParamType>* param;
     int xid;
     string word;
 
@@ -246,11 +248,11 @@ public:
         param = NULL;
     }
 
-    void setParam(LookupTable* paramInit) {
+    void setParam(LookupTable<ParamType>* paramInit) {
         param = paramInit;
     }
 
-    void setParam(LookupTable &table) {
+    void setParam(LookupTable<ParamType> &table) {
         param = &table;
     }
 
@@ -311,12 +313,25 @@ public:
     }
 };
 
+namespace n3ldg_plus {
 
+template <typename ParamType>
+Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, int dim, const string &word) {
+    LookupNode<ParamType>* input_lookup(new LookupNode<ParamType>);
+    input_lookup->init(dim);
+    input_lookup->setParam(lookup);
+    input_lookup->forward(graph, word);
+    return input_lookup;
+}
+
+}
+
+template<typename ParamType>
 #if USE_GPU
 class LookupExecutor :public Executor {
 public:
     int dim;
-    LookupTable *table;
+    LookupTable<ParamType> *table;
     std::vector<int> xids;
 
     void  forward() {
@@ -325,7 +340,7 @@ public:
         std::vector<dtype*> vals;
         vals.reserve(count);
         for (int idx = 0; idx < count; idx++) {
-            LookupNode *n = static_cast<LookupNode*>(batch[idx]);
+            LookupNode<ParamType> *n = static_cast<LookupNode<ParamType>*>(batch[idx]);
             xids.push_back(n->xid);
             vals.push_back(n->val().value);
         }
@@ -339,6 +354,8 @@ public:
 #endif
     }
 
+    void genericBackward(vector<dtype*> &losses);
+
     void backward() {
         int count = batch.size();
         std::vector<dtype*> losses;
@@ -346,31 +363,47 @@ public:
         for (Node *n : batch) {
             losses.push_back(n->loss().value);
         }
-        n3ldg_cuda::LookupBackward(xids, table->nUNKId, table->bFineTune,
-                losses,
-                count,
-                dim,
-                table->E.grad.value,
-                table->E.dIndexers.value);
+        genericBackward(losses);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward();
         }
 
         n3ldg_cuda::Assert(table->E.grad.verify("lookup backward grad"));
-        n3ldg_cuda::Assert(n3ldg_cuda::Verify(table->E.indexers.c_buf(),
-                    table->E.dIndexers.value,
-                    table->E.dIndexers.len,
-                    "lookup backward index"));
+//        n3ldg_cuda::Assert(n3ldg_cuda::Verify(table->E.indexers.c_buf(),
+//                    table->E.dIndexers.value,
+//                    table->E.dIndexers.len,
+//                    "lookup backward index"));
 #endif
     }
 };
+
+template<>
+void LookupExecutor<SparseParam>::genericBackward(vector<dtype*> &losses) {
+        n3ldg_cuda::LookupBackward(xids, table->nUNKId, table->bFineTune,
+                losses,
+                batch.size(),
+                dim,
+                table->E.grad.value,
+                table->E.dIndexers.value);
+}
+
+template<>
+void LookupExecutor<Param>::genericBackward(vector<dtype*> &losses) {
+        n3ldg_cuda::LookupBackward(xids, table->nUNKId, table->bFineTune,
+                losses,
+                batch.size(),
+                dim,
+                table->E.grad.value);
+}
+
 #else
 class LookupExecutor :public Executor {};
 #endif
 
-PExecutor LookupNode::generate() {
-    LookupExecutor* exec = new LookupExecutor();
+template<typename ParamType>
+PExecutor LookupNode<ParamType>::generate() {
+    LookupExecutor<ParamType>* exec = new LookupExecutor<ParamType>();
     exec->batch.push_back(this);
 #if USE_GPU
     exec->table = param;

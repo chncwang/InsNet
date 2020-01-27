@@ -58,12 +58,10 @@ public:
 
             _params[i]->val[idx][idy] = orginValue + CHECK_GRAD_STEP;
             plused_loss = 0.0;
-            cout << "add 0.001" << endl;
             for (int j = 0; j < examples.size(); j++) {
                 plused_loss += classifier->cost(examples[j]);
             }
 
-            cout << "minus 0.001" << endl;
             _params[i]->val[idx][idy] = orginValue - CHECK_GRAD_STEP;
             minused_loss = 0.0;
             for (int j = 0; j < examples.size(); j++) {
@@ -76,7 +74,7 @@ public:
             mockGrad = mockGrad / examples.size();
             computeGrad = _params[i]->grad[idx][idy];
 
-            printf("    mock grad = %.10f,\ncomputed grad = %.10f\n", mockGrad, computeGrad);
+            printf("    mock grad = %.10f,\ncomputed grad = %.10f\n\n", mockGrad, computeGrad);
 
             _params[i]->val[idx][idy] = orginValue;
         }

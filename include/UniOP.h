@@ -32,8 +32,9 @@ public:
 
     UniParams(const string &name) : W(name + "-W"), b(name + "-b", true) {}
 
-    void init(int nOSize, int nISize, bool useB = true) {
-        W.init(nOSize, nISize);
+    void init(int nOSize, int nISize, bool useB = true,
+            const std::function<float(int, int)> *bound = nullptr) {
+        W.init(nOSize, nISize, bound);
 
         bUseB = useB;
         if (bUseB) {
@@ -106,7 +107,7 @@ public:
 
     void forward(Graph &graph, Node &x) {
         if (x.getDim() != param->W.inDim()) {
-            cerr << boost::format("input dim:%1% node in dim:%2%") % x.getDim() % param->W.inDim()
+            cerr << boost::format("input dim:%1% preset in dim:%2%") % x.getDim() % param->W.inDim()
                 << endl;
             abort();
         }
@@ -370,7 +371,7 @@ public:
         return input.getDim() == param_->outDim();
     }
 
-    void setParam(SparseParam &word_vectors, int offset = 0) {
+    void setParam(Param &word_vectors, int offset = 0) {
         if (offset + getDim() > word_vectors.inDim()) {
             cerr << boost::format("offset:%1% getDim():%2% word_vectors.inDim():%3%") % offset %
                 getDim() % word_vectors.inDim() << endl;
@@ -406,14 +407,26 @@ public:
     }
 
 private:
-    SparseParam *param_ = nullptr;
+    Param *param_ = nullptr;
     friend class LinearWordVectorExecutor;
     int offset_ = 0;
 };
 
 namespace n3ldg_plus {
-    Node *linearWordVector(Graph &graph, int dim, SparseParam &word_vectors, Node &input,
+    Node *linearWordVector(Graph &graph, int dim, Param &word_vectors, Node &input,
             int offset = 0) {
+        if (dim + offset > word_vectors.inDim()) {
+            cerr << boost::format("linearWordVector - dim:%1% offset%2% vocabulary_size:%3%") %
+                dim % offset % word_vectors.inDim() << endl;
+            abort();
+        }
+
+        if (input.getDim() != word_vectors.outDim()) {
+            cerr << boost::format("LinearWordVectorNode - input dim:%1% word vector dim:%2%") %
+                input.getDim() % word_vectors.outDim() << endl;
+            abort();
+        }
+
         LinearWordVectorNode *node =  new LinearWordVectorNode;
         node->init(dim);
         node->setParam(word_vectors, offset);
@@ -428,7 +441,7 @@ class LinearWordVectorExecutor : public UniInputExecutor {
 public:
     Tensor2D x, y;
     int inDim, outDim;
-    SparseParam *param;
+    Param *param;
 
     void forward() {
         int count = batch.size();
@@ -571,7 +584,7 @@ class LinearWordVectorExecutor : public Executor {
 public:
     Tensor2D x, y;
     int inDim, outDim;
-    SparseParam *param;
+    Param *param;
 
     void forward() override {
         int count = batch.size();
@@ -642,6 +655,120 @@ Executor* LinearWordVectorNode::generate() {
     return exec;
 }
 
+class BiasParam : public Param {
+public:
+    BiasParam(const string &name) : Param(name, true) {}
+
+    void init(int outDim, int inDim) override {
+        cerr << "BiasParam::init - unsupported method" << endl;
+        abort();
+    }
+
+    void initAsBias(int dim) {
+        Param::init(dim, 1);
+    }
+};
+
+class BiasNode : public UniInputNode {
+public:
+    BiasNode(BiasParam * bias_param) : UniInputNode("bias"), bias_param_(bias_param) {}
+
+    void init(int dim) override {
+        if (dim > bias_param_->outDim()) {
+            cerr << boost::format("dim is %1%, but bias param dim is %2%") % dim %
+                bias_param_->outDim() << endl;
+            abort();
+        }
+        UniInputNode::init(dim);
+    }
+
+    virtual bool typeEqual(Node *other) override {
+        return UniInputNode::typeEqual(other) && bias_param_ ==
+            static_cast<BiasNode *>(other)->bias_param_;
+    }
+
+    virtual string typeSignature() const override {
+        return UniInputNode::typeSignature() + "-" + addressToString(bias_param_);
+    }
+
+    void compute() override {
+        for (int i = 0; i < getDim(); ++i) {
+            val()[i] = getInput()->getVal()[i] + bias_param_->val[0][i];
+        }
+    }
+
+    void backward() override {
+//        cout << "bias node backward cpu" << endl;
+        getInput()->loss().vec() += loss().vec();
+//        cout << "loss:" << getLoss()[4] << endl;
+//        cout << "before add:"<< bias_param_->grad[0][4] << endl;
+//        cout << bias_param_->grad.toString() << endl;
+        for (int i = 0; i < getDim(); ++i) {
+            bias_param_->grad[0][i] += getLoss()[i];
+        }
+//        cout << "after add:"<< bias_param_->grad[0][4] << endl;
+    }
+
+    Executor *generate() override;
+
+protected:
+    virtual bool isDimLegal(const Node &input) const override {
+        return input.getDim() == getDim();
+    }
+
+private:
+    BiasParam *bias_param_;
+    friend class BiasExecutor;
+};
+
+#if USE_GPU
+class BiasExecutor : public UniInputExecutor {
+public:
+    void forward() override {
+        dtype *bias = param()->val.value;
+        vector<dtype*> inputs, vals;
+        for (Node *node : batch) {
+            BiasNode *bias_node = static_cast<BiasNode *>(node);
+            inputs.push_back(bias_node->getInput()->getVal().value);
+            vals.push_back(bias_node->getVal().value);
+        }
+        n3ldg_cuda::BiasForward(inputs, bias, batch.size(), getDim(), vals);
+#if TEST_CUDA
+        Executor::testForward();
+        cout << "bias forward tested" << endl;
+#endif
+    }
+
+    void backward() override {
+        dtype *bias = param()->grad.value;
+        vector<dtype *> losses, in_losses;
+        for (Node *node : batch) {
+            BiasNode *bias_node = static_cast<BiasNode *>(node);
+            losses.push_back(bias_node->getLoss().value);
+            in_losses.push_back(bias_node->getInput()->getLoss().value);
+        }
+        n3ldg_cuda::BiasBackward(losses, batch.size(), getDim(), bias, in_losses);
+#if TEST_CUDA
+        UniInputExecutor::testBackward();
+        cout << "count:" << batch.size() << endl;
+        n3ldg_cuda::Assert(param()->grad.verify("bias backward bias grad"));
+        cout << "Bias backward tested" << endl;
+#endif
+    }
+
+private:
+    BiasParam *param() {
+        return static_cast<BiasNode*>(batch.front())->bias_param_;
+    }
+};
+#else
+class BiasExecutor : public Executor {};
+#endif
+
+Executor *BiasNode::generate() {
+    return new BiasExecutor;
+}
+
 namespace n3ldg_plus {
 
 Node *linear(Graph &graph, UniParams &params, Node &input) {
@@ -667,8 +794,10 @@ Node *uni(Graph &graph, UniParams &params, Node &input, ActivatedEnum activated_
         activated = new TanhNode;
     } else if (activated_type == ActivatedEnum::SIGMOID) {
         activated = new SigmoidNode;
+    } else if (activated_type == ActivatedEnum::RELU) {
+        activated = new ReluNode;
     } else {
-        cerr << "unsupported activated " << activated << endl;
+        cerr << "uni - unsupported activated " << activated << endl;
         abort();
     }
 
@@ -676,6 +805,14 @@ Node *uni(Graph &graph, UniParams &params, Node &input, ActivatedEnum activated_
     activated->forward(graph, *uni);
 
     return activated;
+}
+
+Node *bias(Graph &graph, BiasParam &param, Node &input) {
+    int dim = input.getDim();
+    BiasNode *node(new BiasNode(&param));
+    node->init(dim);
+    node->forward(graph, input);
+    return node;
 }
 
 }

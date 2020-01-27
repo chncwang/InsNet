@@ -12,7 +12,7 @@
 
 namespace n3ldg_plus {
 
-Node* softmax(Graph &graph, Node &input) {
+Node *minusMaxScalar(Graph &graph, Node &input) {
     int dim = input.getDim();
 
     MaxScalarNode *max_scalar = new MaxScalarNode();
@@ -26,6 +26,12 @@ Node* softmax(Graph &graph, Node &input) {
     SubNode *subtracted = new SubNode;
     subtracted->init(dim);
     subtracted->forward(graph, input, *scalar_to_vector);
+    return subtracted;
+}
+
+Node* softmax(Graph &graph, Node &input) {
+    int dim = input.getDim();
+    Node *subtracted = minusMaxScalar(graph, input);
 
     ExpNode *exp = new ExpNode;
     exp->init(dim);

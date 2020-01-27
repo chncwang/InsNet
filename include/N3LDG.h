@@ -22,11 +22,14 @@
 #include "Windowlized.h"
 #include "UniOP.h"
 #include "LSTM1.h"
+#include "GRU.h"
 #include "SoftMaxLoss.h"
 #include "AttentionHelp.h"
 #include "Attention.h"
 #include "SparseOP.h"
 #include "MaxProbabilityLoss.h"
+#include "ParamOP.h"
+
 #if USE_GPU
 #include "N3LDG_cuda.h"
 #endif

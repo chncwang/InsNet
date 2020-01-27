@@ -255,6 +255,37 @@ private:
     int node_index_;
 };
 
+void validateEqualNodeDims(const vector<Node *> &nodes) {
+    for (int i = 1; i < nodes.size(); ++i) {
+        if (nodes.at(i)->getDim() != nodes.front()->getDim()) {
+            cerr << boost::format(
+                    "validateEqualNodeDims - first node size is %1%, but %2%st is %3%") %
+                nodes.size() % i % nodes.front()->getDim() << endl;
+            abort();
+        }
+    }
+}
+
+auto cpu_get_node_val = [](Node *node) {
+    return node->val().v;
+};
+
+auto cpu_get_node_loss = [](Node *node) {
+    return node->loss().v;
+};
+
+#if USE_GPU
+
+auto gpu_get_node_val = [](Node *node) {
+    return node->val().value;
+};
+
+auto gpu_get_node_loss = [](Node *node) {
+    return node->loss().value;
+};
+
+#endif
+
 typedef Node* PNode;
 
 //class CompositionNode : public Node {
@@ -326,7 +357,7 @@ std::vector<Node*> toNodePointers(const std::vector<T *> &vec) {
 /* *
  * return tuple<exp, pair<max_i, max>, sum>
  * */
-std::tuple<std::unique_ptr<Tensor1D>, std::pair<int, dtype>, dtype> toExp(const Node &node) {
+std::tuple<std::unique_ptr<n3ldg_cpu::Tensor1D>, std::pair<int, dtype>, dtype> toExp(const Node &node) {
     dtype max = node.getVal().v[0];
     int max_j = 0;
     for (int j = 1; j < node.getDim(); ++j) {
@@ -336,7 +367,7 @@ std::tuple<std::unique_ptr<Tensor1D>, std::pair<int, dtype>, dtype> toExp(const 
         }
     }
 
-    std::unique_ptr<Tensor1D> exp(new Tensor1D);
+    std::unique_ptr<n3ldg_cpu::Tensor1D> exp(new n3ldg_cpu::Tensor1D);
     exp->init(node.getDim());
     exp->vec() = (node.getVal().vec() - max).exp();
     dtype sum = static_cast<Eigen::Tensor<dtype, 0>>(exp->vec().sum())(0);
@@ -393,6 +424,7 @@ public:
         n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
         profiler.BeginEvent(getNodeType() + " forward");
         forward();
+
         profiler.EndCudaEvent();
         for (Node *node : batch) {
             node->setDegree(-1);
