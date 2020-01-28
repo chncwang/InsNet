@@ -230,6 +230,10 @@ public:
     void forward() override {
         vector<dtype *> in_vals, vals;
         for (Node *node : batch) {
+            dims_.push_back(node->getDim());
+        }
+        max_dim_ = *max_element(dims_.begin(), dims_.end());
+        for (Node *node : batch) {
             ScalarConcatNode *concat = static_cast<ScalarConcatNode *>(node);
             for (Node *in : concat->ins()) {
                 in_vals.push_back(in->getVal().value);
@@ -238,9 +242,7 @@ public:
                 in_vals.push_back(nullptr);
             }
             vals.push_back(node->getVal().value);
-            dims_.push_back(node->getDim());
         }
-        max_dim_ = *max_element(dims_.begin(), dims_.end());
         n3ldg_cuda::ScalarConcatForward(in_vals, batch.size(), dims_, max_dim_, vals);
 #if TEST_CUDA
         Executor::testForward();
@@ -261,7 +263,15 @@ public:
         }
         n3ldg_cuda::ScalarConcatBackward(losses, batch.size(), dims_, max_dim_, in_losses);
 #if TEST_CUDA
-        Executor::testBackward();
+        auto get_inputs = [](Node &node) {
+            ScalarConcatNode &concat = static_cast<ScalarConcatNode&>(node);
+            vector<pair<Node *, string>> results;
+            for (Node *n : concat.ins()) {
+                results.push_back(make_pair(n, "input"));
+            }
+            return results;
+        };
+        Executor::testBackward(get_inputs);
 #endif
     }
 
