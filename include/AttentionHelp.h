@@ -47,7 +47,7 @@ Node* attention(Graph &graph, vector<Node *>& inputs, vector<Node *>& scores) {
         }
     }
 
-    Node *concated = concat(graph, scores);
+    Node *concated = scalarConcat(graph, scores);
 
     Node *softmax = n3ldg_plus::softmax(graph, *concated);
 

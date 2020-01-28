@@ -90,7 +90,6 @@ public:
         }
     }
 
-
     void backward() override {
         int nSize = ins.size();
         int offset = 0;
@@ -101,21 +100,7 @@ public:
             offset += inDims[i];
         }
     }
-
 };
-
-namespace n3ldg_plus {
-Node *concat(Graph &graph, const vector<Node*> inputs) {
-    int dim = 0;
-    for (Node *in : inputs) {
-        dim += in->getDim();
-    }
-    ConcatNode *concat = new ConcatNode;
-    concat->init(dim);
-    concat->forward(graph, inputs);
-    return concat;
-}
-}
 
 #if USE_GPU
 class ConcatExecutor : public Executor {
@@ -192,6 +177,126 @@ PExecutor ConcatNode::generate() {
     }
 #endif
     return exec;
+}
+
+class ScalarConcatNode : public Node {
+public:
+    ScalarConcatNode() : Node("scalar_concat") {}
+
+    void forward(Graph &graph, const vector<Node *> &ins) {
+        if (ins.size() != getDim()) {
+            cerr << "ScalarConcatNode forward - ins size error" << endl;
+            abort();
+        }
+
+        ins_ = ins;
+        for (Node *n : ins) {
+            if (n->getDim() != 1) {
+                cerr << "ScalarConcatNode forward - non scalar found" << endl;
+                abort();
+            }
+            n->addParent(this);
+        }
+        graph.addNode(this);
+    }
+
+    Executor *generate() override;
+
+    void compute() override {
+        int i = 0;
+        for (Node *in : ins_) {
+            val()[i++] = in->getVal()[0];
+        }
+    }
+
+    void backward() override {
+        int i = 0;
+        for (Node *in : ins_) {
+            in->loss()[0] += getLoss()[i++];
+        }
+    }
+
+    const vector<Node *> ins() const {
+        return ins_;
+    }
+
+private:
+    vector<Node *> ins_;
+};
+
+#if USE_GPU
+class ScalarConcatExecutor : public Executor {
+public:
+    void forward() override {
+        vector<dtype *> in_vals, vals;
+        for (Node *node : batch) {
+            ScalarConcatNode *concat = static_cast<ScalarConcatNode *>(node);
+            for (Node *in : concat->ins()) {
+                in_vals.push_back(in->getVal().value);
+            }
+            for (int i = 0; i < max_dim_ - concat->ins().size(); ++i) {
+                in_vals.push_back(nullptr);
+            }
+            vals.push_back(node->getVal().value);
+            dims_.push_back(node->getDim());
+        }
+        max_dim_ = *max_element(dims_.begin(), dims_.end());
+        n3ldg_cuda::ScalarConcatForward(in_vals, batch.size(), dims_, max_dim_, vals);
+#if TEST_CUDA
+        Executor::testForward();
+#endif
+    }
+
+    void backward() override {
+        vector<dtype *> losses, in_losses;
+        for (Node *node : batch) {
+            ScalarConcatNode *concat = static_cast<ScalarConcatNode *>(node);
+            for (Node *in : concat->ins()) {
+                in_losses.push_back(in->getVal().value);
+            }
+            for (int i = 0; i < max_dim_ - concat->ins().size(); ++i) {
+                in_losses.push_back(nullptr);
+            }
+            losses.push_back(node->getLoss().value);
+        }
+        n3ldg_cuda::ScalarConcatBackward(losses, batch.size(), dims_, max_dim_, in_losses);
+#if TEST_CUDA
+        Executor::testBackward();
+#endif
+    }
+
+private:
+    vector<int> dims_;
+    int max_dim_;
+};
+#else
+class ScalarConcatExecutor : public Executor {};
+#endif
+
+Executor *ScalarConcatNode::generate() {
+    return new ScalarConcatExecutor;
+}
+
+namespace n3ldg_plus {
+
+Node *concat(Graph &graph, const vector<Node*> inputs) {
+    int dim = 0;
+    for (Node *in : inputs) {
+        dim += in->getDim();
+    }
+    ConcatNode *concat = new ConcatNode;
+    concat->init(dim);
+    concat->forward(graph, inputs);
+    return concat;
+}
+
+Node *scalarConcat(Graph &graph, const vector<Node *> inputs) {
+    ScalarConcatNode *concat = new ScalarConcatNode;
+    concat->init(inputs.size());
+    concat->forward(graph, inputs);
+    return concat;
+}
+
 }
 
 #endif

@@ -218,6 +218,12 @@ void ConcatBackward(const std::vector<dtype*> &in_losses,
         int count,
         int in_count,
         int out_dim);
+void ScalarConcatForward(const vector<dtype *> &ins, int count, const vector<int> &dims,
+        int max_dim,
+        const vector<dtype *> &results);
+void ScalarConcatBackward(const vector<dtype *> &losses, int count, const vector<int> &dims,
+        int max_dim,
+        const vector<dtype *> in_losses);
 void LookupForward(const std::vector<int> &xids, const dtype *vocabulary,
         int count,
         int dim,
