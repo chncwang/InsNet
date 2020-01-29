@@ -567,38 +567,46 @@ void CopyFromDeviceToHost(const std::vector<dtype*> &src,
 
 __global__ void KernelActivationForward(ActivatedEnum activated, const dtype *const *xs,
         int count,
-        int dim,
+        int *dims,
+        int max_dim,
         dtype *const *ys) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
-    for (int i = index; i < dim * count; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        if (activated == ActivatedEnum::TANH) {
-            ys[count_i][dim_i] = cuda_tanh(xs[count_i][dim_i]);
-        } else if (activated == ActivatedEnum::SIGMOID) {
-            ys[count_i][dim_i] = cuda_sigmoid(xs[count_i][dim_i]);
-        } else if (activated == ActivatedEnum::EXP) {
-            ys[count_i][dim_i] = cuda_exp(xs[count_i][dim_i]);
-        } else if (activated == ActivatedEnum::RELU)
-            ys[count_i][dim_i] = cuda_relu(xs[count_i][dim_i]);
-        else {
-            printf("KernelActivationForward - error enum\n");
-            assert(false);
+    for (int i = index; i < max_dim * count; i += step) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+        if (dim_i < dims[count_i]) {
+            if (activated == ActivatedEnum::TANH) {
+                ys[count_i][dim_i] = cuda_tanh(xs[count_i][dim_i]);
+            } else if (activated == ActivatedEnum::SIGMOID) {
+                ys[count_i][dim_i] = cuda_sigmoid(xs[count_i][dim_i]);
+            } else if (activated == ActivatedEnum::EXP) {
+                ys[count_i][dim_i] = cuda_exp(xs[count_i][dim_i]);
+            } else if (activated == ActivatedEnum::RELU) {
+                ys[count_i][dim_i] = cuda_relu(xs[count_i][dim_i]);
+            } else {
+                printf("KernelActivationForward - error enum\n");
+                assert(false);
+            }
         }
     }
 }
 
 void ActivationForward(ActivatedEnum activated, const std::vector<const dtype*> &xs,
         int count,
-        int dim,
+        const vector<int> &dims,
         std::vector<dtype*> &ys) {
+    int max_dim = *max_element(dims.begin(), dims.end());
     NumberPointerArray x_arr, y_arr;
     x_arr.init((dtype**)xs.data(), xs.size());
     y_arr.init((dtype**)ys.data(), ys.size());
-    int block_count = DefaultBlockCount(count * dim);
-    KernelActivationForward<<<block_count, TPB>>>(activated,
-            (const dtype* const *)x_arr.value, count, dim, (dtype *const *)y_arr.value);
+    int block_count = DefaultBlockCount(count * max_dim);
+
+    IntArray dim_arr;
+    dim_arr.init(dims.data(), dims.size());
+
+    KernelActivationForward<<<block_count, TPB>>>(activated, (const dtype* const *)x_arr.value,
+            count, dim_arr.value, max_dim, (dtype *const *)y_arr.value);
     CheckCudaError();
 }
 
@@ -606,43 +614,49 @@ __global__ void KernelActivationBackward(ActivatedEnum activated,
         const dtype *const *losses,
         const dtype *const *vals,
         int count,
-        int dim,
+        int *dims,
+        int max_dim,
         dtype* const* in_losses) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
-    for (int i = index; i < dim * count; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        dtype l;
-        if (activated == ActivatedEnum::TANH) {
-            l = cuda_dtanh(vals[count_i][dim_i]);
-        } else if (activated == ActivatedEnum::SIGMOID) {
-            l = cuda_dsigmoid(vals[count_i][dim_i]);
-        } else if (activated == ActivatedEnum::EXP) {
-            l = cuda_dexp(vals[count_i][dim_i]);
-        } else if (activated == ActivatedEnum::RELU) {
-            l = cuda_drelu(vals[count_i][dim_i]);
-        } else {
-            printf("KernelActivationBackward - error enum\n");
-            assert(false);
+    for (int i = index; i < max_dim * count; i += step) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+        if (dim_i < dims[count_i]) {
+            dtype l;
+            if (activated == ActivatedEnum::TANH) {
+                l = cuda_dtanh(vals[count_i][dim_i]);
+            } else if (activated == ActivatedEnum::SIGMOID) {
+                l = cuda_dsigmoid(vals[count_i][dim_i]);
+            } else if (activated == ActivatedEnum::EXP) {
+                l = cuda_dexp(vals[count_i][dim_i]);
+            } else if (activated == ActivatedEnum::RELU) {
+                l = cuda_drelu(vals[count_i][dim_i]);
+            } else {
+                printf("KernelActivationBackward - error enum\n");
+                assert(false);
+            }
+            dtype v = l * losses[count_i][dim_i];
+            DeviceAtomicAdd(in_losses[count_i] + dim_i, v);
         }
-        dtype v = l * losses[count_i][dim_i];
-        DeviceAtomicAdd(in_losses[count_i] + dim_i, v);
     }
 }
 
 void ActivationBackward(ActivatedEnum activated, const std::vector<const dtype*> &losses,
         const std::vector<dtype*> &vals,
         int count,
-        int dim,
+        const vector<int> &dims,
         std::vector<dtype*> &in_losses) {
+    int max_dim = *max_element(dims.begin(), dims.end());
     NumberPointerArray loss_arr, val_arr, in_loss_arr;
     loss_arr.init((dtype**)losses.data(), losses.size());
     val_arr.init((dtype**)vals.data(), vals.size());
     in_loss_arr.init((dtype**)in_losses.data(), in_losses.size());
-    int block_count = DefaultBlockCount(count * dim);
-    KernelActivationBackward<<<block_count, TPB>>>(activated ,loss_arr.value,
-            val_arr.value, count, dim, (dtype *const *)in_loss_arr.value);
+    int block_count = DefaultBlockCount(count * max_dim);
+    IntArray dim_arr;
+    dim_arr.init(dims.data(), dims.size());
+    KernelActivationBackward<<<block_count, TPB>>>(activated, loss_arr.value,
+            val_arr.value, count, dim_arr.value, max_dim, (dtype *const *)in_loss_arr.value);
     CheckCudaError();
 }
 
@@ -2130,57 +2144,71 @@ void SplitBackward(const vector<const dtype*> &losses, const vector<int> offsets
 
 __global__ void KernelSubForward(const dtype *const *minuend, const dtype *const *subtrahend,
         int count,
-        int dim,
+        int *dims,
+        int max_dim,
         dtype *const *results) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
 
-    for (int i = index; i < count * dim; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        results[count_i][dim_i] = minuend[count_i][dim_i] - subtrahend[count_i][dim_i];
+    for (int i = index; i < count * max_dim; i += step) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+        if (dim_i < dims[count_i]) {
+            results[count_i][dim_i] = minuend[count_i][dim_i] - subtrahend[count_i][dim_i];
+        }
     }
 }
 
 void SubForward(const std::vector<const dtype*> &minuend,
         const std::vector<const dtype*> &subtrahend,
         int count,
-        int dim,
+        const vector<int> &dims,
         std::vector<dtype*> &results) {
-    int block_count = DefaultBlockCount(count * dim);
+    int max_dim = *max_element(dims.begin(), dims.end());
+    int block_count = DefaultBlockCount(count * max_dim);
     NumberPointerArray minuend_arr, subtrahend_arr, result_arr;
     minuend_arr.init((dtype**)minuend.data(), count);
     subtrahend_arr.init((dtype**)subtrahend.data(), count);
     result_arr.init((dtype**)results.data(), count);
+    IntArray dim_arr;
+    dim_arr.init(dims.data(), dims.size());
     KernelSubForward<<<block_count, TPB>>>((const dtype* const*)minuend_arr.value,
-            (const dtype *const *)subtrahend_arr.value, count, dim,
+            (const dtype *const *)subtrahend_arr.value, count, dim_arr.value, max_dim,
             (dtype *const *)result_arr.value);
     CheckCudaError();
 }
 
-__global__ void KernelSubBackward(const dtype *const *losses, int count, int dim,
+__global__ void KernelSubBackward(const dtype *const *losses, int count, int *dims, int max_dim,
         dtype *const *minuend_losses,
         dtype *const *subtrahend_losses) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
-    for (int i = index; i < count * dim; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        DeviceAtomicAdd(minuend_losses[count_i] + dim_i, losses[count_i][dim_i]);
-        DeviceAtomicAdd(subtrahend_losses[count_i] + dim_i, -losses[count_i][dim_i]);
+    for (int i = index; i < count * max_dim; i += step) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+        if (dim_i < dims[count_i]) {
+            DeviceAtomicAdd(minuend_losses[count_i] + dim_i, losses[count_i][dim_i]);
+            DeviceAtomicAdd(subtrahend_losses[count_i] + dim_i, -losses[count_i][dim_i]);
+        }
     }
 }
 
-void SubBackward(const std::vector<const dtype*> &losses, int count, int dim,
+void SubBackward(const std::vector<const dtype*> &losses, int count, const vector<int> &dims,
         std::vector<dtype*> &minuend_losses,
         std::vector<dtype*> &subtrahend_losses) {
-    int block_count = DefaultBlockCount(count * dim);
+    int max_dim = *max_element(dims.begin(), dims.end());
+    int block_count = DefaultBlockCount(count * max_dim);
     NumberPointerArray loss_arr, minuend_loss_arr, subtrahend_loss_arr;
     loss_arr.init((dtype**)losses.data(), losses.size());
     minuend_loss_arr.init((dtype**)minuend_losses.data(), minuend_losses.size());
     subtrahend_loss_arr.init((dtype**)subtrahend_losses.data(), subtrahend_losses.size());
-    KernelSubBackward<<<block_count, TPB>>>((const dtype *const *)loss_arr.value, count, dim,
-            (dtype *const *)minuend_loss_arr.value, (dtype *const *)subtrahend_loss_arr.value);
+
+    IntArray dim_arr;
+    dim_arr.init(dims.data(), dims.size());
+
+    KernelSubBackward<<<block_count, TPB>>>((const dtype *const *)loss_arr.value, count,
+            dim_arr.value, max_dim, (dtype *const *)minuend_loss_arr.value,
+            (dtype *const *)subtrahend_loss_arr.value);
     CheckCudaError();
 }
 
@@ -2655,7 +2683,11 @@ dtype MultiCrossEntropyLoss(const vector<dtype*> &vals, const vector<vector<int>
     };
     transform(logged_vec.begin(), logged_vec.end(), back_inserter(const_logged_arr), return_const);
 
-    VectorSumForward(const_logged_arr, count, dim, ce_losses);
+    vector<int> dims;
+    for (int i = 0; i < count; ++i) {
+        dims.push_back(dim);
+    }
+    VectorSumForward(const_logged_arr, count, dims, ce_losses);
 
     dtype ce_loss_sum = 0.0f;
 
@@ -2751,7 +2783,11 @@ dtype KLCrossEntropyLoss(const vector<dtype*> &vals,
     };
     transform(logged_vec.begin(), logged_vec.end(), back_inserter(const_logged_arr), return_const);
 
-    VectorSumForward(const_logged_arr, count, dim, ce_losses);
+    vector<int> dims;
+    for (int i = 0; i < count; ++i) {
+        dims.push_back(dim);
+    }
+    VectorSumForward(const_logged_arr, count, dims, ce_losses);
 
     dtype ce_loss_sum = 0.0f;
 
@@ -3161,7 +3197,7 @@ void MaxScalarBackward(const vector<const dtype *> &losses, const vector<int> &i
     CheckCudaError();
 }
 
-__global__ void KernelVectorSumForward(const dtype *const *v, int count, int dim,
+__global__ void KernelVectorSumForward(const dtype *const *v, int count, int *dims,
         volatile dtype *block_sums,
         int *block_counters,
         dtype *const *results) {
@@ -3176,7 +3212,7 @@ __global__ void KernelVectorSumForward(const dtype *const *v, int count, int dim
 
     int count_i = blockIdx.x;
     int offset = blockIdx.y * blockDim.x + threadIdx.x;
-    shared_sum[threadIdx.x] = offset < dim ? v[count_i][offset] : 0.0f;
+    shared_sum[threadIdx.x] = offset < dims[count_i] ? v[count_i][offset] : 0.0f;
     __syncthreads();
 
     for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
@@ -3219,10 +3255,11 @@ __global__ void KernelVectorSumForward(const dtype *const *v, int count, int dim
 }
 
 
-void VectorSumForward(const vector<const dtype *> &inputs, int count, int dim,
+void VectorSumForward(const vector<const dtype *> &inputs, int count, const vector<int> &dims,
         vector<dtype*> &results) {
-    int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
-    int block_y_count = (dim - 1 + thread_count) / thread_count;
+    int max_dim = *max_element(dims.begin(), dims.end());
+    int thread_count = min(NextTwoIntegerPowerNumber(max_dim), TPB);
+    int block_y_count = (max_dim - 1 + thread_count) / thread_count;
     dim3 block_dim(count, block_y_count, 1);
 
     NumberArray block_sums;
@@ -3235,59 +3272,75 @@ void VectorSumForward(const vector<const dtype *> &inputs, int count, int dim,
     NumberPointerArray result_arr;
     result_arr.init((dtype**)results.data(), results.size());
 
+    IntArray dim_arr;
+    dim_arr.init(dims.data(), dims.size());
+
     KernelVectorSumForward<<<block_dim, thread_count>>>((const dtype *const *)input_arr.value,
-            count, dim, block_sums.value, block_counters.value, (dtype *const *)result_arr.value);
+            count, dim_arr.value, block_sums.value, block_counters.value,
+            (dtype *const *)result_arr.value);
     CheckCudaError();
 }
 
-__global__ void KernelVectorSumBackward(const dtype *const *losses, int count, int dim,
+__global__ void KernelVectorSumBackward(const dtype *const *losses, int count, int *dims,
+        int max_dim,
         dtype *const *input_losses) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
-    for (int i = index; i < count * dim; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
+    for (int i = index; i < count * max_dim; i += step) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
 
-        DeviceAtomicAdd(input_losses[count_i] + dim_i, losses[count_i][0]);
+        if (dim_i < dims[count_i]) {
+            DeviceAtomicAdd(input_losses[count_i] + dim_i, losses[count_i][0]);
+        }
     }
 }
 
-void VectorSumBackward(const vector<const dtype*> &losses, int count, int dim,
+void VectorSumBackward(const vector<const dtype*> &losses, int count, const vector<int> &dims,
         vector<dtype*> &input_losses) {
-    int block_count = DefaultBlockCount(count * dim);
+    int max_dim = *max_element(dims.begin(), dims.end());
+    int block_count = DefaultBlockCount(count * max_dim);
     NumberPointerArray loss_arr, input_loss_arr;
     loss_arr.init((dtype**)losses.data(), losses.size());
     input_loss_arr.init((dtype**)input_losses.data(), input_losses.size());
-    KernelVectorSumBackward<<<block_count, TPB>>>((const dtype *const *)loss_arr.value, count, dim,
-            (dtype *const *)input_loss_arr.value);
+    IntArray dim_arr;
+    dim_arr.init(dims.data(), dims.size());
+    KernelVectorSumBackward<<<block_count, TPB>>>((const dtype *const *)loss_arr.value, count,
+            dim_arr.value, max_dim, (dtype *const *)input_loss_arr.value);
     CheckCudaError();
 }
 
-__global__ void KernelScalarToVectorForward(const dtype* const* inputs, int count, int dim,
+__global__ void KernelScalarToVectorForward(const dtype* const* inputs, int count, int *dims,
+        int max_dim,
         dtype *const *results) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
-    for (int i = index; i < count * dim; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        results[count_i][dim_i] = inputs[count_i][0];
+    for (int i = index; i < count * max_dim; i += step) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+        if (dim_i < dims[count_i]) {
+            results[count_i][dim_i] = inputs[count_i][0];
+        }
     }
 }
 
-void ScalarToVectorForward(const vector<const dtype*> &inputs, int count, int dim,
+void ScalarToVectorForward(const vector<const dtype*> &inputs, int count, const vector<int> &dims,
         vector<dtype*> &results) {
-    int block_count = DefaultBlockCount(dim * count);
+    int max_dim = *max_element(dims.begin(), dims.end());
+    int block_count = DefaultBlockCount(max_dim * count);
     NumberPointerArray input_arr;
     input_arr.init((dtype**)inputs.data(), inputs.size());
     NumberPointerArray result_arr;
     result_arr.init((dtype**)results.data(), inputs.size());
+    IntArray dim_arr;
+    dim_arr.init(dims.data(), dims.size());
 
     KernelScalarToVectorForward<<<block_count, TPB>>>((const dtype* const *)input_arr.value,
-            count, dim, (dtype *const *)result_arr.value);
+            count, dim_arr.value, max_dim, (dtype *const *)result_arr.value);
     CheckCudaError();
 }
 
-__global__ void KernelScalarToVectorBackward(const dtype *const *losses, int count, int dim,
+__global__ void KernelScalarToVectorBackward(const dtype *const *losses, int count, int *dims,
         volatile dtype *block_sums,
         int *block_counters,
         dtype *const *input_losses) {
@@ -3302,7 +3355,7 @@ __global__ void KernelScalarToVectorBackward(const dtype *const *losses, int cou
 
     int count_i = blockIdx.x;
     int offset = blockIdx.y * blockDim.x + threadIdx.x;
-    shared_sum[threadIdx.x] = offset < dim ? losses[count_i][offset] : 0.0f;
+    shared_sum[threadIdx.x] = offset < dims[count_i] ? losses[count_i][offset] : 0.0f;
     __syncthreads();
 
     for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
@@ -3344,10 +3397,12 @@ __global__ void KernelScalarToVectorBackward(const dtype *const *losses, int cou
     }
 }
 
-void ScalarToVectorBackward(const vector<const dtype*> &losses, int count, int dim,
+void ScalarToVectorBackward(const vector<const dtype*> &losses, int count, const vector<int> &dims,
         vector<dtype*> &input_losses) {
-    int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
-    int block_y_count = (dim - 1 + thread_count) / thread_count;
+    int max_dim = *max_element(dims.begin(), dims.end());
+
+    int thread_count = min(NextTwoIntegerPowerNumber(max_dim), TPB);
+    int block_y_count = (max_dim - 1 + thread_count) / thread_count;
     dim3 block_dim(count, block_y_count, 1);
 
     NumberArray block_sums;
@@ -3360,8 +3415,11 @@ void ScalarToVectorBackward(const vector<const dtype*> &losses, int count, int d
     NumberPointerArray input_loss_arr;
     input_loss_arr.init((dtype**)input_losses.data(), input_losses.size());
 
+    IntArray dim_arr;
+    dim_arr.init(dims.data(), dims.size());
+
     KernelScalarToVectorBackward<<<block_dim, thread_count>>>((const dtype *const *)loss_arr.value,
-            count, dim, block_sums.value, block_counters.value,
+            count, dim_arr.value, block_sums.value, block_counters.value,
             (dtype *const *)input_loss_arr.value);
     CheckCudaError();
 }

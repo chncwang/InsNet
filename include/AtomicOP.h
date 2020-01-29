@@ -19,8 +19,9 @@ public:
             UniInputNode *expnode = static_cast<UniInputNode*>(node);
             inputs.push_back(expnode->getInput()->getVal().value);
             vals.push_back(expnode->getVal().value);
+            dims_.push_back(node->getDim());
         }
-        n3ldg_cuda::ActivationForward(activation, inputs, batch.size(), getDim(), vals);
+        n3ldg_cuda::ActivationForward(activation, inputs, batch.size(), dims_, vals);
 #if TEST_CUDA
         Executor::testForward();
         cout << "exp forward tested" << endl;
@@ -39,13 +40,16 @@ public:
             input_losses.push_back(exp->getInput()->getLoss().value);
         }
 
-        n3ldg_cuda::ActivationBackward(activation, losses, vals, batch.size(), getDim(),
+        n3ldg_cuda::ActivationBackward(activation, losses, vals, batch.size(), dims_,
                 input_losses);
 #if TEST_CUDA
         UniInputExecutor::testBackward();
         cout << "exp backward tested" << endl;
 #endif
     }
+
+private:
+    vector<int> dims_;
 };
 #else
 template<ActivatedEnum activation>
@@ -526,6 +530,14 @@ class ScalarToVectorNode : public UniInputNode {
 public:
     ScalarToVectorNode() : UniInputNode("scalar_to_vector") {}
 
+    bool typeEqual(Node *other) override {
+        return getNodeType() == other->getNodeType();
+    }
+
+    string typeSignature() const override {
+        return getNodeType();
+    }
+
     void compute() override {
         for (int i = 0; i < getDim(); ++i) {
             val()[i] = getInput()->getVal()[0];
@@ -562,11 +574,12 @@ public:
         vector<const dtype*> inputs;
         vector<dtype*> results;
         for (Node *node : batch) {
-            ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(node);
+            ScalarToVectorNode *n = static_cast<ScalarToVectorNode*>(node);
             inputs.push_back(n->getInput()->getVal().value);
             results.push_back(n->getVal().value);
+            dims_.push_back(n->getDim());
         }
-        n3ldg_cuda::ScalarToVectorForward(inputs, batch.size(), getDim(), results);
+        n3ldg_cuda::ScalarToVectorForward(inputs, batch.size(), dims_, results);
 #if TEST_CUDA
         Executor::testForward();
         cout << "scalarToVector tested" << endl;
@@ -574,6 +587,14 @@ public:
     }
 
     void backward() override {
+#if TEST_CUDA
+        cout << "scalarToVector test before backward..." << endl;
+        for (Node *node : batch) {
+            ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(node);
+            cout << n->getInput()->getNodeType() << endl;
+        }
+        UniInputExecutor::testBeforeBackward();
+#endif
         vector<const dtype*> losses;
         vector<dtype*> input_losses;
         for (Node *node : batch) {
@@ -581,12 +602,16 @@ public:
             losses.push_back(n->getLoss().value);
             input_losses.push_back(n->getInput()->getLoss().value);
         }
-        n3ldg_cuda::ScalarToVectorBackward(losses, batch.size(), getDim(), input_losses);
+        n3ldg_cuda::ScalarToVectorBackward(losses, batch.size(), dims_, input_losses);
 #if TEST_CUDA
+        cout << "scalarToVector test backward..." << endl;
         UniInputExecutor::testBackward();
         cout << "ScalarToVectorNode backward tested" << endl;
 #endif
     }
+
+private:
+    vector<int> dims_;
 };
 #else
 class ScalarToVectorExecutor : public Executor {};
@@ -603,6 +628,14 @@ public:
 
     Executor* generate() override {
         return new ActivationExecutor<ActivatedEnum::EXP>;
+    }
+
+    bool typeEqual(Node *other) override {
+        return getNodeType() == other->getNodeType();
+    }
+
+    string typeSignature() const override {
+        return getNodeType();
     }
 
     void compute() override {
@@ -630,6 +663,14 @@ public:
 
     void initAsScalar() {
         init(1);
+    }
+
+    virtual bool typeEqual(Node *other) override {
+        return Node::typeEqual(other);
+    }
+
+    virtual string typeSignature() const override {
+        return Node::typeSignature();
     }
 
     void compute() override {
@@ -664,9 +705,9 @@ class SumExecutor : public UniInputExecutor {
             SumNode *sum = static_cast<SumNode*>(node);
             inputs.push_back(sum->getInput()->getVal().value);
             results.push_back(sum->getVal().value);
+            dims_.push_back(sum->getInput()->getDim());
         }
-        n3ldg_cuda::VectorSumForward(inputs, batch.size(),
-                static_cast<SumNode*>(batch.front())->getInput()->getDim(), results);
+        n3ldg_cuda::VectorSumForward(inputs, batch.size(), dims_, results);
 #if TEST_CUDA
         Executor::testForward();
         cout << "sum tested" << endl;
@@ -685,13 +726,15 @@ class SumExecutor : public UniInputExecutor {
             input_losses.push_back(sum->getInput()->getLoss().value);
         }
 
-        int dim = static_cast<SumNode*>(batch.front())->getInput()->getDim();
-        n3ldg_cuda::VectorSumBackward(losses, batch.size(), dim, input_losses);
+        n3ldg_cuda::VectorSumBackward(losses, batch.size(), dims_, input_losses);
 #if TEST_CUDA
         UniInputExecutor::testBackward();
         cout << "sum backward tested" << endl;
 #endif
     }
+
+private:
+    vector<int> dims_;
 };
 #else
 class SumExecutor : public Executor {};

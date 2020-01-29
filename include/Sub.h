@@ -10,6 +10,14 @@ class SubNode : public Node {
 public:
     SubNode() : Node("sub") {}
 
+    bool typeEqual(Node* other) override {
+        return getNodeType() == other->getNodeType();
+    }
+
+    string typeSignature() const override {
+        return getNodeType();
+    }
+
     void forward(Graph &graph, Node &minuend, Node &subtrahend) {
         if (getDim() != minuend.getDim() || getDim() != subtrahend.getDim()) {
             cerr << boost::format("dim:%1% minuend:%2% subtrahend:%3%") % getDim() %
@@ -67,9 +75,10 @@ class SubExecutor : public Executor {
             minuend.push_back(sub->minuend_->getVal().value);
             subtrahend.push_back(sub->subtrahend_->getVal().value);
             results.push_back(sub->getVal().value);
+            dims_.push_back(node->getDim());
         }
 
-        n3ldg_cuda::SubForward(minuend, subtrahend, batch.size(), getDim(), results);
+        n3ldg_cuda::SubForward(minuend, subtrahend, batch.size(), dims_, results);
 #if TEST_CUDA
         testForward();
         cout << "sub forward tested" << endl;
@@ -96,13 +105,16 @@ class SubExecutor : public Executor {
         testBeforeBackward(get_inputs);
 #endif
         int count = batch.size();
-        n3ldg_cuda::SubBackward(losses, count, getDim(), minuend_losses, subtrahend_losses);
+        n3ldg_cuda::SubBackward(losses, count, dims_, minuend_losses, subtrahend_losses);
 #if TEST_CUDA
         cout << "test sub backward..." << endl;
         Executor::testBackward(get_inputs);
         cout << "sub tested" << endl;
 #endif
     }
+
+private:
+    vector<int> dims_;
 };
 #else
 class SubExecutor : public Executor {};

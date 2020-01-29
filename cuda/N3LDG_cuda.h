@@ -157,12 +157,12 @@ enum PoolingEnum {
 
 void ActivationForward(ActivatedEnum activated, const std::vector<const dtype*> &xs,
         int count,
-        int dim,
+        const vector<int> &dims,
         std::vector<dtype*> &ys);
 void ActivationBackward(ActivatedEnum activated, const std::vector<const dtype*> &losses,
         const std::vector<dtype*> &vals,
         int count,
-        int dim,
+        const vector<int> &dims,
         std::vector<dtype*> &in_losses);
 void DropoutForward(const std::vector<dtype*> &xs, int count, int dim,
         bool is_training,
@@ -292,9 +292,9 @@ void SplitBackward(const std::vector<const dtype*> &losses, const std::vector<in
 void SubForward(const std::vector<const dtype*> &minuend,
         const std::vector<const dtype*> &subtrahend,
         int count,
-        int dim,
+        const vector<int> &dims,
         std::vector<dtype*> &results);
-void SubBackward(const std::vector<const dtype*> &losses, int count, int dim,
+void SubBackward(const std::vector<const dtype*> &losses, int count, const vector<int> &dims,
         std::vector<dtype*> &minuend_losses,
         std::vector<dtype*> &subtrahend_losses);
 void PMultiBackward(const std::vector<dtype*> &losses,
@@ -343,14 +343,14 @@ void MaxScalarForward(const vector<const dtype*> &inputs, int count, const vecto
 void MaxScalarBackward(const std::vector<const dtype *> &losses, const std::vector<int> &indexes,
         int count,
         const std::vector<dtype*> &input_losses);
-void VectorSumForward(const std::vector<const dtype *> &inputs, int count, int dim,
-        std::vector<dtype*> &results);
-void VectorSumBackward(const std::vector<const dtype*> &losses, int count, int dim,
-        std::vector<dtype*> &input_losses);
-void ScalarToVectorForward(const std::vector<const dtype*> &inputs, int count, int dim,
-        std::vector<dtype*> &results);
-void ScalarToVectorBackward(const std::vector<const dtype*> &losses, int count, int dim,
-        std::vector<dtype*> &input_losses);
+void VectorSumForward(const vector<const dtype *> &inputs, int count, const vector<int> &dims,
+        vector<dtype*> &results);
+void VectorSumBackward(const vector<const dtype*> &losses, int count, const vector<int> &dims,
+        vector<dtype*> &input_losses);
+void ScalarToVectorForward(const vector<const dtype*> &inputs, int count, const vector<int> &dims,
+        vector<dtype*> &results);
+void ScalarToVectorBackward(const vector<const dtype*> &losses, int count, const vector<int> &dims,
+        vector<dtype*> &input_losses);
 void BiasForward(const vector<dtype*> &in_vals, const dtype *bias, int count, int dim,
         const vector<dtype *> &vals);
 void BiasBackward(const vector<dtype *> &losses, int count, int dim, dtype *bias_loss,

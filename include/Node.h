@@ -388,6 +388,11 @@ void clearNodes(std::vector<Node*> &nodes) {
         dims.push_back(n->getDim());
     }
     n3ldg_cuda::BatchMemset(val_and_losses, val_and_losses.size(), dims, 0.0f);
+#if TEST_CUDA
+    for (Node *node : nodes) {
+        node->loss().verify("clearNodes");
+    }
+#endif
     profiler.EndEvent();
 }
 #endif
@@ -530,6 +535,15 @@ protected:
                                 " forward input").c_str()));
             }
         }
+    }
+
+    void testBeforeBackward() {
+        auto get_inputs = [](Node &node) {
+            UniInputNode &uni_input = static_cast<UniInputNode&>(node);
+            vector<pair<Node*, string>> inputs = {make_pair(uni_input.input_, "input")};
+            return inputs;
+        };
+        Executor::testBeforeBackward(get_inputs);
     }
 
     void testBackward() {
