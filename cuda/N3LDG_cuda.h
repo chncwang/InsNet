@@ -131,8 +131,7 @@ void Assert(bool v, const std::string &message = "",
 void Memset(dtype *p, int len, dtype value);
 void Memset(bool *p, int len, bool value);
 void *Malloc(int size);
-void BatchMemset(const std::vector<dtype*> &vec, int count, int dim,
-        dtype value);
+void BatchMemset(const std::vector<dtype*> &vec, int count, const vector<int> &dims, dtype value);
 void PrintNums(const dtype* p, int len);
 void PrintInts(const int* p, int len);
 

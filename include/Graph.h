@@ -137,7 +137,7 @@ public:
             profiler.EndEvent();
 #if USE_GPU
             profiler.BeginEvent("clear nodes");
-            clearNodes(cur_exec->batch, cur_exec->getDim());
+            clearNodes(cur_exec->batch);
             profiler.EndCudaEvent();
 #endif
 //            cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl << endl;

@@ -375,17 +375,19 @@ std::tuple<std::unique_ptr<n3ldg_cpu::Tensor1D>, std::pair<int, dtype>, dtype> t
 }
 
 #if USE_GPU
-void clearNodes(std::vector<Node*> &nodes, int dim) {
+void clearNodes(std::vector<Node*> &nodes) {
     n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
     profiler.BeginEvent("clearNodes");
     std::vector<dtype*> val_and_losses;
+    vector<int> dims;
     val_and_losses.reserve(2 * nodes.size());
     for (Node *n : nodes) {
         val_and_losses.push_back(n->getVal().value);
         val_and_losses.push_back(n->getLoss().value);
+        dims.push_back(n->getDim());
+        dims.push_back(n->getDim());
     }
-    n3ldg_cuda::BatchMemset(val_and_losses, val_and_losses.size(), dim,
-            0.0f);
+    n3ldg_cuda::BatchMemset(val_and_losses, val_and_losses.size(), dims, 0.0f);
     profiler.EndEvent();
 }
 #endif

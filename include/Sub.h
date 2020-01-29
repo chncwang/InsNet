@@ -84,10 +84,6 @@ class SubExecutor : public Executor {
             losses.push_back(sub->loss().value);
             minuend_losses.push_back(sub->minuend_->loss().value);
             subtrahend_losses.push_back(sub->subtrahend_->loss().value);
-            cout << "minuend type:" << sub->minuend_->getNodeType() << endl;
-            for (Node *p : sub->minuend_->getParents()) {
-                cout << "type:" << p->getNodeType() << endl;
-            }
         }
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {

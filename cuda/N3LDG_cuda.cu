@@ -1517,23 +1517,29 @@ void *Malloc(int size) {
     return p;
 }
 
-__global__ void KernelBatchMemset(dtype *const *p, int count, int dim, dtype value) {
+__global__ void KernelBatchMemset(dtype *const *p, int count, int *dims, int max_dim,
+        dtype value) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
-    for (int i = index; i < dim * count ; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        p[count_i][dim_i] = value;
+    for (int i = index; i < max_dim * count ; i += step) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+        if (dim_i < dims[count_i]) {
+            p[count_i][dim_i] = value;
+        }
     }
 }
 
-void BatchMemset(const std::vector<dtype*> &vec, int count, int dim,
-        dtype value) {
-    int block_count = (count * dim -1 + TPB) / TPB;
+void BatchMemset(const std::vector<dtype*> &vec, int count, const vector<int> &dims, dtype value) {
+    int max_dim = *max_element(dims.begin(), dims.end());
+    int block_count = (count * max_dim -1 + TPB) / TPB;
     block_count = std::min(block_count, BLOCK_COUNT);
     NumberPointerArray vec_arr;
     vec_arr.init((dtype**)vec.data(), vec.size());
-    KernelBatchMemset<<<block_count, TPB>>>((dtype *const *)vec_arr.value, count, dim, value);
+    IntArray dim_arr;
+    dim_arr.init(dims.data(), dims.size());
+    KernelBatchMemset<<<block_count, TPB>>>((dtype *const *)vec_arr.value, count, dim_arr.value,
+            max_dim, value);
     CheckCudaError();
 }
 
