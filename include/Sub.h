@@ -84,9 +84,11 @@ class SubExecutor : public Executor {
             losses.push_back(sub->loss().value);
             minuend_losses.push_back(sub->minuend_->loss().value);
             subtrahend_losses.push_back(sub->subtrahend_->loss().value);
+            cout << "minuend type:" << sub->minuend_->getNodeType() << endl;
+            for (Node *p : sub->minuend_->getParents()) {
+                cout << "type:" << p->getNodeType() << endl;
+            }
         }
-        int count = batch.size();
-        n3ldg_cuda::SubBackward(losses, count, getDim(), minuend_losses, subtrahend_losses);
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {
             SubNode &sub = static_cast<SubNode&>(node);
@@ -94,6 +96,13 @@ class SubExecutor : public Executor {
                 make_pair(sub.subtrahend_, "subtrahend")};
             return inputs;
         };
+        cout << "test before sub backward..." << endl;
+        testBeforeBackward(get_inputs);
+#endif
+        int count = batch.size();
+        n3ldg_cuda::SubBackward(losses, count, getDim(), minuend_losses, subtrahend_losses);
+#if TEST_CUDA
+        cout << "test sub backward..." << endl;
         Executor::testBackward(get_inputs);
         cout << "sub tested" << endl;
 #endif

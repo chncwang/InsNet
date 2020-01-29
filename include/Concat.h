@@ -220,6 +220,14 @@ public:
         return ins_;
     }
 
+    bool typeEqual(Node *other) override {
+        return getNodeType() == other->getNodeType();
+    }
+
+    string typeSignature() const override {
+        return getNodeType();
+    }
+
 private:
     vector<Node *> ins_;
 };
@@ -261,7 +269,6 @@ public:
             }
             losses.push_back(node->getLoss().value);
         }
-        n3ldg_cuda::ScalarConcatBackward(losses, batch.size(), dims_, max_dim_, in_losses);
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {
             ScalarConcatNode &concat = static_cast<ScalarConcatNode&>(node);
@@ -271,6 +278,11 @@ public:
             }
             return results;
         };
+        cout << "test before scalar concat" << endl;
+        Executor::testBeforeBackward(get_inputs);
+#endif
+        n3ldg_cuda::ScalarConcatBackward(losses, batch.size(), dims_, max_dim_, in_losses);
+#if TEST_CUDA
         Executor::testBackward(get_inputs);
 #endif
     }
