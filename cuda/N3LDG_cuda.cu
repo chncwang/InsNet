@@ -3013,7 +3013,7 @@ void SoftMaxLossByExp(const dtype *const *exps, int count, int dim, const dtype 
     CheckCudaError();
 }
 
-__global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim,
+__global__ void KernelMaxScalarForward(const dtype *const *v, int count, int* dims, int max_dim,
         volatile dtype *block_maxes,
         volatile int *block_max_is,
         int *block_counters,
@@ -3031,7 +3031,7 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
 
     int count_i = blockIdx.x;
     int offset = blockIdx.y * blockDim.x + threadIdx.x;
-    shared_max[threadIdx.x] = offset < dim ? v[count_i][offset] : -1e10;
+    shared_max[threadIdx.x] = offset < dims[count_i] ? v[count_i][offset] : -1e10;
     shared_max_i[threadIdx.x] = offset;
     __syncthreads();
 
@@ -3046,7 +3046,7 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
     if (threadIdx.x == 0) {
         int block_maxes_offset = blockIdx.x * gridDim.y + blockIdx.y;
         int max_ii = shared_max_i[0];
-        if (max_ii < 0 || max_ii >= dim) {
+        if (max_ii < 0 || max_ii >= max_dim) {
             printf("threadIdx.x == 0 after first reduce max_ii:%d v:%f\n", max_ii, shared_max[0]);
             for (int i = 0; i < TPB; ++i) {
                 printf("shared_max[%d]:%f shared_max_i[%d]:%d\n", i, shared_max[i], i,
@@ -3068,7 +3068,7 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
         for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
             int offset = blockIdx.x * gridDim.y + i;
             int max_ii = block_max_is[offset];
-            if (max_ii < 0 || max_ii >= dim) {
+            if (max_ii < 0 || max_ii >= max_dim) {
                 printf("offset:%d is_last_block block_maxes[offset]:%f block_max_is[offset]:%d\n",
                         offset, block_maxes[offset], block_max_is[offset]);
                 assert(false);
@@ -3096,7 +3096,7 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
             max_vals[count_i][0] = shared_max[0];
             max_indexes[count_i] = shared_max_i[0];
             int max_ii = max_indexes[count_i];
-            if (max_ii < 0 || max_ii >= dim) {
+            if (max_ii < 0 || max_ii >= max_dim) {
                 printf("threadIdx.x == 0 max_i:%d count_i:%d max_val:%f\n", max_indexes[count_i],
                         count_i, max_vals[count_i][0]);
                 assert(false);
@@ -3105,11 +3105,12 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int dim
     }
 }
 
-void MaxScalarForward(const vector<const dtype*> &inputs, int count, int dim,
+void MaxScalarForward(const vector<const dtype*> &inputs, int count, const vector<int> &dims,
         vector<dtype*> &results,
         vector<int> &max_indexes) {
-    int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
-    int block_y_count = (dim - 1 + thread_count) / thread_count;
+    int max_dim = *max_element(dims.begin(), dims.end());
+    int thread_count = min(NextTwoIntegerPowerNumber(max_dim), TPB);
+    int block_y_count = (max_dim - 1 + thread_count) / thread_count;
     dim3 block_dim(count, block_y_count, 1);
 
     NumberArray block_maxes;
@@ -3125,8 +3126,12 @@ void MaxScalarForward(const vector<const dtype*> &inputs, int count, int dim,
     IntArray max_index_arr;
     max_index_arr.init(max_indexes.size());
 
+    IntArray dim_arr;
+    dim_arr.init(dims.data(), dims.size());
+
     KernelMaxScalarForward<<<block_dim, thread_count>>>((const dtype *const *)input_arr.value,
-            count, dim, block_maxes.value, block_max_is.value, block_counters.value,
+            count, dim_arr.value, max_dim, block_maxes.value, block_max_is.value,
+            block_counters.value,
             max_index_arr.value, (dtype *const *)result_arr.value);
     CheckCudaError();
     MyCudaMemcpy(max_indexes.data(), max_index_arr.value, count * sizeof(int),

@@ -417,6 +417,14 @@ public:
         init(1);
     }
 
+    bool typeEqual(Node *other) override {
+        return Node::typeEqual(other);
+    }
+
+    string typeSignature() const override {
+        return Node::typeSignature();
+    }
+
     void compute() override {
         float max = getInput()->getVal()[0];
         int max_i = 0;
@@ -453,13 +461,14 @@ public:
         vector<const dtype*> inputs;
         vector<dtype*> results;
         max_indexes.resize(batch.size());
+        vector<int> dims;
         for (int i = 0; i < batch.size(); ++i) {
             MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));
             inputs.push_back(node->getInput()->getVal().value);
             results.push_back(node->getVal().value);
+            dims.push_back(node->getInput()->getDim());
         }
-        int input_dim = static_cast<MaxScalarNode*>(batch.front())->getInput()->getDim();
-        n3ldg_cuda::MaxScalarForward(inputs, batch.size(), input_dim, results, max_indexes);
+        n3ldg_cuda::MaxScalarForward(inputs, batch.size(), dims, results, max_indexes);
 
         for (int i = 0; i < batch.size(); ++i) {
             MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));

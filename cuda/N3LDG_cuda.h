@@ -337,9 +337,9 @@ dtype KLCrossEntropyLoss(const vector<dtype*> &vals,
         int dim,
         dtype factor,
         const vector<dtype*> &losses);
-void MaxScalarForward(const std::vector<const dtype*> &inputs, int count, int dim,
-        std::vector<dtype*> &results,
-        std::vector<int> &max_indexes);
+void MaxScalarForward(const vector<const dtype*> &inputs, int count, const vector<int> &dims,
+        vector<dtype*> &results,
+        vector<int> &max_indexes);
 void MaxScalarBackward(const std::vector<const dtype *> &losses, const std::vector<int> &indexes,
         int count,
         const std::vector<dtype*> &input_losses);
