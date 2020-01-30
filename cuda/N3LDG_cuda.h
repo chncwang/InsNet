@@ -269,18 +269,16 @@ void PMultiForward(const std::vector<dtype*> &ins1,
         int count,
         int dim,
         std::vector<dtype*> &vals);
-void DivForwartd(const std::vector<const dtype*> numerators,
-        const std::vector<const dtype*> denominators,
+void DivForward(const vector<const dtype*> numerators, const vector<const dtype*> denominators,
         int count,
-        int dim,
-        std::vector<dtype*> &results);
-void DivBackward(const std::vector<const dtype*> &losses,
-        const std::vector<const dtype*> &denominator_vals,
-        const std::vector<const dtype*> &numerator_vals,
+        const vector<int> &dims,
+        vector<dtype*> &results);
+void DivBackward(const vector<const dtype*> &losses, const vector<const dtype*> &denominator_vals,
+        const vector<const dtype*> &numerator_vals,
         int count,
-        int dim,
-        std::vector<dtype*> &numerator_losses,
-        std::vector<dtype*> &denominator_losses);
+        const vector<int> &dims,
+        vector<dtype*> &numerator_losses,
+        vector<dtype*> &denominator_losses);
 void SplitForward(const std::vector<const dtype*> &inputs, const std::vector<int> &offsets,
         int count,
         int dim,

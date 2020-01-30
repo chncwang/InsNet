@@ -10,6 +10,14 @@ class DivNode : public Node {
 public:
     DivNode() : Node("div_node") {}
 
+    bool typeEqual(Node* other) override {
+        return getNodeType() == other->getNodeType();
+    }
+
+    string typeSignature() const override {
+        return getNodeType();
+    }
+
     void forward(Graph &graph, Node &numerator, Node &denominator) {
         if (getDim() != numerator.getDim() || 1 != denominator.getDim()) {
             cerr << boost::format("dim:%1% minuend:%2% subtrahend:%3%") % getDim() %
@@ -49,6 +57,7 @@ class DivExecutor : public Executor {
 public:
     vector<const dtype*> numerators;
     vector<const dtype*> denominators;
+    vector<int> dims;
 
     void forward() override {
         vector<dtype*> results;
@@ -57,9 +66,10 @@ public:
             numerators.push_back(div->numerator_->getVal().value);
             denominators.push_back(div->denominator_->getVal().value);
             results.push_back(div->getVal().value);
+            dims.push_back(node->getDim());
         }
 
-        n3ldg_cuda::DivForwartd(numerators, denominators, batch.size(), getDim(), results);
+        n3ldg_cuda::DivForward(numerators, denominators, batch.size(), dims, results);
 #if TEST_CUDA
         Executor::testForward();
         cout << "div tested" << endl;
@@ -76,7 +86,7 @@ public:
             denominator_losses.push_back(div->denominator_->getLoss().value);
         }
 
-        n3ldg_cuda::DivBackward(losses, denominators, numerators, batch.size(), getDim(),
+        n3ldg_cuda::DivBackward(losses, denominators, numerators, batch.size(), dims,
                 numerator_losses, denominator_losses);
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {

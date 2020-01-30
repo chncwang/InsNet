@@ -1942,44 +1942,53 @@ void PMultiForward(const std::vector<dtype*> &ins1,
 
 __global__ void KernelDivForward(const dtype *const *numerators, const dtype *const *denominators,
         int count,
-        int dim,
+        int *dims,
+        int max_dim,
         dtype *const *results) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
-    for (int i = index; i < count * dim; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        results[count_i][dim_i] = numerators[count_i][dim_i] / denominators[count_i][0];
+    for (int i = index; i < count * max_dim; i += step) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+        if (dim_i < dims[count_i]) {
+            results[count_i][dim_i] = numerators[count_i][dim_i] / denominators[count_i][0];
+        }
     }
 }
 
-void DivForwartd(const vector<const dtype*> numerators, const vector<const dtype*> denominators,
+void DivForward(const vector<const dtype*> numerators, const vector<const dtype*> denominators,
         int count,
-        int dim,
+        const vector<int> &dims,
         vector<dtype*> &results) {
-    int block_count = DefaultBlockCount(count * dim);
+    int max_dim = *max_element(dims.begin(), dims.end());
+    int block_count = DefaultBlockCount(count * max_dim);
     NumberPointerArray numerator_arr, denominator_arr, result_arr;
     numerator_arr.init((dtype**)numerators.data(), count);
     denominator_arr.init((dtype**)denominators.data(), count);
     result_arr.init((dtype**)results.data(), count);
-    KernelDivForward<<<block_count, TPB>>>(numerator_arr.value, denominator_arr.value, count, dim,
-            (dtype *const *)result_arr.value);
+    IntArray dim_arr;
+    dim_arr.init(dims.data(), dims.size());
+    KernelDivForward<<<block_count, TPB>>>(numerator_arr.value, denominator_arr.value, count,
+            dim_arr.value, max_dim, (dtype *const *)result_arr.value);
     CheckCudaError();
 }
 
 __global__ void KernelDivNumeratorBackward(const dtype *const *losses,
         const dtype *const *denominator_vals,
         int count,
-        int dim,
+        int *dims,
+        int max_dim,
         dtype *const *numerator_losses) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
 
-    for (int i = index; i < count * dim; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        DeviceAtomicAdd(numerator_losses[count_i] + dim_i, losses[count_i][dim_i] /
-                denominator_vals[count_i][0]);
+    for (int i = index; i < count * max_dim; i += step) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+        if (dim_i < dims[count_i]) {
+            DeviceAtomicAdd(numerator_losses[count_i] + dim_i, losses[count_i][dim_i] /
+                    denominator_vals[count_i][0]);
+        }
     }
 }
 
@@ -1987,7 +1996,7 @@ __global__ void KernelDivDenominatorBackward(const dtype *const *losses,
         const dtype *const *numerator_vals,
         const dtype *const *denominator_vals,
         int count,
-        int dim,
+        int *dims,
         volatile dtype *block_sums,
         int *block_counters,
         dtype *const *denominator_losses) {
@@ -2006,7 +2015,7 @@ __global__ void KernelDivDenominatorBackward(const dtype *const *losses,
 
     int offset = blockIdx.y * blockDim.x + threadIdx.x;
 
-    shared_sum[threadIdx.x] = offset < dim ? losses[count_i][offset] *
+    shared_sum[threadIdx.x] = offset < dims[count_i] ? losses[count_i][offset] *
         numerator_vals[count_i][offset] / square : 0.0f;
     __syncthreads();
 
@@ -2052,9 +2061,10 @@ __global__ void KernelDivDenominatorBackward(const dtype *const *losses,
 void DivBackward(const vector<const dtype*> &losses, const vector<const dtype*> &denominator_vals,
         const vector<const dtype*> &numerator_vals,
         int count,
-        int dim,
+        const vector<int> &dims,
         vector<dtype*> &numerator_losses,
         vector<dtype*> &denominator_losses) {
+    int max_dim = *max_element(dims.begin(), dims.end());
     NumberPointerArray loss_arr, denominator_val_arr, numerator_val_arr, numerator_loss_arr,
         denominator_loss_arr;
     loss_arr.init((dtype**)losses.data(), losses.size());
@@ -2062,16 +2072,16 @@ void DivBackward(const vector<const dtype*> &losses, const vector<const dtype*> 
     numerator_val_arr.init((dtype**)numerator_vals.data(), numerator_vals.size());
     numerator_loss_arr.init((dtype**)numerator_losses.data(), numerator_losses.size());
     denominator_loss_arr.init((dtype**)denominator_losses.data(), denominator_losses.size());
+    IntArray dim_arr;
+    dim_arr.init(dims.data(), dims.size());
 
-    int block_count = DefaultBlockCount(count * dim);
+    int block_count = DefaultBlockCount(count * max_dim);
     KernelDivNumeratorBackward<<<block_count, TPB>>>(loss_arr.value, denominator_val_arr.value,
-            count,
-            dim,
-            (dtype *const *)numerator_loss_arr.value);
+            count, dim_arr.value, max_dim, (dtype *const *)numerator_loss_arr.value);
     CheckCudaError();
 
-    int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
-    int block_y_count = (dim - 1 + thread_count) / thread_count;
+    int thread_count = min(NextTwoIntegerPowerNumber(max_dim), TPB);
+    int block_y_count = (max_dim - 1 + thread_count) / thread_count;
     dim3 block_dim(count, block_y_count, 1);
 
     NumberArray block_sums;
@@ -2080,8 +2090,8 @@ void DivBackward(const vector<const dtype*> &losses, const vector<const dtype*> 
     block_counters.init(count);
 
     KernelDivDenominatorBackward<<<block_dim , thread_count>>>(loss_arr.value,
-            numerator_val_arr.value, denominator_val_arr.value, count, dim, block_sums.value,
-            block_counters.value, (dtype *const *)denominator_loss_arr.value);
+            numerator_val_arr.value, denominator_val_arr.value, count, dim_arr.value,
+            block_sums.value, block_counters.value, (dtype *const *)denominator_loss_arr.value);
     CheckCudaError();
 }
 
