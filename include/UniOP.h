@@ -222,6 +222,13 @@ public:
     }
 
     void backward() {
+#if TEST_CUDA
+        if (param->bUseB) {
+            n3ldg_cuda::Assert(param->b.grad.verify("before uni backward b grad"));
+            param->b.grad.copyFromDeviceToHost();
+        }
+        param->W.val.copyFromDeviceToHost();
+#endif
         int count = batch.size();
         Tensor2D lx, ly;
         lx.init(inDim, count);

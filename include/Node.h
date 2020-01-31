@@ -382,9 +382,9 @@ void clearNodes(std::vector<Node*> &nodes) {
     vector<int> dims;
     val_and_losses.reserve(2 * nodes.size());
     for (Node *n : nodes) {
-        val_and_losses.push_back(n->getVal().value);
+//        val_and_losses.push_back(n->getVal().value);
         val_and_losses.push_back(n->getLoss().value);
-        dims.push_back(n->getDim());
+//        dims.push_back(n->getDim());
         dims.push_back(n->getDim());
     }
     n3ldg_cuda::BatchMemset(val_and_losses, val_and_losses.size(), dims, 0.0f);
