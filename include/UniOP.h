@@ -152,9 +152,9 @@ public:
     void  forward() {
         int count = batch.size();
 #if TEST_CUDA
-        param->W.val.copyFromDeviceToHost();
+        param->W.val.copyFromDeviceToHost(nullptr);
         if (param->bUseB) {
-            param->b.val.copyFromDeviceToHost();
+            param->b.val.copyFromDeviceToHost(nullptr);
         }
 #endif
 
@@ -173,15 +173,15 @@ public:
             xs.push_back(n->in->val().value);
             ys.push_back(n->val().value);
 #if TEST_CUDA
-            n->in->val().copyFromDeviceToHost();
+            n->in->val().copyFromDeviceToHost(nullptr);
 #endif
         }
 
-        n3ldg_cuda::CopyForUniNodeForward(xs, param->b.val.value,
-                x.value, y.value, count, inDim, outDim, param->bUseB);
+        n3ldg_cuda::CopyForUniNodeForward(xs, param->b.val.value, x.value, y.value, count, inDim,
+                outDim, param->bUseB, n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 
-        n3ldg_cuda::MatrixMultiplyMatrix(param->W.val.value, x.value, y.value,
-                outDim, inDim, count, param->bUseB);
+        n3ldg_cuda::MatrixMultiplyMatrix(param->W.val.value, x.value, y.value, outDim, inDim,
+                count, param->bUseB, n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 
         std::vector<dtype*> vals;
         vals.reserve(count);
@@ -189,7 +189,8 @@ public:
             vals.push_back(node->val().value);
         }
 
-        n3ldg_cuda::CopyFromOneVectorToMultiVals(y.value, vals, count, outDim);
+        n3ldg_cuda::CopyFromOneVectorToMultiVals(y.value, vals, count, outDim,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
@@ -225,9 +226,9 @@ public:
 #if TEST_CUDA
         if (param->bUseB) {
             n3ldg_cuda::Assert(param->b.grad.verify("before uni backward b grad"));
-            param->b.grad.copyFromDeviceToHost();
+            param->b.grad.copyFromDeviceToHost(nullptr);
         }
-        param->W.val.copyFromDeviceToHost();
+        param->W.val.copyFromDeviceToHost(nullptr);
 #endif
         int count = batch.size();
         Tensor2D lx, ly;
@@ -240,11 +241,12 @@ public:
             LinearNode* ptr = (LinearNode*)batch[i];
             ly_vec.push_back(ptr->loss().value);
         }
-        n3ldg_cuda::CopyFromMultiVectorsToOneVector(ly_vec, ly.value, count, outDim);
-        n3ldg_cuda::MatrixMultiplyMatrix(ly.value, x.value,
-                param->W.grad.value, outDim, count, inDim, true, true, false);
-        n3ldg_cuda::MatrixMultiplyMatrix(param->W.val.value, ly.value,
-                lx.value, inDim, outDim, count, false, false, true);
+        n3ldg_cuda::CopyFromMultiVectorsToOneVector(ly_vec, ly.value, count, outDim,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
+        n3ldg_cuda::MatrixMultiplyMatrix(ly.value, x.value, param->W.grad.value, outDim, count,
+                inDim, true, n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM), true, false);
+        n3ldg_cuda::MatrixMultiplyMatrix(param->W.val.value, ly.value, lx.value, inDim, outDim,
+                count, false, n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM), false, true);
         std::vector<dtype*> losses;
         losses.reserve(count);
         for (int idx = 0; idx < count; idx++) {
@@ -252,9 +254,9 @@ public:
             losses.push_back(ptr->in->loss().value);
         }
 
-        n3ldg_cuda::AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(
-                ly.value, lx.value, param->b.grad.value, losses, count,
-                outDim, inDim, param->bUseB);
+        n3ldg_cuda::AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(ly.value, lx.value,
+                param->b.grad.value, losses, count, outDim, inDim, param->bUseB,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
@@ -459,23 +461,24 @@ public:
         xs.reserve(batch.size());
         ys.reserve(batch.size());
 #if TEST_CUDA
-        param->val.copyFromDeviceToHost();
+        param->val.copyFromDeviceToHost(nullptr);
 #endif
 
         for (int i = 0; i < batch.size(); ++i) {
             LinearWordVectorNode *n = static_cast<LinearWordVectorNode*>(batch.at(i));
 #if TEST_CUDA
-            n->getInput()->val().copyFromDeviceToHost();
+            n->getInput()->val().copyFromDeviceToHost(nullptr);
 #endif
             xs.push_back(n->getInput()->val().value);
             ys.push_back(n->val().value);
         }
 
         n3ldg_cuda::CopyForUniNodeForward(xs, nullptr, x.value, y.value, count, inDim, outDim,
-                false);
+                false, n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
         int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
         n3ldg_cuda::MatrixMultiplyMatrix(param->val.value + offset * inDim, x.value, y.value,
-                outDim, inDim, count, false, false, true);
+                outDim, inDim, count, false, n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM),
+                false, true);
 
         std::vector<dtype*> vals;
         vals.reserve(count);
@@ -483,7 +486,8 @@ public:
             vals.push_back(node->val().value);
         }
 
-        n3ldg_cuda::CopyFromOneVectorToMultiVals(y.value, vals, count, outDim);
+        n3ldg_cuda::CopyFromOneVectorToMultiVals(y.value, vals, count, outDim,
+                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         for (int i = 0; i < count; i++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
@@ -511,7 +515,7 @@ public:
         lx.init(inDim, count);
         ly.init(outDim, count);
 #if TEST_CUDA
-        param->grad.copyFromDeviceToHost();
+        param->grad.copyFromDeviceToHost(nullptr);
 #endif
 
         std::vector<dtype*> ly_vec;
@@ -519,17 +523,20 @@ public:
         for (int i = 0; i < count; ++i) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
 #if TEST_CUDA
-            ptr->loss().copyFromDeviceToHost();
-            ptr->val().copyFromDeviceToHost();
+            ptr->loss().copyFromDeviceToHost(nullptr);
+            ptr->val().copyFromDeviceToHost(nullptr);
 #endif
             ly_vec.push_back(ptr->loss().value);
         }
-        n3ldg_cuda::CopyFromMultiVectorsToOneVector(ly_vec, ly.value, count, outDim);
+        n3ldg_cuda::CopyFromMultiVectorsToOneVector(ly_vec, ly.value, count, outDim,
+                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
         int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
         n3ldg_cuda::MatrixMultiplyMatrix(x.value, ly.value, param->grad.value + inDim * offset,
-                inDim, count, outDim, true, true, false);
+                inDim, count, outDim, true, n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM),
+                true, false);
         n3ldg_cuda::MatrixMultiplyMatrix(param->val.value + offset * inDim, ly.value, lx.value,
-                inDim, outDim, count, false, false, false);
+                inDim, outDim, count, false, n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM),
+                false, false);
         std::vector<dtype*> losses;
         losses.reserve(count);
         for (int idx = 0; idx < count; idx++) {
@@ -538,12 +545,13 @@ public:
         }
 
         n3ldg_cuda::AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(ly.value, lx.value,
-                nullptr, losses, count, outDim, inDim, false);
+                nullptr, losses, count, outDim, inDim, false,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
             memcpy(ly.v + idx * outDim, ptr->loss().v, outDim * sizeof(dtype));
-            ptr->loss().copyFromDeviceToHost();
+            ptr->loss().copyFromDeviceToHost(nullptr);
         }
 
         n3ldg_cuda::Assert(x.verify("backward x"));
@@ -739,7 +747,8 @@ public:
             inputs.push_back(bias_node->getInput()->getVal().value);
             vals.push_back(bias_node->getVal().value);
         }
-        n3ldg_cuda::BiasForward(inputs, bias, batch.size(), getDim(), vals);
+        n3ldg_cuda::BiasForward(inputs, bias, batch.size(), getDim(), vals,
+                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         Executor::testForward();
         cout << "bias forward tested" << endl;
@@ -754,7 +763,8 @@ public:
             losses.push_back(bias_node->getLoss().value);
             in_losses.push_back(bias_node->getInput()->getLoss().value);
         }
-        n3ldg_cuda::BiasBackward(losses, batch.size(), getDim(), bias, in_losses);
+        n3ldg_cuda::BiasBackward(losses, batch.size(), getDim(), bias, in_losses,
+                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         UniInputExecutor::testBackward();
         cout << "count:" << batch.size() << endl;

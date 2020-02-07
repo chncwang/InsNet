@@ -21,7 +21,8 @@ public:
             vals.push_back(expnode->getVal().value);
             dims_.push_back(node->getDim());
         }
-        n3ldg_cuda::ActivationForward(activation, inputs, batch.size(), dims_, vals);
+        n3ldg_cuda::ActivationForward(activation, inputs, batch.size(), dims_, vals,
+                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         Executor::testForward();
         cout << "exp forward tested" << endl;
@@ -40,8 +41,8 @@ public:
             input_losses.push_back(exp->getInput()->getLoss().value);
         }
 
-        n3ldg_cuda::ActivationBackward(activation, losses, vals, batch.size(), dims_,
-                input_losses);
+        n3ldg_cuda::ActivationBackward(activation, losses, vals, batch.size(), dims_, input_losses,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         UniInputExecutor::testBackward();
         cout << "exp backward tested" << endl;
@@ -170,8 +171,12 @@ public:
 };
 
 #if USE_GPU
+
+using n3ldg_cuda::StreamManager;
+
 class PDotExecutor :public Executor {
 public:
+
     void  forward() {
         int count = batch.size();
         std::vector<dtype*> vals;
@@ -186,7 +191,8 @@ public:
         }
 
         n3ldg_cuda::PDotForward(ins1, ins2, count,
-                static_cast<PDotNode*>(batch.at(0))->in1->getDim(), vals);
+                static_cast<PDotNode*>(batch.at(0))->in1->getDim(), vals,
+                StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         for (Node *node : batch) {
             PDotNode *dot = static_cast<PDotNode*>(node);
@@ -212,7 +218,7 @@ public:
         }
         n3ldg_cuda::PDotBackward(losses, ins1, ins2, count,
                 static_cast<PDotNode*>(batch.at(0))->in1->getDim(), in_losses1,
-                in_losses2);
+                in_losses2, StreamManager::ins().stream(GRAD_STREAM));
 
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
@@ -351,16 +357,17 @@ class DropoutExecutor :public Executor {
         for (Node *n : batch) {
             DropoutNode *tanh = static_cast<DropoutNode*>(n);
 #if TEST_CUDA
-            tanh->in()->val().copyFromHostToDevice();
+            tanh->in()->val().copyFromHostToDevice(nullptr);
 #endif
             xs.push_back(tanh->in()->getVal().value);
             ys.push_back(tanh->getVal().value);
         }
 
         CalculateDropMask(count, dim, drop_mask);
-        n3ldg_cuda::DropoutForward(xs, count, dim, is_training, drop_mask.value, drop_value, ys);
+        n3ldg_cuda::DropoutForward(xs, count, dim, is_training, drop_mask.value, drop_value, ys,
+                StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
-        drop_mask.copyFromDeviceToHost();
+        drop_mask.copyFromDeviceToHost(nullptr);
         for (int i = 0; i < count; ++i) {
             for (int j = 0; j < dim; ++j) {
                 dtype v = drop_mask[i][j];
@@ -383,15 +390,15 @@ class DropoutExecutor :public Executor {
         for (Node *n : batch) {
             DropoutNode *tanh = static_cast<DropoutNode*>(n);
 #if TEST_CUDA
-            tanh->loss().copyFromHostToDevice();
-            tanh->in()->loss().copyFromHostToDevice();
+            tanh->loss().copyFromHostToDevice(nullptr);
+            tanh->in()->loss().copyFromHostToDevice(nullptr);
 #endif
             vals.push_back(tanh->val().value);
             losses.push_back(tanh->loss().value);
             in_losses.push_back(tanh->in()->loss().value);
         }
         n3ldg_cuda::DropoutBackward(losses, vals, count, dim, is_training, drop_mask.value,
-                drop_value, in_losses);
+                drop_value, in_losses, StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         for (Node *n : batch) {
             n->backward();
@@ -472,7 +479,8 @@ public:
             results.push_back(node->getVal().value);
             dims.push_back(node->getInput()->getDim());
         }
-        n3ldg_cuda::MaxScalarForward(inputs, batch.size(), dims, results, max_indexes);
+        n3ldg_cuda::MaxScalarForward(inputs, batch.size(), dims, results, max_indexes,
+                StreamManager::ins().stream(VAL_STREAM));
 
         for (int i = 0; i < batch.size(); ++i) {
             MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));
@@ -507,7 +515,8 @@ public:
             input_losses.push_back(max_scalar->getInput()->getLoss().value);
         }
 
-        n3ldg_cuda::MaxScalarBackward(losses, max_indexes, batch.size(), input_losses);
+        n3ldg_cuda::MaxScalarBackward(losses, max_indexes, batch.size(), input_losses,
+                StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         UniInputExecutor::testBackward();
         cout << "max scalar backward tested" << endl;
@@ -579,7 +588,8 @@ public:
             results.push_back(n->getVal().value);
             dims_.push_back(n->getDim());
         }
-        n3ldg_cuda::ScalarToVectorForward(inputs, batch.size(), dims_, results);
+        n3ldg_cuda::ScalarToVectorForward(inputs, batch.size(), dims_, results,
+                StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         Executor::testForward();
         cout << "scalarToVector tested" << endl;
@@ -602,7 +612,8 @@ public:
             losses.push_back(n->getLoss().value);
             input_losses.push_back(n->getInput()->getLoss().value);
         }
-        n3ldg_cuda::ScalarToVectorBackward(losses, batch.size(), dims_, input_losses);
+        n3ldg_cuda::ScalarToVectorBackward(losses, batch.size(), dims_, input_losses,
+                StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         cout << "scalarToVector test backward..." << endl;
         UniInputExecutor::testBackward();
@@ -707,7 +718,8 @@ class SumExecutor : public UniInputExecutor {
             results.push_back(sum->getVal().value);
             dims_.push_back(sum->getInput()->getDim());
         }
-        n3ldg_cuda::VectorSumForward(inputs, batch.size(), dims_, results);
+        n3ldg_cuda::VectorSumForward(inputs, batch.size(), dims_, results,
+                StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         Executor::testForward();
         cout << "sum tested" << endl;
@@ -719,14 +731,15 @@ class SumExecutor : public UniInputExecutor {
         vector<dtype*> input_losses;
         for (Node *node : batch) {
 #if TEST_CUDA
-            node->loss().copyFromDeviceToHost();
+            node->loss().copyFromDeviceToHost(nullptr);
 #endif
             losses.push_back(node->getLoss().value);
             SumNode *sum = static_cast<SumNode*>(node);
             input_losses.push_back(sum->getInput()->getLoss().value);
         }
 
-        n3ldg_cuda::VectorSumBackward(losses, batch.size(), dims_, input_losses);
+        n3ldg_cuda::VectorSumBackward(losses, batch.size(), dims_, input_losses,
+                StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         UniInputExecutor::testBackward();
         cout << "sum backward tested" << endl;

@@ -85,7 +85,7 @@ public:
         //E.val.norm2one();
         bFineTune = tune;
 #if USE_GPU
-        E.val.copyFromHostToDevice();
+        E.val.copyFromHostToDevice(nullptr);
 #endif
     }
 
@@ -194,7 +194,7 @@ public:
             E.val.norm2one(norm);
         }
 #if USE_GPU
-        E.val.copyFromHostToDevice();
+        E.val.copyFromHostToDevice(nullptr);
 #endif
     }
 
@@ -345,7 +345,8 @@ public:
             vals.push_back(n->val().value);
         }
 
-        n3ldg_cuda::LookupForward(xids, table->E.val.value, count, dim, vals);
+        n3ldg_cuda::LookupForward(xids, table->E.val.value, count, dim, vals,
+                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -380,21 +381,15 @@ public:
 
 template<>
 void LookupExecutor<SparseParam>::genericBackward(vector<dtype*> &losses) {
-        n3ldg_cuda::LookupBackward(xids, table->nUNKId, table->bFineTune,
-                losses,
-                batch.size(),
-                dim,
-                table->E.grad.value,
-                table->E.dIndexers.value);
+        n3ldg_cuda::LookupBackward(xids, table->nUNKId, table->bFineTune, losses, batch.size(),
+                dim, table->E.grad.value, table->E.dIndexers.value,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 }
 
 template<>
 void LookupExecutor<Param>::genericBackward(vector<dtype*> &losses) {
-        n3ldg_cuda::LookupBackward(xids, table->nUNKId, table->bFineTune,
-                losses,
-                batch.size(),
-                dim,
-                table->E.grad.value);
+        n3ldg_cuda::LookupBackward(xids, table->nUNKId, table->bFineTune, losses, batch.size(),
+                dim, table->E.grad.value, n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 }
 
 #else

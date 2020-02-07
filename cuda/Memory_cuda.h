@@ -17,6 +17,61 @@ using namespace std;
 
 namespace n3ldg_cuda {
 
+class StreamPool {
+public:
+    cudaStream_t *getStream() {
+        cudaStream_t *result;
+        if (available_streams_.empty()) {
+            result = new cudaStream_t;
+            cudaStreamCreate(result);
+        } else {
+            result = available_streams_.back();
+            available_streams_.pop_back();
+        }
+        return result;
+    }
+
+    void returnStream(cudaStream_t *stream) {
+        available_streams_.push_back(stream);
+    }
+
+    static StreamPool &ins() {
+        static StreamPool ins;
+        return ins;
+    }
+
+private:
+    vector<cudaStream_t *> available_streams_;
+
+    StreamPool() = default;
+    friend class StreamManager;
+};
+
+class StreamManager {
+public:
+    static StreamManager &ins() {
+        static StreamManager ins;
+        return ins;
+    }
+
+    cudaStream_t *stream(int key) {
+        const auto &it = stream_table_.find(key);
+        cudaStream_t *result;
+        if (it == stream_table_.end()) {
+            StreamPool &pool = StreamPool::ins();
+            result = pool.getStream();
+            stream_table_.insert(make_pair(key, result));
+        } else {
+            result = it->second;
+        }
+//        cout << "key:" << key << " result:" << result << endl;
+        return result;
+    }
+
+    StreamManager() = default;
+    map<int, cudaStream_t *> stream_table_;
+};
+
 struct MemoryBlock {
     void *p;
     int64_t size;

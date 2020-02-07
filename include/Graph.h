@@ -140,7 +140,7 @@ public:
             clearNodes(cur_exec->batch);
             profiler.EndCudaEvent();
 #endif
-//            cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl << endl;
+            //cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl << endl;
 
             profiler.BeginEvent("computation forward");
             cur_exec->forwardFully();

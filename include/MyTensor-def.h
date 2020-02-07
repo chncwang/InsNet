@@ -59,7 +59,7 @@ struct Tensor1D : public N3LDGSerializable {
 
     virtual void print() const;
 
-    virtual std::vector<dtype> toCpu() const;
+    virtual std::vector<dtype> toCpu(void *stream) const;
 
     virtual void checkIsNumber() const;
 };
@@ -118,8 +118,8 @@ namespace n3ldg_cuda {
 
 class Transferable {
 public:
-    virtual void copyFromHostToDevice() = 0;
-    virtual void copyFromDeviceToHost() = 0;
+    virtual void copyFromHostToDevice(void *stream) = 0;
+    virtual void copyFromDeviceToHost(void *stream) = 0;
 };
 
 bool Verify(dtype *host, dtype* device, int len, const char* message);
@@ -147,8 +147,8 @@ struct Tensor1D : public n3ldg_cpu::Tensor1D, public Transferable {
 
     bool verify(const char *message) const;
 
-    void copyFromHostToDevice() override;
-    void copyFromDeviceToHost() override;
+    void copyFromHostToDevice(void *stream) override;
+    void copyFromDeviceToHost(void *stream) override;
     void checkIsNumber() const override;
 
 private:
@@ -179,8 +179,8 @@ struct Tensor2D : public n3ldg_cpu::Tensor2D, public Transferable {
 
     void initOnMemoryAndDevice(int row, int col);
 
-    void copyFromHostToDevice() override;
-    void copyFromDeviceToHost() override;
+    void copyFromHostToDevice(void *stream) override;
+    void copyFromDeviceToHost(void *stream) override;
 private:
     void initOnDevice(int row, int col);
 };

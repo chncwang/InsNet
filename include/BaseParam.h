@@ -26,16 +26,16 @@ typedef n3ldg_cpu::Tensor2D Tensor2D;
 class TransferableComponents : public n3ldg_cuda::Transferable
 {
 public:
-    void copyFromHostToDevice() override {
+    void copyFromHostToDevice(void *stream) override {
         for (auto *t : transferablePtrs()) {
-            t->copyFromHostToDevice();
+            t->copyFromHostToDevice(stream);
         }
     }
 
-    void copyFromDeviceToHost() override {
+    void copyFromDeviceToHost(void *stream) override {
         for (auto *t : transferablePtrs()) {
 //            std::cout << boost::format("name:%1%") % t->name() << std::endl;
-            t->copyFromDeviceToHost();
+            t->copyFromDeviceToHost(stream);
         }
     }
 

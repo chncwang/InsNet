@@ -133,7 +133,8 @@ public:
             PAddNode *padd = static_cast<PAddNode*>(n);
             outs.push_back(padd->val().value);
         }
-        n3ldg_cuda::PAddForward(in_vals, count, dim, in_count, outs);
+        n3ldg_cuda::PAddForward(in_vals, count, dim, in_count, outs,
+                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -172,7 +173,8 @@ public:
             PAddNode *padd = static_cast<PAddNode*>(n);
             out_losses.push_back(padd->loss().value);
         }
-        n3ldg_cuda::PAddBackward(out_losses, count, dim, in_count, in_losses);
+        n3ldg_cuda::PAddBackward(out_losses, count, dim, in_count, in_losses,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward();

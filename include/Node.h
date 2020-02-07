@@ -148,8 +148,8 @@ public:
         dim_ = ndim;
         val_.initOnMemoryAndDevice(ndim);
         loss_.initOnMemoryAndDevice(ndim);
-        n3ldg_cuda::Memset(val_.value, dim_, 0.0f);
-        n3ldg_cuda::Memset(loss_.value, dim_, 0.0f);
+        n3ldg_cuda::Memset(val_.value, dim_, 0.0f, nullptr);
+        n3ldg_cuda::Memset(loss_.value, dim_, 0.0f, nullptr);
     }
 #endif
 
@@ -387,7 +387,8 @@ void clearNodes(std::vector<Node*> &nodes) {
 //        dims.push_back(n->getDim());
         dims.push_back(n->getDim());
     }
-    n3ldg_cuda::BatchMemset(val_and_losses, val_and_losses.size(), dims, 0.0f);
+    cudaStream_t *stream = n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM);
+    n3ldg_cuda::BatchMemset(val_and_losses, val_and_losses.size(), dims, 0.0f, stream);
 #if TEST_CUDA
     for (Node *node : nodes) {
         node->loss().verify("clearNodes");

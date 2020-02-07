@@ -67,6 +67,10 @@ Node *pointwiseMultiply(Graph &graph, Node &a, Node &b) {
 
 }
 
+#if USE_GPU
+using n3ldg_cuda::StreamManager;
+#endif
+
 class PMultiExecutor :public Executor {
 public:
     std::vector<dtype*> in_vals1;
@@ -87,7 +91,8 @@ public:
             in_vals2.push_back(pmulti->in2->val().value);
             vals.push_back(pmulti->val().value);
         }
-        n3ldg_cuda::PMultiForward(in_vals1, in_vals2, count, dim, vals);
+        n3ldg_cuda::PMultiForward(in_vals1, in_vals2, count, dim, vals,
+                StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -112,7 +117,8 @@ public:
             losses1.push_back(pmulti->in1->loss().value);
             losses2.push_back(pmulti->in2->loss().value);
         }
-        n3ldg_cuda::PMultiBackward(losses, vals1, vals2, count, dim, losses1, losses2);
+        n3ldg_cuda::PMultiBackward(losses, vals1, vals2, count, dim, losses1, losses2,
+                StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward();

@@ -93,7 +93,8 @@ public:
                 cpu_x.push_back(bucket->input_.at(i));
             }
         }
-        n3ldg_cuda::BucketForward(cpu_x, count, getDim(), ys);
+        n3ldg_cuda::BucketForward(cpu_x, count, getDim(), ys,
+                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         for (Node *node : batch) {
             BucketNode *bucket = static_cast<BucketNode*>(node);

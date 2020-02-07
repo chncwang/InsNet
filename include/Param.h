@@ -50,9 +50,10 @@ public:
         }
         iter = 0;
 #if USE_GPU
-        n3ldg_cuda::Memset(grad.value, outDim * inDim, 0.0f);
-        n3ldg_cuda::Memset(aux_square.value, outDim * inDim, 0.0f);
-        n3ldg_cuda::Memset(aux_mean.value, outDim * inDim, 0.0f);
+        n3ldg_cuda::Memset(grad.value, outDim * inDim, 0.0f, nullptr);
+        n3ldg_cuda::Memset(aux_square.value, outDim * inDim, 0.0f, nullptr);
+        n3ldg_cuda::Memset(aux_mean.value, outDim * inDim, 0.0f, nullptr);
+        grad_stream = n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM);
 #endif
     }
 
@@ -79,7 +80,7 @@ public:
 
     void clearGrad() override {
 #if USE_GPU
-        n3ldg_cuda::Memset(grad.value, grad.size, 0.0f);
+        n3ldg_cuda::Memset(grad.value, grad.size, 0.0f, grad_stream);
 #if TEST_CUDA
         grad.zero();
         n3ldg_cuda::Assert(grad.verify("Param clearGrad"));
@@ -95,7 +96,7 @@ public:
         }
 #if USE_GPU
         n3ldg_cuda::UpdateAdagrad(val.value, grad.value, val.row, val.col,
-                aux_square.value, alpha, reg, eps);
+                aux_square.value, alpha, reg, eps, grad_stream);
 #if TEST_CUDA
         if (!isBias()) grad.vec() = grad.vec() + val.vec() * reg;
         aux_square.vec() = aux_square.vec() + grad.vec().square();
@@ -120,15 +121,8 @@ public:
         n3ldg_cuda::Assert(aux_mean.verify("Param adam begin aux_mean"));
         n3ldg_cuda::Assert(aux_square.verify("Param adam begin aux_square"));
 #endif
-        n3ldg_cuda::UpdateAdam(val.value, grad.value, val.row, val.col, isBias(),
-                aux_mean.value,
-                aux_square.value,
-                iter,
-                belta1,
-                belta2,
-                alpha,
-                reg,
-                eps);
+        n3ldg_cuda::UpdateAdam(val.value, grad.value, val.row, val.col, isBias(), aux_mean.value,
+                aux_square.value, iter, belta1, belta2, alpha, reg, eps, grad_stream);
 #if TEST_CUDA
         if (!isBias()) grad.vec() = grad.vec() + val.vec() * reg;
         aux_mean.vec() = belta1 * aux_mean.vec() + (1 - belta1) * grad.vec();
@@ -159,7 +153,7 @@ public:
         n3ldg_cuda::Assert(aux_square.verify("Param adam begin aux_square"));
 #endif
         n3ldg_cuda::UpdateAdamW(val.value, grad.value, val.row, val.col, isBias(), aux_mean.value,
-                aux_square.value, iter, belta1, belta2, alpha, reg, eps);
+                aux_square.value, iter, belta1, belta2, alpha, reg, eps, grad_stream);
 #if TEST_CUDA
         aux_mean.vec() = belta1 * aux_mean.vec() + (1 - belta1) * grad.vec();
         aux_square.vec() = belta2 * aux_square.vec() + (1 - belta2) * grad.vec().square();
@@ -194,11 +188,11 @@ public:
 
     dtype squareGradNorm() override {
 #if USE_GPU && !TEST_CUDA
-        return n3ldg_cuda::SquareSum(grad.value, grad.size);
+        return n3ldg_cuda::SquareSum(grad.value, grad.size, grad_stream);
 #elif USE_GPU && TEST_CUDA
         cout << "squareGradNorm - param name:" << this->getParamName() << endl;
         n3ldg_cuda::Assert(grad.verify("squareGradNorm grad"));
-        dtype cuda = n3ldg_cuda::SquareSum(grad.value, grad.size);
+        dtype cuda = n3ldg_cuda::SquareSum(grad.value, grad.size, grad_stream);
         dtype sumNorm = 0.0;
         for (int i = 0; i < grad.size; i++) {
             sumNorm += grad.v[i] * grad.v[i];
@@ -218,7 +212,7 @@ public:
 
     void rescaleGrad(dtype scale) override {
 #if USE_GPU
-        n3ldg_cuda::Rescale(grad.value, grad.size, scale);
+        n3ldg_cuda::Rescale(grad.value, grad.size, scale, grad_stream);
 #if TEST_CUDA
         grad.vec() = grad.vec() * scale;
         n3ldg_cuda::Assert(grad.verify("Param rescaleGrad"));
@@ -257,6 +251,9 @@ public:
             grad[featId][idx] += loss[idx];
         }
     }
+
+private:
+    cudaStream_t *grad_stream;
 };
 
 template<typename ParamType>

@@ -72,7 +72,8 @@ public:
         transform(batch.begin(), batch.end(), back_inserter(vals), gpu_get_node_val);
         ParamRowNode *node = static_cast<ParamRowNode*>(batch.front());
         n3ldg_cuda::ParamRowForward(node->getParam()->val.value, node->row_index_,
-                node->getParam()->outDim(), batch.size(), getDim(), vals);
+                node->getParam()->outDim(), batch.size(), getDim(), vals,
+                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         Executor::testForward();
 #endif

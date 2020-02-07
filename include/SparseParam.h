@@ -27,20 +27,20 @@ public:
     n3ldg_cuda::BoolArray dIndexers;
     n3ldg_cuda::IntArray dIters;
 
-    void copyFromHostToDevice() override {
-        BaseParam::copyFromHostToDevice();
+    void copyFromHostToDevice(void *stream) override {
+        BaseParam::copyFromHostToDevice(stream);
         n3ldg_cuda::MyCudaMemcpy(dIters.value, last_update.c_buf(), sizeof(int) * dIters.len,
-                cudaMemcpyHostToDevice);
-        aux_square.copyFromHostToDevice();
-        aux_mean.copyFromHostToDevice();
+                cudaMemcpyHostToDevice, (cudaStream_t*)stream);
+        aux_square.copyFromHostToDevice(stream);
+        aux_mean.copyFromHostToDevice(stream);
     }
 
-    void copyFromDeviceToHost() override {
-        BaseParam::copyFromDeviceToHost();
+    void copyFromDeviceToHost(void *stream) override {
+        BaseParam::copyFromDeviceToHost(stream);
         n3ldg_cuda::MyCudaMemcpy(last_update.c_buf(), dIters.value, sizeof(int) * dIters.len,
-                cudaMemcpyDeviceToHost);
-        aux_square.copyFromDeviceToHost();
-        aux_mean.copyFromDeviceToHost();
+                cudaMemcpyDeviceToHost, (cudaStream_t*)stream);
+        aux_square.copyFromDeviceToHost(stream);
+        aux_mean.copyFromDeviceToHost(stream);
     }
 
     virtual std::string name() const {
@@ -69,18 +69,19 @@ public:
         last_update.resize(inDim);
         last_update = 0;
 #if USE_GPU
-        dIndexers.init(indexers.c_buf(), indexers.size());
-        dIters.init(last_update.c_buf(), last_update.size());
-        n3ldg_cuda::Memset(grad.value, grad.size, 0.0f);
-        n3ldg_cuda::Memset(aux_square.value, inDim * outDim, 0.0f);
-        n3ldg_cuda::Memset(aux_mean.value, inDim * outDim, 0.0f);
+        dIndexers.init(indexers.c_buf(), indexers.size(), nullptr);
+        dIters.init(last_update.c_buf(), last_update.size(), nullptr);
+        n3ldg_cuda::Memset(grad.value, grad.size, 0.0f, nullptr);
+        n3ldg_cuda::Memset(aux_square.value, inDim * outDim, 0.0f, nullptr);
+        n3ldg_cuda::Memset(aux_mean.value, inDim * outDim, 0.0f, nullptr);
 #endif
     }
 
     void clearGrad() override {
 #if USE_GPU
-        n3ldg_cuda::Memset(grad.value, grad.size, 0.0f);
-        n3ldg_cuda::Memset(dIndexers.value, grad.col, false);
+        cudaStream_t *stream = n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM);
+        n3ldg_cuda::Memset(grad.value, grad.size, 0.0f, stream);
+        n3ldg_cuda::Memset(dIndexers.value, grad.col, false, stream);
 #if TEST_CUDA
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
@@ -114,8 +115,9 @@ public:
 
     void updateAdagrad(dtype alpha, dtype reg, dtype eps) override {
 #if USE_GPU
-        n3ldg_cuda::UpdateAdagrad(val.value, grad.value, indexers.size(),
-                grad.col, aux_square.value, dIndexers.value, alpha, reg, eps);
+        n3ldg_cuda::UpdateAdagrad(val.value, grad.value, indexers.size(), grad.col,
+                aux_square.value, dIndexers.value, alpha, reg, eps,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
@@ -144,17 +146,9 @@ public:
 
     void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override {
 #if USE_GPU
-        n3ldg_cuda::UpdateAdam(val.value, grad.value, grad.row,
-                indexers.size(),
-                aux_mean.value,
-                aux_square.value,
-                dIndexers.value,
-                dIters.value,
-                belta1,
-                belta2,
-                alpha,
-                reg,
-                eps);
+        n3ldg_cuda::UpdateAdam(val.value, grad.value, grad.row, indexers.size(), aux_mean.value,
+                aux_square.value, dIndexers.value, dIters.value, belta1, belta2, alpha, reg, eps,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         dtype lr_t;
         int inDim = indexers.size();
@@ -216,10 +210,10 @@ public:
     dtype squareGradNorm() override {
 #if USE_GPU && !TEST_CUDA
         dtype result = n3ldg_cuda::SquareSum(grad.value, dIndexers.value,
-                indexers.size(), val.row);
+                indexers.size(), val.row, n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
         return result;
 #elif USE_GPU && TEST_CUDA
-        grad.copyFromDeviceToHost();
+        grad.copyFromDeviceToHost(nullptr);
         dtype sumNorm = 0.0;
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
@@ -235,8 +229,8 @@ public:
                     indexers.size(),
                     "sparse squareGradNorm"));
         n3ldg_cuda::Assert(grad.verify("squareGradNorm grad"));
-        dtype cuda = n3ldg_cuda::SquareSum(grad.value, dIndexers.value, inDim,
-                val.row);
+        dtype cuda = n3ldg_cuda::SquareSum(grad.value, dIndexers.value, inDim, val.row,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
         n3ldg_cuda::Assert(isEqual(cuda, sumNorm));
 
         return sumNorm;
@@ -256,7 +250,8 @@ public:
 
     void rescaleGrad(dtype scale) override {
 #if USE_GPU
-        n3ldg_cuda::Rescale(grad.value, grad.size, scale);
+        n3ldg_cuda::Rescale(grad.value, grad.size, scale,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {

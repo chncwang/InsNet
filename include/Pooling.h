@@ -287,8 +287,8 @@ public:
                 in_vals.push_back(NULL);
             }
         }
-        n3ldg_cuda::PoolForward(n3ldg_cuda::PoolingEnum::MAX, in_vals, vals,
-                count, in_counts, dim, hit_inputs.value);
+        n3ldg_cuda::PoolForward(n3ldg_cuda::PoolingEnum::MAX, in_vals, vals, count, in_counts, dim,
+                hit_inputs.value, n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -320,8 +320,8 @@ public:
             }
         }
 
-        n3ldg_cuda::PoolBackward(losses, in_losses, in_counts,
-                hit_inputs.value, count, dim);
+        n3ldg_cuda::PoolBackward(losses, in_losses, in_counts, hit_inputs.value, count, dim,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
@@ -378,7 +378,8 @@ public:
             }
         }
         n3ldg_cuda::PoolForward(n3ldg_cuda::PoolingEnum::MIN, in_vals, vals,
-                count, in_counts, dim, hit_inputs.value);
+                count, in_counts, dim, hit_inputs.value,
+                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -409,8 +410,8 @@ public:
             }
         }
 
-        n3ldg_cuda::PoolBackward(losses, in_losses, in_counts,
-                hit_inputs.value, count, dim);
+        n3ldg_cuda::PoolBackward(losses, in_losses, in_counts, hit_inputs.value, count, dim,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
@@ -542,7 +543,8 @@ public:
         }
 
         n3ldg_cuda::SumPoolForward(n3ldg_cuda::PoolingEnum::SUM, in_vals,
-                count, dim, in_counts, vals);
+                count, dim, in_counts, vals,
+                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -570,8 +572,8 @@ public:
                 in_losses.push_back(NULL);
             }
         }
-        n3ldg_cuda::SumPoolBackward(n3ldg_cuda::PoolingEnum::SUM, losses,
-                in_counts, count, dim, in_losses);
+        n3ldg_cuda::SumPoolBackward(n3ldg_cuda::PoolingEnum::SUM, losses, in_counts, count, dim,
+                in_losses, n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         for (Node *n : batch) {
             n->backward();
@@ -696,8 +698,8 @@ public:
             }
         }
 
-        n3ldg_cuda::SumPoolForward(n3ldg_cuda::PoolingEnum::AVG, in_vals,
-                count, dim, in_counts, vals);
+        n3ldg_cuda::SumPoolForward(n3ldg_cuda::PoolingEnum::AVG, in_vals, count, dim, in_counts,
+                vals, n3ldg_cuda::StreamManager().ins().stream(VAL_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -725,8 +727,8 @@ public:
                 in_losses.push_back(NULL);
             }
         }
-        n3ldg_cuda::SumPoolBackward(n3ldg_cuda::PoolingEnum::AVG, losses,
-                in_counts, count, dim, in_losses);
+        n3ldg_cuda::SumPoolBackward(n3ldg_cuda::PoolingEnum::AVG, losses, in_counts, count, dim,
+                in_losses, n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         for (Node *n : batch) {
             n->backward();

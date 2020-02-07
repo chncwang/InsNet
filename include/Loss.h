@@ -17,7 +17,8 @@ vector<int> cpuPredict(const vector<Node *> &nodes) {
 vector<int> gpuPredict(const vector<Node *> &nodes) {
     vector<dtype*> vals;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
-    return n3ldg_cuda::Predict(vals, nodes.size(), nodes.front()->getDim());
+    return n3ldg_cuda::Predict(vals, nodes.size(), nodes.front()->getDim(),
+            n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 }
 
 #endif
@@ -52,7 +53,9 @@ dtype crossEntropyLoss(vector<Node *> &nodes, const vector<int> &answers, dtype 
     vector<dtype*> vals, losses;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     transform(nodes.begin(), nodes.end(), back_inserter(losses), gpu_get_node_loss);
-    dtype loss = n3ldg_cuda::CrossEntropyLoss(vals, answers, nodes.size(), factor, losses);
+    cudaStreamSynchronize(*n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
+    dtype loss = n3ldg_cuda::CrossEntropyLoss(vals, answers, nodes.size(), factor, losses,
+            n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
     dtype cpu_loss = cpuCrossEntropyLoss(nodes, answers, factor);
     for (Node *node : nodes) {
@@ -114,8 +117,10 @@ pair<float, vector<int>> KLLoss(vector<Node *> &nodes,
     vector<dtype *> vals, losses;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     transform(nodes.begin(), nodes.end(), back_inserter(losses), gpu_get_node_loss);
+    cudaStreamSynchronize(*n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
     dtype gpu_loss = n3ldg_cuda::KLCrossEntropyLoss(vals, answers, nodes.size(),
-            nodes.front()->getDim(), factor, losses);
+            nodes.front()->getDim(), factor, losses,
+            n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
     dtype cpu_loss = cpuKLLoss(nodes, answers, factor);
     cout << "KLLoss - gpu loss:" << gpu_loss << " cpu_loss:" << cpu_loss << endl;
@@ -143,8 +148,10 @@ float multiCrossEntropyLoss(vector<Node *> &nodes, const vector<vector<int>> &an
     vector<dtype *> vals, losses;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     transform(nodes.begin(), nodes.end(), back_inserter(losses), gpu_get_node_loss);
+    cudaStreamSynchronize(*n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
     dtype gpu_loss = n3ldg_cuda::MultiCrossEntropyLoss(vals, answers, nodes.size(),
-            nodes.front()->getDim(), factor, losses);
+            nodes.front()->getDim(), factor, losses,
+            n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
     dtype cpu_loss = cpuMultiCrossEntropyLoss(nodes, answers, factor);
     cout << "multiCrossEntropyLoss - gpu loss:" << gpu_loss << " cpu_loss:" << cpu_loss << endl;

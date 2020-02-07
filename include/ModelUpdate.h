@@ -25,8 +25,6 @@ public:
         _reg = 1e-8;
         _alpha = 0.001;
         _eps = 1e-8;
-
-
         _belta1 = 0.9;
         _belta2 = 0.999;
     }
@@ -94,7 +92,7 @@ public:
         updateAdam();
 #if TEST_CUDA
         for (BaseParam *p : _params) {
-            p->copyFromHostToDevice();
+            p->copyFromHostToDevice(nullptr);
         }
 #endif
     }
@@ -118,7 +116,7 @@ public:
         updateAdamW();
 #if TEST_CUDA
         for (BaseParam *p : _params) {
-            p->copyFromHostToDevice();
+            p->copyFromHostToDevice(nullptr);
         }
 #endif
     }

@@ -6,8 +6,6 @@
 #include "Memory_cuda.h"
 #include <iostream>
 #include <cassert>
-#include <cuda.h>
-#include <cuda_runtime.h>
 #include <helper_cuda.h>
 #include <vector>
 #include <cmath>
@@ -29,24 +27,25 @@ struct GPUArray {
         abort();
     }
 
-    void init(const T *host_arr, int len);
+    void init(const T *host_arr, int len, cudaStream_t *stream);
     void init(int len);
     ~GPUArray();
 
-    vector<T> toCpu() const;
+    vector<T> toCpu(cudaStream_t *stream) const;
 };
 
-cudaError_t MyCudaMemcpy(void *dest, const void *src, size_t count, cudaMemcpyKind kind);
+cudaError_t MyCudaMemcpy(void *dest, const void *src, size_t count, cudaMemcpyKind kind,
+        cudaStream_t *stream);
 void CallCuda(cudaError_t status);
 
 template <typename T>
-void GPUArray<T>::init(const T *host_arr, int len) {
+void GPUArray<T>::init(const T *host_arr, int len, cudaStream_t *stream) {
     if (value != nullptr) {
         CallCuda(MemoryPool::Ins().Free(value));
         value = nullptr;
     }
     CallCuda(MemoryPool::Ins().Malloc((void**)&value, len * sizeof(T)));
-    CallCuda(MyCudaMemcpy(value, host_arr, len * sizeof(T), cudaMemcpyHostToDevice));
+    CallCuda(MyCudaMemcpy(value, host_arr, len * sizeof(T), cudaMemcpyHostToDevice, stream));
     this->len = len;
 }
 
@@ -61,14 +60,14 @@ void GPUArray<T>::init(int len) {
 }
 
 template <typename T>
-vector<T> GPUArray<T>::toCpu() const {
+vector<T> GPUArray<T>::toCpu(cudaStream_t *stream) const {
     vector<T> result;
     result.resize(len);
     if (value == nullptr) {
         cerr << "GPUArray::toCpu - value is nullptr" << endl;
         abort();
     }
-    CallCuda(MyCudaMemcpy(result.data(), value, sizeof(T) * len, cudaMemcpyDeviceToHost));
+    CallCuda(MyCudaMemcpy(result.data(), value, sizeof(T) * len, cudaMemcpyDeviceToHost, stream));
     return result;
 }
 
@@ -101,7 +100,7 @@ struct DeviceNumber {
     }
 
     void init();
-    void copyFromDeviceToHost();
+    void copyFromDeviceToHost(cudaStream_t *stream);
     ~DeviceNumber();
 };
 
@@ -118,8 +117,8 @@ struct DeviceInt {
     }
 
     void init();
-    void copyFromDeviceToHost();
-    void copyFromHostToDevice();
+    void copyFromDeviceToHost(cudaStream_t *stream);
+    void copyFromHostToDevice(cudaStream_t *stream);
     ~DeviceInt();
 };
 
@@ -128,10 +127,11 @@ bool Verify(int *host, int *device, int len, const char* message);
 
 void Assert(bool v, const std::string &message = "",
         const std::function<void(void)> &call = []() {});
-void Memset(dtype *p, int len, dtype value);
-void Memset(bool *p, int len, bool value);
+void Memset(dtype *p, int len, dtype value, cudaStream_t *stream);
+void Memset(bool *p, int len, bool value, cudaStream_t *stream);
 void *Malloc(int size);
-void BatchMemset(const std::vector<dtype*> &vec, int count, const vector<int> &dims, dtype value);
+void BatchMemset(const std::vector<dtype*> &vec, int count, const vector<int> &dims, dtype value,
+        cudaStream_t *stream);
 void PrintNums(const dtype* p, int len);
 void PrintInts(const int* p, int len);
 
@@ -139,15 +139,12 @@ void InitCuda(int device_id = 0, float memory_in_gb = 0.0f);
 void EndCuda();
 
 void CopyFromMultiVectorsToOneVector(const std::vector<dtype*> &src, dtype *dest, int count,
-        int len);
+        int len,
+        cudaStream_t *stream);
 void CopyFromOneVectorToMultiVals(const dtype *src, std::vector<dtype*> &vals,
         int count,
-        int len);
-void CopyFromHostToDevice(const std::vector<dtype*> &src,
-        std::vector<dtype*> &dest, int count, int dim);
-void CopyFromDeviceToHost(const std::vector<dtype*> &src,
-        std::vector<dtype*> &dest, int count, int dim);
-
+        int len,
+        cudaStream_t *stream);
 enum PoolingEnum {
     MAX,
     MIN,
@@ -158,17 +155,20 @@ enum PoolingEnum {
 void ActivationForward(ActivatedEnum activated, const std::vector<const dtype*> &xs,
         int count,
         const vector<int> &dims,
-        std::vector<dtype*> &ys);
+        std::vector<dtype*> &ys,
+        cudaStream_t *stream);
 void ActivationBackward(ActivatedEnum activated, const std::vector<const dtype*> &losses,
         const std::vector<dtype*> &vals,
         int count,
         const vector<int> &dims,
-        std::vector<dtype*> &in_losses);
+        std::vector<dtype*> &in_losses,
+        cudaStream_t *stream);
 void DropoutForward(const std::vector<dtype*> &xs, int count, int dim,
         bool is_training,
         const dtype *drop_mask,
         dtype drop_factor,
-        std::vector<dtype*> &ys);
+        std::vector<dtype*> &ys,
+        cudaStream_t *stream);
 void DropoutBackward(const std::vector<dtype*> &losses,
         const std::vector<dtype*> &vals,
         int count,
@@ -176,23 +176,32 @@ void DropoutBackward(const std::vector<dtype*> &losses,
         bool is_training,
         const dtype *drop_mask,
         dtype drop_factor,
-        std::vector<dtype*> &in_losses);
-void BucketForward(const std::vector<dtype> input, int count, int dim, std::vector<dtype*> &ys);
+        std::vector<dtype*> &in_losses,
+        cudaStream_t *stream);
+void BucketForward(const std::vector<dtype> input, int count, int dim, std::vector<dtype*> &ys,
+        cudaStream_t *stream);
 void CopyForUniNodeForward(const std::vector<dtype*> &xs, const dtype* b,
         dtype* xs_dest,
         dtype* b_dest,
         int count,
         int x_len,
         int b_len,
-        bool use_b);
+        bool use_b,
+        cudaStream_t *stream);
 void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y, int row, int col,
         int count,
         bool useb,
+        cudaStream_t *stream,
         bool should_x_transpose = false,
         bool should_W_transpose = false);
-void AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(const dtype *lty,
-        const dtype *lx, dtype *b, std::vector<dtype*> &losses, int count,
-        int out_dim, int in_dim, bool use_b);
+void AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(const dtype *lty, const dtype *lx,
+        dtype *b,
+        std::vector<dtype*> &losses,
+        int count,
+        int out_dim,
+        int in_dim,
+        bool use_b,
+        cudaStream_t *stream);
 void AddLtyToParamBiasAndAddLxToInputLossesForBiBackward(const dtype *lty,
         const dtype *lx1,
         const dtype *lx2,
@@ -203,168 +212,206 @@ void AddLtyToParamBiasAndAddLxToInputLossesForBiBackward(const dtype *lty,
         int out_dim,
         int in_dim1,
         int in_dim2,
-        bool use_b);
+        bool use_b,
+        cudaStream_t *stream);
 void CalculateDropoutMask(dtype dropout_ratio, int count, int dim, dtype *mask);
 void ConcatForward(const std::vector<dtype*> &in_vals,
         const std::vector<int> &in_dims,
         std::vector<dtype*> &vals,
         int count,
         int in_count,
-        int out_dim);
+        int out_dim,
+        cudaStream_t *stream);
 void ConcatBackward(const std::vector<dtype*> &in_losses,
         const std::vector<int> &in_dims,
         std::vector<dtype*> &losses,
         int count,
         int in_count,
-        int out_dim);
+        int out_dim,
+        cudaStream_t *stream);
 void ScalarConcatForward(const vector<dtype *> &ins, int count, const vector<int> &dims,
         int max_dim,
-        const vector<dtype *> &results);
+        const vector<dtype *> &results,
+        cudaStream_t *stream);
 void ScalarConcatBackward(const vector<dtype *> &losses, int count, const vector<int> &dims,
         int max_dim,
-        const vector<dtype *> in_losses);
+        const vector<dtype *> in_losses,
+        cudaStream_t *stream);
 void LookupForward(const std::vector<int> &xids, const dtype *vocabulary,
         int count,
         int dim,
-        std::vector<dtype*> &vals);
+        std::vector<dtype*> &vals,
+        cudaStream_t *stream);
 void LookupBackward(const std::vector<int> &xids, int unknown_id,
         bool fine_tune,
         const std::vector<dtype*> &losses,
         int count,
         int dim,
         dtype *grad,
-        bool *indexers);
+        bool *indexers,
+        cudaStream_t *stream);
 void LookupBackward(const std::vector<int> &xids, int unknown_id,
         bool fine_tune,
         const std::vector<dtype*> &losses,
         int count,
         int dim,
-        dtype *grad);
+        dtype *grad,
+        cudaStream_t *stream);
 void ParamRowForward(const dtype *param, int row_index, int param_row_count, int count, int dim,
-        vector<dtype*> &vals);
+        vector<dtype*> &vals,
+        cudaStream_t *stream);
 void PoolForward(PoolingEnum pooling, const std::vector<dtype*> &in_vals,
         std::vector<dtype*> &vals,
         int count,
         const std::vector<int> &in_counts,
         int dim,
-        int *hit_inputs);
+        int *hit_inputs,
+        cudaStream_t *stream);
 void PoolBackward(const std::vector<dtype*> &losses,
         std::vector<dtype*> &in_losses,
         const std::vector<int> &in_counts,
         const int *hit_inputs,
         int count,
-        int dim);
+        int dim,
+        cudaStream_t *stream);
 void SumPoolForward(PoolingEnum pooling, const std::vector<dtype*> &in_vals,
         int count,
         int dim,
         const std::vector<int> &in_counts,
-        std::vector<dtype*> &vals);
+        std::vector<dtype*> &vals,
+        cudaStream_t *stream);
 void SumPoolBackward(PoolingEnum pooling, const std::vector<dtype*> &losses,
         const std::vector<int> &in_counts,
         int count,
         int dim,
-        std::vector<dtype*> &in_losses);
+        std::vector<dtype*> &in_losses,
+        cudaStream_t *stream);
 void PMultiForward(const std::vector<dtype*> &ins1,
         const std::vector<dtype*> &ins2,
         int count,
         int dim,
-        std::vector<dtype*> &vals);
+        std::vector<dtype*> &vals,
+        cudaStream_t *stream);
 void DivForward(const vector<const dtype*> numerators, const vector<const dtype*> denominators,
         int count,
         const vector<int> &dims,
-        vector<dtype*> &results);
+        vector<dtype*> &results,
+        cudaStream_t *stream);
 void DivBackward(const vector<const dtype*> &losses, const vector<const dtype*> &denominator_vals,
         const vector<const dtype*> &numerator_vals,
         int count,
         const vector<int> &dims,
         vector<dtype*> &numerator_losses,
-        vector<dtype*> &denominator_losses);
+        vector<dtype*> &denominator_losses,
+        cudaStream_t *stream);
 void SplitForward(const std::vector<const dtype*> &inputs, const std::vector<int> &offsets,
         int count,
         int dim,
-        std::vector<dtype*> &results);
+        std::vector<dtype*> &results,
+        cudaStream_t *stream);
 void SplitBackward(const std::vector<const dtype*> &losses, const std::vector<int> offsets,
         int count,
         int dim,
-        const std::vector<dtype*> &input_losses);
+        const std::vector<dtype*> &input_losses,
+        cudaStream_t *stream);
 void SubForward(const std::vector<const dtype*> &minuend,
         const std::vector<const dtype*> &subtrahend,
         int count,
         const vector<int> &dims,
-        std::vector<dtype*> &results);
+        std::vector<dtype*> &results,
+        cudaStream_t *stream);
 void SubBackward(const std::vector<const dtype*> &losses, int count, const vector<int> &dims,
         std::vector<dtype*> &minuend_losses,
-        std::vector<dtype*> &subtrahend_losses);
+        std::vector<dtype*> &subtrahend_losses,
+        cudaStream_t *stream);
 void PMultiBackward(const std::vector<dtype*> &losses,
         const std::vector<dtype*> &in_vals1,
         const std::vector<dtype*> &in_vals2,
         int count,
         int dim,
         std::vector<dtype*> &in_losses1,
-        std::vector<dtype*> &in_losses2);
+        std::vector<dtype*> &in_losses2,
+        cudaStream_t *stream);
 void PDotForward(const std::vector<dtype*> &ins1,
         const std::vector<dtype*> &ins2,
         int count,
         int dim,
-        std::vector<dtype*> &vals);
+        std::vector<dtype*> &vals,
+        cudaStream_t *stream);
 void PDotBackward(const std::vector<dtype*> &losses,
         const std::vector<dtype*> &in_vals1,
         const std::vector<dtype*> &in_vals2,
         int count,
         int dim,
         std::vector<dtype*> &in_losses1,
-        std::vector<dtype*> &in_losses2);
+        std::vector<dtype*> &in_losses2,
+        cudaStream_t *stream);
 void PAddForward(const std::vector<std::vector<dtype*>> &ins, int count,
         int dim,
         int in_count,
-        std::vector<dtype*> &vals);
+        std::vector<dtype*> &vals,
+        cudaStream_t *stream);
 void PAddBackward(const std::vector<dtype*> &losses, int count, int dim,
         int in_count,
-        std::vector<std::vector<dtype*>> &in_losses);
+        std::vector<std::vector<dtype*>> &in_losses,
+        cudaStream_t *stream);
 dtype CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, int count,
         dtype batchsize,
-        vector<dtype *> &losses);
+        vector<dtype *> &losses,
+        cudaStream_t *stream);
 dtype MultiCrossEntropyLoss(const vector<dtype*> &vals, const vector<vector<int>> &answers,
         int count,
         int dim,
         dtype factor,
-        const vector<dtype*> &losses);
+        const vector<dtype*> &losses,
+        cudaStream_t *stream);
 dtype KLCrossEntropyLoss(const vector<dtype*> &vals,
         const vector<shared_ptr<vector<dtype>>> &answers,
         int count,
         int dim,
         dtype factor,
-        const vector<dtype*> &losses);
+        const vector<dtype*> &losses,
+        cudaStream_t *stream);
 void MaxScalarForward(const vector<const dtype*> &inputs, int count, const vector<int> &dims,
         vector<dtype*> &results,
-        vector<int> &max_indexes);
+        vector<int> &max_indexes,
+        cudaStream_t *stream);
 void MaxScalarBackward(const std::vector<const dtype *> &losses, const std::vector<int> &indexes,
         int count,
-        const std::vector<dtype*> &input_losses);
+        const std::vector<dtype*> &input_losses,
+        cudaStream_t *stream);
 void VectorSumForward(const vector<const dtype *> &inputs, int count, const vector<int> &dims,
-        vector<dtype*> &results);
+        vector<dtype*> &results,
+        cudaStream_t *stream);
 void VectorSumBackward(const vector<const dtype*> &losses, int count, const vector<int> &dims,
-        vector<dtype*> &input_losses);
+        vector<dtype*> &input_losses,
+        cudaStream_t *stream);
 void ScalarToVectorForward(const vector<const dtype*> &inputs, int count, const vector<int> &dims,
-        vector<dtype*> &results);
+        vector<dtype*> &results,
+        cudaStream_t *stream);
 void ScalarToVectorBackward(const vector<const dtype*> &losses, int count, const vector<int> &dims,
-        vector<dtype*> &input_losses);
+        vector<dtype*> &input_losses,
+        cudaStream_t *stream);
 void BiasForward(const vector<dtype*> &in_vals, const dtype *bias, int count, int dim,
-        const vector<dtype *> &vals);
+        const vector<dtype *> &vals,
+        cudaStream_t *stream);
 void BiasBackward(const vector<dtype *> &losses, int count, int dim, dtype *bias_loss,
-        const vector<dtype *> input_losses);
-vector<int> Predict(const vector<dtype*> &vals, int count, int dim);
-int Predict(const dtype* val, int dim);
-void Max(const dtype *const *v, int count, int dim, int *max_indexes, dtype *max_vals);
-std::pair<dtype, std::vector<int>> SoftMaxLoss(const std::vector<const dtype *> &vals_vector,
-        int count,
-        int dim,
-        const std::vector<int> &gold_answers,
-        int batchsize,
-        const std::vector<dtype *> &losses_vector);
-dtype SquareSum(const dtype *v, int len);
-dtype SquareSum(const dtype *v, const bool *indexers, int count, int dim);
-void Rescale(dtype *v, int len, dtype scale);
+        const vector<dtype *> input_losses,
+        cudaStream_t *stream);
+vector<int> Predict(const vector<dtype*> &vals, int count, int dim,
+        cudaStream_t *stream);
+//int Predict(const dtype* val, int dim);
+void Max(const dtype *const *v, int count, int dim, int *max_indexes, dtype *max_vals,
+        cudaStream_t *stream);
+//std::pair<dtype, std::vector<int>> SoftMaxLoss(const std::vector<const dtype *> &vals_vector,
+//        int count,
+//        int dim,
+//        const std::vector<int> &gold_answers,
+//        int batchsize,
+//        const std::vector<dtype *> &losses_vector);
+dtype SquareSum(const dtype *v, int len, cudaStream_t *stream);
+dtype SquareSum(const dtype *v, const bool *indexers, int count, int dim, cudaStream_t *stream);
+void Rescale(dtype *v, int len, dtype scale, cudaStream_t *stream);
 void UpdateAdam(dtype *val, dtype *grad, int row, int col, bool is_bias, dtype *aux_mean,
         dtype *aux_square,
         int iter,
@@ -372,7 +419,8 @@ void UpdateAdam(dtype *val, dtype *grad, int row, int col, bool is_bias, dtype *
         dtype belta2,
         dtype alpha,
         dtype reg,
-        dtype eps);
+        dtype eps,
+        cudaStream_t *stream);
 void UpdateAdam(dtype *val, dtype *grad, int row, int col, dtype *aux_mean,
         dtype *aux_square,
         const bool *indexers,
@@ -381,7 +429,8 @@ void UpdateAdam(dtype *val, dtype *grad, int row, int col, dtype *aux_mean,
         dtype belta2,
         dtype alpha,
         dtype reg,
-        dtype eps);
+        dtype eps,
+        cudaStream_t *stream);
 void UpdateAdamW(dtype *val, dtype *grad, int row, int col, bool is_bias, dtype *aux_mean,
         dtype *aux_square,
         int iter,
@@ -389,18 +438,21 @@ void UpdateAdamW(dtype *val, dtype *grad, int row, int col, bool is_bias, dtype 
         dtype belta2,
         dtype alpha,
         dtype reg,
-        dtype eps);
+        dtype eps,
+        cudaStream_t *stream);
 void UpdateAdagrad(dtype *val, dtype *grad, int row, int col,
         dtype *aux_square,
         dtype alpha,
         dtype reg,
-        dtype eps);
+        dtype eps,
+        cudaStream_t *stream);
 void UpdateAdagrad(dtype *val, dtype *grad, int row, int col,
         dtype *aux_square,
         const bool *indexers,
         dtype alpha,
         dtype reg,
-        dtype eps);
+        dtype eps,
+        cudaStream_t *stream);
 void *GraphHostAlloc();
 }
 

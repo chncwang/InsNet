@@ -123,7 +123,7 @@ class ConcatExecutor : public Executor {
         }
 
         n3ldg_cuda::ConcatForward(in_vals, static_cast<ConcatNode*>(batch.at(0))->inDims, vals,
-                count, inCount, outDim);
+                count, inCount, outDim, n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -147,7 +147,8 @@ class ConcatExecutor : public Executor {
         }
 
         n3ldg_cuda::ConcatBackward(in_losses, static_cast<ConcatNode*>(batch.at(0))->inDims,
-                losses, count, inCount, outDim);
+                losses, count, inCount, outDim,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward();
@@ -251,7 +252,8 @@ public:
             }
             vals.push_back(node->getVal().value);
         }
-        n3ldg_cuda::ScalarConcatForward(in_vals, batch.size(), dims_, max_dim_, vals);
+        n3ldg_cuda::ScalarConcatForward(in_vals, batch.size(), dims_, max_dim_, vals,
+                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         Executor::testForward();
 #endif
@@ -281,7 +283,8 @@ public:
         cout << "test before scalar concat" << endl;
         Executor::testBeforeBackward(get_inputs);
 #endif
-        n3ldg_cuda::ScalarConcatBackward(losses, batch.size(), dims_, max_dim_, in_losses);
+        n3ldg_cuda::ScalarConcatBackward(losses, batch.size(), dims_, max_dim_, in_losses,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         Executor::testBackward(get_inputs);
 #endif

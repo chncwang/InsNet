@@ -69,7 +69,8 @@ public:
             dims.push_back(node->getDim());
         }
 
-        n3ldg_cuda::DivForward(numerators, denominators, batch.size(), dims, results);
+        n3ldg_cuda::DivForward(numerators, denominators, batch.size(), dims, results,
+                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         Executor::testForward();
         cout << "div tested" << endl;
@@ -87,7 +88,8 @@ public:
         }
 
         n3ldg_cuda::DivBackward(losses, denominators, numerators, batch.size(), dims,
-                numerator_losses, denominator_losses);
+                numerator_losses, denominator_losses,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {
             DivNode &div = static_cast<DivNode&>(node);

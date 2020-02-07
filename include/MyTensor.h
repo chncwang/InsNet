@@ -125,7 +125,7 @@ void n3ldg_cpu::Tensor1D::fromJson(const Json::Value &json) {
     }
 }
 
-std::vector<dtype> n3ldg_cpu::Tensor1D::toCpu() const {
+std::vector<dtype> n3ldg_cpu::Tensor1D::toCpu(void *stream) const {
     std::vector<dtype> result;
     result.resize(dim);
     memcpy(result.data(), v, sizeof(dtype) * dim);
@@ -291,19 +291,19 @@ std::string n3ldg_cuda::Tensor1D::name() const {
 
 n3ldg_cuda::Tensor1D& n3ldg_cuda::Tensor1D::operator=(const Tensor1D &tensor) {
     n3ldg_cpu::Tensor1D::operator=(tensor);
-    copyFromHostToDevice();
+    copyFromHostToDevice(nullptr);
     return *this;
 }
 
 n3ldg_cuda::Tensor1D& n3ldg_cuda::Tensor1D::operator=(dtype v) {
     n3ldg_cpu::Tensor1D::operator=(v);
-    copyFromHostToDevice();
+    copyFromHostToDevice(nullptr);
     return *this;
 }
 
 void n3ldg_cuda::Tensor1D::random(dtype bound) {
     n3ldg_cpu::Tensor1D::random(bound);
-    copyFromHostToDevice();
+    copyFromHostToDevice(nullptr);
 }
 
 bool n3ldg_cuda::Tensor1D::verify(const char *message) const {
@@ -335,7 +335,7 @@ void n3ldg_cuda::Tensor2D::zero() {
 
 void n3ldg_cuda::Tensor2D::random(dtype bound) {
     n3ldg_cpu::Tensor2D::random(bound);
-    copyFromHostToDevice();
+    copyFromHostToDevice(nullptr);
 }
 
 bool n3ldg_cuda::Tensor2D::verify(const char* message) {
@@ -348,7 +348,7 @@ bool n3ldg_cuda::Tensor2D::verify(const char* message) {
 
 void n3ldg_cuda::Tensor2D::assignAll(dtype a) {
     n3ldg_cpu::Tensor2D::assignAll(a);
-    copyFromHostToDevice();
+    copyFromHostToDevice(nullptr);
 }
 
 #endif

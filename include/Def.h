@@ -34,5 +34,7 @@ enum ActivatedEnum {
     SELU = 5
 };
 
+constexpr int GRAD_STREAM = 0;
+constexpr int VAL_STREAM = 0;
 
 #endif

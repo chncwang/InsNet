@@ -68,7 +68,8 @@ public:
             offsets.push_back(split->offset_);
             results.push_back(split->getVal().value);
         }
-        n3ldg_cuda::SplitForward(inputs, offsets, batch.size(), getDim(), results);
+        n3ldg_cuda::SplitForward(inputs, offsets, batch.size(), getDim(), results,
+                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         testForward();
         cout << "split tested" << endl;
@@ -85,7 +86,8 @@ public:
             input_losses.push_back(split->input_->getLoss().value);
         }
 
-        n3ldg_cuda::SplitBackward(losses, offsets, batch.size(), getDim(), input_losses);
+        n3ldg_cuda::SplitBackward(losses, offsets, batch.size(), getDim(), input_losses,
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {
             SplitNode &split = static_cast<SplitNode&>(node);
