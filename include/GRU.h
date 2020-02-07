@@ -118,7 +118,7 @@ struct DynamicGRUBuilder {
         Node *one = bucket(graph, hidden_dim, 1);
         Node *reversal_update = sub(graph, *one, *update_gate);
         Node *passed_last_hidden = pointwiseMultiply(graph, *reversal_update, *last_hidden);
-        Node *updated_candidate = pointwiseMultiply(graph, *update_gate, *candidate_hidden);
+        Node *updated_candidate = pointwiseMultiply(graph, *update_gate, *candidate);
         Node *h = add(graph, {passed_last_hidden, updated_candidate});
         hiddens.push_back(h);
     }
