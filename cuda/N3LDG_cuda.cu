@@ -855,6 +855,7 @@ __global__ void KernelVerify(bool *host, bool *device, int len,
 }
 
 bool Verify(bool *host, bool *device, int len, const char* message) {
+    cudaDeviceSynchronize();
     BoolArray arr;
     arr.init(host, len, nullptr);
     int block_count = (len + TPB - 1) / TPB;
@@ -1496,7 +1497,9 @@ __global__ void KernelMemset(dtype *p, int len, dtype value) {
 void Memset(dtype *p, int len, dtype value, cudaStream_t *stream) {
     int block_count = std::min(BLOCK_COUNT, (len - 1 + TPB) / TPB);
     if (stream == nullptr) {
+        cudaDeviceSynchronize();
         KernelMemset<<<block_count, TPB, 0, 0>>>(p, len, value);
+        cudaDeviceSynchronize();
     } else {
         KernelMemset<<<block_count, TPB, 0, *stream>>>(p, len, value);
     }
