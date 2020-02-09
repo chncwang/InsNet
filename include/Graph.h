@@ -69,10 +69,14 @@ public:
     }
 
     void backward() {
+        using n3ldg_cuda::StreamManager;
+        StreamManager::ins().right_key_ = GRAD_STREAM;
         n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
         profiler.BeginEvent("computation backward");
         int count = execs.size();
         for (int idx = count - 1; idx >= 0; idx--) {
+            //cudaDeviceSynchronize();
+//            cout << "backward type:" << execs.at(idx)->getNodeType() << endl;
             execs.at(idx)->backwardFully();
         }
         profiler.EndCudaEvent();
@@ -108,6 +112,7 @@ public:
 
     void compute() {
         n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
+        using n3ldg_cuda::StreamManager;
 
         while (true) {
             profiler.BeginEvent("computation plan");
@@ -137,12 +142,17 @@ public:
             profiler.EndEvent();
 #if USE_GPU
             profiler.BeginEvent("clear nodes");
+//            ::cudaDeviceSynchronize();
+            StreamManager::ins().right_key_ = GRAD_STREAM;
             clearNodes(cur_exec->batch);
+            //::cudaDeviceSynchronize();
+            StreamManager::ins().right_key_ = VAL_STREAM;
             profiler.EndCudaEvent();
 #endif
-            //cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl << endl;
+//            cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl << endl;
 
             profiler.BeginEvent("computation forward");
+//            cout << "exec type:" << cur_exec->getNodeType() << endl;
             cur_exec->forwardFully();
             if (eager_) {
                 for (Node *node : cur_exec->batch) {
@@ -187,6 +197,7 @@ public:
             std::cerr << "unprocessed: " << unprocessed << std::endl;
             abort();
         }
+        StreamManager::ins().right_key_ = -1;
     }
 
 protected:

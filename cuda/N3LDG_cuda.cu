@@ -24,6 +24,7 @@
 #include <memory>
 #include "profiler.h"
 #include "MyTensor-def.h"
+#include "host_allocate.h"
 
 namespace n3ldg_cuda {
 
@@ -104,15 +105,9 @@ cublasHandle_t& GetCublasHandle(cudaStream_t *stream) {
 
 cudaError_t MyCudaMemcpy(void *dest, const void *src, size_t count, cudaMemcpyKind kind,
         cudaStream_t *stream) {
-    if (stream == nullptr) {
-        cudaDeviceSynchronize();
-    }
     cudaError_t e = stream == nullptr ? cudaMemcpyAsync(dest, src, count, kind) :
         cudaMemcpyAsync(dest, src, count, kind, *stream);
     CallCuda(e);
-    //if (stream == nullptr) {
-    cudaDeviceSynchronize();
-    //}
     return e;
 }
 
@@ -125,10 +120,10 @@ int NextTwoIntegerPowerNumber(int number) {
 }
 
 template <>
-vector<bool> GPUArray<bool>::toCpu(cudaStream_t *stream) const {
+PageLockedVector<bool> GPUArray<bool>::toCpu(cudaStream_t *stream) const {
     bool *cpu_arr = new bool[len];
     CallCuda(MyCudaMemcpy(cpu_arr, value, sizeof(bool) * len, cudaMemcpyDeviceToHost, stream));
-    vector<bool> result;
+    PageLockedVector<bool> result;
     result.resize(len);
     for (int i = 0; i < len; ++i) {
         result.at(i) = cpu_arr[i];
@@ -139,10 +134,10 @@ vector<bool> GPUArray<bool>::toCpu(cudaStream_t *stream) const {
 
 void DeviceInt::init() {
     if (value != NULL) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        CallCuda(DeviceMemoryPool::Ins().Free(value));
         value = NULL;
     }
-    CallCuda(MemoryPool::Ins().Malloc((void**)&value, sizeof(int)));
+    CallCuda(DeviceMemoryPool::Ins().Malloc((void**)&value, sizeof(int)));
 }
 
 void DeviceInt::copyFromDeviceToHost(cudaStream_t *stream) {
@@ -155,16 +150,16 @@ void DeviceInt::copyFromHostToDevice(cudaStream_t *stream) {
 
 DeviceInt::~DeviceInt() {
     if (value != NULL) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        CallCuda(DeviceMemoryPool::Ins().Free(value));
     }
 }
 
 void DeviceNumber::init() {
     if (value != NULL) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        CallCuda(DeviceMemoryPool::Ins().Free(value));
         value = NULL;
     }
-    CallCuda(MemoryPool::Ins().Malloc((void**)&value, sizeof(int)));
+    CallCuda(DeviceMemoryPool::Ins().Malloc((void**)&value, sizeof(int)));
 }
 
 void DeviceNumber::copyFromDeviceToHost(cudaStream_t *stream) {
@@ -173,7 +168,7 @@ void DeviceNumber::copyFromDeviceToHost(cudaStream_t *stream) {
 
 DeviceNumber::~DeviceNumber() {
     if (value != NULL) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        CallCuda(DeviceMemoryPool::Ins().Free(value));
     }
 }
 
@@ -192,7 +187,7 @@ void Tensor1D::initOnMemoryAndDevice(int dim) {
 }
 
 void Tensor1D::initOnDevice(int dim) {
-    CallCuda(MemoryPool::Ins().Malloc((void**)&value, dim * sizeof(dtype)));
+    CallCuda(DeviceMemoryPool::Ins().Malloc((void**)&value, dim * sizeof(dtype)));
     this->dim = dim;
 }
 
@@ -209,7 +204,7 @@ Tensor1D::Tensor1D(const Tensor1D &t) {
 
 Tensor1D::~Tensor1D() {
     if (value != NULL) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        CallCuda(DeviceMemoryPool::Ins().Free(value));
     }
 }
 
@@ -280,7 +275,7 @@ void Tensor2D::init(int row, int col) {
 }
 
 void Tensor2D::initOnDevice(int row, int col) {
-    CallCuda(MemoryPool::Ins().Malloc((void**)&value,
+    CallCuda(DeviceMemoryPool::Ins().Malloc((void**)&value,
                 row * col * sizeof(dtype)));
     this->row = row;
     this->col = col;
@@ -297,7 +292,7 @@ Tensor2D::Tensor2D(const Tensor2D &t) {
 
 Tensor2D::~Tensor2D() {
     if (value != NULL) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        CallCuda(DeviceMemoryPool::Ins().Free(value));
     }
 }
 
@@ -472,7 +467,7 @@ void InitCuda(int device_id, float memory_in_gb) {
 #endif
     CallCuda(cudaDeviceSetCacheConfig(cudaFuncCachePreferL1));
     CallCuda(cudaPrintfInit());
-    MemoryPool::Ins().Init(memory_in_gb);
+    DeviceMemoryPool::Ins().Init(memory_in_gb);
 }
 
 void EndCuda() {
@@ -491,7 +486,7 @@ __global__ void KernelCopyFromOneVectorToMultiVectors(const dtype *src,
     }
 }
 
-void CopyFromOneVectorToMultiVals(const dtype *src, std::vector<dtype*> &vals,
+void CopyFromOneVectorToMultiVals(const dtype *src, PageLockedVector<dtype*> &vals,
         int count,
         int len,
         cudaStream_t *stream) {
@@ -515,7 +510,7 @@ __global__ void KernelCopyFromMultiVectorsToOneVector(const dtype **src, dtype *
     }
 }
 
-void CopyFromMultiVectorsToOneVector(const std::vector<dtype*> &src,
+void CopyFromMultiVectorsToOneVector(const PageLockedVector<dtype*> &src,
         dtype *dest,
         int count,
         int len,
@@ -555,10 +550,10 @@ __global__ void KernelActivationForward(ActivatedEnum activated, const dtype *co
     }
 }
 
-void ActivationForward(ActivatedEnum activated, const std::vector<const dtype*> &xs,
+void ActivationForward(ActivatedEnum activated, const PageLockedVector<const dtype*> &xs,
         int count,
-        const vector<int> &dims,
-        std::vector<dtype*> &ys,
+        const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &ys,
         cudaStream_t *stream) {
     int max_dim = *max_element(dims.begin(), dims.end());
     NumberPointerArray x_arr, y_arr;
@@ -607,11 +602,11 @@ __global__ void KernelActivationBackward(ActivatedEnum activated,
     }
 }
 
-void ActivationBackward(ActivatedEnum activated, const std::vector<const dtype*> &losses,
-        const std::vector<dtype*> &vals,
+void ActivationBackward(ActivatedEnum activated, const PageLockedVector<const dtype*> &losses,
+        const PageLockedVector<dtype*> &vals,
         int count,
-        const vector<int> &dims,
-        std::vector<dtype*> &in_losses,
+        const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &in_losses,
         cudaStream_t *stream) {
     int max_dim = *max_element(dims.begin(), dims.end());
     NumberPointerArray loss_arr, val_arr, in_loss_arr;
@@ -648,11 +643,11 @@ __global__ void KernelDropoutForward(const dtype *const *xs, int count, int dim,
     }
 }
 
-void DropoutForward(const std::vector<dtype*> &xs, int count, int dim,
+void DropoutForward(const PageLockedVector<dtype*> &xs, int count, int dim,
         bool is_training,
         const dtype *drop_mask,
         dtype drop_factor,
-        std::vector<dtype*> &ys,
+        PageLockedVector<dtype*> &ys,
         cudaStream_t *stream) {
     if (drop_factor < 0 || drop_factor >= 1.0f) {
         std::cerr << "drop value is " << drop_factor << std::endl;
@@ -690,14 +685,14 @@ __global__ void KernelDropoutBackward(const dtype *const *losses, const dtype *c
     }
 }
 
-void DropoutBackward(const std::vector<dtype*> &losses,
-        const std::vector<dtype*> &vals,
+void DropoutBackward(const PageLockedVector<dtype*> &losses,
+        const PageLockedVector<dtype*> &vals,
         int count,
         int dim,
         bool is_training,
         const dtype *drop_mask,
         dtype drop_factor,
-        std::vector<dtype*> &in_losses,
+        PageLockedVector<dtype*> &in_losses,
         cudaStream_t *stream) {
     if (drop_factor < 0 || drop_factor >= 1) {
         std::cerr << "drop value is " << drop_factor << std::endl;
@@ -722,7 +717,7 @@ __global__ void KernelBucketForward(const dtype *input, int count, int dim, dtyp
     }
 }
 
-void BucketForward(const std::vector<dtype> input, int count, int dim, std::vector<dtype*> &ys,
+void BucketForward(const PageLockedVector<dtype> input, int count, int dim, PageLockedVector<dtype*> &ys,
         cudaStream_t *stream) {
     NumberArray input_arr;
     NumberPointerArray ys_arr;
@@ -758,7 +753,7 @@ __global__ void KernelCopyForUniNodeForward(const dtype** xs, const dtype* b,
     }
 }
 
-void CopyForUniNodeForward(const std::vector<dtype*> &xs, const dtype* b, dtype* xs_dest,
+void CopyForUniNodeForward(const PageLockedVector<dtype*> &xs, const dtype* b, dtype* xs_dest,
         dtype* b_dest,
         int count,
         int x_len,
@@ -816,21 +811,21 @@ bool Verify(dtype *host, dtype *device, int len, const char* message) {
     arr.init(host, len, nullptr);
     int block_count = DefaultBlockCount(len);
     char *m = NULL;
-    CallCuda(MemoryPool::Ins().Malloc((void**)&m,
+    CallCuda(DeviceMemoryPool::Ins().Malloc((void**)&m,
                 (strlen(message) + 1) * sizeof(char)));
     CallCuda(MyCudaMemcpy(m, message,
                 (strlen(message) + 1) * sizeof(char), cudaMemcpyHostToDevice, nullptr));
     bool success = true;
     bool *dev_success = NULL;
-    CallCuda(MemoryPool::Ins().Malloc((void**)&dev_success, 8 * sizeof(bool)));
+    CallCuda(DeviceMemoryPool::Ins().Malloc((void**)&dev_success, 8 * sizeof(bool)));
     CallCuda(MyCudaMemcpy(dev_success, &success, sizeof(bool),
                 cudaMemcpyHostToDevice, nullptr));
     KernelVerify<<<block_count, TPB>>>(arr.value, device, len, m, dev_success);
     CheckCudaError();
     CallCuda(MyCudaMemcpy(&success, dev_success, sizeof(bool),
                 cudaMemcpyDeviceToHost, nullptr));
-    MemoryPool::Ins().Free(dev_success);
-    MemoryPool::Ins().Free(m);
+    DeviceMemoryPool::Ins().Free(dev_success);
+    DeviceMemoryPool::Ins().Free(m);
     cudaDeviceSynchronize();
     cudaPrintfDisplay(stdout, true);
     if (!success) {
@@ -860,21 +855,21 @@ bool Verify(bool *host, bool *device, int len, const char* message) {
     arr.init(host, len, nullptr);
     int block_count = (len + TPB - 1) / TPB;
     char *m = NULL;
-    CallCuda(MemoryPool::Ins().Malloc((void**)&m,
+    CallCuda(DeviceMemoryPool::Ins().Malloc((void**)&m,
                 (strlen(message) + 1) * sizeof(char)));
     CallCuda(MyCudaMemcpy(m, message, (strlen(message) + 1) * sizeof(char),
                 cudaMemcpyHostToDevice, nullptr));
     bool success = true;
     bool *dev_success = NULL;
-    CallCuda(MemoryPool::Ins().Malloc((void**)&dev_success, 8 * sizeof(bool)));
+    CallCuda(DeviceMemoryPool::Ins().Malloc((void**)&dev_success, 8 * sizeof(bool)));
     CallCuda(MyCudaMemcpy(dev_success, &success, sizeof(bool),
                 cudaMemcpyHostToDevice, nullptr));
     KernelVerify<<<block_count, TPB>>>(arr.value, device, len, m, dev_success);
     CheckCudaError();
     CallCuda(MyCudaMemcpy(&success, dev_success, sizeof(bool),
                 cudaMemcpyDeviceToHost, nullptr));
-    MemoryPool::Ins().Free(dev_success);
-    MemoryPool::Ins().Free(m);
+    DeviceMemoryPool::Ins().Free(dev_success);
+    DeviceMemoryPool::Ins().Free(m);
     cudaDeviceSynchronize();
     cudaPrintfDisplay(stdout, true);
     return success;
@@ -900,21 +895,21 @@ bool Verify(int *host, int *device, int len, const char* message) {
     arr.init(host, len, nullptr);
     int block_count = (len + TPB - 1) / TPB;
     char *m = NULL;
-    CallCuda(MemoryPool::Ins().Malloc((void**)&m,
+    CallCuda(DeviceMemoryPool::Ins().Malloc((void**)&m,
                 (strlen(message) + 1) * sizeof(char)));
     CallCuda(MyCudaMemcpy(m, message,
                 (strlen(message) + 1) * sizeof(char), cudaMemcpyHostToDevice, nullptr));
     bool success = true;
     bool *dev_success = NULL;
-    CallCuda(MemoryPool::Ins().Malloc((void**)&dev_success, sizeof(bool)));
+    CallCuda(DeviceMemoryPool::Ins().Malloc((void**)&dev_success, sizeof(bool)));
     CallCuda(MyCudaMemcpy(dev_success, &success, sizeof(bool),
                 cudaMemcpyHostToDevice, nullptr));
     KernelVerify<<<block_count, TPB>>>(arr.value, device, len, m, dev_success);
     CheckCudaError();
     CallCuda(MyCudaMemcpy(&success, dev_success, sizeof(bool),
                 cudaMemcpyDeviceToHost, nullptr));
-    MemoryPool::Ins().Free(dev_success);
-    MemoryPool::Ins().Free(m);
+    DeviceMemoryPool::Ins().Free(dev_success);
+    DeviceMemoryPool::Ins().Free(m);
     cudaDeviceSynchronize();
     cudaPrintfDisplay(stdout, true);
     return success;
@@ -922,10 +917,11 @@ bool Verify(int *host, int *device, int len, const char* message) {
 
 constexpr int MAX_BLOCK_POWER = 100;
 
-MemoryPool& MemoryPool::Ins() {
-    static MemoryPool *p;
+template<typename T>
+MemoryPool<T>& MemoryPool<T>::Ins() {
+    static MemoryPool<T> *p;
     if (p == NULL) {
-        p = new MemoryPool;
+        p = new MemoryPool<T>;
         p->free_blocks_.resize(MAX_BLOCK_POWER + 1);
         p->busy_blocks_.reserve(10000);
     }
@@ -944,21 +940,12 @@ void appendFreeBlock(const MemoryBlock &memory_block,
     free_blocks.at(i).insert(make_pair(memory_block.p, memory_block));
 }
 
-cudaError_t MemoryPool::Malloc(void **p, int size) {
+template<typename T>
+cudaError_t MemoryPool<T>::Malloc(void **p, int size) {
     cudaError_t error_code;
     assert(*p == NULL);
     Profiler &profiler = Profiler::Ins();
     profiler.BeginEvent("Malloc");
-#if DEVICE_MEMORY == 0
-    CallCnmem(cnmemMalloc(p, size, NULL));
-    profiler.EndEvent();
-    error_code = cudaSuccess;
-    cudaDeviceSynchronize();
-#elif DEVICE_MEMORY == 1
-    error_code = cudaMalloc(p, size);
-    profiler.EndEvent();
-    cudaDeviceSynchronize();
-#else
     int fit_size = 1;
     int n = 0;
     while (fit_size < size) {
@@ -974,12 +961,11 @@ cudaError_t MemoryPool::Malloc(void **p, int size) {
             }
             if (higher_power > MAX_BLOCK_POWER) {
                 while (status != cudaSuccess) {
-                    status = cudaMalloc(p, fit_size);
-                    //cout << "status:" << status << endl;
+                    status = allocator_.malloc(p, fit_size);
                 }
                 CallCuda(status);
 //                cout << "MemoryPool malloc - before sync" << endl;
-                //cudaDeviceSynchronize();
+                //cudaStreamSynchronize(0);
 //                cout << "MemoryPool malloc - after sync" << endl;
                 MemoryBlock block(*p, fit_size);
                 busy_blocks_.insert(std::make_pair(*p, block));
@@ -1007,8 +993,15 @@ cudaError_t MemoryPool::Malloc(void **p, int size) {
     profiler.EndEvent();
 
     error_code = status;
-#endif
     return error_code;
+}
+
+cudaError_t DeviceAllocator::malloc(void **p, size_t size) {
+    return cudaMalloc(p, size);
+}
+
+cudaError_t HostAlloc::malloc(void **p, size_t size) {
+    return cudaHostAlloc(p, size, cudaHostAllocDefault);
 }
 
 std::pair<const MemoryBlock *, const MemoryBlock *> lowerAndhigherBlocks(const MemoryBlock &a,
@@ -1077,17 +1070,10 @@ void returnFreeBlock(const MemoryBlock &block, vector<map<void*, MemoryBlock>> &
     profiler.EndEvent();
 }
 
-cudaError_t MemoryPool::Free(void *p) {
+template<typename T>
+cudaError_t MemoryPool<T>::Free(void *p) {
     Profiler &profiler = Profiler::Ins();
     profiler.BeginEvent("Free");
-#if DEVICE_MEMORY == 0
-    CallCnmem(cnmemFree(p, NULL));
-    profiler.EndEvent();
-#elif DEVICE_MEMORY == 1
-    cudaError_t r = cudaFree(p);
-    profiler.EndEvent();
-    return r;
-#else
     auto it = busy_blocks_.find(p);
     if (it == busy_blocks_.end()) {
         cerr << "cannot find busy block " << p << endl;
@@ -1118,7 +1104,6 @@ cudaError_t MemoryPool::Free(void *p) {
         cerr << boost::format("Malloc - find freed p in busy blocks") << endl;
     }
     return cudaSuccess;
-#endif
 }
 
 void Profiler::EndCudaEvent() {
@@ -1182,7 +1167,7 @@ __global__ void KernelAddLtyToParamBiasAndAddLxToInputLossesForUniBackward(
 void AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(const dtype *lty,
         const dtype *lx,
         dtype *b,
-        std::vector<dtype*> &losses,
+        PageLockedVector<dtype*> &losses,
         int count,
         int out_dim,
         int in_dim,
@@ -1267,8 +1252,8 @@ void AddLtyToParamBiasAndAddLxToInputLossesForBiBackward(const dtype *lty,
         const dtype *lx1,
         const dtype *lx2,
         dtype *b,
-        std::vector<dtype*> &losses1,
-        std::vector<dtype*> &losses2,
+        PageLockedVector<dtype*> &losses1,
+        PageLockedVector<dtype*> &losses2,
         int count,
         int out_dim,
         int in_dim1,
@@ -1304,10 +1289,11 @@ __global__ void KernelInitCurandStates(curandState_t *states) {
 curandState_t *GetCurandStates() {
     static curandState_t *states;
     if (states == NULL) {
-        MemoryPool &pool = MemoryPool::Ins();
+        DeviceMemoryPool &pool = DeviceMemoryPool::Ins();
         CallCuda(pool.Malloc((void**)&states, sizeof(curandState_t) *
                     MAX_BATCH_COUNT));
         KernelInitCurandStates<<<BLOCK_COUNT, TPB>>>( states);
+        cudaDeviceSynchronize();
         CheckCudaError();
     }
     return states;
@@ -1357,9 +1343,9 @@ __global__ void KernelConcatForward(const dtype *const *ins, int *in_dims,
     }
 }
 
-void ConcatForward(const std::vector<dtype*> &in_vals,
-        const std::vector<int> &in_dims,
-        std::vector<dtype*> &vals,
+void ConcatForward(const PageLockedVector<dtype*> &in_vals,
+        const PageLockedVector<int> &in_dims,
+        PageLockedVector<dtype*> &vals,
         int count,
         int in_count,
         int out_dim,
@@ -1404,9 +1390,9 @@ __global__ void KernelConcatBackward(dtype *const *in_losses, int *in_dims,
     }
 }
 
-void ConcatBackward(const std::vector<dtype*> &in_losses,
-        const std::vector<int> &in_dims,
-        std::vector<dtype*> &losses,
+void ConcatBackward(const PageLockedVector<dtype*> &in_losses,
+        const PageLockedVector<int> &in_dims,
+        PageLockedVector<dtype*> &losses,
         int count,
         int in_count,
         int out_dim,
@@ -1440,9 +1426,9 @@ __global__ void KernelScalarConcatForward(const dtype *const *ins, int count,
     }
 }
 
-void ScalarConcatForward(const vector<dtype *> &ins, int count, const vector<int> &dims,
+void ScalarConcatForward(const PageLockedVector<dtype *> &ins, int count, const PageLockedVector<int> &dims,
         int max_dim,
-        const vector<dtype *> &results,
+        const PageLockedVector<dtype *> &results,
         cudaStream_t *stream) {
     NumberPointerArray result_arr;
     result_arr.init((dtype**)results.data(), results.size(), stream);
@@ -1471,9 +1457,9 @@ __global__ void KernelScalarConcatBackward(const dtype *const *losses, int count
     }
 }
 
-void ScalarConcatBackward(const vector<dtype *> &losses, int count, const vector<int> &dims,
+void ScalarConcatBackward(const PageLockedVector<dtype *> &losses, int count, const PageLockedVector<int> &dims,
         int max_dim,
-        const vector<dtype *> in_losses,
+        const PageLockedVector<dtype *> in_losses,
         cudaStream_t *stream) {
     NumberPointerArray loss_arr, in_loss_arr;
     loss_arr.init((dtype**)losses.data(), losses.size(), stream);
@@ -1497,9 +1483,8 @@ __global__ void KernelMemset(dtype *p, int len, dtype value) {
 void Memset(dtype *p, int len, dtype value, cudaStream_t *stream) {
     int block_count = std::min(BLOCK_COUNT, (len - 1 + TPB) / TPB);
     if (stream == nullptr) {
-        cudaDeviceSynchronize();
         KernelMemset<<<block_count, TPB, 0, 0>>>(p, len, value);
-        cudaDeviceSynchronize();
+        cudaStreamSynchronize(0);
     } else {
         KernelMemset<<<block_count, TPB, 0, *stream>>>(p, len, value);
     }
@@ -1516,7 +1501,7 @@ __global__ void KernelMemset(bool *p, int len, bool value) {
 
 void Memset(bool *p, int len, bool value, cudaStream_t *stream) {
     int block_count = std::min(BLOCK_COUNT, (len - 1 + TPB) / TPB);
-    KernelMemset<<<block_count, TPB>>>(p, len, value);
+    KernelMemset<<<block_count, TPB, 0, *stream>>>(p, len, value);
     CheckCudaError();
 }
 
@@ -1539,7 +1524,7 @@ __global__ void KernelBatchMemset(dtype *const *p, int count, int *dims, int max
     }
 }
 
-void BatchMemset(const std::vector<dtype*> &vec, int count, const vector<int> &dims, dtype value,
+void BatchMemset(const PageLockedVector<dtype*> &vec, int count, const PageLockedVector<int> &dims, dtype value,
         cudaStream_t *stream) {
     int max_dim = *max_element(dims.begin(), dims.end());
     int block_count = (count * max_dim -1 + TPB) / TPB;
@@ -1573,10 +1558,10 @@ __global__ void KernelLookupForward(const int *xids, const dtype *vocabulary,
     }
 }
 
-void LookupForward(const std::vector<int> &xids, const dtype *vocabulary,
+void LookupForward(const PageLockedVector<int> &xids, const dtype *vocabulary,
         int count,
         int dim,
-        std::vector<dtype*> &vals,
+        PageLockedVector<dtype*> &vals,
         cudaStream_t *stream) {
     int block_count = std::min(BLOCK_COUNT, (count * dim - 1 + TPB) / TPB);
     IntArray xid_arr;
@@ -1611,9 +1596,9 @@ __global__ void KernelLookupBackward(const int *xids, int unknown_id,
     }
 }
 
-void LookupBackward(const std::vector<int> &xids, int unknown_id,
+void LookupBackward(const PageLockedVector<int> &xids, int unknown_id,
         bool fine_tune,
-        const std::vector<dtype*> &losses,
+        const PageLockedVector<dtype*> &losses,
         int count,
         int dim,
         dtype *grad,
@@ -1657,9 +1642,9 @@ __global__ void KernelLookupBackward(const int *xids, int unknown_id,
     }
 }
 
-void LookupBackward(const std::vector<int> &xids, int unknown_id,
+void LookupBackward(const PageLockedVector<int> &xids, int unknown_id,
         bool fine_tune,
-        const std::vector<dtype*> &losses,
+        const PageLockedVector<dtype*> &losses,
         int count,
         int dim,
         dtype *grad,
@@ -1697,7 +1682,7 @@ __global__ void KernelParamRowForward(const dtype *param, int row_index, int par
 }
 
 void ParamRowForward(const dtype *param, int row_index, int param_row_count, int count, int dim,
-        vector<dtype*> &vals,
+        PageLockedVector<dtype*> &vals,
         cudaStream_t *stream) {
     NumberPointerArray val_arr;
     val_arr.init((dtype**)vals.data(), vals.size(), stream);
@@ -1750,10 +1735,10 @@ __global__ void KernelPoolForward(PoolingEnum pooling, const dtype *const *ins,
     }
 }
 
-void PoolForward(PoolingEnum pooling, const std::vector<dtype*> &in_vals,
-        std::vector<dtype*> &vals,
+void PoolForward(PoolingEnum pooling, const PageLockedVector<dtype*> &in_vals,
+        PageLockedVector<dtype*> &vals,
         int count,
-        const std::vector<int> &in_counts,
+        const PageLockedVector<int> &in_counts,
         int dim,
         int *hit_inputs,
         cudaStream_t *stream) {
@@ -1795,9 +1780,9 @@ __global__ void KernelPoolBackward(const dtype *const * losses,
     }
 }
 
-void PoolBackward(const std::vector<dtype*> &losses,
-        std::vector<dtype*> &in_losses,
-        const std::vector<int> &in_counts,
+void PoolBackward(const PageLockedVector<dtype*> &losses,
+        PageLockedVector<dtype*> &in_losses,
+        const PageLockedVector<int> &in_counts,
         const int *hit_inputs,
         int count,
         int dim,
@@ -1851,11 +1836,11 @@ __global__ void KernelSumPoolForward(PoolingEnum pooling,
     }
 }
 
-void SumPoolForward(PoolingEnum pooling, const std::vector<dtype*> &in_vals,
+void SumPoolForward(PoolingEnum pooling, const PageLockedVector<dtype*> &in_vals,
         int count,
         int dim,
-        const std::vector<int> &in_counts,
-        std::vector<dtype*> &vals,
+        const PageLockedVector<int> &in_counts,
+        PageLockedVector<dtype*> &vals,
         cudaStream_t *stream) {
     int max_in_count = *std::max_element(in_counts.begin(), in_counts.end());
     int thread_count = 8;
@@ -1891,11 +1876,11 @@ __global__ void KernelSumBackward(PoolingEnum pooling, const dtype *const *losse
     }
 }
 
-void SumPoolBackward(PoolingEnum pooling, const std::vector<dtype*> &losses,
-        const std::vector<int> &in_counts,
+void SumPoolBackward(PoolingEnum pooling, const PageLockedVector<dtype*> &losses,
+        const PageLockedVector<int> &in_counts,
         int count,
         int dim,
-        std::vector<dtype*> &in_losses,
+        PageLockedVector<dtype*> &in_losses,
         cudaStream_t *stream) {
     int thread_count = 8;
     while (thread_count < dim) {
@@ -1930,11 +1915,11 @@ __global__ void KernelPMultiForward(const dtype **ins1, const dtype **ins2,
     }
 }
 
-void PMultiForward(const std::vector<dtype*> &ins1,
-        const std::vector<dtype*> &ins2,
+void PMultiForward(const PageLockedVector<dtype*> &ins1,
+        const PageLockedVector<dtype*> &ins2,
         int count,
         int dim,
-        std::vector<dtype*> &vals,
+        PageLockedVector<dtype*> &vals,
         cudaStream_t *stream) {
     int block_count = DefaultBlockCount(count * dim);
     NumberPointerArray ins1_arr, ins2_arr, vals_arr;
@@ -1962,10 +1947,10 @@ __global__ void KernelDivForward(const dtype *const *numerators, const dtype *co
     }
 }
 
-void DivForward(const vector<const dtype*> numerators, const vector<const dtype*> denominators,
+void DivForward(const PageLockedVector<const dtype*> numerators, const PageLockedVector<const dtype*> denominators,
         int count,
-        const vector<int> &dims,
-        vector<dtype*> &results,
+        const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &results,
         cudaStream_t *stream) {
     int max_dim = *max_element(dims.begin(), dims.end());
     int block_count = DefaultBlockCount(count * max_dim);
@@ -2065,12 +2050,12 @@ __global__ void KernelDivDenominatorBackward(const dtype *const *losses,
     }
 }
 
-void DivBackward(const vector<const dtype*> &losses, const vector<const dtype*> &denominator_vals,
-        const vector<const dtype*> &numerator_vals,
+void DivBackward(const PageLockedVector<const dtype*> &losses, const PageLockedVector<const dtype*> &denominator_vals,
+        const PageLockedVector<const dtype*> &numerator_vals,
         int count,
-        const vector<int> &dims,
-        vector<dtype*> &numerator_losses,
-        vector<dtype*> &denominator_losses,
+        const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &numerator_losses,
+        PageLockedVector<dtype*> &denominator_losses,
         cudaStream_t *stream) {
     int max_dim = *max_element(dims.begin(), dims.end());
     NumberPointerArray loss_arr, denominator_val_arr, numerator_val_arr, numerator_loss_arr,
@@ -2098,7 +2083,7 @@ void DivBackward(const vector<const dtype*> &losses, const vector<const dtype*> 
     IntArray block_counters;
     block_counters.init(count);
 
-    KernelDivDenominatorBackward<<<block_dim , thread_count>>>(loss_arr.value,
+    KernelDivDenominatorBackward<<<block_dim , thread_count, 0, *stream>>>(loss_arr.value,
             numerator_val_arr.value, denominator_val_arr.value, count, dim_arr.value,
             block_sums.value, block_counters.value, (dtype *const *)denominator_loss_arr.value);
     CheckCudaError();
@@ -2118,9 +2103,9 @@ __global__ void KernelSplitForward(const dtype *const *inputs, const int *offset
     }
 }
 
-void SplitForward(const vector<const dtype*> &inputs, const vector<int> &offsets, int count,
+void SplitForward(const PageLockedVector<const dtype*> &inputs, const PageLockedVector<int> &offsets, int count,
         int dim,
-        vector<dtype*> &results,
+        PageLockedVector<dtype*> &results,
         cudaStream_t *stream) {
     NumberPointerArray input_arr, result_arr;
     input_arr.init((dtype**)inputs.data(), inputs.size(), stream);
@@ -2148,9 +2133,9 @@ __global__ void KernelSplitBackward(const dtype *const *losses, const int *offse
     }
 }
 
-void SplitBackward(const vector<const dtype*> &losses, const vector<int> offsets, int count,
+void SplitBackward(const PageLockedVector<const dtype*> &losses, const PageLockedVector<int> offsets, int count,
         int dim,
-        const vector<dtype*> &input_losses,
+        const PageLockedVector<dtype*> &input_losses,
         cudaStream_t *stream) {
     NumberPointerArray loss_arr, input_loss_arr;
     loss_arr.init((dtype**)losses.data(), losses.size(), stream);
@@ -2180,11 +2165,11 @@ __global__ void KernelSubForward(const dtype *const *minuend, const dtype *const
     }
 }
 
-void SubForward(const std::vector<const dtype*> &minuend,
-        const std::vector<const dtype*> &subtrahend,
+void SubForward(const PageLockedVector<const dtype*> &minuend,
+        const PageLockedVector<const dtype*> &subtrahend,
         int count,
-        const vector<int> &dims,
-        std::vector<dtype*> &results,
+        const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &results,
         cudaStream_t *stream) {
     int max_dim = *max_element(dims.begin(), dims.end());
     int block_count = DefaultBlockCount(count * max_dim);
@@ -2215,9 +2200,9 @@ __global__ void KernelSubBackward(const dtype *const *losses, int count, int *di
     }
 }
 
-void SubBackward(const std::vector<const dtype*> &losses, int count, const vector<int> &dims,
-        std::vector<dtype*> &minuend_losses,
-        std::vector<dtype*> &subtrahend_losses,
+void SubBackward(const PageLockedVector<const dtype*> &losses, int count, const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &minuend_losses,
+        PageLockedVector<dtype*> &subtrahend_losses,
         cudaStream_t *stream) {
     int max_dim = *max_element(dims.begin(), dims.end());
     int block_count = DefaultBlockCount(count * max_dim);
@@ -2254,13 +2239,13 @@ __global__ void KernelPMultiBackward(const dtype **losses,
     }
 }
 
-void PMultiBackward(const std::vector<dtype*> &losses,
-        const std::vector<dtype*> &in_vals1,
-        const std::vector<dtype*> &in_vals2,
+void PMultiBackward(const PageLockedVector<dtype*> &losses,
+        const PageLockedVector<dtype*> &in_vals1,
+        const PageLockedVector<dtype*> &in_vals2,
         int count,
         int dim,
-        std::vector<dtype*> &in_losses1,
-        std::vector<dtype*> &in_losses2,
+        PageLockedVector<dtype*> &in_losses1,
+        PageLockedVector<dtype*> &in_losses2,
         cudaStream_t *stream) {
     int block_count = DefaultBlockCount(count * dim);
     NumberPointerArray losses_arr, in_vals1_arr, in_vals2_arr, in_losses1_arr,
@@ -2317,9 +2302,9 @@ __global__ void KernelPDotForward(const dtype *const *in_vals1, const dtype *con
     }
 }
 
-void PDotForward(const std::vector<dtype*> &ins1, const std::vector<dtype*> &ins2, int count,
+void PDotForward(const PageLockedVector<dtype*> &ins1, const PageLockedVector<dtype*> &ins2, int count,
         int dim,
-        std::vector<dtype*> &vals,
+        PageLockedVector<dtype*> &vals,
         cudaStream_t *stream) {
     NumberPointerArray in1_arr, in2_arr, val_arr;
     in1_arr.init((dtype**)ins1.data(), ins1.size(), stream);
@@ -2351,13 +2336,13 @@ __global__ void KernelPDotBackward(const dtype *const *losses,
     }
 }
 
-void PDotBackward(const std::vector<dtype*> &losses,
-        const std::vector<dtype*> &in_vals1,
-        const std::vector<dtype*> &in_vals2,
+void PDotBackward(const PageLockedVector<dtype*> &losses,
+        const PageLockedVector<dtype*> &in_vals1,
+        const PageLockedVector<dtype*> &in_vals2,
         int count,
         int dim,
-        std::vector<dtype*> &in_losses1,
-        std::vector<dtype*> &in_losses2,
+        PageLockedVector<dtype*> &in_losses1,
+        PageLockedVector<dtype*> &in_losses2,
         cudaStream_t *stream) {
     NumberPointerArray in1_loss_arr, in2_loss_arr, loss_arr, in_val1_arr,
     in_val2_arr;
@@ -2373,18 +2358,18 @@ void PDotBackward(const std::vector<dtype*> &losses,
     CheckCudaError();
 }
 
-void PAddForward(const std::vector<std::vector<dtype*>> &ins, int count, int dim, int in_count,
-        std::vector<dtype*> &vals,
+void PAddForward(const PageLockedVector<PageLockedVector<dtype*>> &ins, int count, int dim, int in_count,
+        PageLockedVector<dtype*> &vals,
         cudaStream_t *stream) {
-    std::vector<std::shared_ptr<NumberPointerArray>> gpu_addr;
+    PageLockedVector<std::shared_ptr<NumberPointerArray>> gpu_addr;
     gpu_addr.reserve(ins.size());
-    for (const std::vector<dtype*> &x : ins) {
+    for (const PageLockedVector<dtype*> &x : ins) {
         std::shared_ptr<NumberPointerArray> arr =
             std::make_shared<NumberPointerArray>();
         arr->init((dtype**)x.data(), x.size(), stream);
         gpu_addr.push_back(arr);
     }
-    std::vector<dtype**> ins_gpu;
+    PageLockedVector<dtype**> ins_gpu;
     ins_gpu.reserve(ins.size());
     for (auto &ptr : gpu_addr) {
         ins_gpu.push_back((dtype**)ptr->value);
@@ -2416,19 +2401,19 @@ __global__ void KernelPAddBackward(const dtype **losses, int count, int dim,
     }
 }
 
-void PAddBackward(const std::vector<dtype*> &losses, int count, int dim,
+void PAddBackward(const PageLockedVector<dtype*> &losses, int count, int dim,
         int in_count,
-        std::vector<std::vector<dtype*>> &in_losses,
+        PageLockedVector<PageLockedVector<dtype*>> &in_losses,
         cudaStream_t *stream) {
-    std::vector<std::shared_ptr<NumberPointerArray>> gpu_addr;
+    PageLockedVector<std::shared_ptr<NumberPointerArray>> gpu_addr;
     gpu_addr.reserve(in_losses.size());
-    for (const std::vector<dtype*> &x : in_losses) {
+    for (const PageLockedVector<dtype*> &x : in_losses) {
         std::shared_ptr<NumberPointerArray> arr =
             std::make_shared<NumberPointerArray>();
         arr->init((dtype**)x.data(), x.size(), stream);
         gpu_addr.push_back(arr);
     }
-    std::vector<dtype**> in_losses_gpu;
+    PageLockedVector<dtype**> in_losses_gpu;
     in_losses_gpu.reserve(in_losses.size());
     for (auto &ptr : gpu_addr) {
         in_losses_gpu.push_back((dtype **)ptr->value);
@@ -2444,83 +2429,6 @@ void PAddBackward(const std::vector<dtype*> &losses, int count, int dim,
             count, dim, in_count, (dtype *const *const *)in_loss_arr.value);
     CheckCudaError();
 }
-
-//__global__ void KernelSoftMaxLoss(const dtype **vals, dtype **losses,
-//        int *correct_count, int *answers, int batchsize, int count, int dim) {
-//    volatile __shared__ int opt_label;
-//    volatile __shared__ dtype shared_val[TPB];
-//    volatile __shared__ int64_t max_indexes[TPB];
-//    volatile __shared__ dtype scores_sum[TPB];
-//    volatile __shared__ dtype scores[TPB];
-//    int dim_i = threadIdx.x;
-//    int count_i = blockIdx.x;
-//    if (count_i == 0 && dim_i == 0) {
-//        *correct_count = 0;
-//    }
-//    shared_val[dim_i] = dim_i < dim ? vals[count_i][dim_i] : -1e10;
-//    max_indexes[dim_i] = dim_i;
-//    __syncthreads();
-//
-//    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-//        if (shared_val[threadIdx.x + i] > shared_val[threadIdx.x]) { // race
-//            shared_val[threadIdx.x] = shared_val[threadIdx.x + i]; // race
-//            max_indexes[threadIdx.x] = max_indexes[threadIdx.x + i]; // race
-//        }
-//        __syncthreads();
-//    }
-//
-//    if (threadIdx.x == 0) {
-//        opt_label = max_indexes[0];
-//        if (answers[count_i] == opt_label) {
-//            atomicAdd(correct_count, 1);
-//        }
-//    }
-//    __syncthreads();
-//
-//    dtype max_score = vals[count_i][opt_label];
-//    dtype score = dim_i < dim ? cuda_exp(vals[count_i][dim_i] - max_score) :
-//        0.0f;
-//    scores[dim_i] = score;
-//    scores_sum[dim_i] = score;
-//
-//    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-//        scores_sum[threadIdx.x] = scores_sum[threadIdx.x] +
-//            scores_sum[threadIdx.x + i]; // race
-//        __syncthreads();
-//    }
-//
-//    if (dim_i < dim) {
-//        losses[count_i][dim_i] = (scores[dim_i] / scores_sum[0] -
-//                (dim_i == answers[count_i] ? 1 : 0)) / batchsize;
-//    }
-//}
-//
-//void SoftMaxLoss(const std::vector<dtype*> &vals, std::vector<dtype*> &losses,
-//        int *correct_count,
-//        const std::vector<int> &answers,
-//        int batchsize,
-//        int count,
-//        int dim) {
-//    if (dim > TPB) {
-//        abort();
-//    }
-//    int thread_count = NextTwoIntegerPowerNumber(dim);
-//    NumberPointerArray val_arr;
-//    val_arr.init((dtype**)vals.data(), vals.size());
-//    NumberPointerArray loss_arr;
-//    loss_arr.init((dtype**)losses.data(), losses.size());
-//    IntArray answer_arr;
-//    answer_arr.init((int*)answers.data(), answers.size());
-//    KernelSoftMaxLoss<<<count, thread_count>>>(
-//            const_cast<const dtype **>(val_arr.value),
-//            const_cast<dtype **>(loss_arr.value),
-//            correct_count,
-//            answer_arr.value,
-//            batchsize,
-//            count,
-//            dim);
-//    CheckCudaError();
-//}
 
 __global__ void KernelCrossEntropyLoss(const dtype *const *vals, const int *answers, int count,
         dtype factor,
@@ -2591,9 +2499,9 @@ __global__ void KernelCrossEntropgyLossValue(const dtype *const *vals, const int
     }
 }
 
-dtype CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, int count,
+dtype CrossEntropyLoss(const PageLockedVector<dtype *> &vals, const PageLockedVector<int> &answers, int count,
         dtype factor,
-        vector<dtype *> &losses,
+        PageLockedVector<dtype *> &losses,
         cudaStream_t *stream) {
     NumberPointerArray val_arr, loss_arr;
     val_arr.init((dtype**)vals.data(), vals.size(), stream);
@@ -2601,8 +2509,8 @@ dtype CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, 
     IntArray answer_arr;
     answer_arr.init((int*)answers.data(), answers.size(), stream);
 
-    KernelCrossEntropyLoss<<<DefaultBlockCount(count), TPB>>>(val_arr.value, answer_arr.value,
-            count, factor, (dtype *const *)loss_arr.value);
+    KernelCrossEntropyLoss<<<DefaultBlockCount(count), TPB, 0, *stream>>>(val_arr.value,
+            answer_arr.value, count, factor, (dtype *const *)loss_arr.value);
     CheckCudaError();
 
     int block_count = DefaultBlockCount(count);
@@ -2652,8 +2560,8 @@ __global__ void KernelMultiCrossEntropyLossVector(const dtype *const *in_vals,
 }
 
 template<typename T>
-vector<T *> GPUArrayVectors(vector<shared_ptr<GPUArray<T>>> &ptrs, int count, int dim) {
-    vector<T *> result;
+PageLockedVector<T *> GPUArrayVectors(PageLockedVector<shared_ptr<GPUArray<T>>> &ptrs, int count, int dim) {
+    PageLockedVector<T *> result;
     for (int i = 0; i < count; ++i) {
         shared_ptr<GPUArray<T>> e(new GPUArray<T>);
         e->init(dim);
@@ -2663,19 +2571,19 @@ vector<T *> GPUArrayVectors(vector<shared_ptr<GPUArray<T>>> &ptrs, int count, in
     return result;
 }
 
-dtype MultiCrossEntropyLoss(const vector<dtype*> &vals, const vector<vector<int>> &answers,
+dtype MultiCrossEntropyLoss(const PageLockedVector<dtype*> &vals, const PageLockedVector<PageLockedVector<int>> &answers,
         int count,
         int dim,
         dtype factor,
-        const vector<dtype*> &losses,
+        const PageLockedVector<dtype*> &losses,
         cudaStream_t *stream) {
     int block_count = DefaultBlockCount(count * dim);
     NumberPointerArray val_arr, loss_arr;
     val_arr.init((dtype**)vals.data(), count, stream);
     loss_arr.init((dtype**)losses.data(), count, stream);
 
-    vector<shared_ptr<IntArray>> answer_gpus;
-    vector<int *> answer_gpu_pointers;
+    PageLockedVector<shared_ptr<IntArray>> answer_gpus;
+    PageLockedVector<int *> answer_gpu_pointers;
     for (auto &answer : answers) {
         shared_ptr<IntArray> answer_gpu(new IntArray);
         answer_gpu->init(answer.data(), answer.size(), stream);
@@ -2689,8 +2597,8 @@ dtype MultiCrossEntropyLoss(const vector<dtype*> &vals, const vector<vector<int>
             count, dim, factor, (dtype *const *)loss_arr.value);
     CheckCudaError();
 
-    vector<shared_ptr<NumberArray>> nums;
-    vector<dtype *> logged_vec = GPUArrayVectors(nums, count, dim);
+    PageLockedVector<shared_ptr<NumberArray>> nums;
+    PageLockedVector<dtype *> logged_vec = GPUArrayVectors(nums, count, dim);
 
     NumberPointerArray logged_arr;
     logged_arr.init(logged_vec.data(), count, stream);
@@ -2699,18 +2607,18 @@ dtype MultiCrossEntropyLoss(const vector<dtype*> &vals, const vector<vector<int>
             answer_arr.value, count, dim, (dtype *const *)logged_arr.value);
     CheckCudaError();
 
-    vector<shared_ptr<NumberArray>> ce_loss_arrs;
-    vector<dtype *> ce_losses = GPUArrayVectors(ce_loss_arrs, count, 1);
+    PageLockedVector<shared_ptr<NumberArray>> ce_loss_arrs;
+    PageLockedVector<dtype *> ce_losses = GPUArrayVectors(ce_loss_arrs, count, 1);
     for (auto &ptr : ce_loss_arrs) {
-        vector<dtype> vec = ptr->toCpu(stream);
+        PageLockedVector<dtype> vec = ptr->toCpu(stream);
     }
-    vector<const dtype *> const_logged_arr;
+    PageLockedVector<const dtype *> const_logged_arr;
     auto return_const = [](dtype *v) -> const dtype* {
         return const_cast<const dtype*>(v);
     };
     transform(logged_vec.begin(), logged_vec.end(), back_inserter(const_logged_arr), return_const);
 
-    vector<int> dims;
+    PageLockedVector<int> dims;
     for (int i = 0; i < count; ++i) {
         dims.push_back(dim);
     }
@@ -2719,7 +2627,7 @@ dtype MultiCrossEntropyLoss(const vector<dtype*> &vals, const vector<vector<int>
     dtype ce_loss_sum = 0.0f;
 
     for (auto &ptr : ce_loss_arrs) {
-        vector<dtype> vec = ptr->toCpu(stream);
+        PageLockedVector<dtype> vec = ptr->toCpu(stream);
         if (vec.size() != 1) {
             cerr << "vec size is not 1" << endl;
             abort();
@@ -2763,20 +2671,20 @@ __global__ void KernelKLCrossEntropyLossVector(const dtype *const *in_vals,
     }
 }
 
-dtype KLCrossEntropyLoss(const vector<dtype*> &vals,
-        const vector<shared_ptr<vector<dtype>>> &answers,
+dtype KLCrossEntropyLoss(const PageLockedVector<dtype*> &vals,
+        const PageLockedVector<shared_ptr<PageLockedVector<dtype>>> &answers,
         int count,
         int dim,
         dtype factor,
-        const vector<dtype*> &losses,
+        const PageLockedVector<dtype*> &losses,
         cudaStream_t *stream) {
     int block_count = DefaultBlockCount(count * dim);
     NumberPointerArray val_arr, loss_arr;
     val_arr.init((dtype**)vals.data(), count, stream);
     loss_arr.init((dtype**)losses.data(), count, stream);
 
-    vector<shared_ptr<NumberArray>> answer_gpus;
-    vector<dtype *> answer_gpu_pointers;
+    PageLockedVector<shared_ptr<NumberArray>> answer_gpus;
+    PageLockedVector<dtype *> answer_gpu_pointers;
     for (auto &answer : answers) {
         shared_ptr<NumberArray> answer_gpu(new NumberArray);
         answer_gpu->init(answer->data(), answer->size(), stream);
@@ -2790,8 +2698,8 @@ dtype KLCrossEntropyLoss(const vector<dtype*> &vals,
             count, dim, factor, (dtype *const *)loss_arr.value);
     CheckCudaError();
 
-    vector<shared_ptr<NumberArray>> nums;
-    vector<dtype *> logged_vec = GPUArrayVectors(nums, count, dim);
+    PageLockedVector<shared_ptr<NumberArray>> nums;
+    PageLockedVector<dtype *> logged_vec = GPUArrayVectors(nums, count, dim);
 
     NumberPointerArray logged_arr;
     logged_arr.init(logged_vec.data(), count, stream);
@@ -2800,18 +2708,18 @@ dtype KLCrossEntropyLoss(const vector<dtype*> &vals,
             answer_arr.value, count, dim, (dtype *const *)logged_arr.value);
     CheckCudaError();
 
-    vector<shared_ptr<NumberArray>> ce_loss_arrs;
-    vector<dtype *> ce_losses = GPUArrayVectors(ce_loss_arrs, count, 1);
+    PageLockedVector<shared_ptr<NumberArray>> ce_loss_arrs;
+    PageLockedVector<dtype *> ce_losses = GPUArrayVectors(ce_loss_arrs, count, 1);
     for (auto &ptr : ce_loss_arrs) {
-        vector<dtype> vec = ptr->toCpu(stream);
+        PageLockedVector<dtype> vec = ptr->toCpu(stream);
     }
-    vector<const dtype *> const_logged_arr;
+    PageLockedVector<const dtype *> const_logged_arr;
     auto return_const = [](dtype *v) -> const dtype* {
         return const_cast<const dtype*>(v);
     };
     transform(logged_vec.begin(), logged_vec.end(), back_inserter(const_logged_arr), return_const);
 
-    vector<int> dims;
+    PageLockedVector<int> dims;
     for (int i = 0; i < count; ++i) {
         dims.push_back(dim);
     }
@@ -2820,7 +2728,7 @@ dtype KLCrossEntropyLoss(const vector<dtype*> &vals,
     dtype ce_loss_sum = 0.0f;
 
     for (auto &ptr : ce_loss_arrs) {
-        vector<dtype> vec = ptr->toCpu(stream);
+        PageLockedVector<dtype> vec = ptr->toCpu(stream);
         if (vec.size() != 1) {
             cerr << "vec size is not 1" << endl;
             abort();
@@ -2941,7 +2849,7 @@ void Max(const dtype *const *v, int count, int dim, int *max_indexes, dtype *max
     max_indexer_arr.init(count);
     KernelSingleMax<<<1, 1>>>(v, count, dim, max_indexer_arr.value, max_val_arr.value);
     CheckCudaError();
-    vector<int> max_indexer_target(count), max_indexer_gold(count);
+    PageLockedVector<int> max_indexer_target(count), max_indexer_gold(count);
     MyCudaMemcpy(max_indexer_target.data(), max_indexes, count * sizeof(int),
             cudaMemcpyDeviceToHost, nullptr);
     MyCudaMemcpy(max_indexer_gold.data(), max_indexer_arr.value, count * sizeof(int),
@@ -2959,7 +2867,7 @@ void Max(const dtype *const *v, int count, int dim, int *max_indexes, dtype *max
     CheckCudaError();
 }
 
-vector<int> Predict(const vector<dtype*> &vals, int count, int dim, cudaStream_t *stream) {
+PageLockedVector<int> Predict(const PageLockedVector<dtype*> &vals, int count, int dim, cudaStream_t *stream) {
     NumberPointerArray val_arr;
     val_arr.init((dtype**)vals.data(), vals.size(), stream);
     IntArray max_index_arr;
@@ -3134,9 +3042,9 @@ __global__ void KernelMaxScalarForward(const dtype *const *v, int count, int* di
     }
 }
 
-void MaxScalarForward(const vector<const dtype*> &inputs, int count, const vector<int> &dims,
-        vector<dtype*> &results,
-        vector<int> &max_indexes,
+void MaxScalarForward(const PageLockedVector<const dtype*> &inputs, int count, const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &results,
+        PageLockedVector<int> &max_indexes,
         cudaStream_t *stream) {
     int max_dim = *max_element(dims.begin(), dims.end());
     int thread_count = min(NextTwoIntegerPowerNumber(max_dim), TPB);
@@ -3178,8 +3086,8 @@ __global__ void KernelMaxScalarBackward(const dtype *const *losses, const int *i
     }
 }
 
-void MaxScalarBackward(const vector<const dtype *> &losses, const vector<int> &indexes, int count,
-        const vector<dtype*> &input_losses,
+void MaxScalarBackward(const PageLockedVector<const dtype *> &losses, const PageLockedVector<int> &indexes, int count,
+        const PageLockedVector<dtype*> &input_losses,
         cudaStream_t *stream) {
     int block_count = DefaultBlockCount(count);
     NumberPointerArray loss_arr, input_loss_arr;
@@ -3250,8 +3158,8 @@ __global__ void KernelVectorSumForward(const dtype *const *v, int count, int *di
 }
 
 
-void VectorSumForward(const vector<const dtype *> &inputs, int count, const vector<int> &dims,
-        vector<dtype*> &results, cudaStream_t *stream) {
+void VectorSumForward(const PageLockedVector<const dtype *> &inputs, int count, const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &results, cudaStream_t *stream) {
     int max_dim = *max_element(dims.begin(), dims.end());
     int thread_count = min(NextTwoIntegerPowerNumber(max_dim), TPB);
     int block_y_count = (max_dim - 1 + thread_count) / thread_count;
@@ -3291,8 +3199,8 @@ __global__ void KernelVectorSumBackward(const dtype *const *losses, int count, i
     }
 }
 
-void VectorSumBackward(const vector<const dtype*> &losses, int count, const vector<int> &dims,
-        vector<dtype*> &input_losses,
+void VectorSumBackward(const PageLockedVector<const dtype*> &losses, int count, const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &input_losses,
         cudaStream_t *stream) {
     int max_dim = *max_element(dims.begin(), dims.end());
     int block_count = DefaultBlockCount(count * max_dim);
@@ -3321,8 +3229,8 @@ __global__ void KernelScalarToVectorForward(const dtype* const* inputs, int coun
     }
 }
 
-void ScalarToVectorForward(const vector<const dtype*> &inputs, int count, const vector<int> &dims,
-        vector<dtype*> &results,
+void ScalarToVectorForward(const PageLockedVector<const dtype*> &inputs, int count, const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &results,
         cudaStream_t *stream) {
     int max_dim = *max_element(dims.begin(), dims.end());
     int block_count = DefaultBlockCount(max_dim * count);
@@ -3396,8 +3304,8 @@ __global__ void KernelScalarToVectorBackward(const dtype *const *losses, int cou
     }
 }
 
-void ScalarToVectorBackward(const vector<const dtype*> &losses, int count, const vector<int> &dims,
-        vector<dtype*> &input_losses,
+void ScalarToVectorBackward(const PageLockedVector<const dtype*> &losses, int count, const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &input_losses,
         cudaStream_t *stream) {
     int max_dim = *max_element(dims.begin(), dims.end());
 
@@ -3437,8 +3345,8 @@ __global__ void KernelBiasForward(const dtype *const *in_vals, const dtype *bias
     }
 }
 
-void BiasForward(const vector<dtype*> &in_vals, const dtype *bias, int count, int dim,
-        const vector<dtype *> &vals, cudaStream_t *stream) {
+void BiasForward(const PageLockedVector<dtype*> &in_vals, const dtype *bias, int count, int dim,
+        const PageLockedVector<dtype *> &vals, cudaStream_t *stream) {
     int block_count = DefaultBlockCount(count * dim);
     NumberPointerArray in_arr, val_arr;
     in_arr.init(in_vals.data(), in_vals.size(), stream);
@@ -3460,8 +3368,8 @@ __global__ void KernelBiasBackward(const dtype *const *losses, int count, int di
     }
 }
 
-void BiasBackward(const vector<dtype *> &losses, int count, int dim, dtype *bias_loss,
-        const vector<dtype *> input_losses,
+void BiasBackward(const PageLockedVector<dtype *> &losses, int count, int dim, dtype *bias_loss,
+        const PageLockedVector<dtype *> input_losses,
         cudaStream_t *stream) {
     int block_count = DefaultBlockCount(count * dim);
     NumberPointerArray loss_arr, input_loss_arr;

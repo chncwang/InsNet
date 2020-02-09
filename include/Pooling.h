@@ -261,7 +261,7 @@ class MaxPoolExecutor : public Executor
 public:
     int dim;
     n3ldg_cuda::IntArray hit_inputs;
-    std::vector<int> in_counts;
+    PageLockedVector<int> in_counts;
     int max_in_count;
 
     void forward() override {
@@ -273,9 +273,9 @@ public:
             in_counts.push_back(m->ins.size());
         }
         max_in_count = *std::max_element(in_counts.begin(), in_counts.end());
-        std::vector<dtype*> in_vals;
+        PageLockedVector<dtype*> in_vals;
         in_vals.reserve(count * max_in_count);
-        std::vector<dtype*> vals;
+        PageLockedVector<dtype*> vals;
         vals.reserve(count);
         for (Node *n : batch) {
             MaxPoolNode *m = static_cast<MaxPoolNode*>(n);
@@ -305,9 +305,9 @@ public:
 
     void backward() override {
         int count = batch.size();
-        std::vector<dtype*> in_losses;
+        PageLockedVector<dtype*> in_losses;
         in_losses.reserve(count * max_in_count);
-        std::vector<dtype*> losses;
+        PageLockedVector<dtype*> losses;
         losses.reserve(count);
         for (Node *n : batch) {
             MaxPoolNode *m = static_cast<MaxPoolNode*>(n);
@@ -351,7 +351,7 @@ class MinPoolExecutor : public Executor
 public:
     int dim;
     n3ldg_cuda::IntArray hit_inputs;
-    std::vector<int> in_counts;
+    PageLockedVector<int> in_counts;
     int max_in_count;
 
     void forward() override {
@@ -363,9 +363,9 @@ public:
             in_counts.push_back(m->ins.size());
         }
         max_in_count = *std::max_element(in_counts.begin(), in_counts.end());
-        std::vector<dtype*> in_vals;
+        PageLockedVector<dtype*> in_vals;
         in_vals.reserve(count * max_in_count);
-        std::vector<dtype*> vals;
+        PageLockedVector<dtype*> vals;
         vals.reserve(count);
         for (Node *n : batch) {
             MaxPoolNode *m = static_cast<MaxPoolNode*>(n);
@@ -395,9 +395,9 @@ public:
 
     void backward() override {
         int count = batch.size();
-        std::vector<dtype*> in_losses;
+        PageLockedVector<dtype*> in_losses;
         in_losses.reserve(count * max_in_count);
-        std::vector<dtype*> losses;
+        PageLockedVector<dtype*> losses;
         losses.reserve(count);
         for (Node *n : batch) {
             MaxPoolNode *m = static_cast<MaxPoolNode*>(n);
@@ -508,9 +508,9 @@ public:
 class SumPoolExecutor : public Executor {
 public:
     int dim;
-    std::vector<int> in_counts;
+    PageLockedVector<int> in_counts;
     int max_in_count;
-    std::vector<dtype*> in_vals;
+    PageLockedVector<dtype*> in_vals;
 
     void  forward() {
         int count = batch.size();
@@ -527,7 +527,7 @@ public:
             in_counts.push_back(sum->ins.size());
         }
 
-        std::vector<dtype*> vals;
+        PageLockedVector<dtype*> vals;
         in_vals.reserve(count * max_in_count);
         vals.reserve(count);
 
@@ -542,9 +542,8 @@ public:
             }
         }
 
-        n3ldg_cuda::SumPoolForward(n3ldg_cuda::PoolingEnum::SUM, in_vals,
-                count, dim, in_counts, vals,
-                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
+        n3ldg_cuda::SumPoolForward(n3ldg_cuda::PoolingEnum::SUM, in_vals, count, dim, in_counts,
+                vals, n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -558,9 +557,9 @@ public:
 
     void backward() {
         int count = batch.size();
-        std::vector<dtype*> losses;
+        PageLockedVector<dtype*> losses;
         losses.reserve(count);
-        std::vector<dtype*> in_losses;
+        PageLockedVector<dtype*> in_losses;
         in_losses.reserve(max_in_count * count);
         for (Node *n : batch) {
             SumPoolNode *sum = static_cast<SumPoolNode*>(n);
@@ -664,9 +663,9 @@ public:
 class AvgPoolExecutor : public Executor {
 public:
     int dim;
-    std::vector<int> in_counts;
+    PageLockedVector<int> in_counts;
     int max_in_count;
-    std::vector<dtype*> in_vals;
+    PageLockedVector<dtype*> in_vals;
 
     void  forward() {
         int count = batch.size();
@@ -683,7 +682,7 @@ public:
             in_counts.push_back(sum->ins.size());
         }
 
-        std::vector<dtype*> vals;
+        PageLockedVector<dtype*> vals;
         in_vals.reserve(count * max_in_count);
         vals.reserve(count);
 
@@ -713,9 +712,9 @@ public:
 
     void backward() {
         int count = batch.size();
-        std::vector<dtype*> losses;
+        PageLockedVector<dtype*> losses;
         losses.reserve(count);
-        std::vector<dtype*> in_losses;
+        PageLockedVector<dtype*> in_losses;
         in_losses.reserve(max_in_count * count);
         for (Node *n : batch) {
             AvgPoolNode *sum = static_cast<AvgPoolNode*>(n);

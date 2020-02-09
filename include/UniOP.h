@@ -163,7 +163,7 @@ public:
 #if TEST_CUDA
         b.init(outDim, count);
 #endif
-        std::vector<dtype*> xs, ys;
+        n3ldg_cuda::PageLockedVector<dtype*> xs, ys;
         xs.reserve(batch.size());
         ys.reserve(batch.size());
 
@@ -183,14 +183,14 @@ public:
         n3ldg_cuda::MatrixMultiplyMatrix(param->W.val.value, x.value, y.value, outDim, inDim,
                 count, param->bUseB, n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 
-        std::vector<dtype*> vals;
+        PageLockedVector<dtype*> vals;
         vals.reserve(count);
         for (Node *node : batch) {
             vals.push_back(node->val().value);
         }
 
         n3ldg_cuda::CopyFromOneVectorToMultiVals(y.value, vals, count, outDim,
-                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
+                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
@@ -235,7 +235,7 @@ public:
         lx.init(inDim, count);
         ly.init(outDim, count);
 
-        std::vector<dtype*> ly_vec;
+        PageLockedVector<dtype*> ly_vec;
         ly_vec.reserve(count);
         for (int i = 0; i < count; ++i) {
             LinearNode* ptr = (LinearNode*)batch[i];
@@ -247,7 +247,7 @@ public:
                 inDim, true, n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM), true, false);
         n3ldg_cuda::MatrixMultiplyMatrix(param->W.val.value, ly.value, lx.value, inDim, outDim,
                 count, false, n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM), false, true);
-        std::vector<dtype*> losses;
+        PageLockedVector<dtype*> losses;
         losses.reserve(count);
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
@@ -457,7 +457,7 @@ public:
 
         x.init(inDim, count);
         y.init(outDim, count);
-        std::vector<dtype*> xs, ys;
+        n3ldg_cuda::PageLockedVector<dtype*> xs, ys;
         xs.reserve(batch.size());
         ys.reserve(batch.size());
 #if TEST_CUDA
@@ -480,7 +480,7 @@ public:
                 outDim, inDim, count, false, n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM),
                 false, true);
 
-        std::vector<dtype*> vals;
+        PageLockedVector<dtype*> vals;
         vals.reserve(count);
         for (Node *node : batch) {
             vals.push_back(node->val().value);
@@ -518,7 +518,7 @@ public:
         param->grad.copyFromDeviceToHost(nullptr);
 #endif
 
-        std::vector<dtype*> ly_vec;
+        PageLockedVector<dtype*> ly_vec;
         ly_vec.reserve(count);
         for (int i = 0; i < count; ++i) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
@@ -529,7 +529,7 @@ public:
             ly_vec.push_back(ptr->loss().value);
         }
         n3ldg_cuda::CopyFromMultiVectorsToOneVector(ly_vec, ly.value, count, outDim,
-                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
+                n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
         int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
         n3ldg_cuda::MatrixMultiplyMatrix(x.value, ly.value, param->grad.value + inDim * offset,
                 inDim, count, outDim, true, n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM),
@@ -537,7 +537,7 @@ public:
         n3ldg_cuda::MatrixMultiplyMatrix(param->val.value + offset * inDim, ly.value, lx.value,
                 inDim, outDim, count, false, n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM),
                 false, false);
-        std::vector<dtype*> losses;
+        PageLockedVector<dtype*> losses;
         losses.reserve(count);
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
@@ -741,7 +741,7 @@ class BiasExecutor : public UniInputExecutor {
 public:
     void forward() override {
         dtype *bias = param()->val.value;
-        vector<dtype*> inputs, vals;
+        PageLockedVector<dtype*> inputs, vals;
         for (Node *node : batch) {
             BiasNode *bias_node = static_cast<BiasNode *>(node);
             inputs.push_back(bias_node->getInput()->getVal().value);
@@ -757,7 +757,7 @@ public:
 
     void backward() override {
         dtype *bias = param()->grad.value;
-        vector<dtype *> losses, in_losses;
+        PageLockedVector<dtype *> losses, in_losses;
         for (Node *node : batch) {
             BiasNode *bias_node = static_cast<BiasNode *>(node);
             losses.push_back(bias_node->getLoss().value);

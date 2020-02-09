@@ -83,8 +83,8 @@ public:
     void forward() override {
 #if USE_GPU
         int count = batch.size();
-        vector<dtype*> ys;
-        vector<dtype> cpu_x;
+        PageLockedVector<dtype*> ys;
+        PageLockedVector<dtype> cpu_x;
         cpu_x.reserve(getDim() * count);
         for (Node *node : batch) {
             BucketNode *bucket = static_cast<BucketNode*>(node);

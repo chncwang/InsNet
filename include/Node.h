@@ -25,6 +25,8 @@
 #include <boost/format.hpp>
 #if USE_GPU
 #include "N3LDG_cuda.h"
+#include "host_allocate.h"
+using n3ldg_cuda::PageLockedVector;
 using n3ldg_cuda::Tensor1D;
 using n3ldg_cuda::Tensor2D;
 #else
@@ -378,8 +380,8 @@ std::tuple<std::unique_ptr<n3ldg_cpu::Tensor1D>, std::pair<int, dtype>, dtype> t
 void clearNodes(std::vector<Node*> &nodes) {
     n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
     profiler.BeginEvent("clearNodes");
-    std::vector<dtype*> val_and_losses;
-    vector<int> dims;
+    PageLockedVector<dtype*> val_and_losses;
+    PageLockedVector<int> dims;
     val_and_losses.reserve(2 * nodes.size());
     for (Node *n : nodes) {
 //        val_and_losses.push_back(n->getVal().value);

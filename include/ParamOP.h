@@ -68,7 +68,7 @@ Node *paramRow(Graph &graph, Param &param, int row_index, int dim) {
 class ParamRowExecutor : public Executor {
 public:
     void forward() override {
-        vector<dtype*> vals;
+        PageLockedVector<dtype*> vals;
         transform(batch.begin(), batch.end(), back_inserter(vals), gpu_get_node_val);
         ParamRowNode *node = static_cast<ParamRowNode*>(batch.front());
         n3ldg_cuda::ParamRowForward(node->getParam()->val.value, node->row_index_,

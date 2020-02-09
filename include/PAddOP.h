@@ -116,10 +116,10 @@ public:
     void  forward() {
         int count = batch.size();
 
-        std::vector<std::vector<dtype*>> in_vals;
+        PageLockedVector<PageLockedVector<dtype*>> in_vals;
         in_vals.reserve(in_count);
         for (int i = 0; i < in_count; ++i) {
-            std::vector<dtype*> ins;
+            PageLockedVector<dtype*> ins;
             ins.reserve(count);
             for (PNode n : batch) {
                 PAddNode *padd = static_cast<PAddNode*>(n);
@@ -127,7 +127,7 @@ public:
             }
             in_vals.push_back(ins);
         }
-        std::vector<dtype *> outs;
+        PageLockedVector<dtype *> outs;
         outs.reserve(count);
         for (PNode n : batch) {
             PAddNode *padd = static_cast<PAddNode*>(n);
@@ -156,10 +156,10 @@ public:
 #if USE_GPU
     void backward() {
         int count = batch.size();
-        std::vector<std::vector<dtype*>> in_losses;
+        PageLockedVector<PageLockedVector<dtype*>> in_losses;
         in_losses.reserve(in_count);
         for (int i = 0; i < in_count; ++i) {
-            std::vector<dtype*> ins;
+            PageLockedVector<dtype*> ins;
             ins.reserve(count);
             for (PNode n : batch) {
                 PAddNode *padd = static_cast<PAddNode*>(n);
@@ -167,7 +167,7 @@ public:
             }
             in_losses.push_back(ins);
         }
-        std::vector<dtype *> out_losses;
+        PageLockedVector<dtype *> out_losses;
         out_losses.reserve(count);
         for (PNode n : batch) {
             PAddNode *padd = static_cast<PAddNode*>(n);

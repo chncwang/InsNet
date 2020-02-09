@@ -73,9 +73,9 @@ using n3ldg_cuda::StreamManager;
 
 class PMultiExecutor :public Executor {
 public:
-    std::vector<dtype*> in_vals1;
-    std::vector<dtype*> in_vals2;
-    std::vector<dtype*> vals;
+    PageLockedVector<dtype*> in_vals1;
+    PageLockedVector<dtype*> in_vals2;
+    PageLockedVector<dtype*> vals;
     int dim;
 public:
     Tensor1D y, x1, x2;
@@ -103,7 +103,7 @@ public:
 
     void backward() {
         int count = batch.size();
-        std::vector<dtype*> losses, vals1, vals2, losses1, losses2;
+        PageLockedVector<dtype*> losses, vals1, vals2, losses1, losses2;
         losses.reserve(count);
         vals1.reserve(count);
         vals2.reserve(count);

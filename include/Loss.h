@@ -14,8 +14,8 @@ vector<int> cpuPredict(const vector<Node *> &nodes) {
 
 #if USE_GPU
 
-vector<int> gpuPredict(const vector<Node *> &nodes) {
-    vector<dtype*> vals;
+PageLockedVector<int> gpuPredict(const vector<Node *> &nodes) {
+    PageLockedVector<dtype*> vals;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     return n3ldg_cuda::Predict(vals, nodes.size(), nodes.front()->getDim(),
             n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
@@ -26,7 +26,12 @@ vector<int> gpuPredict(const vector<Node *> &nodes) {
 vector<int> predict(const vector<Node *> &nodes) {
     validateEqualNodeDims(nodes);
 #if USE_GPU
-    return gpuPredict(nodes);
+    auto result = gpuPredict(nodes);
+    vector<int> normal;
+    for (int e : result) {
+        normal.push_back(e);
+    }
+    return normal;
 #else
     return cpuPredict(nodes);
 #endif
@@ -50,11 +55,15 @@ dtype crossEntropyLoss(vector<Node *> &nodes, const vector<int> &answers, dtype 
     }
     validateEqualNodeDims(nodes);
 #if USE_GPU
-    vector<dtype*> vals, losses;
+    PageLockedVector<dtype*> vals, losses;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     transform(nodes.begin(), nodes.end(), back_inserter(losses), gpu_get_node_loss);
     cudaStreamSynchronize(*n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
-    dtype loss = n3ldg_cuda::CrossEntropyLoss(vals, answers, nodes.size(), factor, losses,
+    PageLockedVector<int> page_locked;
+    for (int e : answers) {
+        page_locked.push_back(e);
+    }
+    dtype loss = n3ldg_cuda::CrossEntropyLoss(vals, page_locked, nodes.size(), factor, losses,
             n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
     dtype cpu_loss = cpuCrossEntropyLoss(nodes, answers, factor);
@@ -106,7 +115,7 @@ float cpuKLLoss(vector<Node *> &nodes, const vector<shared_ptr<vector<dtype>>> &
 }
 
 pair<float, vector<int>> KLLoss(vector<Node *> &nodes,
-        const vector<shared_ptr<vector<dtype>>> &answers,
+        const PageLockedVector<shared_ptr<PageLockedVector<dtype>>> &answers,
         dtype factor) {
     if (nodes.size() != answers.size()) {
         cerr << "KLLoss - nodes size is not equal to answers size" << endl;
@@ -114,7 +123,7 @@ pair<float, vector<int>> KLLoss(vector<Node *> &nodes,
     }
     validateEqualNodeDims(nodes);
 #if USE_GPU
-    vector<dtype *> vals, losses;
+    PageLockedVector<dtype *> vals, losses;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     transform(nodes.begin(), nodes.end(), back_inserter(losses), gpu_get_node_loss);
     cudaStreamSynchronize(*n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
@@ -137,7 +146,8 @@ pair<float, vector<int>> KLLoss(vector<Node *> &nodes,
     return result;
 }
 
-float multiCrossEntropyLoss(vector<Node *> &nodes, const vector<vector<int>> &answers,
+float multiCrossEntropyLoss(vector<Node *> &nodes,
+        const PageLockedVector<PageLockedVector<int>> &answers,
         dtype factor) {
     if (nodes.size() != answers.size()) {
         cerr << "multiCrossEntropyLoss - nodes size is not equal to answers size" << endl;
@@ -145,7 +155,7 @@ float multiCrossEntropyLoss(vector<Node *> &nodes, const vector<vector<int>> &an
     }
     validateEqualNodeDims(nodes);
 #if USE_GPU
-    vector<dtype *> vals, losses;
+    PageLockedVector<dtype *> vals, losses;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     transform(nodes.begin(), nodes.end(), back_inserter(losses), gpu_get_node_loss);
     cudaStreamSynchronize(*n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));

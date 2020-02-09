@@ -332,12 +332,12 @@ class LookupExecutor :public Executor {
 public:
     int dim;
     LookupTable<ParamType> *table;
-    std::vector<int> xids;
+    PageLockedVector<int> xids;
 
     void  forward() {
         int count = batch.size();
         xids.reserve(count);
-        std::vector<dtype*> vals;
+        PageLockedVector<dtype*> vals;
         vals.reserve(count);
         for (int idx = 0; idx < count; idx++) {
             LookupNode<ParamType> *n = static_cast<LookupNode<ParamType>*>(batch[idx]);
@@ -355,11 +355,11 @@ public:
 #endif
     }
 
-    void genericBackward(vector<dtype*> &losses);
+    void genericBackward(PageLockedVector<dtype*> &losses);
 
     void backward() {
         int count = batch.size();
-        std::vector<dtype*> losses;
+        PageLockedVector<dtype*> losses;
         losses.reserve(count);
         for (Node *n : batch) {
             losses.push_back(n->loss().value);
@@ -380,14 +380,14 @@ public:
 };
 
 template<>
-void LookupExecutor<SparseParam>::genericBackward(vector<dtype*> &losses) {
+void LookupExecutor<SparseParam>::genericBackward(PageLockedVector<dtype*> &losses) {
         n3ldg_cuda::LookupBackward(xids, table->nUNKId, table->bFineTune, losses, batch.size(),
                 dim, table->E.grad.value, table->E.dIndexers.value,
                 n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 }
 
 template<>
-void LookupExecutor<Param>::genericBackward(vector<dtype*> &losses) {
+void LookupExecutor<Param>::genericBackward(PageLockedVector<dtype*> &losses) {
         n3ldg_cuda::LookupBackward(xids, table->nUNKId, table->bFineTune, losses, batch.size(),
                 dim, table->E.grad.value, n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 }

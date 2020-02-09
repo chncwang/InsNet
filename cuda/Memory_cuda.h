@@ -55,6 +55,10 @@ public:
     }
 
     cudaStream_t *stream(int key) {
+        if (right_key_ >= 0 && key != right_key_) {
+            cout << "right_key_:" << right_key_ << "key:" << key << endl;
+            abort();
+        }
         const auto &it = stream_table_.find(key);
         cudaStream_t *result;
         if (it == stream_table_.end()) {
@@ -64,12 +68,12 @@ public:
         } else {
             result = it->second;
         }
-//        cout << "key:" << key << " result:" << result << endl;
         return result;
     }
 
     StreamManager() = default;
     map<int, cudaStream_t *> stream_table_;
+    int right_key_ = -1;
 };
 
 struct MemoryBlock {
@@ -108,6 +112,7 @@ struct MemoryBlock {
     }
 };
 
+template <typename T>
 class MemoryPool {
 public:
     MemoryPool(const MemoryPool &) = delete;
@@ -158,7 +163,15 @@ private:
     MemoryPool() = default;
     std::vector<map<void*, MemoryBlock>> free_blocks_;
     std::unordered_map<void *, MemoryBlock> busy_blocks_;
+    T allocator_;
 };
+
+class DeviceAllocator {
+public:
+    cudaError_t malloc(void **p, size_t size);
+};
+
+typedef MemoryPool<DeviceAllocator> DeviceMemoryPool;
 
 }
 

@@ -60,8 +60,8 @@ Node* split(Graph &graph, int dim, Node &input, int offset) {
 class SplitExecutor : public Executor {
 public:
     void forward() override {
-        vector<const dtype*> inputs;
-        vector<dtype*> results;
+        PageLockedVector<const dtype*> inputs;
+        PageLockedVector<dtype*> results;
         for (Node *node : batch) {
             SplitNode *split = static_cast<SplitNode*>(node);
             inputs.push_back(split->input_->getVal().value);
@@ -77,8 +77,8 @@ public:
     }
 
     void backward() override {
-        vector<const dtype*> losses;
-        vector<dtype *> input_losses;
+        PageLockedVector<const dtype*> losses;
+        PageLockedVector<dtype *> input_losses;
 
         for (Node *node : batch) {
             SplitNode *split = static_cast<SplitNode*>(node);
@@ -100,7 +100,7 @@ public:
     }
 
 private:
-        vector<int> offsets;
+        PageLockedVector<int> offsets;
 };
 #else
 class SplitExecutor : public Executor {};

@@ -4,6 +4,7 @@
 #include "Def.h"
 
 #include "Memory_cuda.h"
+#include "host_allocate.h"
 #include <iostream>
 #include <cassert>
 #include <helper_cuda.h>
@@ -31,7 +32,7 @@ struct GPUArray {
     void init(int len);
     ~GPUArray();
 
-    vector<T> toCpu(cudaStream_t *stream) const;
+    PageLockedVector<T> toCpu(cudaStream_t *stream) const;
 };
 
 cudaError_t MyCudaMemcpy(void *dest, const void *src, size_t count, cudaMemcpyKind kind,
@@ -41,10 +42,10 @@ void CallCuda(cudaError_t status);
 template <typename T>
 void GPUArray<T>::init(const T *host_arr, int len, cudaStream_t *stream) {
     if (value != nullptr) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        CallCuda(DeviceMemoryPool::Ins().Free(value));
         value = nullptr;
     }
-    CallCuda(MemoryPool::Ins().Malloc((void**)&value, len * sizeof(T)));
+    CallCuda(DeviceMemoryPool::Ins().Malloc((void**)&value, len * sizeof(T)));
     CallCuda(MyCudaMemcpy(value, host_arr, len * sizeof(T), cudaMemcpyHostToDevice, stream));
     this->len = len;
 }
@@ -52,16 +53,16 @@ void GPUArray<T>::init(const T *host_arr, int len, cudaStream_t *stream) {
 template <typename T>
 void GPUArray<T>::init(int len) {
     if (value != nullptr) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        CallCuda(DeviceMemoryPool::Ins().Free(value));
         value = nullptr;
     }
-    CallCuda(MemoryPool::Ins().Malloc((void**)&value, len * sizeof(T)));
+    CallCuda(DeviceMemoryPool::Ins().Malloc((void**)&value, len * sizeof(T)));
     this->len = len;
 }
 
 template <typename T>
-vector<T> GPUArray<T>::toCpu(cudaStream_t *stream) const {
-    vector<T> result;
+PageLockedVector<T> GPUArray<T>::toCpu(cudaStream_t *stream) const {
+    PageLockedVector<T> result;
     result.resize(len);
     if (value == nullptr) {
         cerr << "GPUArray::toCpu - value is nullptr" << endl;
@@ -74,7 +75,7 @@ vector<T> GPUArray<T>::toCpu(cudaStream_t *stream) const {
 template <typename T>
 GPUArray<T>::~GPUArray() {
     if (value != nullptr) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        CallCuda(DeviceMemoryPool::Ins().Free(value));
         value = nullptr;
     }
 }
@@ -130,7 +131,7 @@ void Assert(bool v, const std::string &message = "",
 void Memset(dtype *p, int len, dtype value, cudaStream_t *stream);
 void Memset(bool *p, int len, bool value, cudaStream_t *stream);
 void *Malloc(int size);
-void BatchMemset(const std::vector<dtype*> &vec, int count, const vector<int> &dims, dtype value,
+void BatchMemset(const PageLockedVector<dtype*> &vec, int count, const PageLockedVector<int> &dims, dtype value,
         cudaStream_t *stream);
 void PrintNums(const dtype* p, int len);
 void PrintInts(const int* p, int len);
@@ -138,10 +139,10 @@ void PrintInts(const int* p, int len);
 void InitCuda(int device_id = 0, float memory_in_gb = 0.0f);
 void EndCuda();
 
-void CopyFromMultiVectorsToOneVector(const std::vector<dtype*> &src, dtype *dest, int count,
+void CopyFromMultiVectorsToOneVector(const PageLockedVector<dtype*> &src, dtype *dest, int count,
         int len,
         cudaStream_t *stream);
-void CopyFromOneVectorToMultiVals(const dtype *src, std::vector<dtype*> &vals,
+void CopyFromOneVectorToMultiVals(const dtype *src, PageLockedVector<dtype*> &vals,
         int count,
         int len,
         cudaStream_t *stream);
@@ -152,35 +153,35 @@ enum PoolingEnum {
     AVG
 };
 
-void ActivationForward(ActivatedEnum activated, const std::vector<const dtype*> &xs,
+void ActivationForward(ActivatedEnum activated, const PageLockedVector<const dtype*> &xs,
         int count,
-        const vector<int> &dims,
-        std::vector<dtype*> &ys,
+        const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &ys,
         cudaStream_t *stream);
-void ActivationBackward(ActivatedEnum activated, const std::vector<const dtype*> &losses,
-        const std::vector<dtype*> &vals,
+void ActivationBackward(ActivatedEnum activated, const PageLockedVector<const dtype*> &losses,
+        const PageLockedVector<dtype*> &vals,
         int count,
-        const vector<int> &dims,
-        std::vector<dtype*> &in_losses,
+        const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &in_losses,
         cudaStream_t *stream);
-void DropoutForward(const std::vector<dtype*> &xs, int count, int dim,
+void DropoutForward(const PageLockedVector<dtype*> &xs, int count, int dim,
         bool is_training,
         const dtype *drop_mask,
         dtype drop_factor,
-        std::vector<dtype*> &ys,
+        PageLockedVector<dtype*> &ys,
         cudaStream_t *stream);
-void DropoutBackward(const std::vector<dtype*> &losses,
-        const std::vector<dtype*> &vals,
+void DropoutBackward(const PageLockedVector<dtype*> &losses,
+        const PageLockedVector<dtype*> &vals,
         int count,
         int dim,
         bool is_training,
         const dtype *drop_mask,
         dtype drop_factor,
-        std::vector<dtype*> &in_losses,
+        PageLockedVector<dtype*> &in_losses,
         cudaStream_t *stream);
-void BucketForward(const std::vector<dtype> input, int count, int dim, std::vector<dtype*> &ys,
+void BucketForward(const PageLockedVector<dtype> input, int count, int dim, PageLockedVector<dtype*> &ys,
         cudaStream_t *stream);
-void CopyForUniNodeForward(const std::vector<dtype*> &xs, const dtype* b,
+void CopyForUniNodeForward(const n3ldg_cuda::PageLockedVector<dtype*> &xs, const dtype* b,
         dtype* xs_dest,
         dtype* b_dest,
         int count,
@@ -196,7 +197,7 @@ void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y, int row, int col,
         bool should_W_transpose = false);
 void AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(const dtype *lty, const dtype *lx,
         dtype *b,
-        std::vector<dtype*> &losses,
+        PageLockedVector<dtype*> &losses,
         int count,
         int out_dim,
         int in_dim,
@@ -206,8 +207,8 @@ void AddLtyToParamBiasAndAddLxToInputLossesForBiBackward(const dtype *lty,
         const dtype *lx1,
         const dtype *lx2,
         dtype *b,
-        std::vector<dtype*> &losses1,
-        std::vector<dtype*> &losses2,
+        PageLockedVector<dtype*> &losses1,
+        PageLockedVector<dtype*> &losses2,
         int count,
         int out_dim,
         int in_dim1,
@@ -215,200 +216,194 @@ void AddLtyToParamBiasAndAddLxToInputLossesForBiBackward(const dtype *lty,
         bool use_b,
         cudaStream_t *stream);
 void CalculateDropoutMask(dtype dropout_ratio, int count, int dim, dtype *mask);
-void ConcatForward(const std::vector<dtype*> &in_vals,
-        const std::vector<int> &in_dims,
-        std::vector<dtype*> &vals,
+void ConcatForward(const PageLockedVector<dtype*> &in_vals,
+        const PageLockedVector<int> &in_dims,
+        PageLockedVector<dtype*> &vals,
         int count,
         int in_count,
         int out_dim,
         cudaStream_t *stream);
-void ConcatBackward(const std::vector<dtype*> &in_losses,
-        const std::vector<int> &in_dims,
-        std::vector<dtype*> &losses,
+void ConcatBackward(const PageLockedVector<dtype*> &in_losses,
+        const PageLockedVector<int> &in_dims,
+        PageLockedVector<dtype*> &losses,
         int count,
         int in_count,
         int out_dim,
         cudaStream_t *stream);
-void ScalarConcatForward(const vector<dtype *> &ins, int count, const vector<int> &dims,
+void ScalarConcatForward(const PageLockedVector<dtype *> &ins, int count, const PageLockedVector<int> &dims,
         int max_dim,
-        const vector<dtype *> &results,
+        const PageLockedVector<dtype *> &results,
         cudaStream_t *stream);
-void ScalarConcatBackward(const vector<dtype *> &losses, int count, const vector<int> &dims,
+void ScalarConcatBackward(const PageLockedVector<dtype *> &losses, int count, const PageLockedVector<int> &dims,
         int max_dim,
-        const vector<dtype *> in_losses,
+        const PageLockedVector<dtype *> in_losses,
         cudaStream_t *stream);
-void LookupForward(const std::vector<int> &xids, const dtype *vocabulary,
+void LookupForward(const PageLockedVector<int> &xids, const dtype *vocabulary,
         int count,
         int dim,
-        std::vector<dtype*> &vals,
+        PageLockedVector<dtype*> &vals,
         cudaStream_t *stream);
-void LookupBackward(const std::vector<int> &xids, int unknown_id,
+void LookupBackward(const PageLockedVector<int> &xids, int unknown_id,
         bool fine_tune,
-        const std::vector<dtype*> &losses,
+        const PageLockedVector<dtype*> &losses,
         int count,
         int dim,
         dtype *grad,
         bool *indexers,
         cudaStream_t *stream);
-void LookupBackward(const std::vector<int> &xids, int unknown_id,
+void LookupBackward(const PageLockedVector<int> &xids, int unknown_id,
         bool fine_tune,
-        const std::vector<dtype*> &losses,
+        const PageLockedVector<dtype*> &losses,
         int count,
         int dim,
         dtype *grad,
         cudaStream_t *stream);
 void ParamRowForward(const dtype *param, int row_index, int param_row_count, int count, int dim,
-        vector<dtype*> &vals,
+        PageLockedVector<dtype*> &vals,
         cudaStream_t *stream);
-void PoolForward(PoolingEnum pooling, const std::vector<dtype*> &in_vals,
-        std::vector<dtype*> &vals,
+void PoolForward(PoolingEnum pooling, const PageLockedVector<dtype*> &in_vals,
+        PageLockedVector<dtype*> &vals,
         int count,
-        const std::vector<int> &in_counts,
+        const PageLockedVector<int> &in_counts,
         int dim,
         int *hit_inputs,
         cudaStream_t *stream);
-void PoolBackward(const std::vector<dtype*> &losses,
-        std::vector<dtype*> &in_losses,
-        const std::vector<int> &in_counts,
+void PoolBackward(const PageLockedVector<dtype*> &losses,
+        PageLockedVector<dtype*> &in_losses,
+        const PageLockedVector<int> &in_counts,
         const int *hit_inputs,
         int count,
         int dim,
         cudaStream_t *stream);
-void SumPoolForward(PoolingEnum pooling, const std::vector<dtype*> &in_vals,
+void SumPoolForward(PoolingEnum pooling, const PageLockedVector<dtype*> &in_vals,
         int count,
         int dim,
-        const std::vector<int> &in_counts,
-        std::vector<dtype*> &vals,
+        const PageLockedVector<int> &in_counts,
+        PageLockedVector<dtype*> &vals,
         cudaStream_t *stream);
-void SumPoolBackward(PoolingEnum pooling, const std::vector<dtype*> &losses,
-        const std::vector<int> &in_counts,
+void SumPoolBackward(PoolingEnum pooling, const PageLockedVector<dtype*> &losses,
+        const PageLockedVector<int> &in_counts,
         int count,
         int dim,
-        std::vector<dtype*> &in_losses,
+        PageLockedVector<dtype*> &in_losses,
         cudaStream_t *stream);
-void PMultiForward(const std::vector<dtype*> &ins1,
-        const std::vector<dtype*> &ins2,
+void PMultiForward(const PageLockedVector<dtype*> &ins1,
+        const PageLockedVector<dtype*> &ins2,
         int count,
         int dim,
-        std::vector<dtype*> &vals,
+        PageLockedVector<dtype*> &vals,
         cudaStream_t *stream);
-void DivForward(const vector<const dtype*> numerators, const vector<const dtype*> denominators,
+void DivForward(const PageLockedVector<const dtype*> numerators, const PageLockedVector<const dtype*> denominators,
         int count,
-        const vector<int> &dims,
-        vector<dtype*> &results,
+        const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &results,
         cudaStream_t *stream);
-void DivBackward(const vector<const dtype*> &losses, const vector<const dtype*> &denominator_vals,
-        const vector<const dtype*> &numerator_vals,
+void DivBackward(const PageLockedVector<const dtype*> &losses, const PageLockedVector<const dtype*> &denominator_vals,
+        const PageLockedVector<const dtype*> &numerator_vals,
         int count,
-        const vector<int> &dims,
-        vector<dtype*> &numerator_losses,
-        vector<dtype*> &denominator_losses,
+        const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &numerator_losses,
+        PageLockedVector<dtype*> &denominator_losses,
         cudaStream_t *stream);
-void SplitForward(const std::vector<const dtype*> &inputs, const std::vector<int> &offsets,
-        int count,
-        int dim,
-        std::vector<dtype*> &results,
-        cudaStream_t *stream);
-void SplitBackward(const std::vector<const dtype*> &losses, const std::vector<int> offsets,
+void SplitForward(const PageLockedVector<const dtype*> &inputs, const PageLockedVector<int> &offsets,
         int count,
         int dim,
-        const std::vector<dtype*> &input_losses,
+        PageLockedVector<dtype*> &results,
         cudaStream_t *stream);
-void SubForward(const std::vector<const dtype*> &minuend,
-        const std::vector<const dtype*> &subtrahend,
-        int count,
-        const vector<int> &dims,
-        std::vector<dtype*> &results,
-        cudaStream_t *stream);
-void SubBackward(const std::vector<const dtype*> &losses, int count, const vector<int> &dims,
-        std::vector<dtype*> &minuend_losses,
-        std::vector<dtype*> &subtrahend_losses,
-        cudaStream_t *stream);
-void PMultiBackward(const std::vector<dtype*> &losses,
-        const std::vector<dtype*> &in_vals1,
-        const std::vector<dtype*> &in_vals2,
+void SplitBackward(const PageLockedVector<const dtype*> &losses, const PageLockedVector<int> offsets,
         int count,
         int dim,
-        std::vector<dtype*> &in_losses1,
-        std::vector<dtype*> &in_losses2,
+        const PageLockedVector<dtype*> &input_losses,
         cudaStream_t *stream);
-void PDotForward(const std::vector<dtype*> &ins1,
-        const std::vector<dtype*> &ins2,
+void SubForward(const PageLockedVector<const dtype*> &minuend,
+        const PageLockedVector<const dtype*> &subtrahend,
+        int count,
+        const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &results,
+        cudaStream_t *stream);
+void SubBackward(const PageLockedVector<const dtype*> &losses, int count, const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &minuend_losses,
+        PageLockedVector<dtype*> &subtrahend_losses,
+        cudaStream_t *stream);
+void PMultiBackward(const PageLockedVector<dtype*> &losses,
+        const PageLockedVector<dtype*> &in_vals1,
+        const PageLockedVector<dtype*> &in_vals2,
         int count,
         int dim,
-        std::vector<dtype*> &vals,
+        PageLockedVector<dtype*> &in_losses1,
+        PageLockedVector<dtype*> &in_losses2,
         cudaStream_t *stream);
-void PDotBackward(const std::vector<dtype*> &losses,
-        const std::vector<dtype*> &in_vals1,
-        const std::vector<dtype*> &in_vals2,
+void PDotForward(const PageLockedVector<dtype*> &ins1,
+        const PageLockedVector<dtype*> &ins2,
         int count,
         int dim,
-        std::vector<dtype*> &in_losses1,
-        std::vector<dtype*> &in_losses2,
+        PageLockedVector<dtype*> &vals,
         cudaStream_t *stream);
-void PAddForward(const std::vector<std::vector<dtype*>> &ins, int count,
+void PDotBackward(const PageLockedVector<dtype*> &losses,
+        const PageLockedVector<dtype*> &in_vals1,
+        const PageLockedVector<dtype*> &in_vals2,
+        int count,
+        int dim,
+        PageLockedVector<dtype*> &in_losses1,
+        PageLockedVector<dtype*> &in_losses2,
+        cudaStream_t *stream);
+void PAddForward(const PageLockedVector<PageLockedVector<dtype*>> &ins, int count,
         int dim,
         int in_count,
-        std::vector<dtype*> &vals,
+        PageLockedVector<dtype*> &vals,
         cudaStream_t *stream);
-void PAddBackward(const std::vector<dtype*> &losses, int count, int dim,
+void PAddBackward(const PageLockedVector<dtype*> &losses, int count, int dim,
         int in_count,
-        std::vector<std::vector<dtype*>> &in_losses,
+        PageLockedVector<PageLockedVector<dtype*>> &in_losses,
         cudaStream_t *stream);
-dtype CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, int count,
+dtype CrossEntropyLoss(const PageLockedVector<dtype *> &vals, const PageLockedVector<int> &answers, int count,
         dtype batchsize,
-        vector<dtype *> &losses,
+        PageLockedVector<dtype *> &losses,
         cudaStream_t *stream);
-dtype MultiCrossEntropyLoss(const vector<dtype*> &vals, const vector<vector<int>> &answers,
+dtype MultiCrossEntropyLoss(const PageLockedVector<dtype*> &vals, const PageLockedVector<PageLockedVector<int>> &answers,
         int count,
         int dim,
         dtype factor,
-        const vector<dtype*> &losses,
+        const PageLockedVector<dtype*> &losses,
         cudaStream_t *stream);
-dtype KLCrossEntropyLoss(const vector<dtype*> &vals,
-        const vector<shared_ptr<vector<dtype>>> &answers,
+dtype KLCrossEntropyLoss(const PageLockedVector<dtype*> &vals,
+        const PageLockedVector<shared_ptr<PageLockedVector<dtype>>> &answers,
         int count,
         int dim,
         dtype factor,
-        const vector<dtype*> &losses,
+        const PageLockedVector<dtype*> &losses,
         cudaStream_t *stream);
-void MaxScalarForward(const vector<const dtype*> &inputs, int count, const vector<int> &dims,
-        vector<dtype*> &results,
-        vector<int> &max_indexes,
+void MaxScalarForward(const PageLockedVector<const dtype*> &inputs, int count, const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &results,
+        PageLockedVector<int> &max_indexes,
         cudaStream_t *stream);
-void MaxScalarBackward(const std::vector<const dtype *> &losses, const std::vector<int> &indexes,
+void MaxScalarBackward(const PageLockedVector<const dtype *> &losses, const PageLockedVector<int> &indexes,
         int count,
-        const std::vector<dtype*> &input_losses,
+        const PageLockedVector<dtype*> &input_losses,
         cudaStream_t *stream);
-void VectorSumForward(const vector<const dtype *> &inputs, int count, const vector<int> &dims,
-        vector<dtype*> &results,
+void VectorSumForward(const PageLockedVector<const dtype *> &inputs, int count, const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &results,
         cudaStream_t *stream);
-void VectorSumBackward(const vector<const dtype*> &losses, int count, const vector<int> &dims,
-        vector<dtype*> &input_losses,
+void VectorSumBackward(const PageLockedVector<const dtype*> &losses, int count, const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &input_losses,
         cudaStream_t *stream);
-void ScalarToVectorForward(const vector<const dtype*> &inputs, int count, const vector<int> &dims,
-        vector<dtype*> &results,
+void ScalarToVectorForward(const PageLockedVector<const dtype*> &inputs, int count, const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &results,
         cudaStream_t *stream);
-void ScalarToVectorBackward(const vector<const dtype*> &losses, int count, const vector<int> &dims,
-        vector<dtype*> &input_losses,
+void ScalarToVectorBackward(const PageLockedVector<const dtype*> &losses, int count, const PageLockedVector<int> &dims,
+        PageLockedVector<dtype*> &input_losses,
         cudaStream_t *stream);
-void BiasForward(const vector<dtype*> &in_vals, const dtype *bias, int count, int dim,
-        const vector<dtype *> &vals,
+void BiasForward(const PageLockedVector<dtype*> &in_vals, const dtype *bias, int count, int dim,
+        const PageLockedVector<dtype *> &vals,
         cudaStream_t *stream);
-void BiasBackward(const vector<dtype *> &losses, int count, int dim, dtype *bias_loss,
-        const vector<dtype *> input_losses,
+void BiasBackward(const PageLockedVector<dtype *> &losses, int count, int dim, dtype *bias_loss,
+        const PageLockedVector<dtype *> input_losses,
         cudaStream_t *stream);
-vector<int> Predict(const vector<dtype*> &vals, int count, int dim,
+PageLockedVector<int> Predict(const PageLockedVector<dtype*> &vals, int count, int dim,
         cudaStream_t *stream);
 //int Predict(const dtype* val, int dim);
 void Max(const dtype *const *v, int count, int dim, int *max_indexes, dtype *max_vals,
         cudaStream_t *stream);
-//std::pair<dtype, std::vector<int>> SoftMaxLoss(const std::vector<const dtype *> &vals_vector,
-//        int count,
-//        int dim,
-//        const std::vector<int> &gold_answers,
-//        int batchsize,
-//        const std::vector<dtype *> &losses_vector);
 dtype SquareSum(const dtype *v, int len, cudaStream_t *stream);
 dtype SquareSum(const dtype *v, const bool *indexers, int count, int dim, cudaStream_t *stream);
 void Rescale(dtype *v, int len, dtype scale, cudaStream_t *stream);

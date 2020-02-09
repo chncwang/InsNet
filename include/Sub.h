@@ -67,8 +67,8 @@ Node *sub(Graph &graph, Node &minuend, Node &subtrahend) {
 #if USE_GPU
 class SubExecutor : public Executor {
     void forward() override {
-        vector<const dtype*> minuend, subtrahend;
-        vector<dtype*> results;
+        PageLockedVector<const dtype*> minuend, subtrahend;
+        PageLockedVector<dtype*> results;
 
         for (Node *node : batch) {
             SubNode *sub = static_cast<SubNode*>(node);
@@ -87,8 +87,8 @@ class SubExecutor : public Executor {
     }
 
     void backward() override {
-        std::vector<const dtype*> losses;
-        std::vector<dtype*> minuend_losses, subtrahend_losses;
+        PageLockedVector<const dtype*> losses;
+        PageLockedVector<dtype*> minuend_losses, subtrahend_losses;
         for (Node *n : batch) {
             SubNode *sub = static_cast<SubNode*>(n);
             losses.push_back(sub->loss().value);
@@ -116,7 +116,7 @@ class SubExecutor : public Executor {
     }
 
 private:
-    vector<int> dims_;
+    PageLockedVector<int> dims_;
 };
 #else
 class SubExecutor : public Executor {};

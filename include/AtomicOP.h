@@ -11,10 +11,10 @@
 template<ActivatedEnum activation>
 class ActivationExecutor : public UniInputExecutor {
 public:
-    vector<dtype*> vals;
+    PageLockedVector<dtype*> vals;
 
     void forward() override {
-        vector<const dtype*> inputs;
+        PageLockedVector<const dtype*> inputs;
         for (Node *node : batch) {
             UniInputNode *expnode = static_cast<UniInputNode*>(node);
             inputs.push_back(expnode->getInput()->getVal().value);
@@ -30,9 +30,9 @@ public:
     }
 
     void backward() override {
-        vector<const dtype*> losses;
-        vector<dtype*> vals;
-        vector<dtype*> input_losses;
+        PageLockedVector<const dtype*> losses;
+        PageLockedVector<dtype*> vals;
+        PageLockedVector<dtype*> input_losses;
 
         for (Node *node : batch) {
             UniInputNode *exp = static_cast<UniInputNode*>(node);
@@ -50,7 +50,7 @@ public:
     }
 
 private:
-    vector<int> dims_;
+    PageLockedVector<int> dims_;
 };
 #else
 template<ActivatedEnum activation>
@@ -176,10 +176,9 @@ using n3ldg_cuda::StreamManager;
 
 class PDotExecutor :public Executor {
 public:
-
     void  forward() {
         int count = batch.size();
-        std::vector<dtype*> vals;
+        PageLockedVector<dtype*> vals;
         ins1.reserve(count);
         ins2.reserve(count);
         vals.reserve(count);
@@ -206,7 +205,7 @@ public:
 
     void backward() {
         int count = batch.size();
-        std::vector<dtype*> losses, in_losses1, in_losses2;
+        PageLockedVector<dtype*> losses, in_losses1, in_losses2;
         losses.reserve(count);
         in_losses1.reserve(count);
         in_losses2.reserve(count);
@@ -235,8 +234,8 @@ public:
     }
 
 private:
-    std::vector<dtype*> ins1;
-    std::vector<dtype*> ins2;
+    PageLockedVector<dtype*> ins1;
+    PageLockedVector<dtype*> ins2;
 };
 #else
 class PDotExecutor :public Executor {
@@ -350,7 +349,7 @@ class DropoutExecutor :public Executor {
 
     void forward() {
         int count = batch.size();
-        std::vector<dtype*> xs, ys;
+        PageLockedVector<dtype*> xs, ys;
         xs.reserve(count);
         ys.reserve(count);
         drop_mask.init(dim, count);
@@ -383,7 +382,7 @@ class DropoutExecutor :public Executor {
 
     void backward() {
         int count = batch.size();
-        std::vector<dtype*> vals, losses, in_losses;
+        PageLockedVector<dtype*> vals, losses, in_losses;
         vals.reserve(count);
         losses.reserve(count);
         in_losses.reserve(count);
@@ -469,10 +468,10 @@ private:
 class MaxScalarExecutor : public UniInputExecutor {
 public:
     void forward() override {
-        vector<const dtype*> inputs;
-        vector<dtype*> results;
+        PageLockedVector<const dtype*> inputs;
+        PageLockedVector<dtype*> results;
         max_indexes.resize(batch.size());
-        vector<int> dims;
+        PageLockedVector<int> dims;
         for (int i = 0; i < batch.size(); ++i) {
             MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));
             inputs.push_back(node->getInput()->getVal().value);
@@ -506,8 +505,8 @@ public:
     }
 
     void backward() override {
-        vector<const dtype*> losses;
-        vector<dtype *> input_losses;
+        PageLockedVector<const dtype*> losses;
+        PageLockedVector<dtype *> input_losses;
 
         for (Node *node : batch) {
             MaxScalarNode *max_scalar = static_cast<MaxScalarNode*>(node);
@@ -524,7 +523,7 @@ public:
     }
 
 private:
-    vector<int> max_indexes;
+    PageLockedVector<int> max_indexes;
 };
 #else
 class MaxScalarExecutor : public Executor {};
@@ -580,8 +579,8 @@ public:
 #if TEST_CUDA
         UniInputExecutor::testForwardInpputs();
 #endif
-        vector<const dtype*> inputs;
-        vector<dtype*> results;
+        PageLockedVector<const dtype*> inputs;
+        PageLockedVector<dtype*> results;
         for (Node *node : batch) {
             ScalarToVectorNode *n = static_cast<ScalarToVectorNode*>(node);
             inputs.push_back(n->getInput()->getVal().value);
@@ -605,8 +604,8 @@ public:
         }
         UniInputExecutor::testBeforeBackward();
 #endif
-        vector<const dtype*> losses;
-        vector<dtype*> input_losses;
+        PageLockedVector<const dtype*> losses;
+        PageLockedVector<dtype*> input_losses;
         for (Node *node : batch) {
             ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(node);
             losses.push_back(n->getLoss().value);
@@ -622,7 +621,7 @@ public:
     }
 
 private:
-    vector<int> dims_;
+    PageLockedVector<int> dims_;
 };
 #else
 class ScalarToVectorExecutor : public Executor {};
@@ -710,8 +709,8 @@ private:
 #if USE_GPU
 class SumExecutor : public UniInputExecutor {
     void forward() override {
-        vector<const dtype*> inputs;
-        vector<dtype*> results;
+        PageLockedVector<const dtype*> inputs;
+        PageLockedVector<dtype*> results;
         for (Node *node : batch) {
             SumNode *sum = static_cast<SumNode*>(node);
             inputs.push_back(sum->getInput()->getVal().value);
@@ -727,8 +726,8 @@ class SumExecutor : public UniInputExecutor {
     }
 
     void backward() override {
-        vector<const dtype*> losses;
-        vector<dtype*> input_losses;
+        PageLockedVector<const dtype*> losses;
+        PageLockedVector<dtype*> input_losses;
         for (Node *node : batch) {
 #if TEST_CUDA
             node->loss().copyFromDeviceToHost(nullptr);
@@ -747,7 +746,7 @@ class SumExecutor : public UniInputExecutor {
     }
 
 private:
-    vector<int> dims_;
+    PageLockedVector<int> dims_;
 };
 #else
 class SumExecutor : public Executor {};

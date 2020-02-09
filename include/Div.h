@@ -55,12 +55,12 @@ private:
 #if USE_GPU
 class DivExecutor : public Executor {
 public:
-    vector<const dtype*> numerators;
-    vector<const dtype*> denominators;
-    vector<int> dims;
+    PageLockedVector<const dtype*> numerators;
+    PageLockedVector<const dtype*> denominators;
+    PageLockedVector<int> dims;
 
     void forward() override {
-        vector<dtype*> results;
+        PageLockedVector<dtype*> results;
         for (Node *node : batch) {
             DivNode *div = static_cast<DivNode*>(node);
             numerators.push_back(div->numerator_->getVal().value);
@@ -78,8 +78,8 @@ public:
     }
 
     void backward() override {
-        vector<const dtype*> losses;
-        vector<dtype*> numerator_losses, denominator_losses;
+        PageLockedVector<const dtype*> losses;
+        PageLockedVector<dtype*> numerator_losses, denominator_losses;
         for (Node *node : batch) {
             DivNode *div = static_cast<DivNode*>(node);
             losses.push_back(node->getLoss().value);

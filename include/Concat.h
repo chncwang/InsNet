@@ -107,11 +107,15 @@ class ConcatExecutor : public Executor {
   public:
     int outDim;
     int inCount;
+    PageLockedVector<int> in_dims;
 
     void  forward() {
         int count = batch.size();
+        for (int dim : ((ConcatNode*)batch.front())->inDims) {
+            in_dims.push_back(dim);
+        }
 
-        std::vector<dtype*> in_vals, vals;
+        PageLockedVector<dtype*> in_vals, vals;
         in_vals.reserve(inCount * count);
         vals.reserve(count);
         for (Node *node : batch) {
@@ -122,8 +126,8 @@ class ConcatExecutor : public Executor {
             vals.push_back(node->val().value);
         }
 
-        n3ldg_cuda::ConcatForward(in_vals, static_cast<ConcatNode*>(batch.at(0))->inDims, vals,
-                count, inCount, outDim, n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
+        n3ldg_cuda::ConcatForward(in_vals, in_dims, vals, count, inCount, outDim,
+                n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -135,7 +139,7 @@ class ConcatExecutor : public Executor {
 
     void backward() {
         int count = batch.size();
-        std::vector<dtype*> in_losses, losses;
+        PageLockedVector<dtype*> in_losses, losses;
         in_losses.reserve(inCount * count);
         losses.reserve(count);
         for (Node *node : batch) {
@@ -146,8 +150,7 @@ class ConcatExecutor : public Executor {
             losses.push_back(node->loss().value);
         }
 
-        n3ldg_cuda::ConcatBackward(in_losses, static_cast<ConcatNode*>(batch.at(0))->inDims,
-                losses, count, inCount, outDim,
+        n3ldg_cuda::ConcatBackward(in_losses, in_dims, losses, count, inCount, outDim,
                 n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
@@ -237,7 +240,7 @@ private:
 class ScalarConcatExecutor : public Executor {
 public:
     void forward() override {
-        vector<dtype *> in_vals, vals;
+        PageLockedVector<dtype *> in_vals, vals;
         for (Node *node : batch) {
             dims_.push_back(node->getDim());
         }
@@ -260,7 +263,7 @@ public:
     }
 
     void backward() override {
-        vector<dtype *> losses, in_losses;
+        PageLockedVector<dtype *> losses, in_losses;
         for (Node *node : batch) {
             ScalarConcatNode *concat = static_cast<ScalarConcatNode *>(node);
             for (Node *in : concat->ins()) {
@@ -291,7 +294,7 @@ public:
     }
 
 private:
-    vector<int> dims_;
+    PageLockedVector<int> dims_;
     int max_dim_;
 };
 #else
