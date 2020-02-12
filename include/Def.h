@@ -35,6 +35,6 @@ enum ActivatedEnum {
 };
 
 constexpr int GRAD_STREAM = 0;
-constexpr int VAL_STREAM = 0;
+constexpr int VAL_STREAM = 1;
 
 #endif

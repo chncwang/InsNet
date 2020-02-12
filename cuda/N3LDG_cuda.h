@@ -88,40 +88,56 @@ typedef GPUArray<const dtype *const *> NumberPointerPointerArray;
 typedef GPUArray<int> IntArray;
 typedef GPUArray<const int *> IntPointerArray;
 
-struct DeviceNumber {
-    dtype *value = nullptr;
-    dtype v = 0.0f;
+template <typename T>
+void deleteGPUArray(void *userdata) {
+    GPUArray<T> *arr = static_cast<GPUArray<T> *>(userdata);
+    delete arr;
+}
 
-    DeviceNumber() = default;
-    DeviceNumber(DeviceNumber &&) {
+template<typename T>
+struct DeviceValue {
+    T *value = nullptr;
+    T v = 0;
+
+    DeviceValue() = default;
+    DeviceValue(DeviceValue &&) {
         abort();
     }
-    DeviceNumber(const DeviceNumber&) {
+    DeviceValue(const DeviceValue&) {
         abort();
     }
 
-    void init();
-    void copyFromDeviceToHost(cudaStream_t *stream);
-    ~DeviceNumber();
+    void init() {
+        if (value != nullptr) {
+            CallCuda(DeviceMemoryPool::Ins().Free(value));
+            value = nullptr;
+        }
+        CallCuda(DeviceMemoryPool::Ins().Malloc((void**)&value, sizeof(T)));
+    }
+
+    void copyFromDeviceToHost(cudaStream_t *stream) {
+        CallCuda(MyCudaMemcpy(&v, value, sizeof(T), cudaMemcpyDeviceToHost, stream));
+    }
+
+    void copyFromHostToDevice(cudaStream_t *stream) {
+        CallCuda(MyCudaMemcpy(value, &v, sizeof(T), cudaMemcpyHostToDevice, stream));
+    }
+
+    ~DeviceValue() {
+        if (value != NULL) {
+            CallCuda(DeviceMemoryPool::Ins().Free(value));
+        }
+    }
 };
 
-struct DeviceInt {
-    int *value = nullptr;
-    int v = 0;
+typedef DeviceValue<dtype> DeviceNumber;
+typedef DeviceValue<int> DeviceInt;
 
-    DeviceInt() = default;
-    DeviceInt(DeviceInt &&) {
-        abort();
-    }
-    DeviceInt(const DeviceInt&) {
-        abort();
-    }
-
-    void init();
-    void copyFromDeviceToHost(cudaStream_t *stream);
-    void copyFromHostToDevice(cudaStream_t *stream);
-    ~DeviceInt();
-};
+template<typename T>
+void deleteDeviceValue(void *userdata) {
+    DeviceValue<T> *v = static_cast<DeviceValue<T>*>(userdata);
+    delete v;
+}
 
 bool Verify(bool *host, bool *device, int len, const char* message);
 bool Verify(int *host, int *device, int len, const char* message);
