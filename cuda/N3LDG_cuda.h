@@ -19,6 +19,7 @@ template<typename T>
 struct GPUArray {
     T *value = nullptr;
     int len = 0;
+    string message;
 
     GPUArray() = default;
     GPUArray(GPUArray<T>&&) {
@@ -217,18 +218,6 @@ void AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(const dtype *lty, cons
         int count,
         int out_dim,
         int in_dim,
-        bool use_b,
-        cudaStream_t *stream);
-void AddLtyToParamBiasAndAddLxToInputLossesForBiBackward(const dtype *lty,
-        const dtype *lx1,
-        const dtype *lx2,
-        dtype *b,
-        PageLockedVector<dtype*> &losses1,
-        PageLockedVector<dtype*> &losses2,
-        int count,
-        int out_dim,
-        int in_dim1,
-        int in_dim2,
         bool use_b,
         cudaStream_t *stream);
 void CalculateDropoutMask(dtype dropout_ratio, int count, int dim, dtype *mask);

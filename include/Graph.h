@@ -75,7 +75,6 @@ public:
         profiler.BeginEvent("computation backward");
         int count = execs.size();
         for (int idx = count - 1; idx >= 0; idx--) {
-            //cudaDeviceSynchronize();
 //            cout << "backward type:" << execs.at(idx)->getNodeType() << endl;
             execs.at(idx)->backwardFully();
         }
@@ -142,20 +141,19 @@ public:
             profiler.EndEvent();
 #if USE_GPU
             profiler.BeginEvent("clear nodes");
-//            ::cudaDeviceSynchronize();
             StreamManager::ins().right_key_ = -1;
-//            ::cudaStreamSynchronize(*n3ldg_cuda::StreamManager::ins().stream(VAL_STREAM));
             StreamManager::ins().right_key_ = GRAD_STREAM;
+//            cout << "clear grads..." << endl;
+            if (cur_exec->getNodeType() == "linear") {
+                cudaDeviceSynchronize();
+            }
             clearNodes(cur_exec->batch);
-//            ::cudaStreamSynchronize(*n3ldg_cuda::StreamManager::ins().stream(GRAD_STREAM));
             StreamManager::ins().right_key_ = VAL_STREAM;
             profiler.EndCudaEvent();
 #endif
-            cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl << endl;
+//            cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl << endl;
 
             profiler.BeginEvent("computation forward");
-//            cout << "exec type:" << cur_exec->getNodeType() << endl;
-//            ::cudaDeviceSynchronize();
             cur_exec->forwardFully();
             if (eager_) {
                 for (Node *node : cur_exec->batch) {

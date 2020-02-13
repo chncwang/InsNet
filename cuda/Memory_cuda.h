@@ -1,6 +1,7 @@
 #ifndef N3LDG_CUDA_MEMORY_POOL_H
 #define N3LDG_CUDA_MEMORY_POOL_H
 
+#include <mutex>
 #include <vector>
 #include <sstream>
 #include <list>
@@ -164,6 +165,7 @@ private:
     std::vector<map<void*, MemoryBlock>> free_blocks_;
     std::unordered_map<void *, MemoryBlock> busy_blocks_;
     T allocator_;
+    std::mutex mutex_;
 };
 
 class DeviceAllocator {
