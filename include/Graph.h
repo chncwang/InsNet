@@ -144,9 +144,6 @@ public:
             StreamManager::ins().right_key_ = -1;
             StreamManager::ins().right_key_ = GRAD_STREAM;
 //            cout << "clear grads..." << endl;
-            if (cur_exec->getNodeType() == "linear") {
-                cudaDeviceSynchronize();
-            }
             clearNodes(cur_exec->batch);
             StreamManager::ins().right_key_ = VAL_STREAM;
             profiler.EndCudaEvent();

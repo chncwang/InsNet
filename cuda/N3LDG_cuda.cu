@@ -2347,12 +2347,49 @@ __global__ void KernelPAddForward(const dtype *const *const *ins, int count, int
     for (int i = index; i < count * dim; i+= step) {
         int count_i = i / dim;
         int dim_i = i % dim;
-        dtype sum = ins[0][count_i][dim_i];
+        const dtype *const *ins0 = ins[0];
+        const dtype *ins0_count_i = ins0[count_i];
+        dtype sum = ins0_count_i[dim_i];
         for (int j = 1; j < in_count; ++j) {
             sum += ins[j][count_i][dim_i];
         }
         vals[count_i][dim_i] = sum;
     }
+}
+
+void PAddForward(const PageLockedVector<PageLockedVector<dtype*>> &ins, int count, int dim,
+        int in_count,
+        PageLockedVector<dtype*> &vals,
+        cudaStream_t *stream) {
+    PageLockedVector<std::shared_ptr<NumberPointerArray>> gpu_addr;
+    gpu_addr.reserve(ins.size());
+    for (const PageLockedVector<dtype*> &x : ins) {
+        std::shared_ptr<NumberPointerArray> arr =
+            std::make_shared<NumberPointerArray>();
+        arr->init((dtype**)x.data(), x.size(), stream);
+        gpu_addr.push_back(arr);
+    }
+    PageLockedVector<dtype**> ins_gpu;
+    ins_gpu.reserve(ins.size());
+    for (auto &ptr : gpu_addr) {
+        ins_gpu.push_back((dtype**)ptr->value);
+    }
+
+    NumberPointerPointerArray* in_arr = new NumberPointerPointerArray;
+    in_arr->init(ins_gpu.data(), ins_gpu.size(), stream);
+    NumberPointerArray* out_arr = new NumberPointerArray;
+    out_arr->init(vals.data(), vals.size(), stream);
+
+    int block_count = DefaultBlockCount(count * dim);
+    cudaStreamSynchronize(*stream);
+    KernelPAddForward<<<block_count, TPB, 0, *stream>>>(in_arr->value, count, dim, in_count,
+            (dtype *const *)out_arr->value);
+    CheckCudaError();
+
+    in_arr->message = "PAddForward";
+    CallCuda(cudaLaunchHostFunc(*stream, deleteNumberPointerPointerArray, in_arr));
+    out_arr->message = "PAddForward";
+    CallCuda(cudaLaunchHostFunc(*stream, deleteNumberPointerArray, out_arr));
 }
 
 __global__ void KernelPDotForward(const dtype *const *in_vals1, const dtype *const *in_vals2,
@@ -2460,40 +2497,6 @@ void PDotBackward(const PageLockedVector<dtype*> &losses,
     CallCuda(cudaLaunchHostFunc(*stream, deleteNumberPointerArray, loss_arr));
     CallCuda(cudaLaunchHostFunc(*stream, deleteNumberPointerArray, in_val1_arr));
     CallCuda(cudaLaunchHostFunc(*stream, deleteNumberPointerArray, in_val2_arr));
-}
-
-void PAddForward(const PageLockedVector<PageLockedVector<dtype*>> &ins, int count, int dim,
-        int in_count,
-        PageLockedVector<dtype*> &vals,
-        cudaStream_t *stream) {
-    PageLockedVector<std::shared_ptr<NumberPointerArray>> gpu_addr;
-    gpu_addr.reserve(ins.size());
-    for (const PageLockedVector<dtype*> &x : ins) {
-        std::shared_ptr<NumberPointerArray> arr =
-            std::make_shared<NumberPointerArray>();
-        arr->init((dtype**)x.data(), x.size(), stream);
-        gpu_addr.push_back(arr);
-    }
-    PageLockedVector<dtype**> ins_gpu;
-    ins_gpu.reserve(ins.size());
-    for (auto &ptr : gpu_addr) {
-        ins_gpu.push_back((dtype**)ptr->value);
-    }
-
-    NumberPointerPointerArray* in_arr = new NumberPointerPointerArray;
-    in_arr->init(ins_gpu.data(), ins_gpu.size(), stream);
-    NumberPointerArray* out_arr = new NumberPointerArray;
-    out_arr->init(vals.data(), vals.size(), stream);
-
-    int block_count = DefaultBlockCount(count * dim);
-    KernelPAddForward<<<block_count, TPB, 0, *stream>>>(in_arr->value, count, dim, in_count,
-            (dtype *const *)out_arr->value);
-    CheckCudaError();
-
-    in_arr->message = "PAddForward";
-    CallCuda(cudaLaunchHostFunc(*stream, deleteNumberPointerPointerArray, in_arr));
-    out_arr->message = "PAddForward";
-    CallCuda(cudaLaunchHostFunc(*stream, deleteNumberPointerArray, out_arr));
 }
 
 __global__ void KernelPAddBackward(const dtype **losses, int count, int dim,
