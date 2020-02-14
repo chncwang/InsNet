@@ -96,8 +96,8 @@ operator!=(HostAllocator<T> const& x, HostAllocator<U> const& y) noexcept
 }
 
 template<typename T>
-//using PageLockedVector = std::vector<T, HostAllocator<T>>;
-using PageLockedVector = std::vector<T>;
+using PageLockedVector = std::vector<T, HostAllocator<T>>;
+//using PageLockedVector = std::vector<T>;
 
 }
 

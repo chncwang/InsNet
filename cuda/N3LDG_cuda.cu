@@ -1032,7 +1032,7 @@ cudaError_t DeviceAllocator::malloc(void **p, size_t size) {
 }
 
 cudaError_t HostAlloc::malloc(void **p, size_t size) {
-    return cudaHostAlloc(p, size, cudaHostAllocDefault);
+    return cudaHostAlloc(p, size, cudaHostAllocWriteCombined);
 }
 
 std::pair<const MemoryBlock *, const MemoryBlock *> lowerAndhigherBlocks(const MemoryBlock &a,
