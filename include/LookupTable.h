@@ -324,6 +324,15 @@ Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, int dim, const str
     return input_lookup;
 }
 
+template <typename ParamType>
+Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, const string &word) {
+    LookupNode<ParamType>* input_lookup(new LookupNode<ParamType>);
+    input_lookup->init(lookup.nDim);
+    input_lookup->setParam(lookup);
+    input_lookup->forward(graph, word);
+    return input_lookup;
+}
+
 }
 
 template<typename ParamType>

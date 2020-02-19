@@ -228,6 +228,12 @@ public:
             param->b.grad.copyFromDeviceToHost();
         }
         param->W.val.copyFromDeviceToHost();
+        param->W.grad.copyFromDeviceToHost();
+        for (int i = 0; i < count; ++i) {
+            LinearNode* ptr = (LinearNode*)batch[i];
+            ptr->val().copyFromDeviceToHost();
+            ptr->in->loss().copyFromDeviceToHost();
+        }
 #endif
         int count = batch.size();
         Tensor2D lx, ly;

@@ -24,7 +24,7 @@ class PoolNode : public Node {
 
     PoolNode(const string &node_type) : Node(node_type) {}
 
-    void init(int ndim) {
+    void init(int ndim) override {
         Node::init(ndim);
         masks.resize(ndim);
         for(int idx = 0; idx < ndim; idx++) {
@@ -32,8 +32,11 @@ class PoolNode : public Node {
         }
     }
 
-  public:
-    void forward(Graph *cg, const vector<PNode>& x) {
+    void forward(Graph &graph, vector<Node *> &x) {
+        forward(&graph, x);
+    }
+
+    void forward(Graph *cg, vector<PNode>& x) {
         if (x.size() == 0) {
             std::cerr << "empty inputs for max|min|sum|avg pooling" << std::endl;
             abort();
@@ -55,19 +58,11 @@ class PoolNode : public Node {
         cg->addNode(this);
     }
 
+    PExecutor generate() override;
 
-  public:
-    PExecutor generate();
-
-    // better to rewrite for deep understanding
-    bool typeEqual(PNode other) {
-        return Node::typeEqual(other);
-    }
-
-  public:
     virtual void setMask() = 0;
 
-    void compute() {
+    void compute() override {
         setMask();
         for(int i = 0; i < getDim(); i++) {
             int mask_i = masks.at(i);
@@ -75,22 +70,18 @@ class PoolNode : public Node {
         }
     }
 
-    void backward() {
+    void backward() override {
         for(int i = 0; i < getDim(); i++) {
             ins[masks[i]]->loss()[i] += loss()[i];
         }
     }
-
 };
 
 #if USE_GPU
 class MaxPoolNode : public PoolNode
 {
 public:
-#if !TEST_CUDA
-    vector<PNode> ins;
-#endif
-    MaxPoolNode(const string &node_type) : PoolNode(node_type) {}
+    MaxPoolNode() : PoolNode("max_pool") {}
 
 #if TEST_CUDA
     void setMask() override {
@@ -121,6 +112,11 @@ public:
         }
     }
 #else
+    void setMask() override {
+        cerr << "unsupported op" << endl;
+        abort();
+    }
+
     void compute() override {
         abort();
     }
@@ -130,30 +126,14 @@ public:
     }
 #endif
 
-    void forward(Graph *cg, const vector<PNode>& x) {
-        assert(!x.empty());
-        int nSize = x.size();
-        ins.clear();
-        for (int i = 0; i < nSize; i++) {
-            assert(x[i]->getVal().dim == getDim());
-            ins.push_back(x[i]);
-        }
-
-        for (int i = 0; i < nSize; i++) {
-            ins[i]->addParent(this);
-        }
-
-        cg->addNode(this);
-    }
-
     PExecutor generate() override;
 };
 #else
 class MaxPoolNode : public PoolNode {
-  public:
+public:
     MaxPoolNode() : PoolNode("max-pooling") {}
 
-    void setMask() {
+    void setMask() override {
         int nSize = ins.size();
 
         for (int idx = 0; idx < getDim(); idx++) {
@@ -216,6 +196,9 @@ public:
         abort();
     }
 #endif
+    void forward(Graph &cg, const vector<PNode>& x) {
+        forward(&cg, x);
+    }
 
     void forward(Graph *cg, const vector<PNode>& x) {
         assert(!x.empty());
@@ -754,6 +737,21 @@ PExecutor AvgPoolNode::generate() {
 }
 
 namespace n3ldg_plus {
+    Node *maxPool(Graph &graph, vector<Node *> &inputs) {
+        int dim = inputs.front()->getDim();
+        for (int i = 1; i < inputs.size(); ++i) {
+            if (dim != inputs.at(i)->getDim()) {
+                cerr << "dim not equal" << endl;
+                abort();
+            }
+        }
+
+        MaxPoolNode *pool = new MaxPoolNode;
+        pool->init(dim);
+        pool->forward(graph, inputs);
+        return pool;
+    }
+
     Node *sumPool(Graph &graph, vector<Node *> &inputs) {
         int dim = inputs.front()->getDim();
         for (int i = 1; i < inputs.size(); ++i) {
