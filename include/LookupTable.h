@@ -239,9 +239,9 @@ public:
 template <typename ParamType>
 class LookupNode : public Node {
 public:
-    LookupTable<ParamType>* param;
+    ParamType* param;
     int xid;
-    string word;
+    bool should_backward = true;
 
     LookupNode() : Node("lookup") {
         xid = -1;
@@ -252,29 +252,13 @@ public:
         param = paramInit;
     }
 
-    void setParam(LookupTable<ParamType> &table) {
+    void setParam(ParamType &table) {
         param = &table;
     }
 
-    //notice the output
-    //this should be leaf nodes
-    void forward(Graph *cg, const string& strNorm) {
-        assert(param != NULL);
-        word = strNorm;
-        if (!param->findElemId(strNorm)) {
-            if (param->nUNKId < 0) {
-                cerr << "nUNKId is negative:" << param->nUNKId << endl;
-                abort();
-            }
-            xid = param->nUNKId;
-        } else {
-            xid = param->getElemId(strNorm);
-        }
-        cg->addNode(this);
-    }
-
-    void forward(Graph &graph, const string &word) {
-        this->forward(&graph, word);
+    void forward(Graph &graph, int &exid) {
+        xid = exid;
+        graph.addNode(this);
     }
 
     PExecutor generate() override;
@@ -299,16 +283,15 @@ public:
     // for which do no require merge
     void compute() override {
         if (xid >= 0) {
-            param->E.value(xid, val());
+            param->value(xid, val());
         } else {
             val().zero();
         }
     }
 
     void backward() override {
-        assert(param != NULL);
-        if (xid == param->nUNKId || (xid >= 0 && param->bFineTune)) {
-            param->E.loss(xid, loss());
+        if (should_backward) {
+            param->loss(xid, loss());
         }
     }
 };
@@ -316,21 +299,37 @@ public:
 namespace n3ldg_plus {
 
 template <typename ParamType>
+Node *embedding(Graph &graph,ParamType &lookup, int id) {
+    LookupNode<ParamType>* input_lookup(new LookupNode<ParamType>);
+    input_lookup->init(lookup.outDim());
+    input_lookup->setParam(lookup);
+    input_lookup->forward(graph, id);
+    input_lookup->should_backward = false;
+    return input_lookup;
+}
+
+template <typename ParamType>
 Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, int dim, const string &word) {
+    int xid;
+    if (!lookup.findElemId(word)) {
+        if (lookup.nUNKId < 0) {
+            cerr << "nUNKId is negative:" << lookup.nUNKId << endl;
+            abort();
+        }
+        xid = lookup.nUNKId;
+    } else {
+        xid = lookup.getElemId(word);
+    }
     LookupNode<ParamType>* input_lookup(new LookupNode<ParamType>);
     input_lookup->init(dim);
-    input_lookup->setParam(lookup);
-    input_lookup->forward(graph, word);
+    input_lookup->setParam(lookup.E);
+    input_lookup->forward(graph, xid);
     return input_lookup;
 }
 
 template <typename ParamType>
 Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, const string &word) {
-    LookupNode<ParamType>* input_lookup(new LookupNode<ParamType>);
-    input_lookup->init(lookup.nDim);
-    input_lookup->setParam(lookup);
-    input_lookup->forward(graph, word);
-    return input_lookup;
+    return embedding(graph, lookup, lookup.nDim, word);
 }
 
 }
@@ -340,8 +339,9 @@ template<typename ParamType>
 class LookupExecutor :public Executor {
 public:
     int dim;
-    LookupTable<ParamType> *table;
+    ParamType *table;
     std::vector<int> xids;
+    std::vector<int> backward_switches;
 
     void  forward() {
         int count = batch.size();
@@ -352,9 +352,10 @@ public:
             LookupNode<ParamType> *n = static_cast<LookupNode<ParamType>*>(batch[idx]);
             xids.push_back(n->xid);
             vals.push_back(n->val().value);
+            backward_switches.push_back(n->should_backward ? 1 : 0);
         }
 
-        n3ldg_cuda::LookupForward(xids, table->E.val.value, count, dim, vals);
+        n3ldg_cuda::LookupForward(xids, table->val.value, count, dim, vals);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -379,31 +380,27 @@ public:
         }
 
         n3ldg_cuda::Assert(table->E.grad.verify("lookup backward grad"));
-//        n3ldg_cuda::Assert(n3ldg_cuda::Verify(table->E.indexers.c_buf(),
-//                    table->E.dIndexers.value,
-//                    table->E.dIndexers.len,
-//                    "lookup backward index"));
 #endif
     }
 };
 
 template<>
 void LookupExecutor<SparseParam>::genericBackward(vector<dtype*> &losses) {
-        n3ldg_cuda::LookupBackward(xids, table->nUNKId, table->bFineTune,
+        n3ldg_cuda::LookupBackward(xids, backward_switches,
                 losses,
                 batch.size(),
                 dim,
-                table->E.grad.value,
-                table->E.dIndexers.value);
+                table->grad.value,
+                table->dIndexers.value);
 }
 
 template<>
 void LookupExecutor<Param>::genericBackward(vector<dtype*> &losses) {
-        n3ldg_cuda::LookupBackward(xids, table->nUNKId, table->bFineTune,
+        n3ldg_cuda::LookupBackward(xids, backward_switches,
                 losses,
                 batch.size(),
                 dim,
-                table->E.grad.value);
+                table->grad.value);
 }
 
 #else
@@ -413,7 +410,6 @@ class LookupExecutor :public Executor {};
 template<typename ParamType>
 PExecutor LookupNode<ParamType>::generate() {
     LookupExecutor<ParamType>* exec = new LookupExecutor<ParamType>();
-    exec->batch.push_back(this);
 #if USE_GPU
     exec->table = param;
     exec->dim = getDim();

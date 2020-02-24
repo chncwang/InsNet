@@ -765,6 +765,20 @@ namespace n3ldg_plus {
         pool->forward(graph, inputs);
         return pool;
     }
+
+    Node *averagePool(Graph &graph, vector<Node *> &inputs) {
+        int dim = inputs.front()->getDim();
+        for (int i = 1; i < inputs.size(); ++i) {
+            if (dim != inputs.at(i)->getDim()) {
+                cerr << "dim not equal" << endl;
+                abort();
+            }
+        }
+        AvgPoolNode *pool = new AvgPoolNode;
+        pool->init(dim);
+        pool->forward(&graph, inputs);
+        return pool;
+    }
 }
 
 #endif

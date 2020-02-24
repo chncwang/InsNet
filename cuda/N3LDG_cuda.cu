@@ -1590,8 +1590,7 @@ void LookupForward(const std::vector<int> &xids, const dtype *vocabulary,
     CheckCudaError();
 }
 
-__global__ void KernelLookupBackward(const int *xids, int unknown_id,
-        bool fine_tune,
+__global__ void KernelLookupBackward(const int *xids, const int *should_backward,
         const dtype** losses,
         int count,
         int dim,
@@ -1603,8 +1602,7 @@ __global__ void KernelLookupBackward(const int *xids, int unknown_id,
         int count_i = i / dim;
         int dim_i = i % dim;
         int xid = xids[count_i];
-        if (xid == unknown_id || fine_tune) {
-            assert(xid >= 0);
+        if (should_backward[count_i]) {
             if (dim_i == 0) {
                 indexers[xid] = true;
             }
@@ -1613,8 +1611,7 @@ __global__ void KernelLookupBackward(const int *xids, int unknown_id,
     }
 }
 
-void LookupBackward(const std::vector<int> &xids, int unknown_id,
-        bool fine_tune,
+void LookupBackward(const std::vector<int> &xids, const std::vector<int> &should_backward,
         const std::vector<dtype*> &losses,
         int count,
         int dim,
@@ -1627,10 +1624,11 @@ void LookupBackward(const std::vector<int> &xids, int unknown_id,
     xid_arr.init((int*)pl_arr.value, xids.size());
     NumberPointerArray loss_arr;
     loss_arr.init((dtype**)losses.data(), losses.size());
+    IntArray should_backward_arr;
+    should_backward_arr.init(should_backward.data(), should_backward.size());
     KernelLookupBackward<<<block_count, TPB>>>(
             const_cast<const int *>(xid_arr.value),
-            unknown_id,
-            fine_tune,
+            should_backward_arr.value,
             const_cast<const dtype**>(loss_arr.value),
             count,
             dim,
@@ -1639,8 +1637,7 @@ void LookupBackward(const std::vector<int> &xids, int unknown_id,
     CheckCudaError();
 }
 
-__global__ void KernelLookupBackward(const int *xids, int unknown_id,
-        bool fine_tune,
+__global__ void KernelLookupBackward(const int *xids, int *should_backward,
         const dtype** losses,
         int count,
         int dim,
@@ -1651,15 +1648,13 @@ __global__ void KernelLookupBackward(const int *xids, int unknown_id,
         int count_i = i / dim;
         int dim_i = i % dim;
         int xid = xids[count_i];
-        if (xid == unknown_id || fine_tune) {
-            assert(xid >= 0);
+        if (should_backward[count_i]) {
             DeviceAtomicAdd(grad + xid * dim + dim_i, losses[count_i][dim_i]);
         }
     }
 }
 
-void LookupBackward(const std::vector<int> &xids, int unknown_id,
-        bool fine_tune,
+void LookupBackward(const std::vector<int> &xids, const vector<int> &should_backward,
         const std::vector<dtype*> &losses,
         int count,
         int dim,
@@ -1671,10 +1666,11 @@ void LookupBackward(const std::vector<int> &xids, int unknown_id,
     xid_arr.init((int*)pl_arr.value, xids.size());
     NumberPointerArray loss_arr;
     loss_arr.init((dtype**)losses.data(), losses.size());
+    IntArray should_backward_arr;
+    should_backward_arr.init(should_backward.data(), should_backward.size());
     KernelLookupBackward<<<block_count, TPB>>>(
             const_cast<const int *>(xid_arr.value),
-            unknown_id,
-            fine_tune,
+            should_backward_arr.value,
             const_cast<const dtype**>(loss_arr.value),
             count,
             dim,

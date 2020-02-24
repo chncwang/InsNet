@@ -270,18 +270,25 @@ struct ParamArray : public N3LDGSerializable, public TunableCombination<BasePara
     vector<shared_ptr<ParamType>> params;
     string name;
 
-    vector<ParamType *> ptrs() {
-        vector<ParamType *> results;
-        for (auto &p : params) {
-            results.push_back(p.get());
+    const vector<ParamType *> &ptrs() const {
+        static vector<ParamType *> *results;
+        if (results == nullptr) {
+            results = new vector<ParamType *>;
+            for (auto &p : params) {
+                results->push_back(p.get());
+            }
         }
         return results;
     }
 
-    void init(int layer, int out_dim, int in_dim) {
+    int size() const {
+        return params.size();
+    }
+
+    void init(int layer, int out_dim, int in_dim, function<void(ParamType &, int)> &init_param) {
         for (int i = 0; i < layer; ++i) {
             shared_ptr<ParamType> param(new ParamType(name + std::to_string(i)));
-            param->init(out_dim, i == 0 ? in_dim : out_dim);
+            init_param(*param, layer);
             params.push_back(param);
         }
     }

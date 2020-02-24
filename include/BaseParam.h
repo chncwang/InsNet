@@ -34,7 +34,6 @@ public:
 
     void copyFromDeviceToHost() override {
         for (auto *t : transferablePtrs()) {
-//            std::cout << boost::format("name:%1%") % t->name() << std::endl;
             t->copyFromDeviceToHost();
         }
     }
@@ -102,7 +101,6 @@ public:
         return name_;
     }
 
-    // Choose one point randomly
     virtual void randpoint(int& idx, int &idy) = 0;
     virtual dtype squareGradNorm() = 0;
     virtual void rescaleGrad(dtype scale) = 0;

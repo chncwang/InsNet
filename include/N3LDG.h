@@ -29,6 +29,7 @@
 #include "SparseOP.h"
 #include "MaxProbabilityLoss.h"
 #include "ParamOP.h"
+#include "transformer.h"
 
 #if USE_GPU
 #include "N3LDG_cuda.h"

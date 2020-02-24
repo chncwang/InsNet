@@ -80,6 +80,8 @@ public:
         StringToId::const_iterator it = m_string_to_id.find(str);
         if (it != m_string_to_id.end()) {
             return it->second;
+        } else if (str == unknownkey) {
+            return -1;
         } else {
             cerr << str << " not found" << endl;
             abort();

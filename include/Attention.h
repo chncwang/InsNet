@@ -33,7 +33,9 @@ public:
         for (int idx = 0; idx < values.size(); idx++) {
             Node *pro = n3ldg_plus::pointwiseMultiply(cg, *keys.at(idx), guide);
             Node *sum = n3ldg_plus::vectorSum(cg, *pro);
-            _weights.push_back(sum);
+            Node *scaled = n3ldg_plus::dropout(cg, *sum, 1 - 1.0 / sqrt((dtype)values.size()),
+                    false);
+            _weights.push_back(scaled);
         }
 
         _hidden = attention(cg, values, _weights);
