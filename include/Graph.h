@@ -65,9 +65,15 @@ public:
             delete execs.at(idx);
         }
 
-        auto &refs = globalPoolReferences();
-        for (auto &e : refs) {
-            e->second = 0;
+        if (globalPoolEnabled()) {
+            auto &refs = globalPoolReferences();
+            for (auto &e : refs) {
+                e->second = 0;
+            }
+        } else {
+            for (Node *node : all_nodes) {
+                delete node;
+            }
         }
     }
 
@@ -126,7 +132,7 @@ public:
                 auto depth_it = node_type_depth.find(type_hash);
                 float avg_depth = (float)depth_it->second.first /
                     depth_it->second.second;
-//                cout << "sig:" << type_hash << " avg_depth:" << avg_depth << endl;
+                //                cout << "sig:" << type_hash << " avg_depth:" << avg_depth << endl;
                 if (avg_depth < min_avg_depth) {
                     min_avg_depth = avg_depth;
                     shallow_nodes = it.second;
@@ -143,7 +149,7 @@ public:
             clearNodes(cur_exec->batch);
             profiler.EndCudaEvent();
 #endif
-//            cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl << endl;
+            //            cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl << endl;
 
             profiler.BeginEvent("computation forward");
             cur_exec->forwardFully();

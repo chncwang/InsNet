@@ -285,10 +285,10 @@ struct ParamArray : public N3LDGSerializable, public TunableCombination<BasePara
         return params.size();
     }
 
-    void init(int layer, int out_dim, int in_dim, function<void(ParamType &, int)> &init_param) {
+    void init(int layer, function<void(ParamType &, int)> &init_param) {
         for (int i = 0; i < layer; ++i) {
             shared_ptr<ParamType> param(new ParamType(name + std::to_string(i)));
-            init_param(*param, layer);
+            init_param(*param, i);
             params.push_back(param);
         }
     }

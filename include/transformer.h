@@ -94,7 +94,7 @@ public:
             [&](AttentionHeadParams &params, int len) {
             params.init(section_out_dim, dim);
         };
-        multi_head_attention_params_.init(head_count, section_out_dim, dim, param_init);
+        multi_head_attention_params_.init(head_count, param_init);
 
         function<dtype(int, int)> init_relu = [](int out, int in) ->dtype {
             return sqrt(2.0 / (out + in));
@@ -181,7 +181,7 @@ public:
             [&](TransformerEncoderLayerParams &params, int layer) {
                 params.init(hidden_dim, head_count);
             };
-        layer_params_.init(layer, hidden_dim, hidden_dim, init_param);
+        layer_params_.init(layer, init_param);
         head_count_ = head_count;
         hidden_dim_ = hidden_dim;
     }

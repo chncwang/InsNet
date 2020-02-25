@@ -1003,6 +1003,9 @@ cudaError_t MemoryPool::Malloc(void **p, int size) {
             if (higher_power > MAX_BLOCK_POWER) {
                 while (status != cudaSuccess) {
                     status = cudaMalloc(p, fit_size);
+                    if (status != cudaSuccess) {
+                        abort();
+                    }
                 }
                 CallCuda(status);
                 MemoryBlock block(*p, fit_size);

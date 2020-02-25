@@ -1,17 +1,6 @@
 #ifndef BasicNode
 #define BasicNode
 
-/*
-*  Node.h:
-*  basic processing unit in a neural network
-*  (1) we have a node structure to build user graph
-*  (2) we have a execute structure to merge similar nodes that can be execute together
-*  The real forward and backward are defined in Executor.
-*  Every operation should define a node class and a execute class together.
-*
-*  Created on: Apr 21, 2017
-*      Author: mszhang
-*/
 #include <iomanip>
 #include <functional>
 #include <string>
@@ -19,6 +8,7 @@
 #include <memory>
 #include <utility>
 #include <vector>
+#include <set>
 #include "MyTensor.h"
 #include "MyLib.h"
 #include "profiler.h"
@@ -40,7 +30,6 @@ dtype flog(const dtype& x) {
     return log(x);
 }
 
-//derive function
 dtype dequal(const dtype& x, const dtype& y) {
     return 1;
 }
@@ -114,8 +103,8 @@ class Executor;
 class Node;
 
 class NodeContainer {
-public:
-    virtual void addNode(Node *node) = 0;
+    public:
+        virtual void addNode(Node *node) = 0;
 };
 
 string addressToString(const void* p) {
@@ -202,7 +191,7 @@ public:
     void setNodeIndex(int node_index) {
         node_index_ = node_index;
     }
-    
+
     int getNodeIndex() const {
         return node_index_;
     }
@@ -239,51 +228,61 @@ protected:
         for (Node *in : ins) {
             in->addParent(this);
         }
-        container.addNode(this);
-    }
-
-    Node(const string &node_type, int dim = 0) : dim_(dim) {
-        degree_ = 0;
-        node_type_ = node_type;
-    }
-
-
-    virtual void init(int ndim) {
-        if (ndim <= 0) {
-            cerr << "dim is less than 0:" << ndim << endl;
-            abort();
+            container.addNode(this);
         }
-        dim_ = ndim;
-        val_.init(dim_);
-        loss_.init(dim_);
-    }
 
-private:
-    std::vector<Node*> parents_;
-    Tensor1D val_;
-    Tensor1D loss_;
-    int dim_;
-    int degree_ = 0;
-    int depth_ = 0;
-    string node_type_;
-    string node_name_;
-    int node_index_;
+        Node(const string &node_type, int dim = 0) : dim_(dim) {
+            degree_ = 0;
+            node_type_ = node_type;
+        }
+
+
+        virtual void init(int ndim) {
+            if (ndim <= 0) {
+                cerr << "dim is less than 0:" << ndim << endl;
+                abort();
+            }
+            dim_ = ndim;
+            val_.init(dim_);
+            loss_.init(dim_);
+        }
+
+    private:
+        std::vector<Node*> parents_;
+        Tensor1D val_;
+        Tensor1D loss_;
+        int dim_;
+        int degree_ = 0;
+        int depth_ = 0;
+        string node_type_;
+        string node_name_;
+        int node_index_;
 };
 
-vector<pair<vector<Node *>, int> *>& globalPoolReferences() {
-    static vector<pair<vector<Node *>, int> *> o;
+set<pair<vector<Node *>, int> *>& globalPoolReferences() {
+    static set<pair<vector<Node *>, int> *> o;
     return o;
+}
+
+bool &globalPoolEnabled() {
+    static bool pool_enabled = true;
+    return pool_enabled;
 }
 
 template <typename T>
 class Poolable {
 public:
     static T *newNode(int key) {
+        if (!globalPoolEnabled()) {
+            T *node = new T;
+            node->initNode(key);
+            return node;
+        }
         auto it = pool_.find(key);
         if (it == pool_.end()) {
             pool_.insert(make_pair(key, make_pair(vector<Node *>(), 0)));
             it = pool_.find(key);
-            globalPoolReferences().push_back(&it->second);
+            globalPoolReferences().insert(&it->second);
         }
         auto &p = it->second;
         vector<Node *> &v = p.first;
@@ -347,28 +346,6 @@ auto gpu_get_node_loss = [](Node *node) {
 #endif
 
 typedef Node* PNode;
-
-//class CompositionNode : public Node {
-//public:
-//    virtual void compute() {
-//        abort();
-//    }
-
-//    virtual void backward() {
-//        abort();
-//    }
-
-//    virtual Executor* generate() {
-//        return nullptr;
-//    }
-
-//    static unique_ptr<CompositionNode> instance() {
-//        return unique_ptr<CompositionNode>(new CompositionNode);
-//    }
-
-//private:
-//    CompositionNode() : Node("") {}
-//};
 
 class UniInputNode : public Node {
 public:
@@ -443,9 +420,9 @@ void clearNodes(std::vector<Node*> &nodes) {
     vector<int> dims;
     val_and_losses.reserve(2 * nodes.size());
     for (Node *n : nodes) {
-//        val_and_losses.push_back(n->getVal().value);
+        //        val_and_losses.push_back(n->getVal().value);
         val_and_losses.push_back(n->getLoss().value);
-//        dims.push_back(n->getDim());
+        //        dims.push_back(n->getDim());
         dims.push_back(n->getDim());
     }
     n3ldg_cuda::BatchMemset(val_and_losses, val_and_losses.size(), dims, 0.0f);
