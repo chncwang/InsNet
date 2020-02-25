@@ -388,7 +388,7 @@ public:
             batch[idx]->backward();
         }
 
-        n3ldg_cuda::Assert(table->E.grad.verify("lookup backward grad"));
+        n3ldg_cuda::Assert(table->grad.verify("lookup backward grad"));
 #endif
     }
 };

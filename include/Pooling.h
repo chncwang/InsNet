@@ -26,6 +26,7 @@ class PoolNode : public Node {
 
     void clear() override {
         ins.clear();
+        Node::clear();
     }
 
     void init(int ndim) override {
@@ -467,6 +468,7 @@ public:
 
     void clear() override {
         ins.clear();
+        Node::clear();
     }
 
     SumPoolNode() : Node("sum-pool") {}
@@ -684,6 +686,7 @@ public:
 
     void clear() override {
         ins.clear();
+        Node::clear();
     }
 };
 

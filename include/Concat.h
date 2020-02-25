@@ -36,6 +36,7 @@ public:
     void clear() override {
         inDims.clear();
         ins.clear();
+        Node::clear();
     }
 
     void forward(Graph &cg, const vector<PNode>& x) {

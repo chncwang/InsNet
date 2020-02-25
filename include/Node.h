@@ -221,6 +221,15 @@ public:
 
     virtual void clear() {
         parents_.clear();
+        degree_ = 0;
+        depth_ = 0;
+#if USE_GPU
+#if TEST_CUDA
+        loss_.zero();
+#endif
+#else
+        loss_.zero();
+#endif
     }
 
     virtual ~Node() = default;

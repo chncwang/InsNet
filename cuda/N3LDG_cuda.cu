@@ -864,7 +864,8 @@ bool Verify(dtype *host, dtype *device, int len, const char* message) {
     cudaDeviceSynchronize();
     cudaPrintfDisplay(stdout, true);
     if (!success) {
-        cout << message << endl;
+        cerr << message << endl;
+        abort();
     }
     return success;
 }

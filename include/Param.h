@@ -30,7 +30,7 @@ public:
         init(outDim, inDim, nullptr);
     }
 
-    void init(int outDim, int inDim, const std::function<float(int, int)> *cal_bound) {
+    void init(int outDim, int inDim, const std::function<dtype(int, int)> *cal_bound) {
 #if USE_GPU
         val.initOnMemoryAndDevice(outDim, inDim);
         aux_square.initOnMemoryAndDevice(outDim, inDim);
