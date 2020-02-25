@@ -18,12 +18,25 @@
 #endif
 #include "profiler.h"
 
-class ConcatNode : public Node {
+class ConcatNode : public Node, public Poolable<ConcatNode> {
 public:
     vector<int> inDims;
     vector<PNode> ins;
 
     ConcatNode() : Node("concat") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
+
+    void clear() override {
+        inDims.clear();
+        ins.clear();
+    }
 
     void forward(Graph &cg, const vector<PNode>& x) {
         if (x.size() == 0) {
@@ -31,7 +44,6 @@ public:
             abort();
         }
 
-        ins.clear();
         for (int i = 0; i < x.size(); i++) {
             ins.push_back(x[i]);
         }
@@ -40,10 +52,9 @@ public:
         for (int i = 0; i < nSize; ++i) {
             ins[i]->addParent(this);
         }
-        inDims.clear();
         int curDim = 0;
         for (int i = 0; i < nSize; ++i) {
-            inDims.push_back(ins[i]->val().dim);
+            inDims.push_back(ins.at(i)->getDim());
             curDim += inDims[i];
         }
         if (curDim != getDim()) {
@@ -179,9 +190,17 @@ PExecutor ConcatNode::generate() {
     return exec;
 }
 
-class ScalarConcatNode : public Node {
+class ScalarConcatNode : public Node, public Poolable<ScalarConcatNode> {
 public:
     ScalarConcatNode() : Node("scalar_concat") {}
+
+    int getKey() const override {
+        return getDim();
+    }
+
+    void initNode(int dim) override {
+        init(dim);
+    }
 
     void forward(Graph &graph, const vector<Node *> &ins) {
         if (ins.size() != getDim()) {
@@ -306,15 +325,13 @@ Node *concat(Graph &graph, const vector<Node*> inputs) {
     for (Node *in : inputs) {
         dim += in->getDim();
     }
-    ConcatNode *concat = new ConcatNode;
-    concat->init(dim);
+    ConcatNode *concat = ConcatNode::newNode(dim);
     concat->forward(graph, inputs);
     return concat;
 }
 
 Node *scalarConcat(Graph &graph, const vector<Node *> inputs) {
-    ScalarConcatNode *concat = new ScalarConcatNode;
-    concat->init(inputs.size());
+    ScalarConcatNode *concat = ScalarConcatNode::newNode(inputs.size());
     concat->forward(graph, inputs);
     return concat;
 }

@@ -9,9 +9,17 @@
 #endif
 #include <boost/format.hpp>
 
-class SplitNode : public Node {
+class SplitNode : public Node, public Poolable<SplitNode> {
 public:
     SplitNode() : Node("split") {}
+
+    int getKey() const override {
+        return getDim();
+    }
+
+    void initNode(int dim) override {
+        init(dim);
+    }
 
     void forward(Graph &graph, Node &input, int offset) {
         if (input.getDim() < offset + getDim()) {
@@ -49,8 +57,7 @@ private:
 
 namespace n3ldg_plus {
 Node* split(Graph &graph, int dim, Node &input, int offset) {
-    SplitNode *split = new SplitNode;
-    split->init(dim);
+    SplitNode *split = SplitNode::newNode(dim);
     split->forward(graph, input, offset);
     return split;
 }

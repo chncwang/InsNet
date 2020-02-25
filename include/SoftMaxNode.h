@@ -14,37 +14,20 @@ namespace n3ldg_plus {
 
 Node *minusMaxScalar(Graph &graph, Node &input) {
     int dim = input.getDim();
+    using namespace n3ldg_plus;
 
-    MaxScalarNode *max_scalar = new MaxScalarNode();
-    max_scalar->initAsScalar();
-    max_scalar->forward(graph, input);
-
-    ScalarToVectorNode *scalar_to_vector = new ScalarToVectorNode;
-    scalar_to_vector->init(dim);
-    scalar_to_vector->forward(graph, *max_scalar);
-
-    SubNode *subtracted = new SubNode;
-    subtracted->init(dim);
-    subtracted->forward(graph, input, *scalar_to_vector);
+    Node *max_scalar = maxScalar(graph, input);
+    Node *scalar_to_vector = scalarToVector(graph, dim, *max_scalar);
+    Node *subtracted = sub(graph, input, *scalar_to_vector);
     return subtracted;
 }
 
 Node* softmax(Graph &graph, Node &input) {
-    int dim = input.getDim();
+    using namespace n3ldg_plus;
     Node *subtracted = minusMaxScalar(graph, input);
-
-    ExpNode *exp = new ExpNode;
-    exp->init(dim);
-    exp->forward(graph, *subtracted);
-
-    SumNode *sum = new SumNode;
-    sum->initAsScalar();
-    sum->forward(graph, *exp);
-
-    DivNode *div = new DivNode;
-    div->init(dim);
-    div->forward(graph, *exp, *sum);
-
+    Node *exp = n3ldg_plus::exp(graph, *subtracted);
+    Node *sum = vectorSum(graph, *exp);
+    Node *div = n3ldg_plus::div(graph, *exp, *sum);
     return div;
 }
 

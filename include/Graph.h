@@ -57,14 +57,17 @@ class Graph : public NodeContainer {
 public:
     Graph(bool eager = false) : eager_(eager) {}
 
+    Graph (const Graph &graph) = delete;
+
     virtual ~Graph() {
         int count = execs.size();
         for (int idx = 0; idx < count; idx++) {
             delete execs.at(idx);
         }
 
-        for (Node *n : nodes) {
-            delete n;
+        auto &refs = globalPoolReferences();
+        for (auto &e : refs) {
+            e->second = 0;
         }
     }
 

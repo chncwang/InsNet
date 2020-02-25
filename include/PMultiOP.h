@@ -14,13 +14,17 @@
 #include "Node.h"
 #include "Graph.h"
 
-class PMultiNode : public Node {
-  public:
+class PMultiNode : public Node, public Poolable<PMultiNode> {
+public:
     PNode in1, in2;
 
     PMultiNode() : Node("point-multiply") {
         in1 = NULL;
         in2 = NULL;
+    }
+
+    void initNode(int dim) override {
+        init(dim);
     }
 
     void forward(Graph &graph, Node &input1, Node &input2) {
@@ -35,21 +39,25 @@ class PMultiNode : public Node {
         cg->addNode(this);
     }
 
-    void compute() {
+    int getKey() const override {
+        return getDim();
+    }
+
+    void compute() override {
         val().vec() = in1->val().vec() * in2->val().vec();
     }
 
-    void backward() {
+    void backward() override {
         in1->loss().vec() += loss().vec() * in2->val().vec();
         in2->loss().vec() += loss().vec() * in1->val().vec();
     }
 
     // better to rewrite for deep understanding
-    bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) override {
         return Node::typeEqual(other);
     }
 
-    PExecutor generate();
+    PExecutor generate() override;
 };
 
 namespace n3ldg_plus {
@@ -59,8 +67,7 @@ Node *pointwiseMultiply(Graph &graph, Node &a, Node &b) {
         cerr << boost::format("a dim:%1% b dim:%2%") % a.getDim() % b.getDim() << endl;
         abort();
     }
-    PMultiNode *node = new PMultiNode;
-    node->init(a.getDim());
+    PMultiNode *node = PMultiNode::newNode(a.getDim());
     node->forward(graph, a, b);
     return node;
 }

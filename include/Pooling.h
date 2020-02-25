@@ -24,6 +24,10 @@ class PoolNode : public Node {
 
     PoolNode(const string &node_type) : Node(node_type) {}
 
+    void clear() override {
+        ins.clear();
+    }
+
     void init(int ndim) override {
         Node::init(ndim);
         masks.resize(ndim);
@@ -42,7 +46,6 @@ class PoolNode : public Node {
             abort();
         }
         int nSize = x.size();
-        ins.clear();
         for (int i = 0; i < nSize; i++) {
             if (x[i]->val().dim != getDim()) {
                 std::cerr << "input matrixes are not matched" << std::endl;
@@ -78,10 +81,18 @@ class PoolNode : public Node {
 };
 
 #if USE_GPU
-class MaxPoolNode : public PoolNode
+class MaxPoolNode : public PoolNode, public Poolable<MaxPoolNode>
 {
 public:
     MaxPoolNode() : PoolNode("max_pool") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
 
 #if TEST_CUDA
     void setMask() override {
@@ -129,9 +140,17 @@ public:
     PExecutor generate() override;
 };
 #else
-class MaxPoolNode : public PoolNode {
+class MaxPoolNode : public PoolNode, public Poolable<MaxPoolNode> {
 public:
     MaxPoolNode() : PoolNode("max-pooling") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
 
     void setMask() override {
         int nSize = ins.size();
@@ -151,13 +170,21 @@ public:
 #endif
 
 #if USE_GPU
-class MinPoolNode : public PoolNode
+class MinPoolNode : public PoolNode, public Poolable<MinPoolNode>
 {
 public:
 #if !TEST_CUDA
     vector<PNode> ins;
 #endif
     MinPoolNode() : PoolNode("min-pooling") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
 
 #if TEST_CUDA
     void setMask() override {
@@ -203,7 +230,6 @@ public:
     void forward(Graph *cg, const vector<PNode>& x) {
         assert(!x.empty());
         int nSize = x.size();
-        ins.clear();
         for (int i = 0; i < nSize; i++) {
             assert(x[i]->getVal().dim == getDim());
             ins.push_back(x[i]);
@@ -219,11 +245,19 @@ public:
     PExecutor generate() override;
 };
 #else
-class MinPoolNode : public PoolNode {
+class MinPoolNode : public PoolNode, public Poolable<MinPoolNode> {
 public:
     MinPoolNode() : PoolNode("min-pooling") {}
 
-    void setMask() {
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
+
+    void setMask() override {
         int nSize = ins.size();
         for (int idx = 0; idx < getDim(); idx++) {
             int minIndex = -1;
@@ -427,11 +461,23 @@ PExecutor PoolNode::generate() {
 
 
 
-class SumPoolNode : public Node {
+class SumPoolNode : public Node, public Poolable<SumPoolNode> {
 public:
     vector<PNode> ins;
 
+    void clear() override {
+        ins.clear();
+    }
+
     SumPoolNode() : Node("sum-pool") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
 
     void forward(Graph &cg, const vector<PNode>& x) {
         if (x.size() == 0) {
@@ -440,10 +486,11 @@ public:
         }
 
         for (int i = 0; i < x.size(); i++) {
-            if (x[i]->val().dim == getDim()) {
+            if (x[i]->getDim() == getDim()) {
                 ins.push_back(x[i]);
             } else {
                 std::cerr << "dim does not match" << std::endl;
+                abort();
             }
         }
 
@@ -455,7 +502,7 @@ public:
         cg.addNode(this);
     }
 
-    void compute() {
+    void compute() override {
         int nSize = ins.size();
         val().zero();
         for (int i = 0; i < nSize; ++i) {
@@ -465,8 +512,7 @@ public:
         }
     }
 
-
-    void backward() {
+    void backward() override {
         int nSize = ins.size();
         for (int i = 0; i < nSize; ++i) {
             for (int idx = 0; idx < getDim(); idx++) {
@@ -475,15 +521,7 @@ public:
         }
     }
 
-
-  public:
-    PExecutor generate();
-
-    // better to rewrite for deep understanding
-    bool typeEqual(PNode other) {
-        return Node::typeEqual(other);
-    }
-
+    PExecutor generate() override;
 };
 
 #if USE_GPU
@@ -581,13 +619,19 @@ PExecutor SumPoolNode::generate() {
     return exec;
 }
 
-
-
-class AvgPoolNode : public Node {
+class AvgPoolNode : public Node, public Poolable<AvgPoolNode> {
 public:
     vector<PNode> ins;
 
     AvgPoolNode() : Node("avg-pool") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
 
     void forward(Graph *cg, const vector<PNode>& x) {
         if (x.size() == 0) {
@@ -595,9 +639,8 @@ public:
             abort();
         }
 
-        ins.clear();
         for (int i = 0; i < x.size(); i++) {
-            if (x[i]->val().dim == getDim()) {
+            if (x[i]->getDim() == getDim()) {
                 ins.push_back(x[i]);
             } else {
                 std::cerr << "dim does not match" << std::endl;
@@ -613,7 +656,7 @@ public:
         cg->addNode(this);
     }
 
-    void compute() {
+    void compute() override {
         int nSize = ins.size();
         val().zero();
         for (int i = 0; i < nSize; ++i) {
@@ -624,7 +667,7 @@ public:
 
     }
 
-    void backward() {
+    void backward() override {
         int nSize = ins.size();
         for (int i = 0; i < nSize; ++i) {
             for (int idx = 0; idx < getDim(); idx++) {
@@ -633,12 +676,15 @@ public:
         }
     }
 
-    PExecutor generate();
+    PExecutor generate() override;
 
-    bool typeEqual(PNode other) {
+    bool typeEqual(PNode other) override {
         return Node::typeEqual(other);
     }
 
+    void clear() override {
+        ins.clear();
+    }
 };
 
 #if USE_GPU
@@ -754,28 +800,14 @@ namespace n3ldg_plus {
 
     Node *sumPool(Graph &graph, vector<Node *> &inputs) {
         int dim = inputs.front()->getDim();
-        for (int i = 1; i < inputs.size(); ++i) {
-            if (dim != inputs.at(i)->getDim()) {
-                cerr << "dim not equal" << endl;
-                abort();
-            }
-        }
-        SumPoolNode *pool = new SumPoolNode;
-        pool->init(dim);
+        SumPoolNode *pool = SumPoolNode::newNode(dim);
         pool->forward(graph, inputs);
         return pool;
     }
 
     Node *averagePool(Graph &graph, vector<Node *> &inputs) {
         int dim = inputs.front()->getDim();
-        for (int i = 1; i < inputs.size(); ++i) {
-            if (dim != inputs.at(i)->getDim()) {
-                cerr << "dim not equal" << endl;
-                abort();
-            }
-        }
-        AvgPoolNode *pool = new AvgPoolNode;
-        pool->init(dim);
+        AvgPoolNode *pool = AvgPoolNode::newNode(dim);
         pool->forward(&graph, inputs);
         return pool;
     }

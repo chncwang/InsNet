@@ -13,6 +13,7 @@
 #include "Node.h"
 #include "Graph.h"
 #include "SparseParam.h"
+#include "ModelUpdate.h"
 
 // for sparse features
 class SparseParams {
@@ -54,65 +55,5 @@ class SparseParams {
     }
 
 };
-
-class SparseNode : public Node {
-  public:
-    SparseParams* param;
-    vector<int> ins;
-
-    SparseNode() : Node("sparsenode") {
-        ins.clear();
-        param = NULL;
-    }
-
-    void setParam(SparseParams* paramInit) {
-        param = paramInit;
-    }
-
-    //notice the output
-    void forward(Graph *cg, const vector<string>& x) {
-        int featId;
-        int featSize = x.size();
-        for (int idx = 0; idx < featSize; idx++) {
-            featId = param->getFeatureId(x[idx]);
-            if (featId >= 0) {
-                ins.push_back(featId);
-            }
-        }
-        cg->addNode(this);
-    }
-
-    void compute() {
-        param->W.value(ins, val());
-    }
-
-    void backward() {
-        param->W.loss(ins, loss());
-    }
-
-    PExecutor generate();
-
-    // better to rewrite for deep understanding
-    bool typeEqual(PNode other) {
-        bool result = Node::typeEqual(other);
-        if (!result) return false;
-
-        SparseNode* conv_other = (SparseNode*)other;
-        if (param != conv_other->param) {
-            return false;
-        }
-
-        return true;
-    }
-
-};
-
-class SparseExecutor :public Executor {};
-
-PExecutor SparseNode::generate() {
-    SparseExecutor* exec = new SparseExecutor();
-    exec->batch.push_back(this);
-    return exec;
-}
 
 #endif /* SPARSEOP_H_ */

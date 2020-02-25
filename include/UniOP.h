@@ -84,10 +84,18 @@ protected:
     }
 };
 
-class LinearNode : public Node {
+class LinearNode : public Node, public Poolable<LinearNode> {
 public:
     PNode in;
     UniParams* param;
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
 
     LinearNode() : Node("linear") {
         in = NULL;
@@ -376,9 +384,17 @@ PExecutor LinearNode::generate() {
 
 class LinearWordVectorExecutor;
 
-class LinearWordVectorNode : public UniInputNode {
+class LinearWordVectorNode : public UniInputNode, public Poolable<LinearWordVectorNode> {
 public:
     LinearWordVectorNode() : UniInputNode("linear_word_vector_node") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
 
     bool isDimLegal(const Node &input) const override {
         return input.getDim() == param_->outDim();
@@ -392,7 +408,6 @@ public:
         }
         param_ = &word_vectors;
         offset_ = offset;
-//        offset_ = 0;
     }
 
     void compute() override {
@@ -440,8 +455,7 @@ namespace n3ldg_plus {
             abort();
         }
 
-        LinearWordVectorNode *node =  new LinearWordVectorNode;
-        node->init(dim);
+        LinearWordVectorNode *node =  LinearWordVectorNode::newNode(dim);
         node->setParam(word_vectors, offset);
         node->forward(graph, input);
         return node;
@@ -682,9 +696,17 @@ public:
     }
 };
 
-class BiasNode : public UniInputNode {
+class BiasNode : public UniInputNode, public Poolable<BiasNode> {
 public:
-    BiasNode(BiasParam * bias_param) : UniInputNode("bias"), bias_param_(bias_param) {}
+    BiasNode() : UniInputNode("bias") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
 
     void init(int dim) override {
         if (dim > bias_param_->outDim()) {
@@ -711,18 +733,17 @@ public:
     }
 
     void backward() override {
-//        cout << "bias node backward cpu" << endl;
         getInput()->loss().vec() += loss().vec();
-//        cout << "loss:" << getLoss()[4] << endl;
-//        cout << "before add:"<< bias_param_->grad[0][4] << endl;
-//        cout << bias_param_->grad.toString() << endl;
         for (int i = 0; i < getDim(); ++i) {
             bias_param_->grad[0][i] += getLoss()[i];
         }
-//        cout << "after add:"<< bias_param_->grad[0][4] << endl;
     }
 
     Executor *generate() override;
+
+    void setParam(BiasParam &param) {
+        bias_param_ = &param;
+    }
 
 protected:
     virtual bool isDimLegal(const Node &input) const override {
@@ -786,8 +807,7 @@ namespace n3ldg_plus {
 
 Node *linear(Graph &graph, UniParams &params, Node &input) {
     int dim = params.W.outDim();
-    LinearNode *uni(new LinearNode);
-    uni->init(dim);
+    LinearNode *uni = LinearNode::newNode(dim);
     uni->setParam(params);
     uni->forward(graph, input);
     return uni;
@@ -797,24 +817,20 @@ Node *uni(Graph &graph, UniParams &params, Node &input, ActivatedEnum activated_
         ActivatedEnum::TANH) {
     int dim = params.W.outDim();
 
-    LinearNode *uni(new LinearNode);
-    uni->init(dim);
-    uni->setParam(params);
-    uni->forward(graph, input);
+    Node *uni = linear(graph, params, input);
 
     UniInputNode *activated;
     if (activated_type == ActivatedEnum::TANH) {
-        activated = new TanhNode;
+        activated = TanhNode::newNode(dim);
     } else if (activated_type == ActivatedEnum::SIGMOID) {
-        activated = new SigmoidNode;
+        activated = SigmoidNode::newNode(dim);
     } else if (activated_type == ActivatedEnum::RELU) {
-        activated = new ReluNode;
+        activated = ReluNode::newNode(dim);
     } else {
         cerr << "uni - unsupported activated " << activated << endl;
         abort();
     }
 
-    activated->init(dim);
     activated->forward(graph, *uni);
 
     return activated;
@@ -822,8 +838,8 @@ Node *uni(Graph &graph, UniParams &params, Node &input, ActivatedEnum activated_
 
 Node *bias(Graph &graph, BiasParam &param, Node &input) {
     int dim = input.getDim();
-    BiasNode *node(new BiasNode(&param));
-    node->init(dim);
+    BiasNode *node = BiasNode::newNode(dim);
+    node->setParam(param);
     node->forward(graph, input);
     return node;
 }

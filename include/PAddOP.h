@@ -14,25 +14,33 @@
 #include "Node.h"
 #include "Graph.h"
 
-class PAddNode : public Node {
+class PAddNode : public Node, public Poolable<PAddNode> {
 public:
     vector<PNode> ins;
 
     PAddNode() : Node("point-add") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
 
     void forward(Graph &graph, Node &input1, Node &input2) {
         vector<Node *> inputs = {&input1, &input2};
         this->forward(graph, inputs);
     }
 
-    void forward(Graph &cg, vector<PNode>& x) {
+    void forward(Graph &cg, vector<Node *>& x) {
         if (x.empty()) {
             std::cerr << "empty inputs for add" << std::endl;
             abort();
         }
 
         for (int i = 0; i < x.size(); i++) {
-            if (x[i]->val().dim != getDim()) {
+            if (x.front()->getDim() != getDim()) {
                 std::cerr << "dim does not match" << std::endl;
                 abort();
             }
@@ -88,16 +96,8 @@ public:
 
 namespace n3ldg_plus {
     Node *add(Graph &graph, vector<Node*> inputs) {
-        for (int i = 1; i < inputs.size(); ++i) {
-            if (inputs.front()->getDim() != inputs.at(i)->getDim()) {
-                cerr << "input dims not equal" << endl;
-                abort();
-            }
-        }
-
         int dim = inputs.front()->getDim();
-        PAddNode *result = new PAddNode;
-        result->init(dim);
+        PAddNode *result = PAddNode::newNode(dim);
         result->forward(graph, inputs);
         return result;
     }

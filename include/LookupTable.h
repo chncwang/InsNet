@@ -237,7 +237,7 @@ public:
 };
 
 template <typename ParamType>
-class LookupNode : public Node {
+class LookupNode : public Node, public Poolable<LookupNode<ParamType>> {
 public:
     ParamType* param;
     int xid;
@@ -246,6 +246,14 @@ public:
     LookupNode() : Node("lookup") {
         xid = -1;
         param = NULL;
+    }
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
     }
 
     void setParam(LookupTable<ParamType>* paramInit) {
@@ -300,8 +308,7 @@ namespace n3ldg_plus {
 
 template <typename ParamType>
 Node *embedding(Graph &graph,ParamType &lookup, int id) {
-    LookupNode<ParamType>* input_lookup(new LookupNode<ParamType>);
-    input_lookup->init(lookup.outDim());
+    LookupNode<ParamType>* input_lookup = LookupNode<ParamType>::newNode(lookup.outDim());
     input_lookup->setParam(lookup);
     input_lookup->forward(graph, id);
     input_lookup->should_backward = false;
@@ -309,7 +316,8 @@ Node *embedding(Graph &graph,ParamType &lookup, int id) {
 }
 
 template <typename ParamType>
-Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, int dim, const string &word) {
+Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, int dim, const string &word,
+        bool should_backward = true) {
     int xid;
     if (!lookup.findElemId(word)) {
         if (lookup.nUNKId < 0) {
@@ -320,16 +328,17 @@ Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, int dim, const str
     } else {
         xid = lookup.getElemId(word);
     }
-    LookupNode<ParamType>* input_lookup(new LookupNode<ParamType>);
-    input_lookup->init(dim);
+    LookupNode<ParamType>* input_lookup = LookupNode<ParamType>::newNode(dim);
     input_lookup->setParam(lookup.E);
     input_lookup->forward(graph, xid);
+    input_lookup->should_backward = should_backward;
     return input_lookup;
 }
 
 template <typename ParamType>
-Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, const string &word) {
-    return embedding(graph, lookup, lookup.nDim, word);
+Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, const string &word,
+        bool should_backward = true) {
+    return embedding(graph, lookup, lookup.nDim, word, should_backward);
 }
 
 }

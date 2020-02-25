@@ -56,9 +56,17 @@ template<ActivatedEnum activation>
 class ActivationExecutor : public UniInputExecutor {};
 #endif
 
-class TanhNode : public UniInputNode {
+class TanhNode : public UniInputNode, public Poolable<TanhNode> {
 public:
     TanhNode() : UniInputNode("tanh") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
 
     void compute() override {
         val().vec() = getInput()->val().vec().unaryExpr(ptr_fun(ftanh));
@@ -82,32 +90,48 @@ PExecutor TanhNode::generate() {
 };
 
 
-class SigmoidNode :public UniInputNode {
+class SigmoidNode :public UniInputNode, public Poolable<SigmoidNode> {
 public:
     SigmoidNode() : UniInputNode("sigmoid") {}
 
-    void compute() {
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
+
+    void compute() override {
         val().vec() = getInput()->val().vec().unaryExpr(ptr_fun(fsigmoid));
     }
 
-    void backward() {
+    void backward() override {
         getInput()->loss().vec() += loss().vec() * getInput()->val().vec().binaryExpr(val().vec(),
                 ptr_fun(dsigmoid));
     }
 
-    PExecutor generate() {
+    PExecutor generate() override {
         return new ActivationExecutor<ActivatedEnum::SIGMOID>;
     }
 
 protected:
-    virtual bool isDimLegal(const Node &input) const {
+    virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
     }
 };
 
-class ReluNode :public UniInputNode {
+class ReluNode :public UniInputNode, public Poolable<ReluNode> {
 public:
     ReluNode() : UniInputNode("relu") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
 
     void compute() override {
         val().vec() = getInput()->val().vec().unaryExpr(ptr_fun(frelu));
@@ -128,126 +152,17 @@ protected:
     }
 };
 
-class PDotNode : public Node {
+class DropoutNode : public Node, public Poolable<DropoutNode> {
 public:
-    Node* in1, *in2;
+    DropoutNode() : Node("dropout") {}
 
-    PDotNode() : Node("point-dot", 1) {
-        in1 = nullptr;
-        in2 = nullptr;
+    void initNode(int dim) override {
+        init(dim);
     }
 
-    void init(int dim = 1){
-        if (dim != 1) {
-            abort();
-        }
-        Node::init(dim);
+    int getKey() const override {
+        return getDim();
     }
-
-    void forward(Graph *cg, Node* x1, Node* x2) {
-        in1 = x1;
-        in2 = x2;
-        in1->addParent(this);
-        in2->addParent(this);
-        cg->addNode(this);
-    }
-
-    void compute() {
-        val()[0] = 0.0;
-        for (int idx = 0; idx < in1->getDim(); idx++) {
-            val()[0] += in1->val()[idx] * in2->val()[idx];
-        }
-    }
-
-    void backward() {
-        for (int idx = 0; idx < in1->getDim(); idx++) {
-            in1->loss()[idx] += loss()[0] * in2->val()[idx];
-            in2->loss()[idx] += loss()[0] * in1->val()[idx];
-        }
-    }
-
-    PExecutor generate();
-};
-
-#if USE_GPU
-class PDotExecutor :public Executor {
-public:
-    void  forward() {
-        int count = batch.size();
-        std::vector<dtype*> vals;
-        ins1.reserve(count);
-        ins2.reserve(count);
-        vals.reserve(count);
-        for (Node *node : batch) {
-            PDotNode *dot = static_cast<PDotNode*>(node);
-            ins1.push_back(dot->in1->val().value);
-            ins2.push_back(dot->in2->val().value);
-            vals.push_back(dot->val().value);
-        }
-
-        n3ldg_cuda::PDotForward(ins1, ins2, count,
-                static_cast<PDotNode*>(batch.at(0))->in1->getDim(), vals);
-#if TEST_CUDA
-        for (Node *node : batch) {
-            PDotNode *dot = static_cast<PDotNode*>(node);
-            n3ldg_cuda::Assert(dot->in1->getVal().verify("PDot in1"));
-            n3ldg_cuda::Assert(dot->in2->getVal().verify("PDot in2"));
-            node->compute();
-            n3ldg_cuda::Assert(node->getVal().verify("PDot forward"));
-        }
-#endif
-    }
-
-    void backward() {
-        int count = batch.size();
-        std::vector<dtype*> losses, in_losses1, in_losses2;
-        losses.reserve(count);
-        in_losses1.reserve(count);
-        in_losses2.reserve(count);
-        for (Node *node : batch) {
-            PDotNode *dot = static_cast<PDotNode*>(node);
-            losses.push_back(dot->loss().value);
-            in_losses1.push_back(dot->in1->loss().value);
-            in_losses2.push_back(dot->in2->loss().value);
-        }
-        n3ldg_cuda::PDotBackward(losses, ins1, ins2, count,
-                static_cast<PDotNode*>(batch.at(0))->in1->getDim(), in_losses1,
-                in_losses2);
-
-#if TEST_CUDA
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward();
-            n3ldg_cuda::Assert(batch[idx]->getLoss().verify("PDotExecutor backward"));
-        }
-
-        for (Node *node : batch) {
-            PDotNode *dot = static_cast<PDotNode*>(node);
-            n3ldg_cuda::Assert(dot->in1->getLoss().verify("PDotExecutor backward in1"));
-            n3ldg_cuda::Assert(dot->in2->getLoss().verify("PDotExecutor backward in2"));
-        }
-#endif
-    }
-
-private:
-    std::vector<dtype*> ins1;
-    std::vector<dtype*> ins2;
-};
-#else
-class PDotExecutor :public Executor {
-};
-#endif
-
-
-PExecutor PDotNode::generate() {
-    PDotExecutor* exec = new PDotExecutor();
-    exec->batch.push_back(this);
-    return exec;
-}
-
-class DropoutNode : public Node {
-public:
-    DropoutNode(dtype dropout, bool is_training) : Node("dropout"), drop_value_(dropout),
-    is_training_(is_training) {}
 
     void init(int dimm) override {
         Node::init(dimm);
@@ -319,6 +234,14 @@ public:
 
     Tensor1D &dropMask() {
         return drop_mask_;
+    }
+
+    void setIsTraining(bool is_training) {
+        is_training_ = is_training;
+    }
+
+    void setDropValue(dtype drop_value) {
+        drop_value_ = drop_value;
     }
 
 private:
@@ -413,12 +336,16 @@ PExecutor DropoutNode::generate() {
     return exec;
 }
 
-class MaxScalarNode : public UniInputNode {
+class MaxScalarNode : public UniInputNode, public Poolable<MaxScalarNode> {
 public:
     MaxScalarNode() : UniInputNode("max_scalar_node") {}
 
-    void initAsScalar() {
-        init(1);
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
     }
 
     bool typeEqual(Node *other) override {
@@ -526,9 +453,17 @@ Executor *MaxScalarNode::generate() {
     return executor;
 }
 
-class ScalarToVectorNode : public UniInputNode {
+class ScalarToVectorNode : public UniInputNode, public Poolable<ScalarToVectorNode> {
 public:
     ScalarToVectorNode() : UniInputNode("scalar_to_vector") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
 
     bool typeEqual(Node *other) override {
         return getNodeType() == other->getNodeType();
@@ -622,9 +557,17 @@ Executor *ScalarToVectorNode::generate() {
     return executor;
 }
 
-class ExpNode : public UniInputNode {
+class ExpNode : public UniInputNode, public Poolable<ExpNode> {
 public:
     ExpNode() : UniInputNode("exp") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
 
     Executor* generate() override {
         return new ActivationExecutor<ActivatedEnum::EXP>;
@@ -655,15 +598,19 @@ private:
     friend class ExpExecutor;
 };
 
-class SumNode : public UniInputNode {
+class SumNode : public UniInputNode, public Poolable<SumNode> {
 public:
     SumNode(): UniInputNode("sum") {}
 
-    Executor* generate() override;
-
-    void initAsScalar() {
-        init(1);
+    void initNode(int dim) override {
+        init(dim);
     }
+
+    int getKey() const override {
+        return getDim();
+    }
+
+    Executor* generate() override;
 
     virtual bool typeEqual(Node *other) override {
         return Node::typeEqual(other);
@@ -747,44 +694,52 @@ Executor *SumNode::generate() {
 
 namespace n3ldg_plus {
 
+Node *maxScalar(Graph &graph, Node &input) {
+    MaxScalarNode *node = MaxScalarNode::newNode(1);
+    node->forward(graph, input);
+    return node;
+}
+
 Node *tanh(Graph &graph, Node &input) {
-    TanhNode *result = new TanhNode;
-    result->init(input.getDim());
+    TanhNode *result = TanhNode::newNode(input.getDim());
     result->forward(graph, input);
     return result;
 }
 
 Node *sigmoid(Graph &graph, Node &input) {
-    SigmoidNode *result = new SigmoidNode;
-    result->init(input.getDim());
+    SigmoidNode *result = SigmoidNode::newNode(input.getDim());
     result->forward(graph, input);
     return result;
 }
 
 Node *relu(Graph &graph, Node &input) {
-    ReluNode *result = new ReluNode;
-    result->init(input.getDim());
+    ReluNode *result = ReluNode::newNode(input.getDim());
     result->forward(graph, input);
     return result;
 }
 
 Node *scalarToVector(Graph &graph, int dim, Node &input) {
-    ScalarToVectorNode *node = new ScalarToVectorNode;
-    node->init(dim);
+    ScalarToVectorNode *node = ScalarToVectorNode::newNode(dim);
     node->forward(graph, input);
     return node;
 }
 
 Node *vectorSum(Graph &graph, Node &input) {
-    SumNode *sum = new SumNode;
-    sum->initAsScalar();
+    SumNode *sum = SumNode::newNode(1);
     sum->forward(graph, input);
     return sum;
 }
 
+Node *exp(Graph &graph, Node &input) {
+    ExpNode *node = ExpNode::newNode(input.getDim());
+    node->forward(graph, input);
+    return node;
+}
+
 Node *dropout(Graph &graph, Node &input, dtype dropout, bool is_training) {
-    DropoutNode *node = new DropoutNode(dropout, is_training);
-    node->init(input.getDim());
+    DropoutNode *node = DropoutNode::newNode(input.getDim());
+    node->setIsTraining(is_training);
+    node->setDropValue(dropout);
     node->forward(graph, input);
     return node;
 }

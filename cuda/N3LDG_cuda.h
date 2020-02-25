@@ -301,18 +301,6 @@ void PMultiBackward(const std::vector<dtype*> &losses,
         int dim,
         std::vector<dtype*> &in_losses1,
         std::vector<dtype*> &in_losses2);
-void PDotForward(const std::vector<dtype*> &ins1,
-        const std::vector<dtype*> &ins2,
-        int count,
-        int dim,
-        std::vector<dtype*> &vals);
-void PDotBackward(const std::vector<dtype*> &losses,
-        const std::vector<dtype*> &in_vals1,
-        const std::vector<dtype*> &in_vals2,
-        int count,
-        int dim,
-        std::vector<dtype*> &in_losses1,
-        std::vector<dtype*> &in_losses2);
 void PAddForward(const std::vector<std::vector<dtype*>> &ins, int count,
         int dim,
         int in_count,

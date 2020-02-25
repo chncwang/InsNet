@@ -6,9 +6,17 @@
 #include "Node.h"
 #include "Graph.h"
 
-class SubNode : public Node {
+class SubNode : public Node, public Poolable<SubNode> {
 public:
     SubNode() : Node("sub") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
 
     bool typeEqual(Node* other) override {
         return getNodeType() == other->getNodeType();
@@ -50,14 +58,7 @@ private:
 namespace n3ldg_plus {
 
 Node *sub(Graph &graph, Node &minuend, Node &subtrahend) {
-    if (minuend.getDim() != subtrahend.getDim()) {
-        cerr << boost::format("sub - minuend dim is %1%, but subtrahend is %2%") % minuend.getDim()
-            % subtrahend.getDim() << endl;
-        abort();
-    }
-
-    SubNode *result = new SubNode;
-    result->init(minuend.getDim());
+    SubNode *result = SubNode::newNode(minuend.getDim());
     result->forward(graph, minuend, subtrahend);
     return result;
 }

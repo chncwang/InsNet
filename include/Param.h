@@ -278,7 +278,7 @@ struct ParamArray : public N3LDGSerializable, public TunableCombination<BasePara
                 results->push_back(p.get());
             }
         }
-        return results;
+        return *results;
     }
 
     int size() const {

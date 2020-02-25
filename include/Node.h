@@ -126,23 +126,6 @@ string addressToString(const void* p) {
 
 class Node {
 public:
-    Node(const string &node_type, int dim = 0) : dim_(dim) {
-        degree_ = 0;
-        node_type_ = node_type;
-    }
-
-    virtual ~Node() = default;
-
-    virtual void init(int ndim) {
-        if (ndim <= 0) {
-            cerr << "dim is less than 0:" << ndim << endl;
-            abort();
-        }
-        dim_ = ndim;
-        val_.init(dim_);
-        loss_.init(dim_);
-    }
-
 #if USE_GPU
     virtual void initOnHostAndDevice(int ndim) {
         dim_ = ndim;
@@ -235,12 +218,35 @@ public:
     const vector<Node*> getParents() const {
         return parents_;
     }
+
+    virtual void clear() {
+        parents_.clear();
+    }
+
+    virtual ~Node() = default;
+
 protected:
     void afterForward(NodeContainer &container, vector<Node*> &ins) {
         for (Node *in : ins) {
             in->addParent(this);
         }
         container.addNode(this);
+    }
+
+    Node(const string &node_type, int dim = 0) : dim_(dim) {
+        degree_ = 0;
+        node_type_ = node_type;
+    }
+
+
+    virtual void init(int ndim) {
+        if (ndim <= 0) {
+            cerr << "dim is less than 0:" << ndim << endl;
+            abort();
+        }
+        dim_ = ndim;
+        val_.init(dim_);
+        loss_.init(dim_);
     }
 
 private:
@@ -254,6 +260,51 @@ private:
     string node_name_;
     int node_index_;
 };
+
+vector<pair<vector<Node *>, int> *>& globalPoolReferences() {
+    static vector<pair<vector<Node *>, int> *> o;
+    return o;
+}
+
+template <typename T>
+class Poolable {
+public:
+    static T *newNode(int key) {
+        auto it = pool_.find(key);
+        if (it == pool_.end()) {
+            pool_.insert(make_pair(key, make_pair(vector<Node *>(), 0)));
+            it = pool_.find(key);
+            globalPoolReferences().push_back(&it->second);
+        }
+        auto &p = it->second;
+        vector<Node *> &v = p.first;
+        T *node;
+        if (p.second > v.size()) {
+            abort();
+        } else if (v.size() == p.second) {
+            node = new T;
+            node->initNode(key);
+            v.push_back(node);
+            ++p.second;
+        } else {
+            node = static_cast<T*>(v.at(p.second));
+            ++p.second;
+            Node *n = static_cast<Node *>(node);
+            n->clear();
+        }
+        return node;
+    }
+
+protected:
+    virtual int getKey() const = 0;
+    virtual void initNode(int dim) = 0;
+
+private:
+    static map<int, pair<vector<Node *>, int>> pool_;
+};
+
+template<typename T>
+map<int, pair<vector<Node *>, int>> Poolable<T>::pool_;
 
 void validateEqualNodeDims(const vector<Node *> &nodes) {
     for (int i = 1; i < nodes.size(); ++i) {
@@ -315,7 +366,7 @@ public:
     UniInputNode(const string &node_type) : Node(node_type) {}
 
     virtual bool typeEqual(Node *other) override {
-        UniInputNode *o = static_cast<UniInputNode*>(other);
+        UniInputNode *o = static_cast<UniInputNode *>(other);
         return Node::typeEqual(other) && input_->getDim() == o->input_->getDim();
     }
 
@@ -325,12 +376,13 @@ public:
 
     void forward(NodeContainer &container, Node &input) {
         if (!isDimLegal(input)) {
-            cerr << boost::format("dim:%1% input dim:%2%") % getDim() % input.getDim() << endl;
+            cerr << boost::format("dim:%1% input dim:%2%") % Node::getDim() % input.getDim() <<
+                endl;
             abort();
         }
         input_ = &input;
         vector<Node*> ins = {input_};
-        afterForward(container, ins);
+        Node::afterForward(container, ins);
     }
 
     Node *getInput() const {

@@ -18,17 +18,25 @@
 using namespace Eigen;
 using std::vector;
 
-class BucketNode : public Node {
+class BucketNode : public Node, public Poolable<BucketNode> {
 public:
     BucketNode() : Node("bucket") {}
 
-    virtual void init(int ndim) {
-#if USE_GPU
-        Node::initOnHostAndDevice(ndim);
-#else
-        Node::init(ndim);
-#endif
+    void initNode(int dim) override {
+        init(dim);
     }
+
+    int getKey() const override {
+        return getDim();
+    }
+
+//    virtual void init(int ndim) override {
+//#if USE_GPU
+//        Node::initOnHostAndDevice(ndim);
+//#else
+//        Node::init(ndim);
+//#endif
+//    }
 
     void forward(Graph &graph, const vector<dtype> &input) {
         if (input.size() != getDim()) {
@@ -52,15 +60,17 @@ public:
         forward(graph, 0);
     }
 
-    void compute() {
+    void compute() override {
         abort();
     }
 
-    void backward() {
+    void backward() override {
         abort();
     }
 
-    PExecutor generate();
+    PExecutor generate() override;
+
+protected:
 
 private:
     vector<dtype> input_;
@@ -70,8 +80,7 @@ private:
 namespace n3ldg_plus {
 
 Node *bucket(Graph &graph, int dim, float v) {
-    BucketNode *bucket = new BucketNode;
-    bucket->init(dim);
+    BucketNode *bucket = BucketNode::newNode(dim);
     bucket->forward(graph, v);
     return bucket;
 }

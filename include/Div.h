@@ -6,9 +6,17 @@
 #include "Node.h"
 #include "Graph.h"
 
-class DivNode : public Node {
+class DivNode : public Node, public Poolable<DivNode> {
 public:
     DivNode() : Node("div_node") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
 
     bool typeEqual(Node* other) override {
         return getNodeType() == other->getNodeType();
@@ -51,6 +59,14 @@ private:
     Node *denominator_;
     friend class DivExecutor;
 };
+
+namespace n3ldg_plus {
+    Node *div(Graph &graph, Node &numerator, Node &denominator) {
+        DivNode *result = DivNode::newNode(numerator.getDim());
+        result->forward(graph, numerator, denominator);
+        return result;
+    }
+}
 
 #if USE_GPU
 class DivExecutor : public Executor {
