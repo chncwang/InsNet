@@ -705,11 +705,6 @@ public:
     }
 
     void init(int dim) override {
-        if (dim > bias_param_->outDim()) {
-            cerr << boost::format("dim is %1%, but bias param dim is %2%") % dim %
-                bias_param_->outDim() << endl;
-            abort();
-        }
         UniInputNode::init(dim);
     }
 
@@ -739,6 +734,11 @@ public:
 
     void setParam(BiasParam &param) {
         bias_param_ = &param;
+        if (getDim() > bias_param_->outDim()) {
+            cerr << boost::format("dim is %1%, but bias param dim is %2%") % getDim() %
+                bias_param_->outDim() << endl;
+            abort();
+        }
     }
 
 protected:

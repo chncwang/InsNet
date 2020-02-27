@@ -19,38 +19,48 @@ class LayerNormalizationParams : public N3LDGSerializable, public TunableCombina
 #endif
 {
 public:
+    LayerNormalizationParams(const string &name) : g_(name + "-g"), b_(name + "-b") {}
+
     void init(int dim) {
         g_.init(dim, 1);
         g_.val.assignAll(1);
+        b_.initAsBias(dim);
     }
 
     Param &g() {
         return g_;
     }
 
+    BiasParam &b() {
+        return b_;
+    }
+
     Json::Value toJson() const override {
         Json::Value json;
         json["g"] = g_.toJson();
+        json["b"] = b_.toJson();
         return json;
     }
 
     void fromJson(const Json::Value &json) override {
         g_.fromJson(json["g"]);
+        b_.fromJson(json["b"]);
     }
 
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
-        return {&g_};
+        return {&g_, &b_};
     }
 #endif
 
 protected:
     virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
-        return {&g_};
+        return {&g_, &b_};
     }
 
 private:
     Param g_;
+    BiasParam b_;
 };
 
 vector<Node *> layerNormalization(Graph &graph, LayerNormalizationParams &params,
@@ -75,7 +85,8 @@ vector<Node *> layerNormalization(Graph &graph, LayerNormalizationParams &params
     vector<Node *> normalized_layer;
     for (Node *e : zeros_around) {
         Node *scaled = pointwiseMultiply(graph, *factor, *e);
-        normalized_layer.push_back(scaled);
+        Node *biased = bias(graph, params.b(), *scaled);
+        normalized_layer.push_back(biased);
     }
     return normalized_layer;
 }

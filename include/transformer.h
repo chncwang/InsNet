@@ -81,7 +81,8 @@ public:
     TransformerEncoderLayerParams(const string &name) :
         multi_head_attention_params_(name + "-multi_head_attention_params"),
         ffn_inner_params_(name + "-ffn_inner_params"),
-        ffn_outter_params_(name + "-ffn_outter_params") {}
+        ffn_outter_params_(name + "-ffn_outter_params"),
+        layer_norm_a_(name + "-layer_norm_a"), layer_norm_b_(name + "-layer_norm_b") {}
 
     void init(int dim, int head_count) {
         if (dim % head_count != 0) {
@@ -102,6 +103,8 @@ public:
         };
         ffn_inner_params_.init(4 * dim, dim, true, &init_relu);
         ffn_outter_params_.init(dim, 4 * dim, true, &init_relu);
+        layer_norm_a_.init(dim);
+        layer_norm_b_.init(dim);
     }
 
     ParamArray<AttentionHeadParams> &multiHeadAttentionParams() {
@@ -116,11 +119,21 @@ public:
         return ffn_outter_params_;
     }
 
+    LayerNormalizationParams &layerNormA() {
+        return layer_norm_a_;
+    }
+
+    LayerNormalizationParams &layerNormB() {
+        return layer_norm_b_;
+    }
+
     Json::Value toJson() const override {
         Json::Value json;
         json["multi_head_attention_params"] = multi_head_attention_params_.toJson();
         json["ffn_inner_params"] = ffn_inner_params_.toJson();
         json["ffn_outter_params"] = ffn_outter_params_.toJson();
+        json["layer_norm_a"] = layer_norm_a_.toJson();
+        json["layer_norm_b"] = layer_norm_b_.toJson();
         return json;
     }
 
@@ -128,23 +141,29 @@ public:
         multi_head_attention_params_.fromJson(json["multi_head_attention_params"]);
         ffn_inner_params_.fromJson(json["ffn_inner_params"]);
         ffn_outter_params_.fromJson(json["ffn_outter_params"]);
+        layer_norm_a_.fromJson(json["layer_norm_a"]);
+        layer_norm_b_.fromJson(json["layer_norm_b"]);
     }
 
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
-        return {&multi_head_attention_params_, &ffn_inner_params_, &ffn_outter_params_};
+        return {&multi_head_attention_params_, &ffn_inner_params_, &ffn_outter_params_,
+            &layer_norm_a_, &layer_norm_b_};
     }
 #endif
 
 protected:
     virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
-        return {&multi_head_attention_params_, &ffn_inner_params_, &ffn_outter_params_};
+        return {&multi_head_attention_params_, &ffn_inner_params_, &ffn_outter_params_,
+            &layer_norm_a_, &layer_norm_b_};
     }
 
 private:
     ParamArray<AttentionHeadParams> multi_head_attention_params_;
     UniParams ffn_inner_params_;
     UniParams ffn_outter_params_;
+    LayerNormalizationParams layer_norm_a_;
+    LayerNormalizationParams layer_norm_b_;
 };
 
 class TransformerEncoderParams : public N3LDGSerializable, public TunableCombination<BaseParam>
@@ -317,22 +336,23 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
 
             Node *concated = concat(graph, attended_segments);
             concated = n3ldg_plus::dropout(graph, *concated, dropout, is_training);
-            Node *added = add(graph, {last_layer.at(j), last_layer.at(j)});
+            Node *added = add(graph, {concated, last_layer.at(j)});
             pre_norm_layer.push_back(added);
         }
-        // TODO need layer norm
-        vector<Node *> normed_layer = pre_norm_layer;
+        vector<Node *> normed_layer = layerNormalization(graph, layer_params.layerNormA(),
+                pre_norm_layer);
         vector<Node *> pre_norm_layer2;
         pre_norm_layer2.reserve(normed_layer.size());
         for (Node *node : normed_layer) {
             Node *t = linear(graph, layer_params.ffnInnerParams(), *node);
-//            t = relu(graph, *t);
+            t = relu(graph, *t);
             t = linear(graph, layer_params.ffnOutterParams(), *t);
             t = n3ldg_plus::dropout(graph, *t, dropout, is_training);
             t = add(graph, {node, t});
             pre_norm_layer2.push_back(t);
         }
-        vector <Node *> normed_layer2 = pre_norm_layer2; // TODO
+        vector <Node *> normed_layer2 = layerNormalization(graph, layer_params.layerNormB(),
+                pre_norm_layer2);
         last_layer = normed_layer2;
     }
 
