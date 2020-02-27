@@ -270,15 +270,12 @@ struct ParamArray : public N3LDGSerializable, public TunableCombination<BasePara
     vector<shared_ptr<ParamType>> params;
     string name;
 
-    const vector<ParamType *> &ptrs() const {
-        static vector<ParamType *> *results;
-        if (results == nullptr) {
-            results = new vector<ParamType *>;
-            for (auto &p : params) {
-                results->push_back(p.get());
-            }
+    vector<ParamType *> ptrs() const {
+        vector<ParamType *> results;
+        for (auto &p : params) {
+            results.push_back(p.get());
         }
-        return *results;
+        return results;
     }
 
     int size() const {

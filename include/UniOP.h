@@ -22,7 +22,7 @@
 
 class UniParams : public N3LDGSerializable, public TunableCombination<BaseParam>
 #if USE_GPU
-, public TransferableComponents 
+, public TransferableComponents
 #endif
 {
 public:
@@ -67,10 +67,6 @@ public:
             ptrs.push_back(&b);
         }
         return ptrs;
-    }
-
-    virtual std::string name() const {
-        return "UniParams";
     }
 #endif
 

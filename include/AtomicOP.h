@@ -152,6 +152,36 @@ protected:
     }
 };
 
+class SqrtNode :public UniInputNode, public Poolable<SqrtNode> {
+public:
+    SqrtNode() : UniInputNode("sqrt") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
+
+    void compute() override {
+        val().vec() = getInput()->val().vec().unaryExpr(ptr_fun(fsqrt));
+    }
+
+    void backward() override {
+        getInput()->loss().vec() += loss().vec() * val().vec().unaryExpr(ptr_fun(dsqrt));
+    }
+
+    PExecutor generate() override {
+        return new ActivationExecutor<ActivatedEnum::SQRT>;
+    }
+
+protected:
+    virtual bool isDimLegal(const Node &input) const override {
+        return input.getDim() == getDim();
+    }
+};
+
 class DropoutNode : public Node, public Poolable<DropoutNode> {
 public:
     DropoutNode() : Node("dropout") {}
@@ -714,6 +744,12 @@ Node *sigmoid(Graph &graph, Node &input) {
 
 Node *relu(Graph &graph, Node &input) {
     ReluNode *result = ReluNode::newNode(input.getDim());
+    result->forward(graph, input);
+    return result;
+}
+
+Node *sqrt(Graph &graph, Node &input) {
+    SqrtNode *result = SqrtNode::newNode(input.getDim());
     result->forward(graph, input);
     return result;
 }

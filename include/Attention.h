@@ -25,6 +25,7 @@ public:
 
     void forward(Graph &cg, vector<Node*> &keys, vector<Node *>& values, Node& guide) {
         using namespace n3ldg_plus;
+
         if (values.empty()) {
             std::cerr << "empty inputs for attention operation" << std::endl;
             abort();

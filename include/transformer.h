@@ -10,6 +10,7 @@
 #include "UniOP.h"
 #include "LookupTable.h"
 #include "Attention.h"
+#include "layer_normalization.h"
 
 class AttentionHeadParams : public N3LDGSerializable, public TunableCombination<BaseParam>
 #if USE_GPU
@@ -254,7 +255,7 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
     int sentence_len = inputs.size();
     pos_encoded_layer.reserve(sentence_len);
     for (int i = 0; i < sentence_len; ++i) {
-        Node *embedding = n3ldg_plus::embedding(graph, params.positionalEncodingParam(), i);
+        Node *embedding = n3ldg_plus::embedding(graph, params.positionalEncodingParam(), i, false);
         Node *input = linear(graph, params.inputLinear(), *inputs.at(i));
         Node *pos_encoded = add(graph, {input, embedding});
         pos_encoded = n3ldg_plus::dropout(graph, *pos_encoded, dropout, is_training);
@@ -316,17 +317,23 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
 
             Node *concated = concat(graph, attended_segments);
             concated = n3ldg_plus::dropout(graph, *concated, dropout, is_training);
-            Node *added = add(graph, {concated, last_layer.at(j)});
+            Node *added = add(graph, {last_layer.at(j), last_layer.at(j)});
             pre_norm_layer.push_back(added);
         }
         // TODO need layer norm
         vector<Node *> normed_layer = pre_norm_layer;
-        for (Node *&node : normed_layer) {
-            node = linear(graph, layer_params.ffnInnerParams(), *node);
-            node = relu(graph, *node);
-            node = linear(graph, layer_params.ffnOutterParams(), *node);
+        vector<Node *> pre_norm_layer2;
+        pre_norm_layer2.reserve(normed_layer.size());
+        for (Node *node : normed_layer) {
+            Node *t = linear(graph, layer_params.ffnInnerParams(), *node);
+//            t = relu(graph, *t);
+            t = linear(graph, layer_params.ffnOutterParams(), *t);
+            t = n3ldg_plus::dropout(graph, *t, dropout, is_training);
+            t = add(graph, {node, t});
+            pre_norm_layer2.push_back(t);
         }
-        last_layer = normed_layer;
+        vector <Node *> normed_layer2 = pre_norm_layer2; // TODO
+        last_layer = normed_layer2;
     }
 
     return last_layer;

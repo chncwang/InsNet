@@ -307,11 +307,11 @@ public:
 namespace n3ldg_plus {
 
 template <typename ParamType>
-Node *embedding(Graph &graph,ParamType &lookup, int id) {
+Node *embedding(Graph &graph,ParamType &lookup, int id, bool should_backward = true) {
     LookupNode<ParamType>* input_lookup = LookupNode<ParamType>::newNode(lookup.outDim());
     input_lookup->setParam(lookup);
     input_lookup->forward(graph, id);
-    input_lookup->should_backward = false;
+    input_lookup->should_backward = should_backward;
     return input_lookup;
 }
 

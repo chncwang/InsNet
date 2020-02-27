@@ -126,4 +126,119 @@ Executor *DivNode::generate() {
     return executor;
 }
 
+class FullDivNode : public Node, public Poolable<FullDivNode>  {
+public:
+    FullDivNode() : Node("full_div") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
+
+    bool typeEqual(Node* other) override {
+        return getNodeType() == other->getNodeType();
+    }
+
+    string typeSignature() const override {
+        return getNodeType();
+    }
+
+    void forward(Graph &graph, Node &numerator, Node &denominator) {
+        if (getDim() != numerator.getDim() || getDim() != denominator.getDim()) {
+            cerr << boost::format("dim:%1% minuend:%2% subtrahend:%3%") % getDim() %
+                numerator.getDim() % denominator.getDim() << endl;
+            abort();
+        }
+        numerator_ = &numerator;
+        denominator_ = &denominator;
+        vector<Node*> ins = {numerator_, denominator_};
+        afterForward(graph, ins);
+    }
+
+    void compute() override {
+        val().vec() = numerator_->getVal().vec() / denominator_->getVal().vec();
+    }
+
+    void backward() override {
+        numerator_->loss().vec() += getLoss().vec() / denominator_->getVal().vec();
+        denominator_->loss().vec() -= getLoss().vec() * numerator_->getVal().vec() /
+            denominator_->getVal().vec().square();
+    }
+
+    PExecutor generate() override;
+
+private:
+    Node *numerator_;
+    Node *denominator_;
+    friend class FullDivExecutor;
+};
+
+#if USE_GPU
+class FullDivExecutor : public Executor {
+public:
+    vector<const dtype*> numerators;
+    vector<const dtype*> denominators;
+    vector<int> dims;
+
+    void forward() override {
+        vector<dtype*> results;
+        for (Node *node : batch) {
+            FullDivNode *div = static_cast<FullDivNode*>(node);
+            numerators.push_back(div->numerator_->getVal().value);
+            denominators.push_back(div->denominator_->getVal().value);
+            results.push_back(div->getVal().value);
+            dims.push_back(node->getDim());
+        }
+
+        n3ldg_cuda::DivForward(numerators, denominators, batch.size(), dims, results);
+#if TEST_CUDA
+        Executor::testForward();
+        cout << "div tested" << endl;
+#endif
+    }
+
+    void backward() override {
+        vector<const dtype*> losses;
+        vector<dtype*> numerator_losses, denominator_losses;
+        for (Node *node : batch) {
+            FullDivNode *div = static_cast<FullDivNode*>(node);
+            losses.push_back(node->getLoss().value);
+            numerator_losses.push_back(div->numerator_->getLoss().value);
+            denominator_losses.push_back(div->denominator_->getLoss().value);
+        }
+
+        n3ldg_cuda::DivBackward(losses, denominators, numerators, batch.size(), dims,
+                numerator_losses, denominator_losses);
+#if TEST_CUDA
+        auto get_inputs = [](Node &node) {
+            DivNode &div = static_cast<DivNode&>(node);
+            vector<pair<Node*, string>> results = {make_pair(div.denominator_, "denominator"),
+                    make_pair(div.numerator_, "numerator")};
+            return results;
+        };
+        Executor::testBackward(get_inputs);
+        cout << "div backward tested" << endl;
+#endif
+    }
+
+};
+#else
+class FullDivExecutor : public Executor {};
+#endif
+
+Executor *FullDivNode::generate() {
+    return new FullDivExecutor();
+}
+
+namespace n3ldg_plus {
+    Node *fullDiv(Graph &graph, Node &numerator, Node &denominator) {
+        FullDivNode *result = FullDivNode::newNode(numerator.getDim());
+        result->forward(graph, numerator, denominator);
+        return result;
+    }
+}
+
 #endif

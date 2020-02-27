@@ -353,6 +353,10 @@ __device__ dtype cuda_dleaky_relu(dtype x) {
     return x > 0.0f ? 1.0f : -0.1f;
 }
 
+__device__ dtype cuda_dsqrt(dtype y) {
+    return 0.5 / y;
+}
+
 const dtype SELU_LAMBDA = 1.0507009873554804934193349852946;
 const dtype SELU_ALPHA = 1.6732632423543772848170429916717;
 
@@ -584,6 +588,8 @@ __global__ void KernelActivationForward(ActivatedEnum activated, const dtype *co
                 ys[count_i][dim_i] = cuda_exp(xs[count_i][dim_i]);
             } else if (activated == ActivatedEnum::RELU) {
                 ys[count_i][dim_i] = cuda_relu(xs[count_i][dim_i]);
+            } else if (activated = ActivatedEnum::SQRT) {
+                ys[count_i][dim_i] = cuda_sqrt(xs[count_i][dim_i]);
             } else {
                 printf("KernelActivationForward - error enum\n");
                 assert(false);
@@ -632,6 +638,8 @@ __global__ void KernelActivationBackward(ActivatedEnum activated,
                 l = cuda_dexp(vals[count_i][dim_i]);
             } else if (activated == ActivatedEnum::RELU) {
                 l = cuda_drelu(vals[count_i][dim_i]);
+            } else if (activated == ActivatedEnum::SQRT) {
+                l = cuda_dsqrt(vals[count_i][dim_i]);
             } else {
                 printf("KernelActivationBackward - error enum\n");
                 assert(false);

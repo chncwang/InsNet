@@ -68,6 +68,9 @@ dtype dlog(const dtype& x, const dtype& y) {
     return 1.0 / x;
 }
 
+dtype dsqrt(dtype y) {
+    return 0.5 / y;
+}
 
 //useful functions
 dtype fequal(const dtype& x) {
@@ -97,6 +100,10 @@ dtype fselu(const dtype& x) {
     dtype alpha = 1.6732632423543772848170429916717;
     if (x <= 0) return lambda * alpha * (exp(x) - 1);
     return lambda * x;
+}
+
+dtype fsqrt(const dtype &x) {
+    return sqrt(x);
 }
 
 class Executor;

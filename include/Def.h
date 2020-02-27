@@ -31,7 +31,8 @@ enum ActivatedEnum {
     SIGMOID = 2,
     RELU = 3,
     LEAKY_RELU = 4,
-    SELU = 5
+    SELU = 5,
+    SQRT=6
 };
 
 
