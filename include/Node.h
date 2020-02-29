@@ -152,6 +152,9 @@ public:
     }
 
     virtual void addParent(Node* parent) {
+        if (getNodeIndex() == 19148) {
+            cout << "parent:" << parent->getNodeType() << " " << parent->getNodeIndex() << endl;
+        }
         if (degree_ >= 0) {
             parents_.push_back(parent);
             parent->degree_++;
@@ -247,6 +250,7 @@ protected:
         virtual void init(int ndim) {
             if (ndim <= 0) {
                 cerr << "dim is less than 0:" << ndim << endl;
+                cerr << getNodeType() << endl;
                 abort();
             }
             dim_ = ndim;
@@ -427,9 +431,7 @@ void clearNodes(std::vector<Node*> &nodes) {
     vector<int> dims;
     val_and_losses.reserve(2 * nodes.size());
     for (Node *n : nodes) {
-        //        val_and_losses.push_back(n->getVal().value);
         val_and_losses.push_back(n->getLoss().value);
-        //        dims.push_back(n->getDim());
         dims.push_back(n->getDim());
     }
     n3ldg_cuda::BatchMemset(val_and_losses, val_and_losses.size(), dims, 0.0f);
@@ -542,8 +544,11 @@ protected:
     void testBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
         Executor::backward();
 
+//        int i = 0;
+//        cout << "testBackward count:" << batch.size() << endl;
         for (Node *node : batch) {
             auto inputs = get_inputs(*node);
+//            cout << "testBackward input i:" << i++ << endl;
             for (pair<Node*, string> &input : inputs) {
                 n3ldg_cuda::Assert(input.first->getLoss().verify((getNodeType() +
                                 " backward " + input.second).c_str()));
@@ -555,8 +560,10 @@ protected:
         for (Node *node : batch) {
             auto inputs = get_inputs(*node);
             for (pair<Node*, string> &input : inputs) {
+//                cout << "nodindex:" << input.first->getNodeIndex() << endl;
+//                cout << "grad:" << input.first->getLoss().toString() << endl;
                 n3ldg_cuda::Assert(input.first->getLoss().verify((getNodeType() +
-                                " backward " + input.second).c_str()));
+                                " backward " + input.second + " node index:" + to_string(input.first->getNodeIndex())).c_str()));
             }
         }
     }

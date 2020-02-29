@@ -138,14 +138,6 @@ public:
         return getDim();
     }
 
-    bool typeEqual(Node* other) override {
-        return getNodeType() == other->getNodeType();
-    }
-
-    string typeSignature() const override {
-        return getNodeType();
-    }
-
     void forward(Graph &graph, Node &numerator, Node &denominator) {
         if (getDim() != numerator.getDim() || getDim() != denominator.getDim()) {
             cerr << boost::format("dim:%1% minuend:%2% subtrahend:%3%") % getDim() %
@@ -181,7 +173,6 @@ class FullDivExecutor : public Executor {
 public:
     vector<const dtype*> numerators;
     vector<const dtype*> denominators;
-    vector<int> dims;
 
     void forward() override {
         vector<dtype*> results;
@@ -190,10 +181,9 @@ public:
             numerators.push_back(div->numerator_->getVal().value);
             denominators.push_back(div->denominator_->getVal().value);
             results.push_back(div->getVal().value);
-            dims.push_back(node->getDim());
         }
 
-        n3ldg_cuda::DivForward(numerators, denominators, batch.size(), dims, results);
+        n3ldg_cuda::FullDivForward(numerators, denominators, batch.size(), getDim(), results);
 #if TEST_CUDA
         Executor::testForward();
         cout << "div tested" << endl;
@@ -210,11 +200,11 @@ public:
             denominator_losses.push_back(div->denominator_->getLoss().value);
         }
 
-        n3ldg_cuda::DivBackward(losses, denominators, numerators, batch.size(), dims,
+        n3ldg_cuda::FullDivBackward(losses, denominators, numerators, batch.size(), getDim(),
                 numerator_losses, denominator_losses);
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {
-            DivNode &div = static_cast<DivNode&>(node);
+            FullDivNode &div = static_cast<FullDivNode&>(node);
             vector<pair<Node*, string>> results = {make_pair(div.denominator_, "denominator"),
                     make_pair(div.numerator_, "numerator")};
             return results;

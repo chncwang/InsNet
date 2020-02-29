@@ -313,16 +313,20 @@ class DropoutExecutor :public Executor {
         CalculateDropMask(count, dim, drop_mask);
         n3ldg_cuda::DropoutForward(xs, count, dim, is_training, drop_mask.value, drop_value, ys);
 #if TEST_CUDA
-        drop_mask.copyFromDeviceToHost();
-        for (int i = 0; i < count; ++i) {
-            for (int j = 0; j < dim; ++j) {
-                dtype v = drop_mask[i][j];
-                static_cast<DropoutNode*>(batch.at(i))->dropMask()[j] = v <= drop_value ? 0 : 1;
+        if (is_training) {
+            drop_mask.copyFromDeviceToHost();
+            for (int i = 0; i < count; ++i) {
+                for (int j = 0; j < dim; ++j) {
+                    dtype v = drop_mask[i][j];
+                    static_cast<DropoutNode*>(batch.at(i))->dropMask()[j] = v <= drop_value ?
+                        0 : 1;
+                }
             }
         }
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
             n3ldg_cuda::Assert(batch.at(idx)->val().verify("Dropout forward"));
+            batch[idx]->getVal().print();
         }
 #endif
     }
@@ -362,6 +366,7 @@ PExecutor DropoutNode::generate() {
     DropoutExecutor* exec = new DropoutExecutor();
     exec->batch.push_back(this);
     exec->is_training = isTraning();
+    exec->drop_value = drop_value_;
     exec->dim = getDim();
     return exec;
 }

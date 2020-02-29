@@ -278,6 +278,18 @@ void DivBackward(const vector<const dtype*> &losses, const vector<const dtype*> 
         const vector<int> &dims,
         vector<dtype*> &numerator_losses,
         vector<dtype*> &denominator_losses);
+void FullDivForward(const std::vector<const dtype*> numerators,
+        const std::vector<const dtype*> denominators,
+        int count,
+        int dim,
+        std::vector<dtype*> &results);
+void FullDivBackward(const std::vector<const dtype*> &losses,
+        const std::vector<const dtype*> &denominator_vals,
+        const std::vector<const dtype*> &numerator_vals,
+        int count,
+        int dim,
+        std::vector<dtype*> &numerator_losses,
+        std::vector<dtype*> &denominator_losses);
 void SplitForward(const std::vector<const dtype*> &inputs, const std::vector<int> &offsets,
         int count,
         int dim,

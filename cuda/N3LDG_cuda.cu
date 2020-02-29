@@ -588,7 +588,7 @@ __global__ void KernelActivationForward(ActivatedEnum activated, const dtype *co
                 ys[count_i][dim_i] = cuda_exp(xs[count_i][dim_i]);
             } else if (activated == ActivatedEnum::RELU) {
                 ys[count_i][dim_i] = cuda_relu(xs[count_i][dim_i]);
-            } else if (activated = ActivatedEnum::SQRT) {
+            } else if (activated == ActivatedEnum::SQRT) {
                 ys[count_i][dim_i] = cuda_sqrt(xs[count_i][dim_i]);
             } else {
                 printf("KernelActivationForward - error enum\n");
@@ -2100,6 +2100,78 @@ void DivBackward(const vector<const dtype*> &losses, const vector<const dtype*> 
     KernelDivDenominatorBackward<<<block_dim , thread_count>>>(loss_arr.value,
             numerator_val_arr.value, denominator_val_arr.value, count, dim_arr.value,
             block_sums.value, block_counters.value, (dtype *const *)denominator_loss_arr.value);
+    CheckCudaError();
+}
+
+__global__ void KernelFullDivForward(const dtype *const *numerators,
+        const dtype *const *denominators,
+        int count,
+        int dim,
+        dtype *const *results) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * dim; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        results[count_i][dim_i] = numerators[count_i][dim_i] / denominators[count_i][dim_i];
+    }
+}
+
+void FullDivForward(const vector<const dtype*> numerators,
+        const vector<const dtype*> denominators,
+        int count,
+        int dim,
+        vector<dtype*> &results) {
+    int block_count = DefaultBlockCount(count * dim);
+    NumberPointerArray numerator_arr, denominator_arr, result_arr;
+    numerator_arr.init((dtype**)numerators.data(), count);
+    denominator_arr.init((dtype**)denominators.data(), count);
+    result_arr.init((dtype**)results.data(), count);
+    KernelFullDivForward<<<block_count, TPB>>>(numerator_arr.value, denominator_arr.value, count,
+            dim, (dtype *const *)result_arr.value);
+    CheckCudaError();
+}
+
+__global__ void KernelFullDivBackward(const dtype *const *losses,
+        const dtype *const *numerator_vals,
+        const dtype *const *denominator_vals,
+        int count,
+        int dim,
+        dtype *const *numerator_losses,
+        dtype *const *denominator_losses) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+
+    for (int i = index; i < count * dim; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        DeviceAtomicAdd(numerator_losses[count_i] + dim_i, losses[count_i][dim_i] /
+                denominator_vals[count_i][dim_i]);
+        DeviceAtomicAdd(denominator_losses[count_i] + dim_i, -losses[count_i][dim_i] *
+                numerator_vals[count_i][dim_i] /
+                (denominator_vals[count_i][dim_i] * denominator_vals[count_i][dim_i]));
+    }
+}
+
+void FullDivBackward(const vector<const dtype*> &losses,
+        const vector<const dtype*> &denominator_vals,
+        const vector<const dtype*> &numerator_vals,
+        int count,
+        int dim,
+        vector<dtype*> &numerator_losses,
+        vector<dtype*> &denominator_losses) {
+    NumberPointerArray loss_arr, denominator_val_arr, numerator_val_arr, numerator_loss_arr,
+        denominator_loss_arr;
+    loss_arr.init((dtype**)losses.data(), losses.size());
+    denominator_val_arr.init((dtype**)denominator_vals.data(), denominator_vals.size());
+    numerator_val_arr.init((dtype**)numerator_vals.data(), numerator_vals.size());
+    numerator_loss_arr.init((dtype**)numerator_losses.data(), numerator_losses.size());
+    denominator_loss_arr.init((dtype**)denominator_losses.data(), denominator_losses.size());
+
+    int block_count = DefaultBlockCount(count * dim);
+    KernelFullDivBackward<<<block_count, TPB>>>(loss_arr.value, numerator_val_arr.value,
+            denominator_val_arr.value, count, dim, (dtype *const *)numerator_loss_arr.value,
+            (dtype *const *)denominator_loss_arr.value);
     CheckCudaError();
 }
 

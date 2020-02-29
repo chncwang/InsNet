@@ -282,7 +282,7 @@ public:
         for (Node *node : batch) {
             ScalarConcatNode *concat = static_cast<ScalarConcatNode *>(node);
             for (Node *in : concat->ins()) {
-                in_losses.push_back(in->getVal().value);
+                in_losses.push_back(in->getLoss().value);
             }
             for (int i = 0; i < max_dim_ - concat->ins().size(); ++i) {
                 in_losses.push_back(nullptr);
@@ -298,12 +298,20 @@ public:
             }
             return results;
         };
-        cout << "test before scalar concat" << endl;
+//        cout << "test before scalar concat" << endl;
         Executor::testBeforeBackward(get_inputs);
 #endif
+//        cout << "gpu loss:";
+//        batch.front()->getLoss().print();
+//        for (int dim : dims_) {
+//            cout << "dim:" << dim;
+//        }
         n3ldg_cuda::ScalarConcatBackward(losses, batch.size(), dims_, max_dim_, in_losses);
 #if TEST_CUDA
+//        cout << "batch:" << this->batch.size() << endl;
+//        cout << "loss:" << batch.front()->getLoss().toString() << endl;
         Executor::testBackward(get_inputs);
+//        cout << "scalar concat tested" << endl;
 #endif
     }
 
