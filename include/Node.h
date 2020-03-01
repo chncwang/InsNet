@@ -152,9 +152,6 @@ public:
     }
 
     virtual void addParent(Node* parent) {
-        if (getNodeIndex() == 19148) {
-            cout << "parent:" << parent->getNodeType() << " " << parent->getNodeIndex() << endl;
-        }
         if (degree_ >= 0) {
             parents_.push_back(parent);
             parent->degree_++;
