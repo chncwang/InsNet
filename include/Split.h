@@ -17,6 +17,10 @@ public:
         return getDim();
     }
 
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
     void initNode(int dim) override {
         init(dim);
     }

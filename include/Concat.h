@@ -29,6 +29,10 @@ public:
         init(dim);
     }
 
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
     int getKey() const override {
         return getDim();
     }
@@ -199,6 +203,10 @@ public:
         return getDim();
     }
 
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
     void initNode(int dim) override {
         init(dim);
     }
@@ -206,6 +214,7 @@ public:
     void forward(Graph &graph, const vector<Node *> &ins) {
         if (ins.size() != getDim()) {
             cerr << "ScalarConcatNode forward - ins size error" << endl;
+            cerr << boost::format("ins size:%1% dim:%2%") % ins.size() % getDim() << endl;
             abort();
         }
 

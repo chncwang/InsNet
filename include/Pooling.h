@@ -87,6 +87,10 @@ class MaxPoolNode : public PoolNode, public Poolable<MaxPoolNode>
 public:
     MaxPoolNode() : PoolNode("max_pool") {}
 
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
     void initNode(int dim) override {
         init(dim);
     }
@@ -145,6 +149,10 @@ class MaxPoolNode : public PoolNode, public Poolable<MaxPoolNode> {
 public:
     MaxPoolNode() : PoolNode("max-pooling") {}
 
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
     void initNode(int dim) override {
         init(dim);
     }
@@ -181,6 +189,10 @@ public:
 
     void initNode(int dim) override {
         init(dim);
+    }
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
     }
 
     int getKey() const override {
@@ -252,6 +264,10 @@ public:
 
     void initNode(int dim) override {
         init(dim);
+    }
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
     }
 
     int getKey() const override {
@@ -477,6 +493,10 @@ public:
         init(dim);
     }
 
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
     int getKey() const override {
         return getDim();
     }
@@ -629,6 +649,10 @@ public:
 
     void initNode(int dim) override {
         init(dim);
+    }
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
     }
 
     int getKey() const override {

@@ -24,6 +24,10 @@ public:
         init(dim);
     }
 
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
     int getKey() const override {
         return getDim();
     }

@@ -64,6 +64,10 @@ public:
         init(dim);
     }
 
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
     int getKey() const override {
         return getDim();
     }
@@ -98,6 +102,10 @@ public:
         init(dim);
     }
 
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
     int getKey() const override {
         return getDim();
     }
@@ -127,6 +135,10 @@ public:
 
     void initNode(int dim) override {
         init(dim);
+    }
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
     }
 
     int getKey() const override {
@@ -160,6 +172,10 @@ public:
         init(dim);
     }
 
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
     int getKey() const override {
         return getDim();
     }
@@ -188,6 +204,10 @@ public:
 
     void initNode(int dim) override {
         init(dim);
+    }
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
     }
 
     int getKey() const override {
@@ -379,6 +399,10 @@ public:
         init(dim);
     }
 
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
     int getKey() const override {
         return getDim();
     }
@@ -496,6 +520,10 @@ public:
         init(dim);
     }
 
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
     int getKey() const override {
         return getDim();
     }
@@ -600,6 +628,10 @@ public:
         init(dim);
     }
 
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
     int getKey() const override {
         return getDim();
     }
@@ -643,6 +675,10 @@ public:
 
     int getKey() const override {
         return getDim();
+    }
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
     }
 
     Executor* generate() override;

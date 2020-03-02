@@ -235,27 +235,30 @@ protected:
         for (Node *in : ins) {
             in->addParent(this);
         }
-            container.addNode(this);
+        container.addNode(this);
+    }
+
+    Node(const string &node_type, int dim = 0) : dim_(dim) {
+        degree_ = 0;
+        node_type_ = node_type;
+    }
+
+    virtual void setDim(int dim) {
+        dim_ = dim;
+    }
+
+    virtual void init(int ndim) {
+        if (ndim <= 0) {
+            cerr << "dim is less than 0:" << ndim << endl;
+            cerr << getNodeType() << endl;
+            abort();
         }
+        dim_ = ndim;
+        val_.init(dim_);
+        loss_.init(dim_);
+    }
 
-        Node(const string &node_type, int dim = 0) : dim_(dim) {
-            degree_ = 0;
-            node_type_ = node_type;
-        }
-
-
-        virtual void init(int ndim) {
-            if (ndim <= 0) {
-                cerr << "dim is less than 0:" << ndim << endl;
-                cerr << getNodeType() << endl;
-                abort();
-            }
-            dim_ = ndim;
-            val_.init(dim_);
-            loss_.init(dim_);
-        }
-
-    private:
+private:
         std::vector<Node*> parents_;
         Tensor1D val_;
         Tensor1D loss_;
@@ -277,6 +280,19 @@ bool &globalPoolEnabled() {
     return pool_enabled;
 }
 
+bool &globalLimitedDimEnabled() {
+    static bool enabled = false;
+    return enabled;
+}
+
+int NextTwoIntegerPowerNumber(int number) {
+    int result = 1;
+    while (number > result) {
+        result <<= 1;
+    }
+    return result;
+}
+
 template <typename T>
 class Poolable {
 public:
@@ -285,6 +301,10 @@ public:
             T *node = new T;
             node->initNode(key);
             return node;
+        }
+        int original_key = key;
+        if (globalLimitedDimEnabled()) {
+            key = NextTwoIntegerPowerNumber(key);
         }
         auto it = pool_.find(key);
         if (it == pool_.end()) {
@@ -300,10 +320,12 @@ public:
         } else if (v.size() == p.second) {
             node = new T;
             node->initNode(key);
+            node->setNodeDim(original_key);
             v.push_back(node);
             ++p.second;
         } else {
             node = static_cast<T*>(v.at(p.second));
+            node->setNodeDim(original_key);
             ++p.second;
             Node *n = static_cast<Node *>(node);
             n->clear();
@@ -314,6 +336,7 @@ public:
 protected:
     virtual int getKey() const = 0;
     virtual void initNode(int dim) = 0;
+    virtual void setNodeDim(int dim) = 0;
 
 private:
     static map<int, pair<vector<Node *>, int>> pool_;

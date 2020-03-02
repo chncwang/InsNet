@@ -89,6 +89,10 @@ public:
         init(dim);
     }
 
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
     int getKey() const override {
         return getDim();
     }
@@ -386,6 +390,10 @@ public:
 
     void initNode(int dim) override {
         init(dim);
+    }
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
     }
 
     int getKey() const override {
@@ -698,6 +706,10 @@ public:
 
     void initNode(int dim) override {
         init(dim);
+    }
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
     }
 
     int getKey() const override {
