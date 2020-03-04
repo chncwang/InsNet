@@ -290,9 +290,13 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
                 << sentence_len << endl;
             abort();
         }
-        vector<Node *> pre_norm_layer;
-        pre_norm_layer.reserve(sentence_len);
+
         auto &layer_params = *params.layerParams().ptrs().at(i);
+        vector<Node *> layer_norm_a = layerNormalization(graph, layer_params.layerNormA(),
+                last_layer);
+
+        vector<Node *> res_layer;
+        res_layer.reserve(sentence_len);
 
         int head_count = params.headCount();
         vector<vector<Node *>> key_heads, value_heads;
@@ -304,7 +308,7 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
             values.reserve(sentence_len);
             auto &attention_head_params = *layer_params.multiHeadAttentionParams().ptrs().at(k);
             for (int m = 0; m < sentence_len; ++m) {
-                Node *kv_input = last_layer.at(m);
+                Node *kv_input = layer_norm_a.at(m);
                 Node *k = linear(graph, attention_head_params.k(), *kv_input);
                 keys.push_back(k);
                 Node *v = linear(graph, attention_head_params.v(), *kv_input);
@@ -318,7 +322,7 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
             vector<Node *> attended_segments;
             attended_segments.reserve(head_count);
             for (int k = 0; k < head_count; ++k) {
-                Node *q_input = last_layer.at(j);
+                Node *q_input = layer_norm_a.at(j);
                 auto &attention_head_params =
                     *layer_params.multiHeadAttentionParams().ptrs().at(k);
                 Node *q = linear(graph, attention_head_params.q(), *q_input);
@@ -337,23 +341,22 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
             Node *concated = concat(graph, attended_segments);
             concated = n3ldg_plus::dropout(graph, *concated, dropout, is_training);
             Node *added = add(graph, {concated, last_layer.at(j)});
-            pre_norm_layer.push_back(added);
+            res_layer.push_back(added);
         }
-        vector<Node *> normed_layer = layerNormalization(graph, layer_params.layerNormA(),
-                pre_norm_layer);
-        vector<Node *> pre_norm_layer2;
-        pre_norm_layer2.reserve(normed_layer.size());
-        for (Node *node : normed_layer) {
+        vector<Node *> res_layer2;
+        res_layer2.reserve(res_layer.size());
+        vector<Node *> normed_layer2 = layerNormalization(graph, layer_params.layerNormB(),
+                res_layer);
+        int j = 0;
+        for (Node *node : normed_layer2) {
             Node *t = linear(graph, layer_params.ffnInnerParams(), *node);
             t = relu(graph, *t);
             t = linear(graph, layer_params.ffnOutterParams(), *t);
             t = n3ldg_plus::dropout(graph, *t, dropout, is_training);
-            t = add(graph, {node, t});
-            pre_norm_layer2.push_back(t);
+            t = add(graph, {res_layer.at(j++), t});
+            res_layer2.push_back(t);
         }
-        vector <Node *> normed_layer2 = layerNormalization(graph, layer_params.layerNormB(),
-                pre_norm_layer2);
-        last_layer = normed_layer2;
+        last_layer = res_layer2;
     }
 
     return last_layer;
