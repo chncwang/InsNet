@@ -266,20 +266,26 @@ private:
 namespace n3ldg_plus {
 
 vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params,
-        vector<Node *> inputs,
+        const vector<vector<Node *>> &inputs,
         dtype dropout,
         bool is_training) {
     using namespace n3ldg_plus;
-    vector<Node *> pos_encoded_layer;
-    int sentence_len = inputs.size();
-    pos_encoded_layer.reserve(sentence_len);
-    for (int i = 0; i < sentence_len; ++i) {
-        Node *embedding = n3ldg_plus::embedding(graph, params.positionalEncodingParam(), i, false);
-        Node *input = linear(graph, params.inputLinear(), *inputs.at(i));
-        Node *pos_encoded = add(graph, {input, embedding});
-        pos_encoded = n3ldg_plus::dropout(graph, *pos_encoded, dropout, is_training);
-        pos_encoded_layer.push_back(pos_encoded);
+    vector<vector<Node *>> pos_encoded_layers;
+    for (const auto &sentence : inputs) {
+        vector<Node *> pos_encoded_layer;
+        int sentence_len = inputs.size();
+        pos_encoded_layer.reserve(sentence_len);
+        for (int i = 0; i < sentence_len; ++i) {
+            Node *embedding = n3ldg_plus::embedding(graph, params.positionalEncodingParam(), i,
+                    false);
+            Node *input = linear(graph, params.inputLinear(), *sentence.at(i));
+            Node *pos_encoded = add(graph, {input, embedding});
+            pos_encoded = n3ldg_plus::dropout(graph, *pos_encoded, dropout, is_training);
+            pos_encoded_layer.push_back(pos_encoded);
+        }
+        pos_encoded_layers.push_back(move(pos_encoded_layer));
     }
+    graph.compute();
 
     int layer_count = params.layerCount();
 
