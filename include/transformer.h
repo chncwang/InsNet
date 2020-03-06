@@ -290,8 +290,6 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
                 << sentence_len << endl;
             abort();
         }
-        vector<Node *> pre_norm_layer;
-        pre_norm_layer.reserve(sentence_len);
         auto &layer_params = *params.layerParams().ptrs().at(i);
 
         int head_count = params.headCount();
@@ -314,6 +312,7 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
             value_heads.push_back(move(values));
         }
 
+        vector<Node *> sub_layer;
         for (int j = 0; j < sentence_len; ++j) {
             vector<Node *> attended_segments;
             attended_segments.reserve(head_count);
@@ -337,23 +336,16 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
             Node *concated = concat(graph, attended_segments);
             concated = n3ldg_plus::dropout(graph, *concated, dropout, is_training);
             Node *added = add(graph, {concated, last_layer.at(j)});
-            pre_norm_layer.push_back(added);
-        }
-        vector<Node *> normed_layer = layerNormalization(graph, layer_params.layerNormA(),
-                pre_norm_layer);
-        vector<Node *> pre_norm_layer2;
-        pre_norm_layer2.reserve(normed_layer.size());
-        for (Node *node : normed_layer) {
-            Node *t = linear(graph, layer_params.ffnInnerParams(), *node);
+            Node *normed = layerNormalization(graph, layer_params.layerNormA(), *added);
+            Node *t = linear(graph, layer_params.ffnInnerParams(), *normed);
             t = relu(graph, *t);
             t = linear(graph, layer_params.ffnOutterParams(), *t);
             t = n3ldg_plus::dropout(graph, *t, dropout, is_training);
-            t = add(graph, {node, t});
-            pre_norm_layer2.push_back(t);
+            t = add(graph, {normed, t});
+            Node *normed2 = layerNormalization(graph, layer_params.layerNormB(), *t);
+            sub_layer.push_back(normed2);
         }
-        vector <Node *> normed_layer2 = layerNormalization(graph, layer_params.layerNormB(),
-                pre_norm_layer2);
-        last_layer = normed_layer2;
+        last_layer = sub_layer;
     }
 
     return last_layer;

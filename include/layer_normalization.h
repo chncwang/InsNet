@@ -63,32 +63,23 @@ private:
     BiasParam b_;
 };
 
-vector<Node *> layerNormalization(Graph &graph, LayerNormalizationParams &params,
-        vector<Node *> &input_layer) {
+Node *layerNormalization(Graph &graph, LayerNormalizationParams &params,
+        Node &input_layer) {
     using namespace n3ldg_plus;
-    Node *avg = averagePool(graph, input_layer);
-    int len = input_layer.size();
-    vector<Node *> square_nodes;
-    square_nodes.reserve(len);
-    vector<Node *> zeros_around;
-    for (Node *input : input_layer) {
-        Node *sub = n3ldg_plus::sub(graph, *input, *avg);
-        zeros_around.push_back(sub);
-        Node *square = pointwiseMultiply(graph, *sub, *sub);
-        square_nodes.push_back(square);
-    }
-    Node *var = averagePool(graph, square_nodes);
+    Node *sum = vectorSum(graph, input_layer);
+    Node *avg = dropout(graph, *sum, (1 - 1.0 / input_layer.getDim()), false);
+    Node *avg_vector = scalarToVector(graph, input_layer.getDim(), *avg);
+    Node *zeros_around = sub(graph, input_layer, *avg_vector);
+    Node *square = pointwiseMultiply(graph, *zeros_around, *zeros_around);
+    Node *square_sum = vectorSum(graph, *square);
+    Node *var = dropout(graph, *square_sum, (1 - 1.0 / input_layer.getDim()), false);
     Node *standard_deviation = sqrt(graph, *var);
     Node *g = embedding(graph, params.g(), 0, true);
-    Node *factor = fullDiv(graph, *g, *standard_deviation);
+    Node *factor = div(graph, *g, *standard_deviation);
 
-    vector<Node *> normalized_layer;
-    for (Node *e : zeros_around) {
-        Node *scaled = pointwiseMultiply(graph, *factor, *e);
-        Node *biased = bias(graph, params.b(), *scaled);
-        normalized_layer.push_back(biased);
-    }
-    return normalized_layer;
+    Node *scaled = pointwiseMultiply(graph, *factor, *zeros_around);
+    Node *biased = bias(graph, params.b(), *scaled);
+    return biased;
 }
 
 #endif
