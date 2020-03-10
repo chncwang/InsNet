@@ -247,7 +247,11 @@ public:
     }
 
     void value(const int& featId, Tensor1D& out) {
-        assert(out.dim == val.row);
+        if (out.dim != val.row) {
+            cerr << boost::format("Param value - out dim is %1% param row is %2%") % out.dim %
+                val.row << endl;
+            abort();
+        }
         memcpy(out.v, val[featId], val.row * sizeof(dtype));
     }
 
