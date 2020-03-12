@@ -204,7 +204,7 @@ public:
         }
     }
 
-    int getFLOPs() const {
+    int64_t getFLOPs() const {
         return flops_;
     }
 
