@@ -122,7 +122,12 @@ public:
 
 };
 #else
-class DivExecutor : public Executor {};
+class DivExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        return defaultFLOPs();
+    }
+};
 #endif
 
 Executor *DivNode::generate() {
@@ -224,7 +229,12 @@ public:
 
 };
 #else
-class FullDivExecutor : public Executor {};
+class FullDivExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        return defaultFLOPs();
+    }
+};
 #endif
 
 Executor *FullDivNode::generate() {

@@ -417,7 +417,12 @@ void LookupExecutor<Param>::genericBackward(vector<dtype*> &losses) {
 }
 
 #else
-class LookupExecutor :public Executor {};
+class LookupExecutor :public Executor {
+public:
+    int calculateFLOPs() override {
+        return 0;
+    }
+};
 #endif
 
 template<typename ParamType>

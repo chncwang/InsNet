@@ -84,11 +84,16 @@ public:
     std::vector<dtype*> in_vals2;
     std::vector<dtype*> vals;
     int dim;
-public:
     Tensor1D y, x1, x2;
     int sumDim;
 
-public:
+
+#if !USE_GPU
+    int calculateFLOPs() override {
+        return defaultFLOPs();
+    }
+#endif
+
 #if USE_GPU
     void  forward() {
         int count = batch.size();

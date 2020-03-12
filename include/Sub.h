@@ -122,7 +122,11 @@ private:
     vector<int> dims_;
 };
 #else
-class SubExecutor : public Executor {};
+class SubExecutor : public Executor {
+    int calculateFLOPs() override {
+        return defaultFLOPs();
+    }
+};
 #endif
 
 Executor *SubNode::generate() {

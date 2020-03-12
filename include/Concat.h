@@ -120,7 +120,7 @@ public:
 
 #if USE_GPU
 class ConcatExecutor : public Executor {
-  public:
+public:
     int outDim;
     int inCount;
 
@@ -179,6 +179,10 @@ class ConcatExecutor : public Executor {
 };
 #else
 class ConcatExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        return 0;
+    }
 };
 #endif
 
@@ -329,7 +333,12 @@ private:
     int max_dim_;
 };
 #else
-class ScalarConcatExecutor : public Executor {};
+class ScalarConcatExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        return 0;
+    }
+};
 #endif
 
 Executor *ScalarConcatNode::generate() {

@@ -53,7 +53,13 @@ private:
 };
 #else
 template<ActivatedEnum activation>
-class ActivationExecutor : public UniInputExecutor {};
+class ActivationExecutor : public UniInputExecutor {
+public:
+    int calculateFLOPs() override {
+        return defaultFLOPs();
+    }
+
+};
 #endif
 
 class TanhNode : public UniInputNode, public Poolable<TanhNode> {
@@ -379,6 +385,10 @@ class DropoutExecutor :public Executor {
         }
 #endif
     }
+#else
+    int calculateFLOPs() override {
+        return defaultFLOPs();
+    }
 #endif
 };
 
@@ -504,7 +514,12 @@ private:
     vector<int> max_indexes;
 };
 #else
-class MaxScalarExecutor : public Executor {};
+class MaxScalarExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        return defaultFLOPs();
+    }
+};
 #endif
 
 Executor *MaxScalarNode::generate() {
@@ -612,7 +627,12 @@ private:
     vector<int> dims_;
 };
 #else
-class ScalarToVectorExecutor : public Executor {};
+class ScalarToVectorExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        return 0;
+    }
+};
 #endif
 
 Executor *ScalarToVectorNode::generate() {
@@ -755,7 +775,12 @@ private:
     vector<int> dims_;
 };
 #else
-class SumExecutor : public Executor {};
+class SumExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        return defaultFLOPs();
+    }
+};
 #endif
 
 Executor *SumNode::generate() {

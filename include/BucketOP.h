@@ -93,6 +93,12 @@ Node *bucket(Graph &graph, int dim, float v) {
 
 class BucketExecutor : public Executor {
 public:
+#if !USE_GPU
+    int calculateFLOPs() override {
+        return 0;
+    }
+#endif
+
     void forward() override {
 #if USE_GPU
         int count = batch.size();

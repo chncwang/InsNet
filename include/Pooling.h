@@ -468,7 +468,15 @@ PExecutor MinPoolNode::generate() {
 }
 #endif
 
-class PoolExecutor : public Executor {};
+class PoolExecutor : public Executor {
+public:
+#if !USE_GPU
+    int calculateFLOPs() override {
+        cerr << "unsupported op" << endl;
+        abort();
+    }
+#endif
+};
 
 PExecutor PoolNode::generate() {
     PoolExecutor* exec = new PoolExecutor();
@@ -629,7 +637,17 @@ public:
     }
 };
 #else
-class SumPoolExecutor : public Executor {};
+class SumPoolExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        int sum = 0;
+        for (Node *node : batch) {
+            SumPoolNode *s = static_cast<SumPoolNode*>(node);
+            sum += s->getDim() * s->ins.size();
+        }
+        return sum;
+    }
+};
 #endif
 
 PExecutor SumPoolNode::generate() {
@@ -797,7 +815,17 @@ public:
     }
 };
 #else
-class AvgPoolExecutor : public Executor {};
+class AvgPoolExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        int sum = 0;
+        for (Node *node : batch) {
+            AvgPoolNode *s = static_cast<AvgPoolNode*>(node);
+            sum += s->getDim() * s->ins.size();
+        }
+        return sum;
+    }
+};
 #endif
 
 PExecutor AvgPoolNode::generate() {

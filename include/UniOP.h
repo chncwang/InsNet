@@ -311,12 +311,20 @@ public:
 };
 #else
 class LinearExecutor :public Executor {
-  public:
+public:
     Tensor2D x, y, b;
     int inDim, outDim, count;
     UniParams* param;
 
-    void  forward() {
+    int calculateFLOPs() override {
+        int flops = param->W.inDim() * param->W.outDim() * batch.size();
+        if (param->bUseB) {
+            flops += param->W.outDim() * batch.size();
+        }
+        return flops;
+    }
+
+    void  forward() override {
         count = batch.size();
         x.init(inDim, count);
         y.init(outDim, count);
@@ -341,7 +349,7 @@ class LinearExecutor :public Executor {
         }
     }
 
-    void backward() {
+    void backward() override {
         Tensor2D lx, ly;
         lx.init(inDim, count);
         ly.init(outDim, count);
@@ -617,6 +625,11 @@ public:
     int inDim, outDim;
     Param *param;
 
+    int calculateFLOPs() override {
+        LinearWordVectorNode *node = static_cast<LinearWordVectorNode*>(batch.front());
+        return node->getDim() * node->getInput()->getDim() * batch.size();
+    }
+
     void forward() override {
         int count = batch.size();
         x.init(inDim, count);
@@ -804,7 +817,12 @@ private:
     }
 };
 #else
-class BiasExecutor : public Executor {};
+class BiasExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        return defaultFLOPs();
+    }
+};
 #endif
 
 Executor *BiasNode::generate() {

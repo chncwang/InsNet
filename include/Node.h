@@ -473,6 +473,10 @@ public:
 
     virtual ~Executor() = default;
 
+#if !USE_GPU
+    virtual int calculateFLOPs() = 0;
+#endif
+
     int getDim() const {
         return batch.at(batch.size() - 1)->getDim();
     }
@@ -540,6 +544,14 @@ protected:
         for (Node *node : batch) {
             node->compute();
         }
+    }
+
+    int defaultFLOPs() {
+        int sum = 0;
+        for (Node *node : batch) {
+            sum += node->getDim();
+        }
+        return sum;
     }
 
 #if TEST_CUDA

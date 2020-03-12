@@ -55,7 +55,8 @@ int Size(const NodeMap &map) {
 
 class Graph : public NodeContainer {
 public:
-    Graph(bool eager = false) : eager_(eager) {}
+    Graph(bool eager = false, bool calculate_flops = false) : eager_(eager),
+    calculate_flops_(calculate_flops) {}
 
     Graph (const Graph &graph) = delete;
 
@@ -158,6 +159,11 @@ public:
                     node->getVal().checkIsNumber();
                 }
             }
+            if (calculate_flops_) {
+#if !USE_GPU
+                flops_ += cur_exec->calculateFLOPs();
+#endif
+            }
             profiler.EndEvent();
 
             profiler.BeginEvent("computation plan");
@@ -198,6 +204,10 @@ public:
         }
     }
 
+    int getFLOPs() const {
+        return flops_;
+    }
+
 protected:
     vector<PExecutor> execs;
     vector<Node *> nodes;
@@ -208,6 +218,8 @@ protected:
 
 private:
     bool eager_ = false;
+    bool calculate_flops_ = false;
+    int64_t flops_ = 0;
 };
 
 #endif

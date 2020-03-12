@@ -112,7 +112,12 @@ private:
         vector<int> offsets;
 };
 #else
-class SplitExecutor : public Executor {};
+class SplitExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        return 0;
+    }
+};
 #endif
 
 Executor *SplitNode::generate() {

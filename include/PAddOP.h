@@ -111,10 +111,19 @@ class PAddExecutor : public Executor {
 public:
     int in_count;
     int dim;
-
-public:
     Tensor1D x, y;
     int sumDim;
+
+#if !USE_GPU
+    int calculateFLOPs() override {
+        int sum = 0;
+        for (Node *node : batch) {
+            PAddNode *add = static_cast<PAddNode*>(node);
+            sum += add->getDim() * add->ins.size();
+        }
+        return sum;
+    }
+#endif
 
 #if USE_GPU
     void  forward() {
@@ -148,7 +157,7 @@ public:
 #endif
     }
 #else
-    void  forward() {
+    void  forward() override {
         int count = batch.size();
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -191,7 +200,7 @@ public:
 #endif
     }
 #else
-    void backward() {
+    void backward() override {
         int count = batch.size();
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward();
