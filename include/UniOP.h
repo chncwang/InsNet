@@ -317,7 +317,7 @@ public:
     UniParams* param;
 
     int calculateFLOPs() override {
-        int flops = param->W.inDim() * param->W.outDim() * batch.size();
+        int flops = param->W.inDim() * param->W.outDim() * batch.size() * 2;
         if (param->bUseB) {
             flops += param->W.outDim() * batch.size();
         }

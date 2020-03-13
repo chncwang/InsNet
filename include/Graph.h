@@ -208,6 +208,12 @@ public:
         return flops_;
     }
 
+    void addFLOPs(int64_t flops) {
+        if (calculate_flops_) {
+            flops_ += flops;
+        }
+    }
+
 protected:
     vector<PExecutor> execs;
     vector<Node *> nodes;
