@@ -627,7 +627,7 @@ public:
 
     int calculateFLOPs() override {
         LinearWordVectorNode *node = static_cast<LinearWordVectorNode*>(batch.front());
-        return node->getDim() * node->getInput()->getDim() * batch.size();
+        return node->getDim() * node->getInput()->getDim() * batch.size() * 2;
     }
 
     void forward() override {
