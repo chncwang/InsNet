@@ -161,7 +161,13 @@ public:
             }
             if (calculate_flops_) {
 #if !USE_GPU
-                flops_ += cur_exec->calculateFLOPs();
+                const auto &it = flops_table_.find(cur_exec->getNodeType());
+                if (it == flops_table_.end()) {
+                    flops_table_.insert(make_pair(cur_exec->getNodeType(),
+                                cur_exec->calculateFLOPs()));
+                } else {
+                    it->second += cur_exec->calculateFLOPs();
+                }
 #endif
             }
             profiler.EndEvent();
@@ -204,13 +210,18 @@ public:
         }
     }
 
-    int64_t getFLOPs() const {
-        return flops_;
+    const map<string, int64_t> &getFLOPs() const {
+        return flops_table_;
     }
 
-    void addFLOPs(int64_t flops) {
+    void addFLOPs(int64_t flops, const string &name) {
         if (calculate_flops_) {
-            flops_ += flops;
+            const auto &it = flops_table_.find(name);
+            if (it == flops_table_.end()) {
+                flops_table_.insert(make_pair(name, flops));
+            } else {
+                it->second += flops;
+            }
         }
     }
 
@@ -225,7 +236,7 @@ protected:
 private:
     bool eager_ = false;
     bool calculate_flops_ = false;
-    int64_t flops_ = 0;
+    map<string, int64_t> flops_table_;
 };
 
 #endif
