@@ -468,18 +468,23 @@ public:
             results.push_back(node->getVal().value);
             dims.push_back(node->getInput()->getDim());
         }
-        n3ldg_cuda::MaxScalarForward(inputs, batch.size(), dims, results, max_indexes);
+        bool succeeded = true;
+        do {
+            succeeded = true;
+            n3ldg_cuda::MaxScalarForward(inputs, batch.size(), dims, results, max_indexes);
 
-        for (int i = 0; i < batch.size(); ++i) {
-            MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));
-            if (max_indexes.at(i) > 100000 || max_indexes.at(i) < 0) {
-                cerr << "illegal max index returned " << max_indexes.at(i) << endl;
-                node->getInput()->getVal().print();
-                node->getVal().print();
-                abort();
+            for (int i = 0; i < batch.size(); ++i) {
+                MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));
+                if (max_indexes.at(i) > 100000 || max_indexes.at(i) < 0) {
+                    cerr << "illegal max index returned " << max_indexes.at(i) << endl;
+                    cerr << "node dim:" << node->getInput()->getDim() << endl;
+                    node->getVal().print();
+                    succeeded = false;
+                    break;
+                }
+                node->max_i_ = max_indexes.at(i);
             }
-            node->max_i_ = max_indexes.at(i);
-        }
+        } while (!succeeded);
 #if TEST_CUDA
         Executor::forward();
         int i = 0;
