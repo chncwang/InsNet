@@ -101,7 +101,7 @@ cublasHandle_t& GetCublasHandle() {
 cudaError_t MyCudaMemcpy(void *dest, const void *src, size_t count,
         cudaMemcpyKind kind) {
     cudaError_t e;
-    e = cudaMemcpy(dest, src, count, kind);
+    e = cudaMemcpyAsync(dest, src, count, kind);
     CallCuda(e);
     return e;
 }
