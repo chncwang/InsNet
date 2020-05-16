@@ -183,6 +183,10 @@ public:
     int calculateFLOPs() override {
         return 0;
     }
+
+    int calculateActivations() override {
+        return 0;
+    }
 };
 #endif
 

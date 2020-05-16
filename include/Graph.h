@@ -55,8 +55,9 @@ int Size(const NodeMap &map) {
 
 class Graph : public NodeContainer {
 public:
-    Graph(bool eager = false, bool calculate_flops = false) : eager_(eager),
-    calculate_flops_(calculate_flops) {}
+    Graph(bool eager = false, bool calculate_flops = false, bool calculate_activations = false) :
+        eager_(eager), calculate_flops_(calculate_flops),
+        calculate_activations_(calculate_activations) {}
 
     Graph (const Graph &graph) = delete;
 
@@ -170,6 +171,11 @@ public:
                 }
 #endif
             }
+            if (calculate_activations_) {
+#if !USE_GPU
+                activations_ += cur_exec->calculateActivations();
+#endif
+            }
             profiler.EndEvent();
 
             profiler.BeginEvent("computation plan");
@@ -214,6 +220,10 @@ public:
         return flops_table_;
     }
 
+    int64_t getActivations() const {
+        return activations_;
+    }
+
     void addFLOPs(int64_t flops, const string &name) {
         if (calculate_flops_) {
             const auto &it = flops_table_.find(name);
@@ -237,6 +247,9 @@ private:
     bool eager_ = false;
     bool calculate_flops_ = false;
     map<string, int64_t> flops_table_;
+
+    bool calculate_activations_ = false;
+    int64_t activations_ = 0;
 };
 
 #endif

@@ -467,14 +467,18 @@ void clearNodes(std::vector<Node*> &nodes) {
 class Executor {
 public:
     std::vector<PNode> batch;
-#if USE_GPU
-    void *graph_info;
-#endif
-
     virtual ~Executor() = default;
 
 #if !USE_GPU
     virtual int calculateFLOPs() = 0;
+
+    virtual int calculateActivations() {
+        int sum = 0;
+        for (Node *node : batch) {
+            sum += node->getDim();
+        }
+        return sum;
+    }
 #endif
 
     int getDim() const {
@@ -576,11 +580,8 @@ protected:
     void testBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
         Executor::backward();
 
-//        int i = 0;
-//        cout << "testBackward count:" << batch.size() << endl;
         for (Node *node : batch) {
             auto inputs = get_inputs(*node);
-//            cout << "testBackward input i:" << i++ << endl;
             for (pair<Node*, string> &input : inputs) {
                 n3ldg_cuda::Assert(input.first->getLoss().verify((getNodeType() +
                                 " backward " + input.second).c_str()));
@@ -592,8 +593,6 @@ protected:
         for (Node *node : batch) {
             auto inputs = get_inputs(*node);
             for (pair<Node*, string> &input : inputs) {
-//                cout << "nodindex:" << input.first->getNodeIndex() << endl;
-//                cout << "grad:" << input.first->getLoss().toString() << endl;
                 n3ldg_cuda::Assert(input.first->getLoss().verify((getNodeType() +
                                 " backward " + input.second + " node index:" + to_string(input.first->getNodeIndex())).c_str()));
             }
