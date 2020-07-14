@@ -8,7 +8,7 @@ Due to incorrect operations of git, earlier tens of commitments by me(mainly abo
 
 GPUs are expensive and it is important to make full use of GPU threads. Compared with N3LDG, all CUDA codes are especially designed for NLP net, to achieve an extremely fast training speed. In addition, our CUDA implementation is completed.
 
-Now N3LDG++ is a much better N3LDG in terms of GPU support, Graph execution efficiency, easy APIs, etc. I will write wiki sometime.
+Now N3LDG++ is a much better N3LDG in terms of GPU support, Graph execution efficiency, easy APIs, etc. We will write wiki sometime.
 
 ## Installation:
 ### Prerequisitions:
