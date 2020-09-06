@@ -215,6 +215,9 @@ void Tensor1D::copyFromHostToDevice() {
 }
 
 void Tensor1D::copyFromDeviceToHost() {
+    if (v == nullptr) {
+        initOnMemory(dim);
+    }
     CallCuda(MyCudaMemcpy(v, value, dim * sizeof(dtype), cudaMemcpyDeviceToHost));
 }
 
