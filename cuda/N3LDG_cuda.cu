@@ -70,8 +70,8 @@ void CheckCudaError() {
     //cudaDeviceSynchronize();
     cudaError_t error = cudaGetLastError();
     if (error != cudaSuccess) {
-        std::cerr << "cuda error:" << cudaGetErrorName(error) << std::endl;
-        std::cerr << "cuda error:" << cudaGetErrorString(error) << std::endl;
+        cerr << "cuda error:" << cudaGetErrorName(error) << endl;
+        cerr << "cuda error:" << cudaGetErrorString(error) << endl;
         abort();
     }
 }
@@ -305,10 +305,10 @@ void Tensor2D::copyFromDeviceToHost() {
     CallCuda(MyCudaMemcpy(v, value, size * sizeof(dtype), cudaMemcpyDeviceToHost));
 }
 
-void Assert(bool v, const std::string &message, const function<void(void)> &call) {
+void Assert(bool v, const string &message, const function<void(void)> &call) {
 #if TEST_CUDA
     if (!v) {
-        std::cerr << message << std::endl;
+        cerr << message << endl;
         call();
         abort();
     }
@@ -400,7 +400,7 @@ __device__ dtype DeviceAbs(dtype d) {
 int DefaultBlockCount(int len) {
     int block_count = (len - 1 + TPB) /
         TPB;
-    return std::min(block_count, BLOCK_COUNT);
+    return min(block_count, BLOCK_COUNT);
 }
 
 int DefaultBlockCountWithoutLimit(int len) {
@@ -465,7 +465,7 @@ void PrintInts(const int* p, int len) {
 }
 
 void InitCuda(int device_id, float memory_in_gb) {
-    std::cout << "device_id:" << device_id << std::endl;
+    cout << "device_id:" << device_id << endl;
     CallCuda(cudaSetDeviceFlags(cudaDeviceMapHost));
 
 #if DEVICE_MEMORY == 0
@@ -497,23 +497,23 @@ __global__ void KernelCopyFromOneVectorToMultiVectors(const dtype *src,
     }
 }
 
-void CopyFromOneVectorToMultiVals(const dtype *src, std::vector<dtype*> &vals,
+void CopyFromOneVectorToMultiVals(const dtype *src, vector<dtype*> &vals,
         int count,
         int len) {
     NumberPointerArray val_arr;
     val_arr.init((dtype**)vals.data(), vals.size());
     int block_count = (len * count - 1 + TPB) / TPB;
-    block_count = std::min(block_count, BLOCK_COUNT);
+    block_count = min(block_count, BLOCK_COUNT);
     KernelCopyFromOneVectorToMultiVectors<<<block_count, TPB>>>(src,
             (dtype *const *)val_arr.value, count, len);
     CheckCudaError();
 }
 
-void CopyFromHostToDevice(const std::vector<dtype*> &src,
-        std::vector<dtype*> &dest, int count, int dim) {
+void CopyFromHostToDevice(const vector<dtype*> &src,
+        vector<dtype*> &dest, int count, int dim) {
     dtype *long_src = (dtype*)malloc(count * dim * sizeof(dtype));
     if (long_src == NULL) {
-        std::cerr << "out of memory!" << std::endl;
+        cerr << "out of memory!" << endl;
         abort();
     }
     for (int i = 0; i < count; ++i) {
@@ -540,7 +540,7 @@ __global__ void KernelCopyFromMultiVectorsToOneVector(const dtype **src, dtype *
     }
 }
 
-void CopyFromMultiVectorsToOneVector(const std::vector<dtype*> &src,
+void CopyFromMultiVectorsToOneVector(const vector<dtype*> &src,
         dtype *dest,
         int count,
         int len) {
@@ -552,15 +552,15 @@ void CopyFromMultiVectorsToOneVector(const std::vector<dtype*> &src,
     CheckCudaError();
 }
 
-void CopyFromDeviceToHost(const std::vector<dtype*> &src,
-        std::vector<dtype*> &dest, int count, int dim) {
+void CopyFromDeviceToHost(const vector<dtype*> &src,
+        vector<dtype*> &dest, int count, int dim) {
     dtype *long_src = NULL;
     CallCuda(MemoryPool::Ins().Malloc((void**)&long_src,
                 count * dim * sizeof(dtype*)));
     CopyFromMultiVectorsToOneVector(src, long_src, count, dim);
     dtype *long_dest = (dtype*)malloc(count * dim * sizeof(dtype));
     if (long_dest == NULL) {
-        std::cerr << "out of memory!" << std::endl;
+        cerr << "out of memory!" << endl;
         abort();
     }
     CallCuda(cudaMemcpy(long_dest, long_src, count * dim * sizeof(dtype),
@@ -601,10 +601,10 @@ __global__ void KernelActivationForward(ActivatedEnum activated, const dtype *co
     }
 }
 
-void ActivationForward(ActivatedEnum activated, const std::vector<const dtype*> &xs,
+void ActivationForward(ActivatedEnum activated, const vector<const dtype*> &xs,
         int count,
         const vector<int> &dims,
-        std::vector<dtype*> &ys) {
+        vector<dtype*> &ys) {
     int max_dim = *max_element(dims.begin(), dims.end());
     NumberPointerArray x_arr, y_arr;
     x_arr.init((dtype**)xs.data(), xs.size());
@@ -653,11 +653,11 @@ __global__ void KernelActivationBackward(ActivatedEnum activated,
     }
 }
 
-void ActivationBackward(ActivatedEnum activated, const std::vector<const dtype*> &losses,
-        const std::vector<dtype*> &vals,
+void ActivationBackward(ActivatedEnum activated, const vector<const dtype*> &losses,
+        const vector<dtype*> &vals,
         int count,
         const vector<int> &dims,
-        std::vector<dtype*> &in_losses) {
+        vector<dtype*> &in_losses) {
     int max_dim = *max_element(dims.begin(), dims.end());
     NumberPointerArray loss_arr, val_arr, in_loss_arr;
     loss_arr.init((dtype**)losses.data(), losses.size());
@@ -693,13 +693,13 @@ __global__ void KernelDropoutForward(const dtype *const *xs, int count, int dim,
     }
 }
 
-void DropoutForward(const std::vector<dtype*> &xs, int count, int dim,
+void DropoutForward(const vector<dtype*> &xs, int count, int dim,
         bool is_training,
         const dtype *drop_mask,
         dtype drop_factor,
-        std::vector<dtype*> &ys) {
+        vector<dtype*> &ys) {
     if (drop_factor < 0 || drop_factor >= 1.0f) {
-        std::cerr << "drop value is " << drop_factor << std::endl;
+        cerr << "drop value is " << drop_factor << endl;
         abort();
     }
     NumberPointerArray x_arr, y_arr;
@@ -734,16 +734,16 @@ __global__ void KernelDropoutBackward(const dtype *const *losses, const dtype *c
     }
 }
 
-void DropoutBackward(const std::vector<dtype*> &losses,
-        const std::vector<dtype*> &vals,
+void DropoutBackward(const vector<dtype*> &losses,
+        const vector<dtype*> &vals,
         int count,
         int dim,
         bool is_training,
         const dtype *drop_mask,
         dtype drop_factor,
-        std::vector<dtype*> &in_losses) {
+        vector<dtype*> &in_losses) {
     if (drop_factor < 0 || drop_factor >= 1) {
-        std::cerr << "drop value is " << drop_factor << std::endl;
+        cerr << "drop value is " << drop_factor << endl;
         abort();
     }
     NumberPointerArray loss_arr, val_arr, in_loss_arr;
@@ -765,7 +765,7 @@ __global__ void KernelBucketForward(const dtype *input, int count, int dim, dtyp
     }
 }
 
-void BucketForward(const std::vector<dtype> input, int count, int dim, std::vector<dtype*> &ys) {
+void BucketForward(const vector<dtype> input, int count, int dim, vector<dtype*> &ys) {
     NumberArray input_arr;
     NumberPointerArray ys_arr;
     input_arr.init((dtype*)input.data(), input.size());
@@ -800,7 +800,7 @@ __global__ void KernelCopyForUniNodeForward(const dtype** xs, const dtype* b,
     }
 }
 
-void CopyForUniNodeForward(const std::vector<dtype*> &xs, const dtype* b,
+void CopyForUniNodeForward(const vector<dtype*> &xs, const dtype* b,
         dtype* xs_dest,
         dtype* b_dest,
         int count,
@@ -810,7 +810,7 @@ void CopyForUniNodeForward(const std::vector<dtype*> &xs, const dtype* b,
     NumberPointerArray x_arr;
     x_arr.init((dtype**)xs.data(), xs.size());
     int len = x_len + b_len;
-    int block_count = std::min((count * len - 1 + TPB) / TPB, 56);
+    int block_count = min((count * len - 1 + TPB) / TPB, 56);
     KernelCopyForUniNodeForward<<<block_count, TPB>>>(
             (const dtype**)x_arr.value, (const dtype*)b, xs_dest, b_dest,
             count, x_len, b_len, use_b);
@@ -1020,7 +1020,7 @@ cudaError_t MemoryPool::Malloc(void **p, int size) {
                 }
                 CallCuda(status);
                 MemoryBlock block(*p, fit_size);
-                busy_blocks_.insert(std::make_pair(*p, block));
+                busy_blocks_.insert(make_pair(*p, block));
             } else {
                 auto &v = free_blocks_.at(higher_power);
                 MemoryBlock &to_split = v.rbegin()->second;
@@ -1038,7 +1038,7 @@ cudaError_t MemoryPool::Malloc(void **p, int size) {
             int this_size = free_blocks_.at(n).size();
             MemoryBlock &block = free_blocks_.at(n).rbegin()->second;
             *p = block.p;
-            busy_blocks_.insert(std::make_pair(block.p, block));
+            busy_blocks_.insert(make_pair(block.p, block));
             free_blocks_.at(n).erase(free_blocks_.at(n).rbegin()->first);
         }
     }
@@ -1048,7 +1048,7 @@ cudaError_t MemoryPool::Malloc(void **p, int size) {
 #endif
 }
 
-std::pair<const MemoryBlock *, const MemoryBlock *> lowerAndhigherBlocks(const MemoryBlock &a,
+pair<const MemoryBlock *, const MemoryBlock *> lowerAndhigherBlocks(const MemoryBlock &a,
         const MemoryBlock &b) {
     if (a.size != b.size) {
         cerr << "a.size is not equal to b.size" << endl;
@@ -1061,7 +1061,7 @@ std::pair<const MemoryBlock *, const MemoryBlock *> lowerAndhigherBlocks(const M
     }
     const MemoryBlock &low = distance > 0 ? b : a;
     const MemoryBlock &high = distance > 0 ? a : b;
-    return std::make_pair(&low, &high);
+    return make_pair(&low, &high);
 }
 
 bool isBuddies(const MemoryBlock &a, const MemoryBlock &b) {
@@ -1217,7 +1217,7 @@ __global__ void KernelAddLtyToParamBiasAndAddLxToInputLossesForUniBackward(
 }
 
 void AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(const dtype *lty,
-        const dtype *lx, dtype *b, std::vector<dtype*> &losses, int count,
+        const dtype *lx, dtype *b, vector<dtype*> &losses, int count,
         int out_dim, int in_dim, bool use_b) {
     int block_y = (count - 1 + TPB) / TPB;
     dim3 block_dim(out_dim + in_dim, block_y, 1);
@@ -1298,8 +1298,8 @@ void AddLtyToParamBiasAndAddLxToInputLossesForBiBackward(const dtype *lty,
         const dtype *lx1,
         const dtype *lx2,
         dtype *b,
-        std::vector<dtype*> &losses1,
-        std::vector<dtype*> &losses2,
+        vector<dtype*> &losses1,
+        vector<dtype*> &losses2,
         int count,
         int out_dim,
         int in_dim1,
@@ -1387,14 +1387,14 @@ __global__ void KernelConcatForward(const dtype *const *ins, int *in_dims,
     }
 }
 
-void ConcatForward(const std::vector<dtype*> &in_vals,
-        const std::vector<int> &in_dims,
-        std::vector<dtype*> &vals,
+void ConcatForward(const vector<dtype*> &in_vals,
+        const vector<int> &in_dims,
+        vector<dtype*> &vals,
         int count,
         int in_count,
         int out_dim) {
     int len = count * out_dim;
-    int block_count = std::min(BLOCK_COUNT, (len - 1 + TPB) / TPB);
+    int block_count = min(BLOCK_COUNT, (len - 1 + TPB) / TPB);
     NumberPointerArray in_val_arr, val_arr;
     in_val_arr.init((dtype**)in_vals.data(), in_vals.size());
     val_arr.init((dtype**)vals.data(), vals.size());
@@ -1433,14 +1433,14 @@ __global__ void KernelConcatBackward(dtype *const *in_losses, int *in_dims,
     }
 }
 
-void ConcatBackward(const std::vector<dtype*> &in_losses,
-        const std::vector<int> &in_dims,
-        std::vector<dtype*> &losses,
+void ConcatBackward(const vector<dtype*> &in_losses,
+        const vector<int> &in_dims,
+        vector<dtype*> &losses,
         int count,
         int in_count,
         int out_dim) {
     int len = count * out_dim;
-    int block_count = std::min(BLOCK_COUNT, (len - 1 + TPB) / TPB);
+    int block_count = min(BLOCK_COUNT, (len - 1 + TPB) / TPB);
 
     NumberPointerArray in_loss_arr, loss_arr;
     in_loss_arr.init((dtype**)in_losses.data(), in_losses.size());
@@ -1521,7 +1521,7 @@ __global__ void KernelMemset(dtype *p, int len, dtype value) {
 }
 
 void Memset(dtype *p, int len, dtype value) {
-    int block_count = std::min(BLOCK_COUNT, (len - 1 + TPB) / TPB);
+    int block_count = min(BLOCK_COUNT, (len - 1 + TPB) / TPB);
     KernelMemset<<<block_count, TPB>>>(p, len, value);
     CheckCudaError();
 }
@@ -1535,7 +1535,7 @@ __global__ void KernelMemset(bool *p, int len, bool value) {
 }
 
 void Memset(bool *p, int len, bool value) {
-    int block_count = std::min(BLOCK_COUNT, (len - 1 + TPB) / TPB);
+    int block_count = min(BLOCK_COUNT, (len - 1 + TPB) / TPB);
     KernelMemset<<<block_count, TPB>>>(p, len, value);
     CheckCudaError();
 }
@@ -1559,10 +1559,10 @@ __global__ void KernelBatchMemset(dtype *const *p, int count, int *dims, int max
     }
 }
 
-void BatchMemset(const std::vector<dtype*> &vec, int count, const vector<int> &dims, dtype value) {
+void BatchMemset(const vector<dtype*> &vec, int count, const vector<int> &dims, dtype value) {
     int max_dim = *max_element(dims.begin(), dims.end());
     int block_count = (count * max_dim -1 + TPB) / TPB;
-    block_count = std::min(block_count, BLOCK_COUNT);
+    block_count = min(block_count, BLOCK_COUNT);
     NumberPointerArray vec_arr;
     vec_arr.init((dtype**)vec.data(), vec.size());
     IntArray dim_arr;
@@ -1591,11 +1591,11 @@ __global__ void KernelLookupForward(const int *xids, const dtype *vocabulary,
     }
 }
 
-void LookupForward(const std::vector<int> &xids, const dtype *vocabulary,
+void LookupForward(const vector<int> &xids, const dtype *vocabulary,
         int count,
         int dim,
-        std::vector<dtype*> &vals) {
-    int block_count = std::min(BLOCK_COUNT, (count * dim - 1 + TPB) / TPB);
+        vector<dtype*> &vals) {
+    int block_count = min(BLOCK_COUNT, (count * dim - 1 + TPB) / TPB);
     IntArray xid_arr;
     xid_arr.init((int*)xids.data(), xids.size());
     NumberPointerArray val_arr;
@@ -1626,13 +1626,13 @@ __global__ void KernelLookupBackward(const int *xids, const int *should_backward
     }
 }
 
-void LookupBackward(const std::vector<int> &xids, const std::vector<int> &should_backward,
-        const std::vector<dtype*> &losses,
+void LookupBackward(const vector<int> &xids, const vector<int> &should_backward,
+        const vector<dtype*> &losses,
         int count,
         int dim,
         dtype *grad,
         bool *indexers) {
-    int block_count = std::min((count * dim - 1 + TPB) / TPB, BLOCK_COUNT);
+    int block_count = min((count * dim - 1 + TPB) / TPB, BLOCK_COUNT);
     IntArray pl_arr;
     pl_arr.init((int*)xids.data(), xids.size());
     IntArray xid_arr;
@@ -1669,12 +1669,12 @@ __global__ void KernelLookupBackward(const int *xids, int *should_backward,
     }
 }
 
-void LookupBackward(const std::vector<int> &xids, const vector<int> &should_backward,
-        const std::vector<dtype*> &losses,
+void LookupBackward(const vector<int> &xids, const vector<int> &should_backward,
+        const vector<dtype*> &losses,
         int count,
         int dim,
         dtype *grad) {
-    int block_count = std::min((count * dim - 1 + TPB) / TPB, BLOCK_COUNT);
+    int block_count = min((count * dim - 1 + TPB) / TPB, BLOCK_COUNT);
     IntArray pl_arr;
     pl_arr.init((int*)xids.data(), xids.size());
     IntArray xid_arr;
@@ -1717,8 +1717,11 @@ void ParamRowForward(const dtype *param, int row_index, int param_row_count, int
     CheckCudaError();
 }
 
-__global__ void KernelPoolForward(PoolingEnum pooling, const dtype *const *ins,
-        int *in_counts, int max_in_count, dtype *const *outs, int count, int dim,
+__global__ void KernelPoolForward(PoolingEnum pooling, const dtype *const *ins, int *in_counts,
+        int max_in_count,
+        dtype *const *outs,
+        int count,
+        int dim,
         int* hit_inputs) {
     __shared__ volatile extern dtype pool_shared_arr[];
     volatile dtype* shared_indexers = pool_shared_arr + blockDim.x;
@@ -1760,13 +1763,12 @@ __global__ void KernelPoolForward(PoolingEnum pooling, const dtype *const *ins,
     }
 }
 
-void PoolForward(PoolingEnum pooling, const std::vector<dtype*> &in_vals,
-        std::vector<dtype*> &vals,
+void PoolForward(PoolingEnum pooling, const vector<dtype*> &in_vals, vector<dtype*> &vals,
         int count,
-        const std::vector<int> &in_counts,
+        const vector<int> &in_counts,
         int dim,
         int *hit_inputs) {
-    int max_in_count = *std::max_element(in_counts.begin(), in_counts.end());
+    int max_in_count = *max_element(in_counts.begin(), in_counts.end());
     int thread_count = 8;
     while (max_in_count > thread_count) {
         thread_count <<= 1;
@@ -1786,8 +1788,7 @@ void PoolForward(PoolingEnum pooling, const std::vector<dtype*> &in_vals,
     CheckCudaError();
 }
 
-__global__ void KernelPoolBackward(const dtype *const * losses,
-        const int *hit_inputs,
+__global__ void KernelPoolBackward(const dtype *const * losses, const int *hit_inputs,
         int max_in_count,
         int count,
         int dim,
@@ -1804,18 +1805,17 @@ __global__ void KernelPoolBackward(const dtype *const * losses,
     }
 }
 
-void PoolBackward(const std::vector<dtype*> &losses,
-        std::vector<dtype*> &in_losses,
-        const std::vector<int> &in_counts,
+void PoolBackward(const vector<dtype*> &losses, vector<dtype*> &in_losses,
+        const vector<int> &in_counts,
         const int *hit_inputs,
         int count,
         int dim) {
     NumberPointerArray loss_arr, in_loss_arr;
     loss_arr.init((dtype**)losses.data(), losses.size());
     in_loss_arr.init((dtype**)in_losses.data(), in_losses.size());
-    int max_in_count = *std::max_element(in_counts.begin(), in_counts.end());
+    int max_in_count = *max_element(in_counts.begin(), in_counts.end());
     int block_count = (count * dim - 1 + TPB) / TPB;
-    block_count = std::min(block_count, BLOCK_COUNT);
+    block_count = min(block_count, BLOCK_COUNT);
     KernelPoolBackward<<<block_count, TPB>>>((const dtype**)loss_arr.value,
             hit_inputs,
             max_in_count,
@@ -1825,9 +1825,7 @@ void PoolBackward(const std::vector<dtype*> &losses,
     CheckCudaError();
 }
 
-__global__ void KernelSumPoolForward(PoolingEnum pooling,
-        const dtype *const *in_vals,
-        int count,
+__global__ void KernelSumPoolForward(PoolingEnum pooling, const dtype *const *in_vals, int count,
         int dim,
         const int *in_counts,
         int max_in_count,
@@ -1859,12 +1857,10 @@ __global__ void KernelSumPoolForward(PoolingEnum pooling,
     }
 }
 
-void SumPoolForward(PoolingEnum pooling, const std::vector<dtype*> &in_vals,
-        int count,
-        int dim,
-        const std::vector<int> &in_counts,
-        std::vector<dtype*> &vals) {
-    int max_in_count = *std::max_element(in_counts.begin(), in_counts.end());
+void SumPoolForward(PoolingEnum pooling, const vector<dtype*> &in_vals, int count, int dim,
+        const vector<int> &in_counts,
+        vector<dtype*> &vals) {
+    int max_in_count = *max_element(in_counts.begin(), in_counts.end());
     int thread_count = 8;
     while (max_in_count > thread_count) {
         thread_count <<= 1;
@@ -1898,18 +1894,18 @@ __global__ void KernelSumBackward(PoolingEnum pooling, const dtype *const *losse
     }
 }
 
-void SumPoolBackward(PoolingEnum pooling, const std::vector<dtype*> &losses,
-        const std::vector<int> &in_counts,
+void SumPoolBackward(PoolingEnum pooling, const vector<dtype*> &losses,
+        const vector<int> &in_counts,
         int count,
         int dim,
-        std::vector<dtype*> &in_losses) {
+        vector<dtype*> &in_losses) {
     int thread_count = 8;
     while (thread_count < dim) {
         thread_count <<= 1;
     }
-    thread_count = std::min(TPB, thread_count);
+    thread_count = min(TPB, thread_count);
 
-    int max_in_count = *std::max_element(in_counts.begin(), in_counts.end());
+    int max_in_count = *max_element(in_counts.begin(), in_counts.end());
     dim3 block_dim(count, max_in_count, 1);
     NumberPointerArray loss_arr;
     loss_arr.init((dtype**)losses.data(), losses.size());
@@ -1923,9 +1919,43 @@ void SumPoolBackward(PoolingEnum pooling, const std::vector<dtype*> &losses,
     CheckCudaError();
 }
 
-__global__ void KernelPMultiForward(const dtype **ins1, const dtype **ins2,
-        int count,
-        int dim,
+__global__ void KernelMatrixConcatForward(dtype **in_vals, int count, int in_dim, int *in_counts,
+        int max_in_count,
+        dtype **vals) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * max_in_count * in_dim; i += step) {
+        int max_in_dim_sum = max_in_count * in_dim;
+        int count_i = i / max_in_dim_sum;
+        int x = i % max_in_dim_sum;
+        int in_count_i = x / in_dim;
+        if (in_count_i < in_counts[count_i]) {
+            int dim_i = x % in_dim;
+            vals[count_i][x] = in_vals[count_i * max_in_count + in_count_i][dim_i];
+        }
+    }
+}
+
+void MaxtrixConcatForward(const vector<dtype*> &in_vals, int count, int in_dim,
+        const vector<int> &in_counts,
+        vector<dtype*> &vals) {
+    int max_in_count = *max_element(in_counts.begin(), in_counts.end());
+    int len = count * max_in_count * in_dim;
+    int block_count = DefaultBlockCount(len);
+    NumberPointerArray in_val_arr, val_arr;
+    in_val_arr.init((dtype **)in_vals.data(), in_vals.size());
+    val_arr.init((dtype **)vals.data(), vals.size());
+    IntArray in_count_arr;
+    in_count_arr.init((int*)in_counts.data(), in_counts.size());
+
+    KernelMatrixConcatForward<<<block_count, TPB>>>((dtype**)in_val_arr.value, count, in_dim,
+            in_count_arr.value, max_in_count, (dtype**)val_arr.value);
+    CheckCudaError();
+}
+
+//__global__ void KernelMatrixConcatBackward(dtype **grads, 
+
+__global__ void KernelPMultiForward(const dtype **ins1, const dtype **ins2, int count, int dim,
         dtype *const *vals) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
@@ -1936,11 +1966,11 @@ __global__ void KernelPMultiForward(const dtype **ins1, const dtype **ins2,
     }
 }
 
-void PMultiForward(const std::vector<dtype*> &ins1,
-        const std::vector<dtype*> &ins2,
+void PMultiForward(const vector<dtype*> &ins1,
+        const vector<dtype*> &ins2,
         int count,
         int dim,
-        std::vector<dtype*> &vals) {
+        vector<dtype*> &vals) {
     int block_count = DefaultBlockCount(count * dim);
     NumberPointerArray ins1_arr, ins2_arr, vals_arr;
     ins1_arr.init((dtype**)ins1.data(), count);
@@ -2252,11 +2282,11 @@ __global__ void KernelSubForward(const dtype *const *minuend, const dtype *const
     }
 }
 
-void SubForward(const std::vector<const dtype*> &minuend,
-        const std::vector<const dtype*> &subtrahend,
+void SubForward(const vector<const dtype*> &minuend,
+        const vector<const dtype*> &subtrahend,
         int count,
         const vector<int> &dims,
-        std::vector<dtype*> &results) {
+        vector<dtype*> &results) {
     int max_dim = *max_element(dims.begin(), dims.end());
     int block_count = DefaultBlockCount(count * max_dim);
     NumberPointerArray minuend_arr, subtrahend_arr, result_arr;
@@ -2286,9 +2316,9 @@ __global__ void KernelSubBackward(const dtype *const *losses, int count, int *di
     }
 }
 
-void SubBackward(const std::vector<const dtype*> &losses, int count, const vector<int> &dims,
-        std::vector<dtype*> &minuend_losses,
-        std::vector<dtype*> &subtrahend_losses) {
+void SubBackward(const vector<const dtype*> &losses, int count, const vector<int> &dims,
+        vector<dtype*> &minuend_losses,
+        vector<dtype*> &subtrahend_losses) {
     int max_dim = *max_element(dims.begin(), dims.end());
     int block_count = DefaultBlockCount(count * max_dim);
     NumberPointerArray loss_arr, minuend_loss_arr, subtrahend_loss_arr;
@@ -2324,13 +2354,13 @@ __global__ void KernelPMultiBackward(const dtype **losses,
     }
 }
 
-void PMultiBackward(const std::vector<dtype*> &losses,
-        const std::vector<dtype*> &in_vals1,
-        const std::vector<dtype*> &in_vals2,
+void PMultiBackward(const vector<dtype*> &losses,
+        const vector<dtype*> &in_vals1,
+        const vector<dtype*> &in_vals2,
         int count,
         int dim,
-        std::vector<dtype*> &in_losses1,
-        std::vector<dtype*> &in_losses2) {
+        vector<dtype*> &in_losses1,
+        vector<dtype*> &in_losses2) {
     int block_count = DefaultBlockCount(count * dim);
     NumberPointerArray losses_arr, in_vals1_arr, in_vals2_arr, in_losses1_arr,
                        in_losses2_arr;
@@ -2361,19 +2391,19 @@ __global__ void KernelPAddForward(const dtype *const *const *ins, int count, int
     }
 }
 
-void PAddForward(const std::vector<std::vector<dtype*>> &ins, int count,
+void PAddForward(const vector<vector<dtype*>> &ins, int count,
         int dim,
         int in_count,
-        std::vector<dtype*> &vals) {
-    std::vector<std::shared_ptr<NumberPointerArray>> gpu_addr;
+        vector<dtype*> &vals) {
+    vector<shared_ptr<NumberPointerArray>> gpu_addr;
     gpu_addr.reserve(ins.size());
-    for (const std::vector<dtype*> &x : ins) {
-        std::shared_ptr<NumberPointerArray> arr =
-            std::make_shared<NumberPointerArray>();
+    for (const vector<dtype*> &x : ins) {
+        shared_ptr<NumberPointerArray> arr =
+            make_shared<NumberPointerArray>();
         arr->init((dtype**)x.data(), x.size());
         gpu_addr.push_back(arr);
     }
-    std::vector<dtype**> ins_gpu;
+    vector<dtype**> ins_gpu;
     ins_gpu.reserve(ins.size());
     for (auto &ptr : gpu_addr) {
         ins_gpu.push_back((dtype**)ptr->value);
@@ -2405,18 +2435,18 @@ __global__ void KernelPAddBackward(const dtype **losses, int count, int dim,
     }
 }
 
-void PAddBackward(const std::vector<dtype*> &losses, int count, int dim,
+void PAddBackward(const vector<dtype*> &losses, int count, int dim,
         int in_count,
-        std::vector<std::vector<dtype*>> &in_losses) {
-    std::vector<std::shared_ptr<NumberPointerArray>> gpu_addr;
+        vector<vector<dtype*>> &in_losses) {
+    vector<shared_ptr<NumberPointerArray>> gpu_addr;
     gpu_addr.reserve(in_losses.size());
-    for (const std::vector<dtype*> &x : in_losses) {
-        std::shared_ptr<NumberPointerArray> arr =
-            std::make_shared<NumberPointerArray>();
+    for (const vector<dtype*> &x : in_losses) {
+        shared_ptr<NumberPointerArray> arr =
+            make_shared<NumberPointerArray>();
         arr->init((dtype**)x.data(), x.size());
         gpu_addr.push_back(arr);
     }
-    std::vector<dtype**> in_losses_gpu;
+    vector<dtype**> in_losses_gpu;
     in_losses_gpu.reserve(in_losses.size());
     for (auto &ptr : gpu_addr) {
         in_losses_gpu.push_back((dtype **)ptr->value);
@@ -2483,9 +2513,8 @@ __global__ void KernelSoftMaxLoss(const dtype **vals, dtype **losses,
     }
 }
 
-void SoftMaxLoss(const std::vector<dtype*> &vals, std::vector<dtype*> &losses,
-        int *correct_count,
-        const std::vector<int> &answers,
+void SoftMaxLoss(const vector<dtype*> &vals, vector<dtype*> &losses, int *correct_count,
+        const vector<int> &answers,
         int batchsize,
         int count,
         int dim) {

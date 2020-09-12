@@ -71,7 +71,6 @@ public:
 
     PExecutor generate() override;
 
-    // better to rewrite for deep understanding
     bool typeEqual(PNode other) override {
         if (!Node::typeEqual(other)) {
             return false;
@@ -124,7 +123,7 @@ public:
     int outDim;
     int inCount;
 
-    void  forward() {
+    void forward() override {
         int count = batch.size();
 
         std::vector<dtype*> in_vals, vals;
@@ -135,7 +134,7 @@ public:
             for (Node *in : concat->ins) {
                 in_vals.push_back(in->val().value);
             }
-            vals.push_back(node->val().value);
+            vals.push_back(node->getVal().value);
         }
 
         n3ldg_cuda::ConcatForward(in_vals, static_cast<ConcatNode*>(batch.at(0))->inDims, vals,
@@ -149,7 +148,7 @@ public:
 #endif
     }
 
-    void backward() {
+    void backward() override {
         int count = batch.size();
         std::vector<dtype*> in_losses, losses;
         in_losses.reserve(inCount * count);

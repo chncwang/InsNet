@@ -12,8 +12,6 @@
 #include <vector>
 #include <cmath>
 
-using std::vector;
-
 namespace n3ldg_cuda {
 
 template<typename T>
@@ -126,27 +124,27 @@ struct DeviceInt {
 bool Verify(bool *host, bool *device, int len, const char* message);
 bool Verify(int *host, int *device, int len, const char* message);
 
-void Assert(bool v, const std::string &message = "",
-        const std::function<void(void)> &call = []() {});
+void Assert(bool v, const string &message = "",
+        const function<void(void)> &call = []() {});
 void Memset(dtype *p, int len, dtype value);
 void Memset(bool *p, int len, bool value);
 void *Malloc(int size);
-void BatchMemset(const std::vector<dtype*> &vec, int count, const vector<int> &dims, dtype value);
+void BatchMemset(const vector<dtype*> &vec, int count, const vector<int> &dims, dtype value);
 void PrintNums(const dtype* p, int len);
 void PrintInts(const int* p, int len);
 
 void InitCuda(int device_id = 0, float memory_in_gb = 0.0f);
 void EndCuda();
 
-void CopyFromMultiVectorsToOneVector(const std::vector<dtype*> &src, dtype *dest, int count,
+void CopyFromMultiVectorsToOneVector(const vector<dtype*> &src, dtype *dest, int count,
         int len);
-void CopyFromOneVectorToMultiVals(const dtype *src, std::vector<dtype*> &vals,
+void CopyFromOneVectorToMultiVals(const dtype *src, vector<dtype*> &vals,
         int count,
         int len);
-void CopyFromHostToDevice(const std::vector<dtype*> &src,
-        std::vector<dtype*> &dest, int count, int dim);
-void CopyFromDeviceToHost(const std::vector<dtype*> &src,
-        std::vector<dtype*> &dest, int count, int dim);
+void CopyFromHostToDevice(const vector<dtype*> &src,
+        vector<dtype*> &dest, int count, int dim);
+void CopyFromDeviceToHost(const vector<dtype*> &src,
+        vector<dtype*> &dest, int count, int dim);
 
 enum PoolingEnum {
     MAX,
@@ -155,30 +153,30 @@ enum PoolingEnum {
     AVG
 };
 
-void ActivationForward(ActivatedEnum activated, const std::vector<const dtype*> &xs,
+void ActivationForward(ActivatedEnum activated, const vector<const dtype*> &xs,
         int count,
         const vector<int> &dims,
-        std::vector<dtype*> &ys);
-void ActivationBackward(ActivatedEnum activated, const std::vector<const dtype*> &losses,
-        const std::vector<dtype*> &vals,
+        vector<dtype*> &ys);
+void ActivationBackward(ActivatedEnum activated, const vector<const dtype*> &losses,
+        const vector<dtype*> &vals,
         int count,
         const vector<int> &dims,
-        std::vector<dtype*> &in_losses);
-void DropoutForward(const std::vector<dtype*> &xs, int count, int dim,
+        vector<dtype*> &in_losses);
+void DropoutForward(const vector<dtype*> &xs, int count, int dim,
         bool is_training,
         const dtype *drop_mask,
         dtype drop_factor,
-        std::vector<dtype*> &ys);
-void DropoutBackward(const std::vector<dtype*> &losses,
-        const std::vector<dtype*> &vals,
+        vector<dtype*> &ys);
+void DropoutBackward(const vector<dtype*> &losses,
+        const vector<dtype*> &vals,
         int count,
         int dim,
         bool is_training,
         const dtype *drop_mask,
         dtype drop_factor,
-        std::vector<dtype*> &in_losses);
-void BucketForward(const std::vector<dtype> input, int count, int dim, std::vector<dtype*> &ys);
-void CopyForUniNodeForward(const std::vector<dtype*> &xs, const dtype* b,
+        vector<dtype*> &in_losses);
+void BucketForward(const vector<dtype> input, int count, int dim, vector<dtype*> &ys);
+void CopyForUniNodeForward(const vector<dtype*> &xs, const dtype* b,
         dtype* xs_dest,
         dtype* b_dest,
         int count,
@@ -191,29 +189,29 @@ void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y, int row, int col,
         bool should_x_transpose = false,
         bool should_W_transpose = false);
 void AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(const dtype *lty,
-        const dtype *lx, dtype *b, std::vector<dtype*> &losses, int count,
+        const dtype *lx, dtype *b, vector<dtype*> &losses, int count,
         int out_dim, int in_dim, bool use_b);
 void AddLtyToParamBiasAndAddLxToInputLossesForBiBackward(const dtype *lty,
         const dtype *lx1,
         const dtype *lx2,
         dtype *b,
-        std::vector<dtype*> &losses1,
-        std::vector<dtype*> &losses2,
+        vector<dtype*> &losses1,
+        vector<dtype*> &losses2,
         int count,
         int out_dim,
         int in_dim1,
         int in_dim2,
         bool use_b);
 void CalculateDropoutMask(dtype dropout_ratio, int count, int dim, dtype *mask);
-void ConcatForward(const std::vector<dtype*> &in_vals,
-        const std::vector<int> &in_dims,
-        std::vector<dtype*> &vals,
+void ConcatForward(const vector<dtype*> &in_vals,
+        const vector<int> &in_dims,
+        vector<dtype*> &vals,
         int count,
         int in_count,
         int out_dim);
-void ConcatBackward(const std::vector<dtype*> &in_losses,
-        const std::vector<int> &in_dims,
-        std::vector<dtype*> &losses,
+void ConcatBackward(const vector<dtype*> &in_losses,
+        const vector<int> &in_dims,
+        vector<dtype*> &losses,
         int count,
         int in_count,
         int out_dim);
@@ -223,51 +221,54 @@ void ScalarConcatForward(const vector<dtype *> &ins, int count, const vector<int
 void ScalarConcatBackward(const vector<dtype *> &losses, int count, const vector<int> &dims,
         int max_dim,
         const vector<dtype *> in_losses);
-void LookupForward(const std::vector<int> &xids, const dtype *vocabulary,
+void LookupForward(const vector<int> &xids, const dtype *vocabulary,
         int count,
         int dim,
-        std::vector<dtype*> &vals);
-void LookupBackward(const std::vector<int> &xids,
-        const std::vector<int> &should_backward,
-        const std::vector<dtype*> &losses,
+        vector<dtype*> &vals);
+void LookupBackward(const vector<int> &xids,
+        const vector<int> &should_backward,
+        const vector<dtype*> &losses,
         int count,
         int dim,
         dtype *grad,
         bool *indexers);
-void LookupBackward(const std::vector<int> &xids, const std::vector<int> &should_backward,
-        const std::vector<dtype*> &losses,
+void LookupBackward(const vector<int> &xids, const vector<int> &should_backward,
+        const vector<dtype*> &losses,
         int count,
         int dim,
         dtype *grad);
 void ParamRowForward(const dtype *param, int row_index, int param_row_count, int count, int dim,
         vector<dtype*> &vals);
-void PoolForward(PoolingEnum pooling, const std::vector<dtype*> &in_vals,
-        std::vector<dtype*> &vals,
+void PoolForward(PoolingEnum pooling, const vector<dtype*> &in_vals,
+        vector<dtype*> &vals,
         int count,
-        const std::vector<int> &in_counts,
+        const vector<int> &in_counts,
         int dim,
         int *hit_inputs);
-void PoolBackward(const std::vector<dtype*> &losses,
-        std::vector<dtype*> &in_losses,
-        const std::vector<int> &in_counts,
+void PoolBackward(const vector<dtype*> &losses,
+        vector<dtype*> &in_losses,
+        const vector<int> &in_counts,
         const int *hit_inputs,
         int count,
         int dim);
-void SumPoolForward(PoolingEnum pooling, const std::vector<dtype*> &in_vals,
+void SumPoolForward(PoolingEnum pooling, const vector<dtype*> &in_vals,
         int count,
         int dim,
-        const std::vector<int> &in_counts,
-        std::vector<dtype*> &vals);
-void SumPoolBackward(PoolingEnum pooling, const std::vector<dtype*> &losses,
-        const std::vector<int> &in_counts,
+        const vector<int> &in_counts,
+        vector<dtype*> &vals);
+void SumPoolBackward(PoolingEnum pooling, const vector<dtype*> &losses,
+        const vector<int> &in_counts,
         int count,
         int dim,
-        std::vector<dtype*> &in_losses);
-void PMultiForward(const std::vector<dtype*> &ins1,
-        const std::vector<dtype*> &ins2,
+        vector<dtype*> &in_losses);
+void MaxtrixConcatForward(const vector<dtype*> &in_vals, int count, int in_dim,
+        const vector<int> &in_counts,
+        vector<dtype*> &vals);
+void PMultiForward(const vector<dtype*> &ins1,
+        const vector<dtype*> &ins2,
         int count,
         int dim,
-        std::vector<dtype*> &vals);
+        vector<dtype*> &vals);
 void DivForward(const vector<const dtype*> numerators, const vector<const dtype*> denominators,
         int count,
         const vector<int> &dims,
@@ -278,48 +279,48 @@ void DivBackward(const vector<const dtype*> &losses, const vector<const dtype*> 
         const vector<int> &dims,
         vector<dtype*> &numerator_losses,
         vector<dtype*> &denominator_losses);
-void FullDivForward(const std::vector<const dtype*> numerators,
-        const std::vector<const dtype*> denominators,
+void FullDivForward(const vector<const dtype*> numerators,
+        const vector<const dtype*> denominators,
         int count,
         int dim,
-        std::vector<dtype*> &results);
-void FullDivBackward(const std::vector<const dtype*> &losses,
-        const std::vector<const dtype*> &denominator_vals,
-        const std::vector<const dtype*> &numerator_vals,
+        vector<dtype*> &results);
+void FullDivBackward(const vector<const dtype*> &losses,
+        const vector<const dtype*> &denominator_vals,
+        const vector<const dtype*> &numerator_vals,
         int count,
         int dim,
-        std::vector<dtype*> &numerator_losses,
-        std::vector<dtype*> &denominator_losses);
-void SplitForward(const std::vector<const dtype*> &inputs, const std::vector<int> &offsets,
+        vector<dtype*> &numerator_losses,
+        vector<dtype*> &denominator_losses);
+void SplitForward(const vector<const dtype*> &inputs, const vector<int> &offsets,
         int count,
         int dim,
-        std::vector<dtype*> &results);
-void SplitBackward(const std::vector<const dtype*> &losses, const std::vector<int> offsets,
+        vector<dtype*> &results);
+void SplitBackward(const vector<const dtype*> &losses, const vector<int> offsets,
         int count,
         int dim,
-        const std::vector<dtype*> &input_losses);
-void SubForward(const std::vector<const dtype*> &minuend,
-        const std::vector<const dtype*> &subtrahend,
+        const vector<dtype*> &input_losses);
+void SubForward(const vector<const dtype*> &minuend,
+        const vector<const dtype*> &subtrahend,
         int count,
         const vector<int> &dims,
-        std::vector<dtype*> &results);
-void SubBackward(const std::vector<const dtype*> &losses, int count, const vector<int> &dims,
-        std::vector<dtype*> &minuend_losses,
-        std::vector<dtype*> &subtrahend_losses);
-void PMultiBackward(const std::vector<dtype*> &losses,
-        const std::vector<dtype*> &in_vals1,
-        const std::vector<dtype*> &in_vals2,
+        vector<dtype*> &results);
+void SubBackward(const vector<const dtype*> &losses, int count, const vector<int> &dims,
+        vector<dtype*> &minuend_losses,
+        vector<dtype*> &subtrahend_losses);
+void PMultiBackward(const vector<dtype*> &losses,
+        const vector<dtype*> &in_vals1,
+        const vector<dtype*> &in_vals2,
         int count,
         int dim,
-        std::vector<dtype*> &in_losses1,
-        std::vector<dtype*> &in_losses2);
-void PAddForward(const std::vector<std::vector<dtype*>> &ins, int count,
+        vector<dtype*> &in_losses1,
+        vector<dtype*> &in_losses2);
+void PAddForward(const vector<vector<dtype*>> &ins, int count,
         int dim,
         int in_count,
-        std::vector<dtype*> &vals);
-void PAddBackward(const std::vector<dtype*> &losses, int count, int dim,
+        vector<dtype*> &vals);
+void PAddBackward(const vector<dtype*> &losses, int count, int dim,
         int in_count,
-        std::vector<std::vector<dtype*>> &in_losses);
+        vector<vector<dtype*>> &in_losses);
 dtype CrossEntropyLoss(const vector<dtype *> &vals, const vector<int> &answers, int count,
         dtype batchsize,
         vector<dtype *> &losses);
@@ -337,9 +338,9 @@ dtype KLCrossEntropyLoss(const vector<dtype*> &vals,
 void MaxScalarForward(const vector<const dtype*> &inputs, int count, const vector<int> &dims,
         vector<dtype*> &results,
         vector<int> &max_indexes);
-void MaxScalarBackward(const std::vector<const dtype *> &losses, const std::vector<int> &indexes,
+void MaxScalarBackward(const vector<const dtype *> &losses, const vector<int> &indexes,
         int count,
-        const std::vector<dtype*> &input_losses);
+        const vector<dtype*> &input_losses);
 void VectorSumForward(const vector<const dtype *> &inputs, int count, const vector<int> &dims,
         vector<dtype*> &results);
 void VectorSumBackward(const vector<const dtype*> &losses, int count, const vector<int> &dims,
@@ -355,12 +356,12 @@ void BiasBackward(const vector<dtype *> &losses, int count, int dim, dtype *bias
 vector<int> Predict(const vector<dtype*> &vals, int count, int dim);
 int Predict(const dtype* val, int dim);
 void Max(const dtype *const *v, int count, int dim, int *max_indexes, dtype *max_vals);
-std::pair<dtype, std::vector<int>> SoftMaxLoss(const std::vector<const dtype *> &vals_vector,
+pair<dtype, vector<int>> SoftMaxLoss(const vector<const dtype *> &vals_vector,
         int count,
         int dim,
-        const std::vector<int> &gold_answers,
+        const vector<int> &gold_answers,
         int batchsize,
-        const std::vector<dtype *> &losses_vector);
+        const vector<dtype *> &losses_vector);
 dtype SquareSum(const dtype *v, int len);
 dtype SquareSum(const dtype *v, const bool *indexers, int count, int dim);
 void Rescale(dtype *v, int len, dtype scale);

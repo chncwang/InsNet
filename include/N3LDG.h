@@ -29,6 +29,7 @@
 #include "MaxProbabilityLoss.h"
 #include "ParamOP.h"
 #include "transformer.h"
+#include "MatrixNode.h"
 
 #if USE_GPU
 #include "N3LDG_cuda.h"
