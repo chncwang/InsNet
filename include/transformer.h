@@ -11,6 +11,7 @@
 #include "LookupTable.h"
 #include "Attention.h"
 #include "layer_normalization.h"
+#include "MatrixNode.h"
 
 class AttentionHeadParams : public N3LDGSerializable, public TunableCombination<BaseParam>
 #if USE_GPU
@@ -293,7 +294,7 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
         auto &layer_params = *params.layerParams().ptrs().at(i);
 
         int head_count = params.headCount();
-        vector<vector<Node *>> key_heads, value_heads;
+        vector<MatrixNode *> key_heads, value_heads;
         key_heads.reserve(head_count);
         value_heads.reserve(head_count);
         for (int k = 0; k < head_count; ++k) {
@@ -308,8 +309,10 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
                 Node *v = linear(graph, attention_head_params.v(), *kv_input);
                 values.push_back(v);
             }
-            key_heads.push_back(move(keys));
-            value_heads.push_back(move(values));
+            MatrixNode *key_matrix = concatToMatrix(graph, keys);
+            key_heads.push_back(key_matrix);
+            MatrixNode *value_matrix = concatToMatrix(graph, values);
+            value_heads.push_back(value_matrix);
         }
 
         vector<Node *> sub_layer;
@@ -322,8 +325,8 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
                     *layer_params.multiHeadAttentionParams().ptrs().at(k);
                 Node *q = linear(graph, attention_head_params.q(), *q_input);
 
-                DotAttentionBuilder attention_builder;
-                attention_builder.forward(graph, key_heads.at(k), value_heads.at(k), *q);
+                DotAttentionBuilder attention_builder;// TODO
+//                attention_builder.forward(graph, key_heads.at(k), value_heads.at(k), *q);
                 if (attention_builder._hidden->getDim() * head_count != params.hiddenDim()) {
                     cerr << boost::format("attended_seg dim:%1% head_count:%2% hiddendim:%3%") %
                         attention_builder._hidden->getDim() % head_count % params.hiddenDim()

@@ -1,8 +1,10 @@
+#ifndef N3LDG_PLUS_MATRX_NODE_H
+#define N3LDG_PLUS_MATRX_NODE_H
+
 #include "Node.h"
 #include "Graph.h"
 
-template<typename T>
-class MatrixNode : public Node, Poolable<T> {
+class MatrixNode : public Node {
 public:
     explicit MatrixNode(const string &node_type) : Node(node_type + "-matrix") {}
 
@@ -12,18 +14,6 @@ public:
 
     int getRow() const {
         return getDim() / column_;
-    }
-
-    virtual int getKey() const override {
-        return getDim();
-    }
-
-    virtual void initNode(int dim) override {
-        init(dim);
-    }
-
-    virtual void setNodeDim(int dim) override {
-        setDim(dim);
     }
 
 protected:
@@ -40,15 +30,27 @@ private:
     int column_;
 };
 
-template<typename T>
 class MatrixExecutor : public Executor {
-    int getColumn() const {
-        return static_cast<MatrixNode<T> *>(batch.front())->getColumn();
+public:
+    int getRow() const {
+        return static_cast<MatrixNode *>(batch.front())->getRow();
     }
 };
 
-class MatrixConcatNode : public MatrixNode<MatrixConcatNode> {
+class MatrixConcatNode : public MatrixNode, public Poolable<MatrixConcatNode> {
 public:
+    virtual int getKey() const override {
+        return getDim();
+    }
+
+    virtual void initNode(int dim) override {
+        init(dim);
+    }
+
+    virtual void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
     MatrixConcatNode(): MatrixNode("concat") {}
 
     void forward(Graph &graph, vector<Node *> &inputs) {
@@ -64,13 +66,14 @@ public:
         for (Node *in : inputs) {
             in->addParent(this);
         }
+        setColumn(input_dim);
         graph.addNode(this);
     }
 
     void compute() override {
         for (int i = 0; i < in_nodes.size(); ++i) {
-            int offset = i * getInputDim();
-            for (int j = 0; j < getInputDim(); ++j) {
+            int offset = i * getRow();
+            for (int j = 0; j < getRow(); ++j) {
                 val().v[offset + j] = in_nodes.at(i)->getVal().v[j];
             }
         }
@@ -78,57 +81,81 @@ public:
 
     void backward() override {
         for (int i = 0; i < in_nodes.size(); ++i) {
-            int offset = i * getInputDim();
-            for (int j = 0; j < getInputDim(); ++j) {
+            int offset = i * getRow();
+            for (int j = 0; j < getRow(); ++j) {
                 in_nodes.at(i)->loss()[j] += loss()[offset + j];
             }
         }
     }
 
-    int getInputDim() const {
-        return in_nodes.front()->getDim();
-    }
-
     bool typeEqual(Node *other) override {
         MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(other);
-        return Node::typeEqual(other) && concat->getInputDim() == getInputDim();
+        return Node::typeEqual(other) && concat->getRow() == getRow();
     }
 
     string typeSignature() const override {
-        return Node::typeSignature() + "-" + to_string(getInputDim());
+        return Node::typeSignature() + "-" + to_string(getRow());
     }
 
     Executor* generate() override;
+
+protected:
+    const vector<Node *> &getInputs() const {
+        return in_nodes;
+    }
+
 private:
     vector<Node *> in_nodes;
 };
 
 #if USE_GPU
-class MatrixConcatExecutor : public MatrixExecutor<MatrixConcatNode> {
+class MatrixConcatExecutor : public MatrixExecutor {
 public:
     void forward() override {
-        int count = batch.size();
-        vector<int> in_counts;
         for (Node *node : batch) {
             MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(node);
-            in_counts.push_back(concat->getInputDim());
+            in_counts.push_back(concat->getRow());
         }
-        int max_in_count = *max(in_counts.begin(), in_counts.end());
+        max_in_count = *max(in_counts.begin(), in_counts.end());
         vector<dtype *> vals, in_vals;
-        int node_i = -1;
         for (Node *node : batch) {
-            ++node_i;
             MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(node);
             vals.push_back(concat->getVal().value);
             for (int i = 0; i < max_in_count; ++i) {
                 in_vals.push_back(i < max_in_count ? in_vals.at(i) : nullptr);
             }
         }
+        n3ldg_cuda::MatrixConcatForward(in_vals, getCount(), getRow(), in_counts, vals);
+#if TEST_CUDA
+        testForward();
+#endif
     }
 
     void backward() override {
-
+        vector<dtype *> grads, in_grads;
+        for (Node *node : batch) {
+            MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(node);
+            grads.push_back(concat->getLoss().value);
+            for (int i = 0; i < max_in_count; ++i) {
+                in_grads.push_back(i < max_in_count ? in_grads.at(i) : nullptr);
+            }
+        }
+        n3ldg_cuda::MatrixConcatBackward(grads, getCount(), getRow(), in_counts, in_grads);
+#if TEST_CUDA
+        auto get_inputs = [](Node &node) {
+            vector<pair<Node*, string>> pairs;
+            MatrixConcatNode &concat = static_cast<MatrixConcatNode&>(node);
+            for (Node *input : concat.getInputs()) {
+                pairs.push_back(make_pair(input, input->getNodeType()));
+            }
+        }
+        testBackward();
+#endif
     }
+
+private:
+    vector<int> in_counts;
+    int max_in_count;
 };
 #else
 class MatrixConcatExecutor : public MatrixExecutor {
@@ -146,3 +173,15 @@ public:
 Executor* MatrixConcatNode::generate() {
     return new MatrixConcatExecutor;
 }
+
+namespace n3ldg_plus {
+
+MatrixNode *concatToMatrix(Graph &graph, vector<Node *> &inputs) {
+    int input_dim = inputs.front()->getDim();
+    MatrixConcatNode *node = MatrixConcatNode::newNode(inputs.size() * input_dim);
+    node->forward(graph, inputs);
+    return node;
+}
+
+}
+#endif

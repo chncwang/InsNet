@@ -1936,8 +1936,7 @@ __global__ void KernelMatrixConcatForward(dtype **in_vals, int count, int in_dim
     }
 }
 
-void MatrixConcatForward(vector<dtype*> &in_vals, int count, int in_dim,
-        vector<int> &in_counts,
+void MatrixConcatForward(vector<dtype*> &in_vals, int count, int in_dim, vector<int> &in_counts,
         vector<dtype*> &vals) {
     int max_in_count = *max_element(in_counts.begin(), in_counts.end());
     int len = count * max_in_count * in_dim;
@@ -1971,7 +1970,19 @@ __global__ void KernelMatrixConcatBackward(dtype **grads, int count, int in_dim,
     }
 }
 
-//void MatrixConcatBackward(vector<dtype *> &grads
+void MatrixConcatBackward(vector<dtype *> &grads, int count, int in_dim, vector<int> &in_counts,
+        vector<dtype *> &in_grads) {
+    int max_in_count = *max_element(in_counts.begin(), in_counts.end());
+    int len = count * max_in_count * in_dim;
+    int block_count = DefaultBlockCount(len);
+    NumberPointerArray grad_arr, in_grad_arr;
+    grad_arr.init((dtype**)grads.data(), grads.size());
+    in_grad_arr.init((dtype **)in_grads.data(), in_grads.size());
+    IntArray in_count_arr;
+    in_count_arr.init((int*)in_counts.data(), in_counts.size());
+    KernelMatrixConcatBackward<<<block_count, TPB>>>((dtype **)grad_arr.value, count, in_dim,
+            in_count_arr.value, max_in_count, (dtype**)in_grad_arr.value);
+}
 
 __global__ void KernelPMultiForward(dtype **ins1, dtype **ins2, int count, int dim,
         dtype **vals) {
@@ -2380,14 +2391,14 @@ void PMultiBackward(vector<dtype*> &grads,
         vector<dtype*> &in_grads1,
         vector<dtype*> &in_grads2) {
     int block_count = DefaultBlockCount(count * dim);
-    NumberPointerArray grads_arr, in_vals1_arr, in_vals2_arr, in_grads1_arr,
+    NumberPointerArray grad_arr, in_vals1_arr, in_vals2_arr, in_grads1_arr,
                        in_grads2_arr;
-    grads_arr.init((dtype**)grads.data(), grads.size());
+    grad_arr.init((dtype**)grads.data(), grads.size());
     in_vals1_arr.init((dtype**)in_vals1.data(), in_vals1.size());
     in_vals2_arr.init((dtype**)in_vals2.data(), in_vals2.size());
     in_grads1_arr.init((dtype**)in_grads1.data(), in_grads1.size());
     in_grads2_arr.init((dtype**)in_grads2.data(), in_grads2.size());
-    KernelPMultiBackward<<<block_count, TPB>>>(grads_arr.value, in_vals1_arr.value,
+    KernelPMultiBackward<<<block_count, TPB>>>(grad_arr.value, in_vals1_arr.value,
             in_vals2_arr.value, count, dim, (dtype **)in_grads1_arr.value,
             (dtype **)in_grads2_arr.value);
     CheckCudaError();

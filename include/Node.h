@@ -493,6 +493,10 @@ public:
         return batch.front()->typeSignature();
     }
 
+    int getCount() const {
+        return batch.size();
+    }
+
     void forwardFully() {
         Node *first = batch.front();
         for (int i = 1; i < batch.size(); ++i) {

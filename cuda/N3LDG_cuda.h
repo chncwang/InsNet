@@ -261,9 +261,10 @@ void SumPoolBackward(PoolingEnum pooling, vector<dtype*> &losses,
         int count,
         int dim,
         vector<dtype*> &in_losses);
-void MatrixConcatForward(vector<dtype*> &in_vals, int count, int in_dim,
-        vector<int> &in_counts,
+void MatrixConcatForward(vector<dtype*> &in_vals, int count, int in_dim, vector<int> &in_counts,
         vector<dtype*> &vals);
+void MatrixConcatBackward(vector<dtype *> &grads, int count, int in_dim, vector<int> &in_counts,
+        vector<dtype *> &in_grads);
 void PMultiForward(vector<dtype*> &ins1,
         vector<dtype*> &ins2,
         int count,

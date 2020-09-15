@@ -350,7 +350,7 @@ Executor *ScalarConcatNode::generate() {
 
 namespace n3ldg_plus {
 
-Node *concat(Graph &graph, const vector<Node*> inputs) {
+Node *concat(Graph &graph, vector<Node*> inputs) {
     int dim = 0;
     for (Node *in : inputs) {
         dim += in->getDim();
@@ -360,7 +360,7 @@ Node *concat(Graph &graph, const vector<Node*> inputs) {
     return concat;
 }
 
-Node *scalarConcat(Graph &graph, const vector<Node *> inputs) {
+Node *scalarConcat(Graph &graph, vector<Node *> inputs) {
     ScalarConcatNode *concat = ScalarConcatNode::newNode(inputs.size());
     concat->forward(graph, inputs);
     return concat;

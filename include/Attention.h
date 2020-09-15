@@ -11,6 +11,7 @@
 
 #include "MyLib.h"
 #include "Node.h"
+#include "MatrixNode.h"
 #include "UniOP.h"
 #include "Graph.h"
 #include "AttentionHelp.h"
@@ -41,6 +42,18 @@ public:
 
         _hidden = attention(cg, values, _weights);
     }
+
+//    void forward(Graph &cg, MatrixNode& key_matrix, MatrixNode& value_matrix, Node& guide) {
+//        using namespace n3ldg_plus;
+
+//        Node *pro = n3ldg_plus::pointwiseMultiply(cg, *keys.at(idx), guide);
+//        Node *sum = n3ldg_plus::vectorSum(cg, *pro);
+//        Node *scaled = n3ldg_plus::dropout(cg, *sum, 1 - 1.0 / sqrt((dtype)guide.getDim()),
+//                false);
+//        _weights.push_back(scaled);
+
+//        _hidden = attention(cg, values, _weights);
+//    }
 };
 
 struct AdditiveAttentionParams : public N3LDGSerializable, TunableCombination<BaseParam>
