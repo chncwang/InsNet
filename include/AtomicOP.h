@@ -14,7 +14,7 @@ public:
     vector<dtype*> vals;
 
     void forward() override {
-        vector<const dtype*> inputs;
+        vector<dtype*> inputs;
         for (Node *node : batch) {
             UniInputNode *expnode = static_cast<UniInputNode*>(node);
             inputs.push_back(expnode->getInput()->getVal().value);
@@ -29,7 +29,7 @@ public:
     }
 
     void backward() override {
-        vector<const dtype*> losses;
+        vector<dtype*> losses;
         vector<dtype*> vals;
         vector<dtype*> input_losses;
 
@@ -458,7 +458,7 @@ private:
 class MaxScalarExecutor : public UniInputExecutor {
 public:
     void forward() override {
-        vector<const dtype*> inputs;
+        vector<dtype*> inputs;
         vector<dtype*> results;
         max_indexes.resize(batch.size());
         vector<int> dims;
@@ -499,7 +499,7 @@ public:
     }
 
     void backward() override {
-        vector<const dtype*> losses;
+        vector<dtype*> losses;
         vector<dtype *> input_losses;
 
         for (Node *node : batch) {
@@ -589,7 +589,7 @@ public:
 #if TEST_CUDA
         UniInputExecutor::testForwardInpputs();
 #endif
-        vector<const dtype*> inputs;
+        vector<dtype*> inputs;
         vector<dtype*> results;
         for (Node *node : batch) {
             ScalarToVectorNode *n = static_cast<ScalarToVectorNode*>(node);
@@ -613,7 +613,7 @@ public:
         }
         UniInputExecutor::testBeforeBackward();
 #endif
-        vector<const dtype*> losses;
+        vector<dtype*> losses;
         vector<dtype*> input_losses;
         for (Node *node : batch) {
             ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(node);
@@ -742,7 +742,7 @@ private:
 #if USE_GPU
 class SumExecutor : public UniInputExecutor {
     void forward() override {
-        vector<const dtype*> inputs;
+        vector<dtype*> inputs;
         vector<dtype*> results;
         for (Node *node : batch) {
             SumNode *sum = static_cast<SumNode*>(node);
@@ -758,7 +758,7 @@ class SumExecutor : public UniInputExecutor {
     }
 
     void backward() override {
-        vector<const dtype*> losses;
+        vector<dtype*> losses;
         vector<dtype*> input_losses;
         for (Node *node : batch) {
 #if TEST_CUDA

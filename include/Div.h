@@ -75,8 +75,8 @@ namespace n3ldg_plus {
 #if USE_GPU
 class DivExecutor : public Executor {
 public:
-    vector<const dtype*> numerators;
-    vector<const dtype*> denominators;
+    vector<dtype*> numerators;
+    vector<dtype*> denominators;
     vector<int> dims;
 
     void forward() override {
@@ -97,7 +97,7 @@ public:
     }
 
     void backward() override {
-        vector<const dtype*> losses;
+        vector<dtype*> losses;
         vector<dtype*> numerator_losses, denominator_losses;
         for (Node *node : batch) {
             DivNode *div = static_cast<DivNode*>(node);
@@ -184,8 +184,8 @@ private:
 #if USE_GPU
 class FullDivExecutor : public Executor {
 public:
-    vector<const dtype*> numerators;
-    vector<const dtype*> denominators;
+    vector<dtype*> numerators;
+    vector<dtype*> denominators;
 
     void forward() override {
         vector<dtype*> results;
@@ -204,7 +204,7 @@ public:
     }
 
     void backward() override {
-        vector<const dtype*> losses;
+        vector<dtype*> losses;
         vector<dtype*> numerator_losses, denominator_losses;
         for (Node *node : batch) {
             FullDivNode *div = static_cast<FullDivNode*>(node);

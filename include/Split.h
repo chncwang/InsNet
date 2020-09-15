@@ -71,7 +71,7 @@ Node* split(Graph &graph, int dim, Node &input, int offset) {
 class SplitExecutor : public Executor {
 public:
     void forward() override {
-        vector<const dtype*> inputs;
+        vector<dtype*> inputs;
         vector<dtype*> results;
         for (Node *node : batch) {
             SplitNode *split = static_cast<SplitNode*>(node);
@@ -87,7 +87,7 @@ public:
     }
 
     void backward() override {
-        vector<const dtype*> losses;
+        vector<dtype*> losses;
         vector<dtype *> input_losses;
 
         for (Node *node : batch) {

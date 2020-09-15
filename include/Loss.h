@@ -52,7 +52,8 @@ dtype crossEntropyLoss(vector<Node *> &nodes, const vector<int> &answers, dtype 
     vector<dtype*> vals, losses;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     transform(nodes.begin(), nodes.end(), back_inserter(losses), gpu_get_node_loss);
-    dtype loss = n3ldg_cuda::CrossEntropyLoss(vals, answers, nodes.size(), factor, losses);
+    dtype loss = n3ldg_cuda::CrossEntropyLoss(vals, const_cast<vector<int>&>(answers),
+            nodes.size(), factor, losses);
 #if TEST_CUDA
     dtype cpu_loss = cpuCrossEntropyLoss(nodes, answers, factor);
     for (Node *node : nodes) {
@@ -114,8 +115,9 @@ pair<float, vector<int>> KLLoss(vector<Node *> &nodes,
     vector<dtype *> vals, losses;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     transform(nodes.begin(), nodes.end(), back_inserter(losses), gpu_get_node_loss);
-    dtype gpu_loss = n3ldg_cuda::KLCrossEntropyLoss(vals, answers, nodes.size(),
-            nodes.front()->getDim(), factor, losses);
+    dtype gpu_loss = n3ldg_cuda::KLCrossEntropyLoss(vals,
+            const_cast<vector<shared_ptr<vector<dtype>>>&>(answers),
+            nodes.size(), nodes.front()->getDim(), factor, losses);
 #if TEST_CUDA
     dtype cpu_loss = cpuKLLoss(nodes, answers, factor);
     cout << "KLLoss - gpu loss:" << gpu_loss << " cpu_loss:" << cpu_loss << endl;
@@ -143,7 +145,8 @@ float multiCrossEntropyLoss(vector<Node *> &nodes, const vector<vector<int>> &an
     vector<dtype *> vals, losses;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     transform(nodes.begin(), nodes.end(), back_inserter(losses), gpu_get_node_loss);
-    dtype gpu_loss = n3ldg_cuda::MultiCrossEntropyLoss(vals, answers, nodes.size(),
+    dtype gpu_loss = n3ldg_cuda::MultiCrossEntropyLoss(vals,
+            const_cast<vector<vector<int>>&>(answers), nodes.size(),
             nodes.front()->getDim(), factor, losses);
 #if TEST_CUDA
     dtype cpu_loss = cpuMultiCrossEntropyLoss(nodes, answers, factor);

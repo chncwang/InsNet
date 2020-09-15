@@ -72,7 +72,7 @@ Node *sub(Graph &graph, Node &minuend, Node &subtrahend) {
 #if USE_GPU
 class SubExecutor : public Executor {
     void forward() override {
-        vector<const dtype*> minuend, subtrahend;
+        vector<dtype*> minuend, subtrahend;
         vector<dtype*> results;
 
         for (Node *node : batch) {
@@ -91,7 +91,7 @@ class SubExecutor : public Executor {
     }
 
     void backward() override {
-        std::vector<const dtype*> losses;
+        std::vector<dtype*> losses;
         std::vector<dtype*> minuend_losses, subtrahend_losses;
         for (Node *n : batch) {
             SubNode *sub = static_cast<SubNode*>(n);
