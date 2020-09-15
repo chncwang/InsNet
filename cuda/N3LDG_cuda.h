@@ -261,7 +261,7 @@ void SumPoolBackward(PoolingEnum pooling, const vector<dtype*> &losses,
         int count,
         int dim,
         vector<dtype*> &in_losses);
-void MaxtrixConcatForward(const vector<dtype*> &in_vals, int count, int in_dim,
+void MatrixConcatForward(const vector<dtype*> &in_vals, int count, int in_dim,
         const vector<int> &in_counts,
         vector<dtype*> &vals);
 void PMultiForward(const vector<dtype*> &ins1,

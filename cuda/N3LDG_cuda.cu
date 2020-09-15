@@ -1936,7 +1936,7 @@ __global__ void KernelMatrixConcatForward(dtype **in_vals, int count, int in_dim
     }
 }
 
-void MaxtrixConcatForward(const vector<dtype*> &in_vals, int count, int in_dim,
+void MatrixConcatForward(const vector<dtype*> &in_vals, int count, int in_dim,
         const vector<int> &in_counts,
         vector<dtype*> &vals) {
     int max_in_count = *max_element(in_counts.begin(), in_counts.end());
@@ -1953,7 +1953,25 @@ void MaxtrixConcatForward(const vector<dtype*> &in_vals, int count, int in_dim,
     CheckCudaError();
 }
 
-//__global__ void KernelMatrixConcatBackward(dtype **grads, 
+__global__ void KernelMatrixConcatBackward(dtype **grads, int count, int in_dim, int *in_counts,
+        int max_in_count,
+        dtype **in_grads) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * max_in_count * in_dim; i += step) {
+        int max_in_dim_sum = max_in_count * in_dim;
+        int count_i = i / max_in_dim_sum;
+        int x = i % max_in_dim_sum;
+        int in_count_i = x / in_dim;
+        if (in_count_i < in_counts[count_i]) {
+            int dim_i = x % in_dim;
+            DeviceAtomicAdd(in_grads[count_i * max_in_count + in_count_i] + dim_i,
+                    grads[count_i][x]);
+        }
+    }
+}
+
+//void MatrixConcatBackward(const vector<dtype *> &grads
 
 __global__ void KernelPMultiForward(const dtype **ins1, const dtype **ins2, int count, int dim,
         dtype *const *vals) {
