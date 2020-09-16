@@ -53,7 +53,7 @@ public:
 
     MatrixConcatNode(): MatrixNode("concat") {}
 
-    void forward(Graph &graph, vector<Node *> &inputs) {
+    void forward(Graph &graph, const vector<Node *> &inputs) {
         int input_dim = inputs.front()->getDim();
         for (auto it = inputs.begin() + 1; it != inputs.end(); ++it) {
             if (input_dim != (*it)->getDim()) {
@@ -66,7 +66,7 @@ public:
         for (Node *in : inputs) {
             in->addParent(this);
         }
-        setColumn(input_dim);
+        setColumn(inputs.size());
         graph.addNode(this);
     }
 
@@ -90,16 +90,15 @@ public:
 
     bool typeEqual(Node *other) override {
         MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(other);
-        return Node::typeEqual(other) && concat->getRow() == getRow();
+        return concat->getNodeType() == getNodeType() && concat->getRow() == getRow();
     }
 
     string typeSignature() const override {
-        return Node::typeSignature() + "-" + to_string(getRow());
+        return "MatrixConcatNode-" + to_string(getRow());
     }
 
     Executor* generate() override;
 
-protected:
     const vector<Node *> &getInputs() const {
         return in_nodes;
     }
@@ -114,42 +113,52 @@ public:
     void forward() override {
         for (Node *node : batch) {
             MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(node);
-            in_counts.push_back(concat->getRow());
+//            cout << "in count:" << concat->getColumn() << endl;
+            in_counts.push_back(concat->getColumn());
         }
-        max_in_count = *max(in_counts.begin(), in_counts.end());
+        max_in_count = *max_element(in_counts.begin(), in_counts.end());
+//        cout << "max_in_count:%d" << max_in_count << endl;
         vector<dtype *> vals, in_vals;
+        int node_i = -1;
         for (Node *node : batch) {
+            ++node_i;
             MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(node);
             vals.push_back(concat->getVal().value);
             for (int i = 0; i < max_in_count; ++i) {
-                in_vals.push_back(i < max_in_count ? in_vals.at(i) : nullptr);
+                in_vals.push_back(i < in_counts.at(node_i) ?
+                        concat->getInputs().at(i)->getVal().value : nullptr);
             }
         }
         n3ldg_cuda::MatrixConcatForward(in_vals, getCount(), getRow(), in_counts, vals);
 #if TEST_CUDA
         testForward();
+        cout << "MatrixConcat forward tested" << endl;
 #endif
     }
 
     void backward() override {
         vector<dtype *> grads, in_grads;
+        int node_i = -1;
         for (Node *node : batch) {
+            ++node_i;
             MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(node);
             grads.push_back(concat->getLoss().value);
             for (int i = 0; i < max_in_count; ++i) {
-                in_grads.push_back(i < max_in_count ? in_grads.at(i) : nullptr);
+                in_grads.push_back(i < in_counts.at(node_i) ?
+                        concat->getInputs().at(i)->getLoss().value : nullptr);
             }
         }
         n3ldg_cuda::MatrixConcatBackward(grads, getCount(), getRow(), in_counts, in_grads);
 #if TEST_CUDA
-        auto get_inputs = [](Node &node) {
+        auto get_inputs = [&](Node &node) {
             vector<pair<Node*, string>> pairs;
             MatrixConcatNode &concat = static_cast<MatrixConcatNode&>(node);
             for (Node *input : concat.getInputs()) {
                 pairs.push_back(make_pair(input, input->getNodeType()));
             }
-        }
-        testBackward();
+            return pairs;
+        };
+        testBackward(get_inputs);
 #endif
     }
 
@@ -176,7 +185,7 @@ Executor* MatrixConcatNode::generate() {
 
 namespace n3ldg_plus {
 
-MatrixNode *concatToMatrix(Graph &graph, vector<Node *> &inputs) {
+MatrixNode *concatToMatrix(Graph &graph, const vector<Node *> &inputs) {
     int input_dim = inputs.front()->getDim();
     MatrixConcatNode *node = MatrixConcatNode::newNode(inputs.size() * input_dim);
     node->forward(graph, inputs);

@@ -249,8 +249,8 @@ protected:
 
     virtual void init(int ndim) {
         if (ndim <= 0) {
-            cerr << "dim is less than 0:" << ndim << endl;
-            cerr << getNodeType() << endl;
+            cerr << boost::format("Node init - dim is less than 0:%1% type:%2%") % ndim %
+                getNodeType() << endl;
             abort();
         }
         dim_ = ndim;

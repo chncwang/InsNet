@@ -3,6 +3,7 @@
 #include <boost/format.hpp>
 #include <cstdlib>
 #include <cstddef>
+#include <functional>
 #include <vector>
 #include <algorithm>
 #include <cmath>
@@ -305,7 +306,7 @@ void Tensor2D::copyFromDeviceToHost() {
     CallCuda(MyCudaMemcpy(v, value, size * sizeof(dtype), cudaMemcpyDeviceToHost));
 }
 
-void Assert(bool v, string &message, const function<void(void)> &call) {
+void Assert(bool v, const string &message, const function<void(void)> &call) {
 #if TEST_CUDA
     if (!v) {
         cerr << message << endl;
@@ -852,14 +853,14 @@ __global__ void KernelVerify(dtype *host, dtype *device, int len,
     }
 }
 
-bool Verify(dtype *host, dtype *device, int len, char* message) {
+bool Verify(dtype *host, dtype *device, int len, const char* message) {
     NumberArray arr;
     arr.init(host, len);
     int block_count = DefaultBlockCount(len);
     char *m = NULL;
     CallCuda(MemoryPool::Ins().Malloc((void**)&m,
                 (strlen(message) + 1) * sizeof(char)));
-    CallCuda(MyCudaMemcpy(m, message,
+    CallCuda(MyCudaMemcpy(m, (void *)message,
                 (strlen(message) + 1) * sizeof(char), cudaMemcpyHostToDevice));
     bool success = true;
     bool *dev_success = NULL;
@@ -896,14 +897,14 @@ __global__ void KernelVerify(bool *host, bool *device, int len,
     }
 }
 
-bool Verify(bool *host, bool *device, int len, char* message) {
+bool Verify(bool *host, bool *device, int len, const char* message) {
     BoolArray arr;
     arr.init(host, len);
     int block_count = (len + TPB - 1) / TPB;
     char *m = NULL;
     CallCuda(MemoryPool::Ins().Malloc((void**)&m,
                 (strlen(message) + 1) * sizeof(char)));
-    CallCuda(MyCudaMemcpy(m, message,
+    CallCuda(MyCudaMemcpy(m, (void *)message,
                 (strlen(message) + 1) * sizeof(char), cudaMemcpyHostToDevice));
     bool success = true;
     bool *dev_success = NULL;
@@ -936,14 +937,14 @@ __global__ void KernelVerify(int *host, int *device, int len,
     }
 }
 
-bool Verify(int *host, int *device, int len, char* message) {
+bool Verify(int *host, int *device, int len, const char* message) {
     IntArray arr;
     arr.init(host, len);
     int block_count = (len + TPB - 1) / TPB;
     char *m = NULL;
     CallCuda(MemoryPool::Ins().Malloc((void**)&m,
                 (strlen(message) + 1) * sizeof(char)));
-    CallCuda(MyCudaMemcpy(m, message,
+    CallCuda(MyCudaMemcpy(m, (void*)message,
                 (strlen(message) + 1) * sizeof(char), cudaMemcpyHostToDevice));
     bool success = true;
     bool *dev_success = NULL;
@@ -3235,6 +3236,13 @@ void MaxScalarForward(vector<dtype*> &inputs, int count, vector<int> &dims,
 
     IntArray dim_arr;
     dim_arr.init(dims.data(), dims.size());
+
+//    for (int dim : dims) {
+//        cout << boost::format("dim:%1%") % dim << endl;
+//    }
+//
+//    cout << boost::format("block y:%1% thread_count:%2% count:%3%") % block_y_count % thread_count %
+//        count << endl;
 
     KernelMaxScalarForward<<<block_dim, thread_count>>>((dtype **)input_arr.value,
             count, dim_arr.value, max_dim, block_maxes.value, block_max_is.value,

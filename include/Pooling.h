@@ -687,7 +687,7 @@ public:
             if (x[i]->getDim() == getDim()) {
                 ins.push_back(x[i]);
             } else {
-                std::cerr << "dim does not match" << std::endl;
+                std::cerr << "AvgPooling forward - dim does not match" << std::endl;
                 abort();
             }
         }
