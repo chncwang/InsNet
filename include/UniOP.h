@@ -132,7 +132,7 @@ public:
         abort();
     }
 
-    PExecutor generate() override;
+    Executor * generate() override;
 
     bool typeEqual(PNode other) override {
         bool result = Node::typeEqual(other);
@@ -381,7 +381,7 @@ public:
 };
 #endif
 
-PExecutor LinearNode::generate() {
+Executor * LinearNode::generate() {
     LinearExecutor* exec = new LinearExecutor();
     exec->batch.push_back(this);
     exec->inDim = param->W.inDim();

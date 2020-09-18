@@ -1985,6 +1985,40 @@ void MatrixConcatBackward(vector<dtype *> &grads, int count, int in_dim, vector<
             in_count_arr.value, max_in_count, (dtype**)in_grad_arr.value);
 }
 
+__global__ void KernelMatrixAndVectorPointwiseMultiForward(dtype **matrix_vals,
+        dtype **vector_vals,
+        int count,
+        int row,
+        int *cols,
+        int max_col,
+        dtype **vals) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * row * col; i += step) {
+        int col_i = i / row % max_col;
+        int row_i = i % row;
+        int index_i = row * col_i + row_i;
+        int count_i = i / (row * max_col);
+        if (col_i < cols[count_i]) {
+            vals[count_i][index_i] = matrix_vals[count_i][index_i] * vector_vals[count_i][row_i];
+        }
+    }
+}
+
+void MatrixAndVectorPointwiseMultiForward(vector<dtype *> &matrix_vals,
+        vector<dtype *> &vector_vals,
+        int count,
+        int row,
+        vector<int> &cols,
+        vector<dtype *> &vals) {
+    int max_col = *max_element(cols.begin(), cols.end());
+    int block_count = DefaultBlockCount(count * max_col);
+    NumberPointerArray matrix_arr, vector_arr, val_arr;
+    matrix_arr.init((dtype **)matrix_vals.data(), count);
+    vector_arr.init((dtype **)vector_vals.data(), count);
+    val_arr.init((dtype **)vals.data(), count);
+}
+
 __global__ void KernelPMultiForward(dtype **ins1, dtype **ins2, int count, int dim,
         dtype **vals) {
     int index = DeviceDefaultIndex();
@@ -1996,10 +2030,7 @@ __global__ void KernelPMultiForward(dtype **ins1, dtype **ins2, int count, int d
     }
 }
 
-void PMultiForward(vector<dtype*> &ins1,
-        vector<dtype*> &ins2,
-        int count,
-        int dim,
+void PMultiForward(vector<dtype*> &ins1, vector<dtype*> &ins2, int count, int dim,
         vector<dtype*> &vals) {
     int block_count = DefaultBlockCount(count * dim);
     NumberPointerArray ins1_arr, ins2_arr, vals_arr;

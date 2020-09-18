@@ -183,12 +183,106 @@ Executor* MatrixConcatNode::generate() {
     return new MatrixConcatExecutor;
 }
 
+class MatrixAndVectorPointwiseMultiNode : public MatrixNode,
+    public Poolable<MatrixAndVectorPointwiseMultiNode> {
+public:
+    MatrixAndVectorPointwiseMultiNode() : MatrixNode("MatrixAndVectorPointwiseMulti") {}
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    void forward(Graph &graph, MatrixNode &matrix, Node &vec) {
+        if (matrix.getRow() != vec.getDim()) {
+            cerr << boost::format("MatrixConcatNode forward - matrix row:%1% vec dim:%2%") %
+                matrix.getRow() % vec.getDim() << endl;
+            abort();
+        }
+        matrix.addParent(this);
+        vec.addParent(this);
+        matrix_ = &matrix;
+        vector_ = &vec;
+        setColumn(matrix.getColumn());
+        graph.addNode(this);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
+
+    void compute() override {
+        int in_dim = vector_->getDim();
+        for (int i = 0; i < matrix_->getColumn(); ++i) {
+            int matrix_i = i * in_dim;
+            Vec(val().v + matrix_i, in_dim) = vector_->getVal().vec() *
+                Vec(matrix_->getVal().v + matrix_i, in_dim);
+        }
+    }
+
+    void backward() override {
+        int in_dim = vector_->getDim();
+        for (int i = 0; i < matrix_->getColumn(); ++i) {
+            int matrix_i = i * in_dim;
+            Vec(matrix_->loss().v + matrix_i, in_dim) += Vec(getLoss().v + matrix_i, in_dim) *
+                vector_->getVal().vec();
+            vector_->loss().vec() += Vec(getLoss().v + matrix_i, in_dim) *
+                Vec(matrix_->getVal().v + matrix_i, in_dim);
+        }
+    }
+
+
+    string typeSignature() const override {
+        return "MatrixAndVectorPointwiseMulti-" + to_string(vector_->getDim());
+    }
+
+    bool typeEqual(Node *other) override {
+        return getNodeType() == other->getNodeType() && vector_->getDim() ==
+            static_cast<MatrixAndVectorPointwiseMultiNode *>(other)->vector_->getDim();
+    }
+
+    Executor *generate() override;
+
+private:
+    MatrixNode *matrix_;
+    Node *vector_;
+};
+
+class MatrixAndVectorPointwiseMultiExecutor : public MatrixExecutor {
+public:
+    int calculateFLOPs() override {
+        cerr << "MatrixAndVectorPointwiseMultiExecutor - calculateFLOPs" << endl;
+        abort();
+        return 0;
+    }
+
+    int calculateActivations() override {
+        cerr << "MatrixAndVectorPointwiseMultiExecutor - calculateActivations" << endl;
+        abort();
+        return 0;
+    }
+};
+
+Executor *MatrixAndVectorPointwiseMultiNode::generate() {
+    return new MatrixAndVectorPointwiseMultiExecutor;
+}
+
 namespace n3ldg_plus {
 
 MatrixNode *concatToMatrix(Graph &graph, const vector<Node *> &inputs) {
     int input_dim = inputs.front()->getDim();
     MatrixConcatNode *node = MatrixConcatNode::newNode(inputs.size() * input_dim);
     node->forward(graph, inputs);
+    return node;
+}
+
+MatrixNode *pointwiseMultiply(Graph &graph, MatrixNode &matrix, Node &vec) {
+    MatrixAndVectorPointwiseMultiNode *node = MatrixAndVectorPointwiseMultiNode::newNode(
+            matrix.getDim());
+    node->forward(graph, matrix, vec);
     return node;
 }
 

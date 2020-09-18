@@ -16,11 +16,11 @@
 
 class PMultiNode : public Node, public Poolable<PMultiNode> {
 public:
-    PNode in1, in2;
+    Node *in1, *in2;
 
     PMultiNode() : Node("point-multiply") {
-        in1 = NULL;
-        in2 = NULL;
+        in1 = nullptr;
+        in2 = nullptr;
     }
 
     void setNodeDim(int dim) override {
@@ -35,7 +35,7 @@ public:
         this->forward(&graph, &input1, &input2);
     }
 
-    void forward(Graph *cg, PNode x1, PNode x2) {
+    void forward(Graph *cg, Node * x1, Node * x2) {
         in1 = x1;
         in2 = x2;
         x1->addParent(this);
@@ -56,27 +56,8 @@ public:
         in2->loss().vec() += loss().vec() * in1->val().vec();
     }
 
-    // better to rewrite for deep understanding
-    bool typeEqual(PNode other) override {
-        return Node::typeEqual(other);
-    }
-
-    PExecutor generate() override;
+    Executor * generate() override;
 };
-
-namespace n3ldg_plus {
-
-Node *pointwiseMultiply(Graph &graph, Node &a, Node &b) {
-    if (a.getDim() != b.getDim()) {
-        cerr << boost::format("a dim:%1% b dim:%2%") % a.getDim() % b.getDim() << endl;
-        abort();
-    }
-    PMultiNode *node = PMultiNode::newNode(a.getDim());
-    node->forward(graph, a, b);
-    return node;
-}
-
-}
 
 class PMultiExecutor :public Executor {
 public:
@@ -145,12 +126,24 @@ public:
 #endif
 };
 
-PExecutor PMultiNode::generate() {
+Executor * PMultiNode::generate() {
     PMultiExecutor* exec = new PMultiExecutor();
     exec->batch.push_back(this);
     exec->dim = getDim();
     return exec;
 };
 
+namespace n3ldg_plus {
 
+Node *pointwiseMultiply(Graph &graph, Node &a, Node &b) {
+    if (a.getDim() != b.getDim()) {
+        cerr << boost::format("a dim:%1% b dim:%2%") % a.getDim() % b.getDim() << endl;
+        abort();
+    }
+    PMultiNode *node = PMultiNode::newNode(a.getDim());
+    node->forward(graph, a, b);
+    return node;
+}
+
+}
 #endif
