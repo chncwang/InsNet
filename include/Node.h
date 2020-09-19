@@ -469,7 +469,23 @@ public:
     std::vector<PNode> batch;
     virtual ~Executor() = default;
 
-#if !USE_GPU
+#if USE_GPU
+    vector<dtype *> getVals() {
+        vector<dtype *> vals;
+        for (Node * node : batch) {
+            vals.push_back(node->getVal().value);
+        }
+        return vals;
+    }
+
+    vector<dtype *> getGrads() {
+        vector<dtype *> grads;
+        for (Node * node : batch) {
+            grads.push_back(node->getLoss().value);
+        }
+        return grads;
+    }
+#else
     virtual int calculateFLOPs() = 0;
 
     virtual int calculateActivations() {

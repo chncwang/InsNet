@@ -1994,7 +1994,7 @@ __global__ void KernelMatrixAndVectorPointwiseMultiForward(dtype **matrix_vals,
         dtype **vals) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
-    for (int i = index; i < count * row * col; i += step) {
+    for (int i = index; i < count * row * max_col; i += step) {
         int col_i = i / row % max_col;
         int row_i = i % row;
         int index_i = row * col_i + row_i;
@@ -2012,11 +2012,104 @@ void MatrixAndVectorPointwiseMultiForward(vector<dtype *> &matrix_vals,
         vector<int> &cols,
         vector<dtype *> &vals) {
     int max_col = *max_element(cols.begin(), cols.end());
-    int block_count = DefaultBlockCount(count * max_col);
+    int block_count = DefaultBlockCount(count * max_col * row);
     NumberPointerArray matrix_arr, vector_arr, val_arr;
     matrix_arr.init((dtype **)matrix_vals.data(), count);
     vector_arr.init((dtype **)vector_vals.data(), count);
     val_arr.init((dtype **)vals.data(), count);
+    IntArray col_arr;
+    col_arr.init((int *)cols.data(), count);
+    KernelMatrixAndVectorPointwiseMultiForward<<<block_count, TPB>>>((dtype **)matrix_arr.value,
+            (dtype **)vector_arr.value, count, row, (int *)col_arr.value, max_col,
+            (dtype **)val_arr.value);
+    CheckCudaError();
+}
+
+__global__ void KernelMatrixAndVectorPointwiseMultiBackwardForMatrix(dtype **grads,
+        dtype **vector_vals,
+        int count,
+        int row,
+        int *cols,
+        int max_col,
+        dtype **matrix_grads) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * row * max_col; i += step) {
+        int col_i = i / row % max_col;
+        int row_i = i % row;
+        int index_i = row * col_i + row_i;
+        int count_i = i / (row * max_col);
+        if (col_i < cols[count_i]) {
+            dtype x = grads[count_i][index_i] * vector_vals[count_i][row_i]; 
+            dtype *matrix_grads_addr = matrix_grads[count_i];
+            DeviceAtomicAdd(matrix_grads_addr + index_i, x);
+        }
+    }
+}
+
+__global__ void KernelMatrixAndVectorPointwiseMultiBackwardForVector(dtype **grads,
+        dtype **matrix_vals,
+        int count,
+        int row,
+        int *cols,
+        int max_col,
+        dtype **vector_grads) {
+    __shared__ volatile extern dtype shared_arr[];
+    int count_i = blockIdx.y;
+    int col = cols[count_i];
+    int col_i = threadIdx.x;
+    int row_i = blockIdx.x;
+    if (col_i < col) {
+        int index_i = row * col_i + row_i;
+        shared_arr[threadIdx.x] = grads[count_i][index_i] * matrix_vals[count_i][index_i];
+    } else {
+        shared_arr[threadIdx.x] = 0.0f;
+    }
+    __syncthreads();
+
+    for (int i = (blockDim.x >> 1); i > 0;i >>=1) {
+        if (threadIdx.x < i) {
+            int plus_i = threadIdx.x + i;
+            shared_arr[threadIdx.x] += shared_arr[plus_i];
+        }
+        __syncthreads();
+    }
+
+    if (threadIdx.x == 0) {
+        vector_grads[count_i][row_i] = shared_arr[0];
+    }
+}
+
+void MatrixAndVectorPointwiseMultiBackward(vector<dtype *> &grads, vector<dtype *> &matrix_vals,
+        vector<dtype *> &vector_vals,
+        int count,
+        int row,
+        vector<int> &cols,
+        vector<dtype *> &matrix_grads,
+        vector<dtype *> &vector_grads) {
+    NumberPointerArray grad_arr, matrix_val_arr, vector_val_arr, matrix_grad_arr, vector_grad_arr;
+    grad_arr.init((dtype **)grads.data(), count);
+    matrix_val_arr.init((dtype **)matrix_vals.data(), count);
+    vector_val_arr.init((dtype **)vector_vals.data(), count);
+    matrix_grad_arr.init((dtype **)matrix_grads.data(), count);
+    vector_grad_arr.init((dtype **)vector_grads.data(), count);
+    IntArray col_arr;
+    col_arr.init((int *)cols.data(), count);
+
+    int max_col = *max_element(cols.begin(), cols.end());
+    int block_count = DefaultBlockCount(count * max_col * row);
+    cout << boost::format("count:%1% max_col:%2% row:%3% block_count:%4%") % count % max_col % row
+        % block_count << endl;
+    KernelMatrixAndVectorPointwiseMultiBackwardForMatrix<<<block_count, TPB>>>(grad_arr.value,
+            vector_val_arr.value, count, row, col_arr.value, max_col, matrix_grad_arr.value);
+    CheckCudaError();
+
+    int thread_count = NextTwoIntegerPowerNumber(max_col);
+    dim3 block_dim(row, count, 1);
+    KernelMatrixAndVectorPointwiseMultiBackwardForVector<<<block_dim, thread_count,
+        thread_count * sizeof(dtype)>>>((dtype **)grad_arr.value, (dtype **)matrix_val_arr.value,
+                count, row, (int *)col_arr.value, max_col, (dtype **)vector_grad_arr.value);
+    CheckCudaError();
 }
 
 __global__ void KernelPMultiForward(dtype **ins1, dtype **ins2, int count, int dim,

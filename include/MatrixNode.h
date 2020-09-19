@@ -35,6 +35,16 @@ public:
     int getRow() const {
         return static_cast<MatrixNode *>(batch.front())->getRow();
     }
+
+    vector<int> getCols() const {
+        vector<int> cols;
+        cols.reserve(batch.size());
+        for (Node *node : batch) {
+            MatrixNode *matrix = static_cast<MatrixNode *>(node);
+            cols.push_back(matrix->getColumn());
+        }
+        return cols;
+    }
 };
 
 class MatrixConcatNode : public MatrixNode, public Poolable<MatrixConcatNode> {
@@ -183,6 +193,8 @@ Executor* MatrixConcatNode::generate() {
     return new MatrixConcatExecutor;
 }
 
+class MatrixAndVectorPointwiseMultiExecutor;
+
 class MatrixAndVectorPointwiseMultiNode : public MatrixNode,
     public Poolable<MatrixAndVectorPointwiseMultiNode> {
 public:
@@ -247,10 +259,67 @@ public:
     Executor *generate() override;
 
 private:
-    MatrixNode *matrix_;
-    Node *vector_;
+    MatrixNode *matrix_ = nullptr;
+    Node *vector_ = nullptr;
+    friend class MatrixAndVectorPointwiseMultiExecutor;
 };
 
+#if USE_GPU
+class MatrixAndVectorPointwiseMultiExecutor : public MatrixExecutor {
+public:
+    void forward() override {
+        vector<dtype *> vals = getVals();
+        for (Node *node : batch) {
+            MatrixAndVectorPointwiseMultiNode *multi =
+                static_cast<MatrixAndVectorPointwiseMultiNode *>(node);
+            matrix_vals.push_back(multi->matrix_->getVal().value);
+            vector_vals.push_back(multi->vector_->getVal().value);
+        }
+        int row = getRow();
+        cols = getCols();
+        n3ldg_cuda::MatrixAndVectorPointwiseMultiForward(matrix_vals, vector_vals, batch.size(),
+                row, cols, vals);
+#if TEST_CUDA
+        testForward();
+        cout << "MatrixAndVectorPointwiseMultiExecutor forward tested" << endl;
+#endif
+    }
+
+    void backward() override {
+        vector<dtype *> grads = getGrads();
+        vector<dtype *> matrix_grads, vector_grads;
+        for (Node *node : batch) {
+            MatrixAndVectorPointwiseMultiNode *multi =
+                static_cast<MatrixAndVectorPointwiseMultiNode *>(node);
+            matrix_grads.push_back(multi->matrix_->getLoss().value);
+            cout << "matrix grad dim:" << multi->matrix_->getDim() << endl;
+            cout << "matrix grad tensor dim:" << multi->matrix_->getLoss().dim << endl;
+            vector_grads.push_back(multi->vector_->getLoss().value);
+        }
+        n3ldg_cuda::MatrixAndVectorPointwiseMultiBackward(grads, matrix_vals, vector_vals,
+                    batch.size(), getRow(), cols, matrix_grads, vector_grads);
+#if TEST_CUDA
+        auto get_inputs = [](Node &node)->vector<pair<Node *, string>> {
+            MatrixAndVectorPointwiseMultiNode &multi =
+                static_cast<MatrixAndVectorPointwiseMultiNode&>(node);
+            return {make_pair(multi.matrix_, "matrix"), make_pair(multi.vector_, "vector")};
+        };
+        for (Node *node : batch) {
+            MatrixAndVectorPointwiseMultiNode *multi =
+                static_cast<MatrixAndVectorPointwiseMultiNode *>(node);
+            cout << boost::format("matrix:%1% vec:%2%") % multi->matrix_ % multi->vector_ << endl;
+            cout << boost::format("matrix loss:%1% vec loss:%2%") % multi->matrix_->getLoss().value
+                % multi->vector_->getLoss().value << endl;
+        }
+        testBackward(get_inputs);
+        cout << "MatrixAndVectorPointwiseMultiExecutor backward tested" << endl;
+#endif
+    }
+private:
+    vector<dtype *> matrix_vals, vector_vals;
+    vector<int> cols;
+};
+#else
 class MatrixAndVectorPointwiseMultiExecutor : public MatrixExecutor {
 public:
     int calculateFLOPs() override {
@@ -265,6 +334,7 @@ public:
         return 0;
     }
 };
+#endif
 
 Executor *MatrixAndVectorPointwiseMultiNode::generate() {
     return new MatrixAndVectorPointwiseMultiExecutor;

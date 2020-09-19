@@ -265,6 +265,19 @@ void MatrixConcatForward(vector<dtype*> &in_vals, int count, int in_dim, vector<
         vector<dtype*> &vals);
 void MatrixConcatBackward(vector<dtype *> &grads, int count, int in_dim, vector<int> &in_counts,
         vector<dtype *> &in_grads);
+void MatrixAndVectorPointwiseMultiForward(vector<dtype *> &matrix_vals,
+        vector<dtype *> &vector_vals,
+        int count,
+        int row,
+        vector<int> &cols,
+        vector<dtype *> &vals);
+void MatrixAndVectorPointwiseMultiBackward(vector<dtype *> &grads, vector<dtype *> &matrix_vals,
+        vector<dtype *> &vector_vals,
+        int count,
+        int row,
+        vector<int> &cols,
+        vector<dtype *> &matrix_grads,
+        vector<dtype *> &vector_grads);
 void PMultiForward(vector<dtype*> &ins1,
         vector<dtype*> &ins2,
         int count,
