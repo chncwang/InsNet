@@ -340,6 +340,78 @@ Executor *MatrixAndVectorPointwiseMultiNode::generate() {
     return new MatrixAndVectorPointwiseMultiExecutor;
 }
 
+class MatrixColSumNode : public UniInputNode, public Poolable<MatrixColSumNode> {
+public:
+    MatrixColSumNode() : UniInputNode("MatrixColSum") {}
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    int getKey() const override {
+        return getDim();
+    }
+
+    void compute() override {
+        MatrixNode &input = *static_cast<MatrixNode *>(getInput());
+        for (int i = 0; i < input.getColumn(); ++i) {
+            dtype sum = 0;
+            for (int j = 0; j < input.getRow(); ++j) {
+                sum += input.getVal()[i * input.getRow() + j];
+            }
+            val()[i] = sum;
+        }
+    }
+
+    void backward() override {
+        MatrixNode &input = *static_cast<MatrixNode *>(getInput());
+        for (int i = 0; i < input.getColumn(); ++i) {
+            for (int j = 0; j < input.getRow(); ++j) {
+                input.loss()[i * input.getRow() + j] += getLoss()[i];
+            }
+        }
+    }
+
+    virtual bool typeEqual(Node *other) override {
+        if (getNodeType() != other->getNodeType()) {
+            return false;
+        } else {
+            MatrixColSumNode &matrix = *static_cast<MatrixColSumNode *>(other);
+            return static_cast<MatrixNode *>(getInput())->getRow() ==
+                static_cast<MatrixNode *>(matrix.getInput())->getRow();
+        }
+    }
+
+    virtual string typeSignature() const override {
+        return "MatrixColSum-" + to_string(static_cast<MatrixNode *>(getInput())->getRow());
+    }
+
+    Executor *generate() override;
+
+protected:
+    virtual bool isDimLegal(const Node &input) const override {
+        const MatrixNode &matrix = static_cast<const MatrixNode &>(input);
+        return matrix.getColumn() == getDim();
+    }
+};
+
+#if USE_GPU
+#else
+class MatrixColSumExecutor : public Executor {
+    int calculateFLOPs() override {
+        return 0; // TODO
+    }
+};
+#endif
+
+Executor *MatrixColSumNode::generate() {
+    return new MatrixColSumExecutor;
+}
+
 namespace n3ldg_plus {
 
 MatrixNode *concatToMatrix(Graph &graph, const vector<Node *> &inputs) {
@@ -353,6 +425,12 @@ MatrixNode *pointwiseMultiply(Graph &graph, MatrixNode &matrix, Node &vec) {
     MatrixAndVectorPointwiseMultiNode *node = MatrixAndVectorPointwiseMultiNode::newNode(
             matrix.getDim());
     node->forward(graph, matrix, vec);
+    return node;
+}
+
+Node *matrixColSum(Graph &graph, MatrixNode &input) {
+    MatrixColSumNode *node = MatrixColSumNode::newNode(input.getColumn());
+    node->forward(graph, input);
     return node;
 }
 
