@@ -400,6 +400,44 @@ protected:
 };
 
 #if USE_GPU
+class MatrixColSumExecutor : public UniInputExecutor {
+public:
+    void forward() override {
+        vector<dtype *> in_vals;
+        row = static_cast<MatrixNode *>(static_cast<MatrixColSumNode*>(
+                    batch.front())->getInput())->getRow();
+        for (Node *node : batch) {
+            MatrixColSumNode &sum = *static_cast<MatrixColSumNode *>(node);
+            in_vals.push_back(sum.getInput()->getVal().value);
+            cols.push_back(sum.getDim());
+        }
+        auto vals = getVals();
+        n3ldg_cuda::MatrixColSumForward(in_vals, batch.size(), cols, row, vals);
+#if TEST_CUDA
+        testForward();
+        cout << "MatrixColSumForward tested" << endl;
+#endif
+    }
+
+    void backward() override {
+        vector<dtype *> grads = getGrads();
+        vector<dtype *> in_grads;
+        for (Node *node : batch) {
+            MatrixColSumNode &sum = *static_cast<MatrixColSumNode *>(node);
+            in_grads.push_back(sum.getInput()->getLoss().value);
+            cols.push_back(sum.getDim());
+        }
+        n3ldg_cuda::MatrixColSumBackward(grads, batch.size(), cols, row, in_grads);
+#if TEST_CUDA
+        testBackward();
+        cout << "MatrixColSumBackward tested" << endl;
+#endif
+    }
+
+private:
+    vector<int> cols;
+    int row;
+};
 #else
 class MatrixColSumExecutor : public Executor {
     int calculateFLOPs() override {

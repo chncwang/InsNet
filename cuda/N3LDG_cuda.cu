@@ -2098,8 +2098,6 @@ void MatrixAndVectorPointwiseMultiBackward(vector<dtype *> &grads, vector<dtype 
 
     int max_col = *max_element(cols.begin(), cols.end());
     int block_count = DefaultBlockCount(count * max_col * row);
-    cout << boost::format("count:%1% max_col:%2% row:%3% block_count:%4%") % count % max_col % row
-        % block_count << endl;
     KernelMatrixAndVectorPointwiseMultiBackwardForMatrix<<<block_count, TPB>>>(grad_arr.value,
             vector_val_arr.value, count, row, col_arr.value, max_col, matrix_grad_arr.value);
     CheckCudaError();
@@ -2110,6 +2108,121 @@ void MatrixAndVectorPointwiseMultiBackward(vector<dtype *> &grads, vector<dtype 
         thread_count * sizeof(dtype)>>>((dtype **)grad_arr.value, (dtype **)matrix_val_arr.value,
                 count, row, (int *)col_arr.value, max_col, (dtype **)vector_grad_arr.value);
     CheckCudaError();
+}
+
+__global__ void KernelMatrixColSumForward(dtype **in_vals, int count, int *cols, int max_col,
+        int row,
+        volatile dtype *block_sums,
+        int *block_counters,
+        dtype **vals) {
+    __shared__ volatile dtype shared_sum[TPB];
+    __shared__ volatile bool is_last_block;
+    if (threadIdx.x == 0 && blockIdx.y == 0) {
+        block_counters[blockIdx.x] = 0;
+    }
+    if (threadIdx.x == 0) {
+        is_last_block = false;
+    }
+
+    int count_i = blockIdx.x / max_col;
+    int row_i = blockIdx.y * blockDim.x + threadIdx.x;
+    int col_i = blockIdx.x % max_col;
+    if (col_i >= cols[count_i]) {
+        return;
+    }
+    int offset = row * col_i + row_i;
+    shared_sum[threadIdx.x] = row_i < row ? in_vals[count_i][offset] : 0.0f;
+    __syncthreads();
+
+    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+        if (threadIdx.x < i) {
+            shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+        }
+        __syncthreads();
+    }
+
+    int block_sums_offset = blockIdx.x * gridDim.y + blockIdx.y;
+    if (threadIdx.x == 0) {
+        block_sums[block_sums_offset] = shared_sum[0];
+        if (atomicAdd(block_counters + blockIdx.x, 1) == gridDim.y - 1) {
+            is_last_block = true;
+        }
+    }
+    __syncthreads();
+
+    if (is_last_block) {
+        dtype sum = 0.0f;
+        for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
+            int offset = blockIdx.x * gridDim.y + i;
+            sum += block_sums[offset];
+        }
+
+        shared_sum[threadIdx.x] = sum;
+        __syncthreads();
+
+        for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+            if (threadIdx.x < i) {
+                shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+            }
+            __syncthreads();
+        }
+
+        if (threadIdx.x == 0) {
+            vals[count_i][col_i] = shared_sum[0];
+        }
+    }
+}
+
+void MatrixColSumForward(vector<dtype *> &in_vals, int count, vector<int> &cols, int row,
+        vector<dtype *> &vals) {
+    int thread_count = min(NextTwoIntegerPowerNumber(row), TPB);
+    int block_y_count = (row - 1 + thread_count) / thread_count;
+    int max_col = *max_element(cols.begin(), cols.end());
+    dim3 block_dim(count * max_col, block_y_count, 1);
+
+    NumberArray block_sums;
+    block_sums.init(block_y_count * count * max_col);
+    IntArray block_counters;
+    block_counters.init(count * max_col);
+
+    NumberPointerArray in_val_arr, val_arr;
+    in_val_arr.init((dtype**)in_vals.data(), in_vals.size());
+    val_arr.init((dtype **)vals.data(), vals.size());
+
+    IntArray col_arr;
+    col_arr.init(cols.data(), cols.size());
+
+    KernelMatrixColSumForward<<<block_dim, thread_count>>>(in_val_arr.value, count, col_arr.value,
+            max_col, row, block_sums.value, block_counters.value, val_arr.value);
+}
+
+__global__ void KernelMatrixColSumBackward(dtype **grads, int count, int *cols, int max_col,
+        int row,
+        dtype **in_grads) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * max_col * row; i += step) {
+        int count_i = i / (max_col * row);
+        int col_i = i / row % max_col;
+        int offset = i % (max_col * row);
+
+        if (col_i < cols[count_i]) {
+            DeviceAtomicAdd(in_grads[count_i] + offset, grads[count_i][col_i]);
+        }
+    }
+}
+
+void MatrixColSumBackward(vector<dtype *> &grads, int count, vector<int> &cols, int row,
+        vector<dtype *> &in_grads) {
+    int max_col = *max_element(cols.begin(), cols.end());
+    int block_count = DefaultBlockCount(count * max_col * row);
+    NumberPointerArray grad_arr, in_grad_arr;
+    grad_arr.init((dtype **)grads.data(), grads.size());
+    in_grad_arr.init((dtype **)in_grads.data(), in_grads.size());
+    IntArray col_arr;
+    col_arr.init(cols.data(), cols.size());
+    KernelMatrixColSumBackward<<<block_count, TPB>>>((dtype **)grad_arr.value, count,
+            col_arr.value, max_col, row, in_grad_arr.value);
 }
 
 __global__ void KernelPMultiForward(dtype **ins1, dtype **ins2, int count, int dim,
@@ -2126,12 +2239,12 @@ __global__ void KernelPMultiForward(dtype **ins1, dtype **ins2, int count, int d
 void PMultiForward(vector<dtype*> &ins1, vector<dtype*> &ins2, int count, int dim,
         vector<dtype*> &vals) {
     int block_count = DefaultBlockCount(count * dim);
-    NumberPointerArray ins1_arr, ins2_arr, vals_arr;
+    NumberPointerArray ins1_arr, ins2_arr, val_arr;
     ins1_arr.init((dtype**)ins1.data(), count);
     ins2_arr.init((dtype**)ins2.data(), count);
-    vals_arr.init((dtype**)vals.data(), count);
+    val_arr.init((dtype**)vals.data(), count);
     KernelPMultiForward<<<block_count, TPB>>>(ins1_arr.value, ins2_arr.value, count, dim,
-            (dtype **)vals_arr.value);
+            (dtype **)val_arr.value);
     CheckCudaError();
 }
 
