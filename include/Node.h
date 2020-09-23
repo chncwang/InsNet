@@ -333,8 +333,6 @@ public:
         return node;
     }
 
-protected:
-    virtual int getKey() const = 0;
     virtual void initNode(int dim) = 0;
     virtual void setNodeDim(int dim) = 0;
 

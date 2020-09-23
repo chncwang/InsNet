@@ -18,10 +18,6 @@ public:
         setDim(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     bool typeEqual(Node* other) override {
         return getNodeType() == other->getNodeType();
     }

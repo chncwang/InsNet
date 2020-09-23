@@ -93,10 +93,6 @@ public:
         setDim(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     LinearNode() : Node("linear") {
         in = NULL;
         param = NULL;
@@ -402,10 +398,6 @@ public:
 
     void setNodeDim(int dim) override {
         setDim(dim);
-    }
-
-    int getKey() const override {
-        return getDim();
     }
 
     bool isDimLegal(const Node &input) const override {
@@ -723,10 +715,6 @@ public:
 
     void setNodeDim(int dim) override {
         setDim(dim);
-    }
-
-    int getKey() const override {
-        return getDim();
     }
 
     void init(int dim) override {

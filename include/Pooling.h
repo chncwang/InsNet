@@ -95,10 +95,6 @@ public:
         init(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
 #if TEST_CUDA
     void setMask() override {
         int nSize = ins.size();
@@ -157,10 +153,6 @@ public:
         init(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     void setMask() override {
         int nSize = ins.size();
 
@@ -193,10 +185,6 @@ public:
 
     void setNodeDim(int dim) override {
         setDim(dim);
-    }
-
-    int getKey() const override {
-        return getDim();
     }
 
 #if TEST_CUDA
@@ -268,10 +256,6 @@ public:
 
     void setNodeDim(int dim) override {
         setDim(dim);
-    }
-
-    int getKey() const override {
-        return getDim();
     }
 
     void setMask() override {
@@ -505,10 +489,6 @@ public:
         setDim(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     void forward(Graph &cg, const vector<PNode>& x) {
         if (x.size() == 0) {
             std::cerr << "empty inputs for add" << std::endl;
@@ -671,10 +651,6 @@ public:
 
     void setNodeDim(int dim) override {
         setDim(dim);
-    }
-
-    int getKey() const override {
-        return getDim();
     }
 
     void forward(Graph *cg, const vector<PNode>& x) {

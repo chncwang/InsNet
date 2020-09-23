@@ -33,10 +33,6 @@ public:
         setDim(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     void clear() override {
         inDims.clear();
         ins.clear();
@@ -205,10 +201,6 @@ PExecutor ConcatNode::generate() {
 class ScalarConcatNode : public Node, public Poolable<ScalarConcatNode> {
 public:
     ScalarConcatNode() : Node("scalar_concat") {}
-
-    int getKey() const override {
-        return getDim();
-    }
 
     void setNodeDim(int dim) override {
         setDim(dim);

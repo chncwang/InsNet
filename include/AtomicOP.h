@@ -74,10 +74,6 @@ public:
         setDim(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     void compute() override {
         val().vec() = getInput()->val().vec().unaryExpr(ptr_fun(ftanh));
     }
@@ -112,10 +108,6 @@ public:
         setDim(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     void compute() override {
         val().vec() = getInput()->val().vec().unaryExpr(ptr_fun(fsigmoid));
     }
@@ -145,10 +137,6 @@ public:
 
     void setNodeDim(int dim) override {
         setDim(dim);
-    }
-
-    int getKey() const override {
-        return getDim();
     }
 
     void compute() override {
@@ -182,10 +170,6 @@ public:
         setDim(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     void compute() override {
         val().vec() = getInput()->val().vec().unaryExpr(ptr_fun(fsqrt));
     }
@@ -214,10 +198,6 @@ public:
 
     void setNodeDim(int dim) override {
         setDim(dim);
-    }
-
-    int getKey() const override {
-        return getDim();
     }
 
     void init(int dimm) override {
@@ -413,10 +393,6 @@ public:
         setDim(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     bool typeEqual(Node *other) override {
         return Node::typeEqual(other);
     }
@@ -544,10 +520,6 @@ public:
         setDim(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     bool typeEqual(Node *other) override {
         return getNodeType() == other->getNodeType();
     }
@@ -657,10 +629,6 @@ public:
         setDim(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     Executor* generate() override {
         return new ActivationExecutor<ActivatedEnum::EXP>;
     }
@@ -696,10 +664,6 @@ public:
 
     void initNode(int dim) override {
         init(dim);
-    }
-
-    int getKey() const override {
-        return getDim();
     }
 
     void setNodeDim(int dim) override {

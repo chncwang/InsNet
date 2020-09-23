@@ -30,10 +30,6 @@ public:
         setDim(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
 //    virtual void init(int ndim) override {
 //#if USE_GPU
 //        Node::initOnHostAndDevice(ndim);

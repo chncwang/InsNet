@@ -28,10 +28,6 @@ public:
         setDim(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     void forward(Graph &graph, Node &input1, Node &input2) {
         vector<Node *> inputs = {&input1, &input2};
         this->forward(graph, inputs);

@@ -256,10 +256,6 @@ public:
         init(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     void setParam(LookupTable<ParamType>* paramInit) {
         param = paramInit;
     }

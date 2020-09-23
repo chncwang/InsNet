@@ -18,10 +18,6 @@ public:
         setDim(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     bool typeEqual(Node* other) override {
         return getNodeType() == other->getNodeType();
     }
@@ -145,10 +141,6 @@ public:
 
     void setNodeDim(int dim) override {
         setDim(dim);
-    }
-
-    int getKey() const override {
-        return getDim();
     }
 
     void forward(Graph &graph, Node &numerator, Node &denominator) {

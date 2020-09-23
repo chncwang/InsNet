@@ -13,10 +13,6 @@ class SplitNode : public Node, public Poolable<SplitNode> {
 public:
     SplitNode() : Node("split") {}
 
-    int getKey() const override {
-        return getDim();
-    }
-
     void setNodeDim(int dim) override {
         setDim(dim);
     }

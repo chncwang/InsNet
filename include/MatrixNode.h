@@ -16,6 +16,14 @@ public:
         return getDim() / column_;
     }
 
+    Mat valMat() {
+        return Mat(val().v, getRow(), column_);
+    }
+
+    Mat gradMat() {
+        return Mat(loss().v, getRow(), column_);
+    }
+
 protected:
     void setColumn(int column) {
         if (getDim() % column != 0) {
@@ -49,10 +57,6 @@ public:
 
 class MatrixConcatNode : public MatrixNode, public Poolable<MatrixConcatNode> {
 public:
-    virtual int getKey() const override {
-        return getDim();
-    }
-
     virtual void initNode(int dim) override {
         init(dim);
     }
@@ -222,10 +226,6 @@ public:
         graph.addNode(this);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     void compute() override {
         int in_dim = vector_->getDim();
         for (int i = 0; i < matrix_->getColumn(); ++i) {
@@ -352,10 +352,6 @@ public:
         init(dim);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     void compute() override {
         MatrixNode &input = *static_cast<MatrixNode *>(getInput());
         for (int i = 0; i < input.getColumn(); ++i) {
@@ -450,6 +446,66 @@ Executor *MatrixColSumNode::generate() {
     return new MatrixColSumExecutor;
 }
 
+class MatrixAndVectorMultiNode : public Node, public Poolable<MatrixAndVectorMultiNode> {
+public:
+    MatrixAndVectorMultiNode() : Node("MatrixAndVectorMulti") {}
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    void forward(Graph &graph, MatrixNode &matrix, Node &vec) {
+        matrix.addParent(this);
+        matrix_ = &matrix;
+        vec.addParent(this);
+        vector_ = &vec;
+        graph.addNode(this);
+    }
+
+    void compute() override {
+        val().mat() = matrix_->valMat() * vector_->getVal().mat();
+    }
+
+    void backward() override {
+        matrix_->gradMat() += getLoss().mat() * vector_->getVal().mat().transpose();
+        vector_->loss().mat() += matrix_->valMat().transpose() * getLoss().mat();
+    }
+
+    Executor * generate() override;
+
+    bool typeEqual(Node *other) override {
+        return Node::typeEqual(other);
+    }
+
+    string typeSignature() const override {
+        return Node::typeSignature();
+    }
+
+private:
+    Node *vector_ = nullptr;
+    MatrixNode *matrix_ = nullptr;
+};
+
+#if USE_GPU
+class MatrixAndVectorMultiExecutor : public Executor {
+};
+#else
+class MatrixAndVectorMultiExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        return 0; // TODO
+    }
+};
+#endif
+
+Executor * MatrixAndVectorMultiNode::generate() {
+    return new MatrixAndVectorMultiExecutor;
+}
+
 namespace n3ldg_plus {
 
 MatrixNode *concatToMatrix(Graph &graph, const vector<Node *> &inputs) {
@@ -469,6 +525,12 @@ MatrixNode *pointwiseMultiply(Graph &graph, MatrixNode &matrix, Node &vec) {
 Node *matrixColSum(Graph &graph, MatrixNode &input) {
     MatrixColSumNode *node = MatrixColSumNode::newNode(input.getColumn());
     node->forward(graph, input);
+    return node;
+}
+
+Node *matrixAndVectorMulti(Graph &graph, MatrixNode &matrix, Node &vec) {
+    MatrixAndVectorMultiNode *node = MatrixAndVectorMultiNode::newNode(matrix.getRow());
+    node->forward(graph, matrix, vec);
     return node;
 }
 

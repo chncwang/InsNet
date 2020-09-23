@@ -43,10 +43,6 @@ public:
         cg->addNode(this);
     }
 
-    int getKey() const override {
-        return getDim();
-    }
-
     void compute() override {
         val().vec() = in1->val().vec() * in2->val().vec();
     }
