@@ -27,5 +27,10 @@ for cuda usage, see:
 * https://github.com/chncwang/news-title-classification
 * https://github.com/chncwang/single-turn-conversation
 
+## Paper:
+Since N3LDG++'s paper is not completed yet, please cite
+
+Wang, Qiansheng, Nan Yu, Meishan Zhang, Zijia Han, and Guohong Fu. "N3LDG: A Lightweight Neural Network Library for Natural Language Processing." Beijing Da Xue Xue Bao 55, no. 1 (2019): 113-119.
+
 ## Authors:
-Wang Qiansheng, Zhang Meishan, Han Zijia, Cao Xue, Wang Zhen
+Wang Qiansheng, Zhang Meishan, Wang Zhen, Han Zijia, Cao Xue
