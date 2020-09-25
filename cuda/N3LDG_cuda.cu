@@ -2000,7 +2000,7 @@ __global__ void KernelMatrixAndVectorPointwiseMultiForward(dtype **matrix_vals,
         int index_i = row * col_i + row_i;
         int count_i = i / (row * max_col);
         if (col_i < cols[count_i]) {
-            vals[count_i][index_i] = matrix_vals[count_i][index_i] * vector_vals[count_i][row_i];
+            vals[count_i][row_i] = matrix_vals[count_i][index_i] * vector_vals[count_i][col_i];
         }
     }
 }
@@ -2115,7 +2115,7 @@ __global__ void KernelMatrixColSumForward(dtype **in_vals, int count, int *cols,
         volatile dtype *block_sums,
         int *block_counters,
         dtype **vals) {
-    __shared__ volatile dtype shared_sum[TPB];
+    __shared__ volatile extern dtype shared_sum[];
     __shared__ volatile bool is_last_block;
     if (threadIdx.x == 0 && blockIdx.y == 0) {
         block_counters[blockIdx.x] = 0;
@@ -2192,8 +2192,9 @@ void MatrixColSumForward(vector<dtype *> &in_vals, int count, vector<int> &cols,
     IntArray col_arr;
     col_arr.init(cols.data(), cols.size());
 
-    KernelMatrixColSumForward<<<block_dim, thread_count>>>(in_val_arr.value, count, col_arr.value,
-            max_col, row, block_sums.value, block_counters.value, val_arr.value);
+    KernelMatrixColSumForward<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(
+            in_val_arr.value, count, col_arr.value, max_col, row, block_sums.value,
+            block_counters.value, val_arr.value);
 }
 
 __global__ void KernelMatrixColSumBackward(dtype **grads, int count, int *cols, int max_col,
@@ -2223,6 +2224,179 @@ void MatrixColSumBackward(vector<dtype *> &grads, int count, vector<int> &cols, 
     col_arr.init(cols.data(), cols.size());
     KernelMatrixColSumBackward<<<block_count, TPB>>>((dtype **)grad_arr.value, count,
             col_arr.value, max_col, row, in_grad_arr.value);
+    CheckCudaError();
+}
+
+__global__ void KernelMatrixAndVectorMultiForward(dtype **matrices, dtype **vectors, int count,
+        int row,
+        int *cols,
+        int max_col,
+        dtype **vals) {
+    __shared__ volatile extern dtype shared_arr[];
+    int count_i = blockIdx.y;
+    int col = cols[count_i];
+    int row_i = blockIdx.x;
+    int matrix_offset = row * threadIdx.x + row_i;
+    if (threadIdx.x < col) {
+        shared_arr[threadIdx.x] = matrices[count_i][matrix_offset] * vectors[count_i][threadIdx.x];
+    } else {
+        shared_arr[threadIdx.x] = 0;
+    }
+    __syncthreads();
+
+    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+        if (threadIdx.x < i) {
+            int ii = threadIdx.x + i;
+            shared_arr[threadIdx.x] += shared_arr[ii];
+        }
+        __syncthreads();
+    }
+
+    if (threadIdx.x == 0) {
+        vals[count_i][row_i] = shared_arr[0];
+    }
+}
+
+void MatrixAndVectorMultiForward(vector<dtype *> &matrices, vector<dtype *> &vectors, int count,
+        int row,
+        vector<int> &cols,
+        vector<dtype *> &vals) {
+    NumberPointerArray matrix_arr, vector_arr, val_arr;
+    matrix_arr.init((dtype **)matrices.data(), count);
+    vector_arr.init((dtype **)vectors.data(), count);
+    val_arr.init((dtype **)vals.data(), count);
+    IntArray col_arr;
+    col_arr.init(cols.data(), count);
+    int max_col = *max_element(cols.begin(), cols.end());
+    int thread_count = NextTwoIntegerPowerNumber(max_col);
+    dim3 block_dim(row, count, 1);
+    cout << boost::format("row:%1% count:%2% max_col:%3% thread_count:%4%") % row % count % max_col
+        % thread_count << endl;
+    KernelMatrixAndVectorMultiForward<<<block_dim, thread_count,
+        thread_count * sizeof(dtype)>>>(matrix_arr.value, vector_arr.value,
+                count, row, col_arr.value, max_col, val_arr.value);
+    CheckCudaError();
+}
+
+__global__ void KernelMatrixAndVectorMultiBackwardForMatrix(dtype **grads, dtype **vectors,
+        int count,
+        int row,
+        int *cols,
+        int max_col,
+        dtype **matrix_grads) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * max_col * row; i += step) {
+        int count_i = i / (max_col * row); 
+        int col_i = i / row % max_col;
+        int row_i = i % row;
+        int offset = i % (max_col * row);
+        if (col_i < cols[count_i]) {
+            DeviceAtomicAdd(matrix_grads[count_i] + offset,
+                    grads[count_i][row_i] * vectors[count_i][col_i]);
+        }
+    }
+}
+
+__global__ void KernelMatrixAndVectorMultiBackwardForVector(dtype **grads, dtype **matrices,
+        volatile dtype *block_sums,
+        int *block_counters,
+        int count,
+        int row,
+        int *cols,
+        int max_col,
+        dtype **vector_grads) {
+    __shared__ volatile dtype shared_arr[TPB];
+    __shared__ volatile bool is_last_block;
+    if (blockIdx.z >= cols[blockIdx.x]) {
+        return;
+    }
+
+    if (threadIdx.x == 0 && blockIdx.y == 0) {
+        block_counters[blockIdx.x * max_col + blockIdx.z] = 0;
+    }
+    if (threadIdx.x == 0) {
+        is_last_block = false;
+    }
+    int row_i = blockIdx.y * blockDim.x + threadIdx.x;
+    int matrix_offset = blockIdx.z * row + row_i;
+    shared_arr[threadIdx.x] = row_i < row ?
+        matrices[blockIdx.x][matrix_offset] * grads[blockIdx.x][row_i] : 0;
+    __syncthreads();
+
+    for (int i = (blockDim.x >> 1); i > 0; i >>=1) {
+        if (threadIdx.x < i) {
+            shared_arr[threadIdx.x] += shared_arr[threadIdx.x + i];
+        }
+        __syncthreads();
+    }
+
+    int block_sums_offset = blockIdx.x * max_col * gridDim.y +
+        blockIdx.z * gridDim.y + blockIdx.y;
+    if (threadIdx.x == 0) {
+        block_sums[block_sums_offset] = shared_arr[0];
+        if (atomicAdd(block_counters + max_col * blockIdx.x + blockIdx.z, 1) == gridDim.y - 1) {
+            is_last_block = true;
+        }
+    }
+    __syncthreads();
+
+    if (is_last_block) {
+        dtype sum = 0;
+        for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
+            int offset = blockIdx.x * max_col * gridDim.y + blockIdx.z * gridDim.y + i;
+            sum += block_sums[offset];
+        }
+
+        shared_arr[threadIdx.x] = sum;
+        __syncthreads();
+
+        for (int i = (blockDim.x >> 1); i > 0; i >>=1) {
+            if (threadIdx.x < i) {
+                shared_arr[threadIdx.x] += shared_arr[threadIdx.x + i];
+            }
+            __syncthreads();
+        }
+
+        if (threadIdx.x == 0) {
+            DeviceAtomicAdd(vector_grads[blockIdx.x] + blockIdx.z, shared_arr[0]);
+        }
+    }
+}
+
+void MatrixAndVectorMultiBackward(vector<dtype *> &grads, vector<dtype *> &matrices,
+        vector<dtype *> &vectors,
+        int count,
+        int row,
+        vector<int> &cols,
+        vector<dtype *> &matrix_grads,
+        vector<dtype *> &vector_grads) {
+    int max_col = *max_element(cols.begin(), cols.end());
+    NumberPointerArray grad_arr, vector_arr, matrix_arr, matrix_grad_arr, vector_grad_arr;
+    grad_arr.init(grads.data(), count);
+    vector_arr.init(vectors.data(), count);
+    matrix_arr.init(matrices.data(), count);
+    matrix_grad_arr.init(matrix_grads.data(), count);
+    vector_grad_arr.init(vector_grads.data(), count);
+    IntArray col_arr;
+    col_arr.init(cols.data(), count);
+
+    int block_count = DefaultBlockCount(count * max_col * row);
+    KernelMatrixAndVectorMultiBackwardForMatrix<<<block_count, TPB>>>(grad_arr.value,
+            vector_arr.value, count, row, col_arr.value, max_col, matrix_grad_arr.value);
+    CheckCudaError();
+
+    int y = (row - 1) / TPB + 1;
+    dim3 block_dim(count, y, max_col);
+    NumberArray block_sums;
+    block_sums.init(y * max_col * count);
+    IntArray block_counters;
+    block_counters.init(max_col * count);
+
+    KernelMatrixAndVectorMultiBackwardForVector<<<block_dim, TPB>>>(grad_arr.value,
+            matrix_arr.value, block_sums.value, block_counters.value, count, row,
+            col_arr.value, max_col, vector_grad_arr.value);
+    CheckCudaError();
 }
 
 __global__ void KernelPMultiForward(dtype **ins1, dtype **ins2, int count, int dim,
@@ -2308,7 +2482,7 @@ __global__ void KernelDivDenominatorBackward(dtype **grads,
         volatile dtype *block_sums,
         int *block_counters,
         dtype **denominator_grads) {
-    __shared__ volatile dtype shared_sum[TPB];
+    __shared__ volatile extern dtype shared_sum[];
     __shared__ volatile bool is_last_block;
     __shared__ volatile dtype square;
     if (threadIdx.x == 0 && blockIdx.y == 0) {
@@ -2397,8 +2571,8 @@ void DivBackward(vector<dtype*> &grads, vector<dtype*> &denominator_vals,
     IntArray block_counters;
     block_counters.init(count);
 
-    KernelDivDenominatorBackward<<<block_dim , thread_count>>>(loss_arr.value,
-            numerator_val_arr.value, denominator_val_arr.value, count, dim_arr.value,
+    KernelDivDenominatorBackward<<<block_dim , thread_count, thread_count * sizeof(dtype)>>>(
+            loss_arr.value, numerator_val_arr.value, denominator_val_arr.value, count, dim_arr.value,
             block_sums.value, block_counters.value, (dtype **)denominator_loss_arr.value);
     CheckCudaError();
 }
@@ -3253,7 +3427,7 @@ vector<int> Predict(vector<dtype*> &vals, int count, int dim) {
 __global__ void KernelSum(dtype **v, int count, int dim, volatile dtype *block_sums,
         int *block_counters,
         dtype *sum_vals) {
-    __shared__ volatile dtype shared_sum[TPB];
+    __shared__ volatile extern dtype shared_sum[];
     __shared__ volatile bool is_last_block;
     if (threadIdx.x == 0 && blockIdx.y == 0) {
         block_counters[blockIdx.x] = 0;
@@ -3316,8 +3490,8 @@ void Sum(dtype **v, int count, int dim, dtype *sum_vals) {
     IntArray block_counters;
     block_counters.init(count);
 
-    KernelSum<<<block_dim, thread_count>>>(v, count, dim, block_sums.value, block_counters.value,
-            sum_vals);
+    KernelSum<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(v,
+            count, dim, block_sums.value, block_counters.value, sum_vals);
     CheckCudaError();
 }
 
@@ -3474,13 +3648,6 @@ void MaxScalarForward(vector<dtype*> &inputs, int count, vector<int> &dims,
     IntArray dim_arr;
     dim_arr.init(dims.data(), dims.size());
 
-//    for (int dim : dims) {
-//        cout << boost::format("dim:%1%") % dim << endl;
-//    }
-//
-//    cout << boost::format("block y:%1% thread_count:%2% count:%3%") % block_y_count % thread_count %
-//        count << endl;
-
     KernelMaxScalarForward<<<block_dim, thread_count>>>((dtype **)input_arr.value,
             count, dim_arr.value, max_dim, block_maxes.value, block_max_is.value,
             block_counters.value,
@@ -3517,7 +3684,7 @@ __global__ void KernelVectorSumForward(dtype **v, int count, int *dims,
         volatile dtype *block_sums,
         int *block_counters,
         dtype **results) {
-    __shared__ volatile dtype shared_sum[TPB];
+    __shared__ volatile extern dtype shared_sum[];
     __shared__ volatile bool is_last_block;
     if (threadIdx.x == 0 && blockIdx.y == 0) {
         block_counters[blockIdx.x] = 0;
@@ -3591,9 +3758,9 @@ void VectorSumForward(vector<dtype *> &inputs, int count, vector<int> &dims,
     IntArray dim_arr;
     dim_arr.init(dims.data(), dims.size());
 
-    KernelVectorSumForward<<<block_dim, thread_count>>>((dtype **)input_arr.value,
-            count, dim_arr.value, block_sums.value, block_counters.value,
-            (dtype **)result_arr.value);
+    KernelVectorSumForward<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(
+            (dtype **)input_arr.value, count, dim_arr.value, block_sums.value,
+            block_counters.value, (dtype **)result_arr.value);
     CheckCudaError();
 }
 
@@ -3660,7 +3827,7 @@ __global__ void KernelScalarToVectorBackward(dtype **grads, int count, int *dims
         volatile dtype *block_sums,
         int *block_counters,
         dtype **input_grads) {
-    __shared__ volatile dtype shared_sum[TPB];
+    __shared__ volatile extern dtype shared_sum[];
     __shared__ volatile bool is_last_block;
     if (threadIdx.x == 0 && blockIdx.y == 0) {
         block_counters[blockIdx.x] = 0;
@@ -3734,8 +3901,8 @@ void ScalarToVectorBackward(vector<dtype*> &grads, int count, vector<int> &dims,
     IntArray dim_arr;
     dim_arr.init(dims.data(), dims.size());
 
-    KernelScalarToVectorBackward<<<block_dim, thread_count>>>((dtype **)grad_arr.value,
-            count, dim_arr.value, block_sums.value, block_counters.value,
+    KernelScalarToVectorBackward<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(
+            (dtype **)grad_arr.value, count, dim_arr.value, block_sums.value, block_counters.value,
             (dtype **)input_grad_arr.value);
     CheckCudaError();
 }

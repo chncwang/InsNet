@@ -446,6 +446,8 @@ Executor *MatrixColSumNode::generate() {
     return new MatrixColSumExecutor;
 }
 
+class MatrixAndVectorMultiExecutor;
+
 class MatrixAndVectorMultiNode : public Node, public Poolable<MatrixAndVectorMultiNode> {
 public:
     MatrixAndVectorMultiNode() : Node("MatrixAndVectorMulti") {}
@@ -488,10 +490,64 @@ public:
 private:
     Node *vector_ = nullptr;
     MatrixNode *matrix_ = nullptr;
+    friend class MatrixAndVectorMultiExecutor;
 };
 
 #if USE_GPU
 class MatrixAndVectorMultiExecutor : public Executor {
+public:
+    void forward() override {
+#if TEST_CUDA
+        auto get_inputs = [&](Node &node)->vector<Node *> {
+            MatrixAndVectorMultiNode &multi = static_cast<MatrixAndVectorMultiNode&>(node);
+            vector<Node *> inputs = {multi.matrix_, multi.vector_};
+            return inputs;
+        };
+        testForwardInpputs(get_inputs);
+#endif
+        auto vals = getVals();
+        for (Node *node : batch) {
+            MatrixAndVectorMultiNode *multi = static_cast<MatrixAndVectorMultiNode *>(node);
+            matrix_vals_.push_back(multi->matrix_->getVal().value);
+            vector_vals_.push_back(multi->vector_->getVal().value);
+            cols_.push_back(multi->matrix_->getColumn());
+        }
+        row_ = static_cast<MatrixAndVectorMultiNode *>(batch.front())->matrix_->getRow();
+        n3ldg_cuda::MatrixAndVectorMultiForward(matrix_vals_, vector_vals_, batch.size(), row_,
+                cols_, vals);
+#if TEST_CUDA
+        testForward();
+        cout << "MatrixAndVectorMultiExecutor forward tested" << endl;
+#endif
+    }
+
+    void backward() override {
+        auto grads = getGrads();
+
+        vector<dtype *> matrix_grads, vector_grads;
+        for (Node *node : batch) {
+            MatrixAndVectorMultiNode *multi = static_cast<MatrixAndVectorMultiNode *>(node);
+            matrix_grads.push_back(multi->matrix_->getLoss().value);
+            vector_grads.push_back(multi->vector_->getLoss().value);
+        }
+        n3ldg_cuda::MatrixAndVectorMultiBackward(grads, matrix_vals_, vector_vals_, batch.size(),
+                row_, cols_, matrix_grads, vector_grads);
+#if TEST_CUDA
+        auto get_inputs = [&](Node &node) {
+            MatrixAndVectorMultiNode &multi = static_cast<MatrixAndVectorMultiNode&>(node);
+            vector<pair<Node *, string>> inputs = {make_pair(multi.matrix_, "matrix"),
+            make_pair(multi.vector_, "vector")};
+            return inputs;
+        };
+        testBackward(get_inputs);
+        cout << "MatrixAndVectorMultiExecutor backward tested" << endl;
+#endif
+    }
+
+private:
+    int row_;
+    vector<int> cols_;
+    vector<dtype *> matrix_vals_, vector_vals_;
 };
 #else
 class MatrixAndVectorMultiExecutor : public Executor {

@@ -282,6 +282,17 @@ void MatrixColSumForward(vector<dtype *> &in_vals, int count, vector<int> &cols,
         vector<dtype *> &vals);
 void MatrixColSumBackward(vector<dtype *> &grads, int count, vector<int> &cols, int row,
         vector<dtype *> &in_grads);
+void MatrixAndVectorMultiForward(vector<dtype *> &matrices, vector<dtype *> &vectors, int count,
+        int row,
+        vector<int> &cols,
+        vector<dtype *> &vals);
+void MatrixAndVectorMultiBackward(vector<dtype *> &grads, vector<dtype *> &matrices,
+        vector<dtype *> &vectors,
+        int count,
+        int row,
+        vector<int> &cols,
+        vector<dtype *> &matrix_grads,
+        vector<dtype *> &vector_grads);
 void PMultiForward(vector<dtype*> &ins1,
         vector<dtype*> &ins2,
         int count,
