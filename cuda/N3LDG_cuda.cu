@@ -2000,7 +2000,7 @@ __global__ void KernelMatrixAndVectorPointwiseMultiForward(dtype **matrix_vals,
         int index_i = row * col_i + row_i;
         int count_i = i / (row * max_col);
         if (col_i < cols[count_i]) {
-            vals[count_i][row_i] = matrix_vals[count_i][index_i] * vector_vals[count_i][col_i];
+            vals[count_i][index_i] = matrix_vals[count_i][index_i] * vector_vals[count_i][row_i];
         }
     }
 }
@@ -2270,8 +2270,6 @@ void MatrixAndVectorMultiForward(vector<dtype *> &matrices, vector<dtype *> &vec
     int max_col = *max_element(cols.begin(), cols.end());
     int thread_count = NextTwoIntegerPowerNumber(max_col);
     dim3 block_dim(row, count, 1);
-    cout << boost::format("row:%1% count:%2% max_col:%3% thread_count:%4%") % row % count % max_col
-        % thread_count << endl;
     KernelMatrixAndVectorMultiForward<<<block_dim, thread_count,
         thread_count * sizeof(dtype)>>>(matrix_arr.value, vector_arr.value,
                 count, row, col_arr.value, max_col, val_arr.value);

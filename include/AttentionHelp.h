@@ -74,28 +74,6 @@ Node* attention(Graph &graph, vector<Node *>& inputs, vector<Node *>& scores) {
     return result;
 }
 
-Node* attention(Graph &graph, MatrixNode &input, Node &scores) {
-    using namespace n3ldg_plus;
-
-    if (input.getColumn() != scores.getDim()) {
-        cerr << boost::format("input col:%1% scores:%2%") % input.getColumn() % scores.getDim() <<
-            endl;
-        abort();
-    }
-
-    Node *softmax = n3ldg_plus::softmax(graph, scores);
-
-    vector<Node*> multiplied_nodes;
-//    for (int i = 0; i < inputs.size(); ++i) {
-//        Node *node = pointwiseMultiply(graph, *inputs.at(i), *splitted_vector.at(i));
-//        multiplied_nodes.push_back(node);
-//    }
-
-//    Node *result = n3ldg_plus::sumPool(graph, multiplied_nodes);
-
-//    return result;
-}
-
 }
 
 #endif

@@ -292,8 +292,6 @@ public:
             MatrixAndVectorPointwiseMultiNode *multi =
                 static_cast<MatrixAndVectorPointwiseMultiNode *>(node);
             matrix_grads.push_back(multi->matrix_->getLoss().value);
-            cout << "matrix grad dim:" << multi->matrix_->getDim() << endl;
-            cout << "matrix grad tensor dim:" << multi->matrix_->getLoss().dim << endl;
             vector_grads.push_back(multi->vector_->getLoss().value);
         }
         n3ldg_cuda::MatrixAndVectorPointwiseMultiBackward(grads, matrix_vals, vector_vals,

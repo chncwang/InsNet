@@ -332,7 +332,6 @@ class DropoutExecutor :public Executor {
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
             n3ldg_cuda::Assert(batch.at(idx)->val().verify("Dropout forward"));
-            batch[idx]->getVal().print();
         }
 #endif
     }

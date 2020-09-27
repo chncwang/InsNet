@@ -325,15 +325,15 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
                     *layer_params.multiHeadAttentionParams().ptrs().at(k);
                 Node *q = linear(graph, attention_head_params.q(), *q_input);
 
-                DotAttentionBuilder attention_builder;// TODO
-//                attention_builder.forward(graph, key_heads.at(k), value_heads.at(k), *q);
-                if (attention_builder._hidden->getDim() * head_count != params.hiddenDim()) {
+                Node *attended = n3ldg_plus::dotAttention(graph, *key_heads.at(k),
+                        *value_heads.at(k), *q).first;
+                if (attended->getDim() * head_count != params.hiddenDim()) {
                     cerr << boost::format("attended_seg dim:%1% head_count:%2% hiddendim:%3%") %
-                        attention_builder._hidden->getDim() % head_count % params.hiddenDim()
+                        attended->getDim() % head_count % params.hiddenDim()
                         << endl;
                     abort();
                 }
-                attended_segments.push_back(attention_builder._hidden);
+                attended_segments.push_back(attended);
             }
 
             Node *concated = concat(graph, attended_segments);

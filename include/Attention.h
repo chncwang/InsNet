@@ -42,19 +42,22 @@ public:
 
         _hidden = attention(cg, values, _weights);
     }
-
-//    void forward(Graph &cg, MatrixNode& key_matrix, MatrixNode& value_matrix, Node& guide) {
-//        using namespace n3ldg_plus;
-
-//        Node *pro = n3ldg_plus::pointwiseMultiply(cg, *keys.at(idx), guide);
-//        Node *sum = n3ldg_plus::vectorSum(cg, *pro);
-//        Node *scaled = n3ldg_plus::dropout(cg, *sum, 1 - 1.0 / sqrt((dtype)guide.getDim()),
-//                false);
-//        _weights.push_back(scaled);
-
-//        _hidden = attention(cg, values, _weights);
-//    }
 };
+
+namespace n3ldg_plus {
+
+pair<Node *, Node *> dotAttention(Graph &cg, MatrixNode& key_matrix, MatrixNode& value_matrix,
+        Node& guide) {
+    MatrixNode *matrix = n3ldg_plus::pointwiseMultiply(cg, key_matrix, guide);
+    Node *sum = n3ldg_plus::matrixColSum(cg, *matrix);
+    Node *scaled_weight = n3ldg_plus::dropout(cg, *sum, 1 - 1.0 / ::sqrt((dtype)guide.getDim()),
+            false);
+
+    Node *hidden = n3ldg_plus::matrixAndVectorMulti(cg, *matrix, *scaled_weight);
+    return make_pair(hidden, sum);
+}
+
+}
 
 struct AdditiveAttentionParams : public N3LDGSerializable, TunableCombination<BaseParam>
 #if USE_GPU
@@ -73,6 +76,7 @@ struct AdditiveAttentionParams : public N3LDGSerializable, TunableCombination<Ba
         json["w3t"] = w3t.toJson();
         return json;
     }
+
 
     void fromJson(const Json::Value &json) override {
         k.fromJson(json["k"]);
