@@ -756,6 +756,72 @@ Executor *SumNode::generate() {
     return e;
 }
 
+class ScaledNode : public UniInputNode, public Poolable<ScaledNode> {
+public:
+    ScaledNode() : UniInputNode("scaled") {}
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
+    void setFactor(int factor) {
+        factor_ = factor;
+    }
+
+    void compute() override {
+        val().vec() = factor_ * getInput()->getVal().vec();
+    }
+
+    void backward() override {
+        getInput()->loss().vec() += factor_ * getVal().vec();
+    }
+
+    Executor* generate() override;
+
+    virtual bool typeEqual(Node *other) override {
+        return getNodeType() == other->getNodeType();
+    }
+
+    virtual string typeSignature() const override {
+        return getNodeType();
+    }
+
+protected:
+    bool isDimLegal(const Node &input) const override {
+        return input.getDim() == getDim();
+    }
+
+private:
+    dtype factor_ = 1;
+};
+
+#if USE_GPU
+class ScaledExecutor : public UniInputExecutor {
+public:
+    void forward() override {
+    }
+
+    void backward() override {
+    }
+private:
+};
+#else
+class ScaledExecutor : public UniInputExecutor {
+public:
+    int calculateFLOPs() override {
+        return defaultFLOPs();
+    }
+};
+#endif
+
+Executor *ScaledNode::generate() {
+    return new ScaledExecutor;
+}
+
 namespace n3ldg_plus {
 
 Node *maxScalar(Graph &graph, Node &input) {
@@ -810,6 +876,13 @@ Node *dropout(Graph &graph, Node &input, dtype dropout, bool is_training) {
     DropoutNode *node = DropoutNode::newNode(input.getDim());
     node->setIsTraining(is_training);
     node->setDropValue(dropout);
+    node->forward(graph, input);
+    return node;
+}
+
+Node *scaled(Graph &graph, Node &input, dtype factor) {
+    ScaledNode *node = ScaledNode::newNode(input.getDim());
+    node->setFactor(factor);
     node->forward(graph, input);
     return node;
 }

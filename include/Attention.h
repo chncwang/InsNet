@@ -35,8 +35,7 @@ public:
         for (int idx = 0; idx < values.size(); idx++) {
             Node *pro = n3ldg_plus::pointwiseMultiply(cg, *keys.at(idx), guide);
             Node *sum = n3ldg_plus::vectorSum(cg, *pro);
-            Node *scaled = n3ldg_plus::dropout(cg, *sum, 1 - 1.0 / sqrt((dtype)guide.getDim()),
-                    false);
+            Node *scaled = n3ldg_plus::scaled(cg, *sum, 1.0 / sqrt((dtype)guide.getDim()));
             _weights.push_back(scaled);
         }
 
@@ -50,8 +49,7 @@ pair<Node *, Node *> dotAttention(Graph &cg, MatrixNode& key_matrix, MatrixNode&
         Node& guide) {
     MatrixNode *matrix = n3ldg_plus::pointwiseMultiply(cg, key_matrix, guide);
     Node *sum = n3ldg_plus::matrixColSum(cg, *matrix);
-    Node *scaled_weight = n3ldg_plus::dropout(cg, *sum, 1 - 1.0 / ::sqrt((dtype)guide.getDim()),
-            false);
+    Node *scaled_weight = n3ldg_plus::scaled(cg, *sum, 1.0 / ::sqrt((dtype)guide.getDim()));
 
     Node *hidden = n3ldg_plus::matrixAndVectorMulti(cg, *matrix, *scaled_weight);
     return make_pair(hidden, sum);
