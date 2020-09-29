@@ -756,9 +756,11 @@ Executor *SumNode::generate() {
     return e;
 }
 
+class ScaledExecutor;
+
 class ScaledNode : public UniInputNode, public Poolable<ScaledNode> {
 public:
-    ScaledNode() : UniInputNode("scaled") {}
+    ScaledNode() : UniInputNode("ScaledNode") {}
 
     void initNode(int dim) override {
         init(dim);
@@ -768,7 +770,7 @@ public:
         setDim(dim);
     }
 
-    void setFactor(int factor) {
+    void setFactor(dtype factor) {
         factor_ = factor;
     }
 
@@ -777,7 +779,7 @@ public:
     }
 
     void backward() override {
-        getInput()->loss().vec() += factor_ * getVal().vec();
+        getInput()->loss().vec() += factor_ * getLoss().vec();
     }
 
     Executor* generate() override;
@@ -797,20 +799,48 @@ protected:
 
 private:
     dtype factor_ = 1;
+    friend class ScaledExecutor;
 };
 
 #if USE_GPU
 class ScaledExecutor : public UniInputExecutor {
 public:
     void forward() override {
+        vector<dtype *> in_vals;
+        for (Node *node : batch) {
+            ScaledNode *scaled = static_cast<ScaledNode *>(node);
+            in_vals.push_back(scaled->getInput()->getVal().value);
+            dims.push_back(scaled->getDim());
+            factors.push_back(scaled->factor_);
+        }
+        auto vals = getVals();
+        n3ldg_cuda::ScaledForward(in_vals, batch.size(), dims, factors, vals);
+#if TEST_CUDA
+        testForward();
+        cout << "ScaledExecutor forward tested" << endl;
+#endif
     }
 
     void backward() override {
+        vector<dtype *> in_grads;
+        for (Node *node : batch) {
+            ScaledNode *scaled = static_cast<ScaledNode *>(node);
+            in_grads.push_back(scaled->getInput()->getLoss().value);
+        }
+        auto grads = getGrads();
+        n3ldg_cuda::ScaledBackward(grads, batch.size(), dims, factors, in_grads);
+#if TEST_CUDA
+        testBackward();
+        cout << "ScaledExecutor backward tested" << endl;
+#endif
     }
+
 private:
+    vector<int> dims;
+    vector<dtype> factors;
 };
 #else
-class ScaledExecutor : public UniInputExecutor {
+class ScaledExecutor : public Executor {
 public:
     int calculateFLOPs() override {
         return defaultFLOPs();

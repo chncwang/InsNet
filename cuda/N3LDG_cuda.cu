@@ -3762,8 +3762,7 @@ void VectorSumForward(vector<dtype *> &inputs, int count, vector<int> &dims,
     CheckCudaError();
 }
 
-__global__ void KernelVectorSumBackward(dtype **grads, int count, int *dims,
-        int max_dim,
+__global__ void KernelVectorSumBackward(dtype **grads, int count, int *dims, int max_dim,
         dtype **input_grads) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
@@ -3789,6 +3788,71 @@ void VectorSumBackward(vector<dtype*> &grads, int count, vector<int> &dims,
     KernelVectorSumBackward<<<block_count, TPB>>>((dtype **)grad_arr.value, count,
             dim_arr.value, max_dim, (dtype **)input_grad_arr.value);
     CheckCudaError();
+}
+
+__global__ void KernelScaledForward(dtype **in_vals, int count, int *dims, int max_dim,
+        dtype *factors,
+        dtype **vals) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+
+    for (int i = index; i < count * max_dim; i += step) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+
+        if (dim_i < dims[count_i]) {
+            vals[count_i][dim_i] = in_vals[count_i][dim_i] * factors[count_i];
+        }
+    }
+}
+
+void ScaledForward(vector<dtype *> &in_vals, int count, vector<int> &dims, vector<dtype> &factors,
+        vector<dtype *> &vals) {
+    NumberPointerArray in_val_arr, val_arr;
+    in_val_arr.init(in_vals.data(), in_vals.size());
+    val_arr.init(vals.data(), vals.size());
+    NumberArray factor_arr;
+    factor_arr.init(factors.data(), count);
+    IntArray dim_arr;
+    dim_arr.init(dims.data(), dims.size());
+    int max_dim = *max_element(dims.begin(), dims.end());
+    int block_count = DefaultBlockCount(count * max_dim);
+    KernelScaledForward<<<block_count, TPB>>>(in_val_arr.value, count, dim_arr.value, max_dim,
+            factor_arr.value, val_arr.value);
+}
+
+__global__ void KernelScaledBackward(dtype **grads, int count, int *dims, int max_dim,
+        dtype *factors,
+        dtype **in_grads) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+
+    for (int i = index; i < count * max_dim; i += step) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+
+        if (dim_i < dims[count_i]) {
+            DeviceAtomicAdd(in_grads[count_i] + dim_i, grads[count_i][dim_i] * factors[count_i]);
+        }
+    }
+}
+
+void ScaledBackward(vector<dtype *> &grads, int count, vector<int> &dims, vector<dtype> &factors,
+        vector<dtype *> &in_grads) {
+    NumberPointerArray grad_arr, in_grad_arr;
+    grad_arr.init(grads.data(), count);
+    in_grad_arr.init(in_grads.data(), count);
+
+    NumberArray factor_arr;
+    factor_arr.init(factors.data(), count);
+
+    IntArray dim_arr;
+    dim_arr.init(dims.data(), count);
+
+    int max_dim = *max_element(dims.begin(), dims.end());
+    int block_count = DefaultBlockCount(count * max_dim);
+    KernelScaledBackward<<<block_count, TPB>>>(grad_arr.value, count, dim_arr.value, max_dim,
+            factor_arr.value, in_grad_arr.value);
 }
 
 __global__ void KernelScalarToVectorForward(dtype* const* inputs, int count, int *dims,

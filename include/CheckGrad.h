@@ -71,7 +71,6 @@ public:
             printf("plused_loss:%.10f, minused_loss:%.10f\n", plused_loss, minused_loss);
 
             mockGrad = (plused_loss - minused_loss) * 0.5 / CHECK_GRAD_STEP;
-            mockGrad = mockGrad / examples.size();
             computeGrad = _params[i]->grad[idx][idy];
 
             printf("    mock grad = %.10f,\ncomputed grad = %.10f\n\n", mockGrad, computeGrad);

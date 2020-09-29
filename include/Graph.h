@@ -132,9 +132,10 @@ public:
             for (auto it : free_nodes) {
                 string type_hash = it.first;
                 auto depth_it = node_type_depth.find(type_hash);
-                float avg_depth = (float)depth_it->second.first /
-                    depth_it->second.second;
-                //                cout << "sig:" << type_hash << " avg_depth:" << avg_depth << endl;
+//                int size = it.second.size();
+                float avg_depth = (float)depth_it->second.first / depth_it->second.second;
+//                cout << boost::format("sig:%1% avg_depth:%2% size:%3%") % type_hash % avg_depth %
+//                    size << endl;
                 if (avg_depth < min_avg_depth) {
                     min_avg_depth = avg_depth;
                     shallow_nodes = it.second;
@@ -181,8 +182,10 @@ public:
             profiler.BeginEvent("computation plan");
             execs.push_back(cur_exec);
 
+            int depth_sum = 0;
             for (Node* free_node : cur_exec->batch) {
                 finish_nodes.push_back(free_node);
+                depth_sum += free_node->getDepth();
                 for (auto parent_it : free_node->getParents()) {
                     if (parent_it->getDegree() <= 0) {
                         abort();
@@ -193,6 +196,16 @@ public:
                     }
                 }
             }
+
+            auto &it = node_type_depth.at(cur_exec->batch.front()->typeSignature());
+            it.first -= depth_sum;
+            it.second -= cur_exec->batch.size();
+            if (it.first < 0 || it.second < 0) {
+                cerr << boost::format("Graph compute - it first:%1% second:%2%") % it.first %
+                    it.second;
+                abort();
+            }
+
             profiler.EndEvent();
         }
 

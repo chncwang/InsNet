@@ -203,7 +203,7 @@ public:
         return node_index_;
     }
 
-    int getDepth() const {
+    virtual int getDepth() const {
         return depth_;
     }
 

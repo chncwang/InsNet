@@ -374,6 +374,10 @@ void VectorSumForward(vector<dtype *> &inputs, int count, vector<int> &dims,
         vector<dtype*> &results);
 void VectorSumBackward(vector<dtype*> &losses, int count, vector<int> &dims,
         vector<dtype*> &input_losses);
+void ScaledForward(vector<dtype *> &in_vals, int count, vector<int> &dims, vector<dtype> &factors,
+        vector<dtype *> &vals);
+void ScaledBackward(vector<dtype *> &grads, int count, vector<int> &dims, vector<dtype> &factors,
+        vector<dtype *> &in_grads);
 void ScalarToVectorForward(vector<dtype*> &inputs, int count, vector<int> &dims,
         vector<dtype*> &results);
 void ScalarToVectorBackward(vector<dtype*> &losses, int count, vector<int> &dims,
