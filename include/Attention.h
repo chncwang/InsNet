@@ -11,7 +11,6 @@
 
 #include "MyLib.h"
 #include "Node.h"
-#include "MatrixNode.h"
 #include "UniOP.h"
 #include "Graph.h"
 #include "AttentionHelp.h"
@@ -45,9 +44,9 @@ public:
 
 namespace n3ldg_plus {
 
-pair<Node *, Node *> dotAttention(Graph &cg, MatrixNode& key_matrix, MatrixNode& value_matrix,
+pair<Node *, Node *> dotAttention(Graph &cg, Node& key_matrix, Node& value_matrix,
         Node& guide) {
-    MatrixNode *matrix = n3ldg_plus::pointwiseMultiply(cg, key_matrix, guide);
+    Node *matrix = n3ldg_plus::pointwiseMultiply(cg, key_matrix, guide);
     Node *sum = n3ldg_plus::matrixColSum(cg, *matrix);
     Node *scaled_weight = n3ldg_plus::scaled(cg, *sum, 1.0 / ::sqrt((dtype)guide.getDim()));
 

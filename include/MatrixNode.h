@@ -8,19 +8,19 @@ class MatrixNode : public Node {
 public:
     explicit MatrixNode(const string &node_type) : Node(node_type + "-matrix") {}
 
-    int getColumn() const {
+    int getColumn() const override {
         return column_;
     }
 
-    int getRow() const {
+    int getRow() const override {
         return getDim() / column_;
     }
 
-    Mat valMat() {
+    Mat valMat() override {
         return Mat(val().v, getRow(), column_);
     }
 
-    Mat gradMat() {
+    Mat gradMat() override {
         return Mat(loss().v, getRow(), column_);
     }
 
@@ -212,7 +212,7 @@ public:
         init(dim);
     }
 
-    void forward(Graph &graph, MatrixNode &matrix, Node &vec) {
+    void forward(Graph &graph, Node &matrix, Node &vec) {
         if (matrix.getRow() != vec.getDim()) {
             cerr << boost::format("MatrixConcatNode forward - matrix row:%1% vec dim:%2%") %
                 matrix.getRow() % vec.getDim() << endl;
@@ -259,7 +259,7 @@ public:
     Executor *generate() override;
 
 private:
-    MatrixNode *matrix_ = nullptr;
+    Node *matrix_ = nullptr;
     Node *vector_ = nullptr;
     friend class MatrixAndVectorPointwiseMultiExecutor;
 };
@@ -351,7 +351,7 @@ public:
     }
 
     void compute() override {
-        MatrixNode &input = *static_cast<MatrixNode *>(getInput());
+        Node &input = *getInput();
         for (int i = 0; i < input.getColumn(); ++i) {
             dtype sum = 0;
             for (int j = 0; j < input.getRow(); ++j) {
@@ -362,7 +362,7 @@ public:
     }
 
     void backward() override {
-        MatrixNode &input = *static_cast<MatrixNode *>(getInput());
+        Node &input = *static_cast<MatrixNode *>(getInput());
         for (int i = 0; i < input.getColumn(); ++i) {
             for (int j = 0; j < input.getRow(); ++j) {
                 input.loss()[i * input.getRow() + j] += getLoss()[i];
@@ -388,7 +388,7 @@ public:
 
 protected:
     virtual bool isDimLegal(const Node &input) const override {
-        const MatrixNode &matrix = static_cast<const MatrixNode &>(input);
+        const Node &matrix = static_cast<const Node &>(input);
         return matrix.getColumn() == getDim();
     }
 };
@@ -458,7 +458,7 @@ public:
         init(dim);
     }
 
-    void forward(Graph &graph, MatrixNode &matrix, Node &vec) {
+    void forward(Graph &graph, Node &matrix, Node &vec) {
         matrix.addParent(this);
         matrix_ = &matrix;
         vec.addParent(this);
@@ -487,7 +487,7 @@ public:
 
 private:
     Node *vector_ = nullptr;
-    MatrixNode *matrix_ = nullptr;
+    Node *matrix_ = nullptr;
     friend class MatrixAndVectorMultiExecutor;
 };
 
@@ -569,20 +569,20 @@ MatrixNode *concatToMatrix(Graph &graph, const vector<Node *> &inputs) {
     return node;
 }
 
-MatrixNode *pointwiseMultiply(Graph &graph, MatrixNode &matrix, Node &vec) {
+MatrixNode *pointwiseMultiply(Graph &graph, Node &matrix, Node &vec) {
     MatrixAndVectorPointwiseMultiNode *node = MatrixAndVectorPointwiseMultiNode::newNode(
             matrix.getDim());
     node->forward(graph, matrix, vec);
     return node;
 }
 
-Node *matrixColSum(Graph &graph, MatrixNode &input) {
+Node *matrixColSum(Graph &graph, Node &input) {
     MatrixColSumNode *node = MatrixColSumNode::newNode(input.getColumn());
     node->forward(graph, input);
     return node;
 }
 
-Node *matrixAndVectorMulti(Graph &graph, MatrixNode &matrix, Node &vec) {
+Node *matrixAndVectorMulti(Graph &graph, Node &matrix, Node &vec) {
     MatrixAndVectorMultiNode *node = MatrixAndVectorMultiNode::newNode(matrix.getRow());
     node->forward(graph, matrix, vec);
     return node;

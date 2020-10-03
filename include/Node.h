@@ -230,6 +230,26 @@ public:
 
     virtual ~Node() = default;
 
+    virtual int getColumn() const {
+        cerr << "Node getColumn - unsupported op" << endl;
+        abort();
+    }
+
+    virtual int getRow() const {
+        cerr << "Node getRow - unsupported op" << endl;
+        abort();
+    }
+
+    virtual Mat valMat() {
+        cerr << "Node valMat - unsupported op" << endl;
+        abort();
+    }
+
+    virtual Mat gradMat() {
+        cerr << "Node gradMat - unsupported op" << endl;
+        abort();
+    }
+
 protected:
     void afterForward(NodeContainer &container, vector<Node*> &ins) {
         for (Node *in : ins) {

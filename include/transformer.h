@@ -11,7 +11,6 @@
 #include "LookupTable.h"
 #include "Attention.h"
 #include "layer_normalization.h"
-#include "MatrixNode.h"
 
 class AttentionHeadParams : public N3LDGSerializable, public TunableCombination<BaseParam>
 #if USE_GPU
@@ -167,35 +166,41 @@ private:
     LayerNormalizationParams layer_norm_b_;
 };
 
-class TransformerEncoderParams : public N3LDGSerializable, public TunableCombination<BaseParam>
+void initPositionalEncodingParam(Param &param, int dim, int max_sentence_len) {
+    param.init(dim, max_sentence_len);
+    for (int pos_i = 0; pos_i < max_sentence_len; ++pos_i) {
+        for (int dim_i = 0; dim_i < dim; ++dim_i) {
+            dtype v;
+            if (dim_i % 2 == 0) {
+                int half = dim_i / 2;
+                v = sin(pos_i / pow(1e4, 2.0 * half / dim));
+            } else {
+                int half = (dim_i - 1) / 2;
+                v = cos(pos_i / pow(1e4, 2.0 * half / dim));
+            }
+            param.val[pos_i][dim_i] = v;
+        }
+    }
+#if USE_GPU
+    param.val.copyFromHostToDevice();
+#endif
+}
+
+template <typename T>
+class TransformerParams : public N3LDGSerializable, public TunableCombination<BaseParam>
 #if USE_GPU
 , public TransferableComponents
 #endif
 {
 public:
-    TransformerEncoderParams(const string &name) :
+    TransformerParams(const string &name) :
         positional_encoding_param_(name + "-positional_encoding_param"),
         input_linear_(name + "-input_linear"), layer_params_(name + "-layer_params") {}
 
-    void init(int layer, int hidden_dim, int input_dim, int head_count, int max_sentence_len) {
-        positional_encoding_param_.init(hidden_dim, max_sentence_len);
-        for (int pos_i = 0; pos_i < max_sentence_len; ++pos_i) {
-            for (int dim_i = 0; dim_i < hidden_dim; ++dim_i) {
-                dtype v;
-                if (dim_i % 2 == 0) {
-                    int half = dim_i / 2;
-                    v = sin(pos_i / pow(1e4, 2.0 * half / hidden_dim));
-                } else {
-                    int half = (dim_i - 1) / 2;
-                    v = cos(pos_i / pow(1e4, 2.0 * half / hidden_dim));
-                }
-                positional_encoding_param_.val[pos_i][dim_i] = v;
-            }
-        }
-#if USE_GPU
-        positional_encoding_param_.val.copyFromHostToDevice();
-#endif
+    TransformerParams(const TransformerParams<T> &p) = delete;
 
+    void init(int layer, int hidden_dim, int input_dim, int head_count, int max_sentence_len) {
+        initPositionalEncodingParam(positional_encoding_param_, hidden_dim, max_sentence_len);
         input_linear_.init(hidden_dim, input_dim, false);
 
         function<void(TransformerEncoderLayerParams &, int)> init_param =
@@ -211,7 +216,7 @@ public:
         return positional_encoding_param_;
     }
 
-    ParamArray<TransformerEncoderLayerParams> &layerParams() {
+    ParamArray<T> &layerParams() {
         return layer_params_;
     }
 
@@ -259,15 +264,134 @@ protected:
 private:
     Param positional_encoding_param_;
     UniParams input_linear_;
-    ParamArray<TransformerEncoderLayerParams> layer_params_;
+    ParamArray<T> layer_params_;
     int head_count_;
     int hidden_dim_;
 };
 
+typedef TransformerParams<TransformerEncoderLayerParams> TransformerEncoderParams;
+
+class TransformerDecoderLayerParams : public N3LDGSerializable,
+    public TunableCombination<BaseParam>
+#if USE_GPU
+, public TransferableComponents
+#endif
+{
+public:
+    TransformerDecoderLayerParams(const string &name) :
+        masked_multi_head_attention_params_(name + "-masked_multi_head_attention_params"),
+        multi_head_attention_params_(name + "-multi_head_attention_params"),
+        ffn_inner_params_(name + "-ffn_inner_params"),
+        ffn_outter_params_(name + "-ffn_outter_params"),
+        layer_norm_a_(name + "-layer_norm_a"), layer_norm_b_(name + "-layer_norm_b"),
+        layer_norm_c_(name + "-layer_norm_c") {}
+
+    void init(int dim, int head_count) {
+        if (dim % head_count != 0) {
+            cerr << "out_dim:" << dim << " head_count:" << head_count << endl;
+            abort();
+        }
+        int section_out_dim = dim / head_count;
+        cout << boost::format("section_out_dim:%1% dim:%2% head_count:%3%") % section_out_dim %
+            dim % head_count << endl;
+        function<void(AttentionHeadParams&, int)> param_init =
+            [&](AttentionHeadParams &params, int len) {
+            params.init(section_out_dim, dim);
+        };
+        masked_multi_head_attention_params_.init(head_count, param_init);
+        multi_head_attention_params_.init(head_count, param_init);
+
+        function<dtype(int, int)> init_relu = [](int out, int in) ->dtype {
+            return sqrt(2.0 / (out + in));
+        };
+        ffn_inner_params_.init(4 * dim, dim, true, &init_relu);
+        ffn_outter_params_.init(dim, 4 * dim, true, &init_relu);
+        layer_norm_a_.init(dim);
+        layer_norm_b_.init(dim);
+        layer_norm_c_.init(dim);
+    }
+
+    ParamArray<AttentionHeadParams> &maskedMultiHeadAttentionParams() {
+        return masked_multi_head_attention_params_;
+    }
+
+    ParamArray<AttentionHeadParams> &multiHeadAttentionParams() {
+        return multi_head_attention_params_;
+    }
+
+    UniParams &ffnInnerParams() {
+        return ffn_inner_params_;
+    }
+
+    UniParams &ffnOutterParams() {
+        return ffn_outter_params_;
+    }
+
+    LayerNormalizationParams &layerNormA() {
+        return layer_norm_a_;
+    }
+
+    LayerNormalizationParams &layerNormB() {
+        return layer_norm_b_;
+    }
+
+    LayerNormalizationParams &layerNormC() {
+        return layer_norm_c_;
+    }
+
+    Json::Value toJson() const override {
+        Json::Value json;
+        json["masked_multi_head_attention_params"] = masked_multi_head_attention_params_.toJson();
+        json["multi_head_attention_params"] = multi_head_attention_params_.toJson();
+        json["ffn_inner_params"] = ffn_inner_params_.toJson();
+        json["ffn_outter_params"] = ffn_outter_params_.toJson();
+        json["layer_norm_a"] = layer_norm_a_.toJson();
+        json["layer_norm_b"] = layer_norm_b_.toJson();
+        json["layer_norm_c"] = layer_norm_c_.toJson();
+        return json;
+    }
+
+    void fromJson(const Json::Value &json) override {
+        masked_multi_head_attention_params_.fromJson(json["masked_multi_head_attention_params"]);
+        multi_head_attention_params_.fromJson(json["multi_head_attention_params"]);
+        ffn_inner_params_.fromJson(json["ffn_inner_params"]);
+        ffn_outter_params_.fromJson(json["ffn_outter_params"]);
+        layer_norm_a_.fromJson(json["layer_norm_a"]);
+        layer_norm_b_.fromJson(json["layer_norm_b"]);
+        layer_norm_c_.fromJson(json["layer_norm_c"]);
+    }
+
+#if USE_GPU
+    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
+        return {&masked_multi_head_attention_params_, &multi_head_attention_params_,
+            &ffn_inner_params_, &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_,
+            &layer_norm_c_};
+    }
+#endif
+
+protected:
+    virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
+        return {&masked_multi_head_attention_params_, &multi_head_attention_params_,
+            &ffn_inner_params_, &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_,
+            &layer_norm_c_};
+    }
+
+private:
+    ParamArray<AttentionHeadParams> masked_multi_head_attention_params_;
+    ParamArray<AttentionHeadParams> multi_head_attention_params_;
+    UniParams ffn_inner_params_;
+    UniParams ffn_outter_params_;
+    LayerNormalizationParams layer_norm_a_;
+    LayerNormalizationParams layer_norm_b_;
+    LayerNormalizationParams layer_norm_c_;
+};
+
+typedef TransformerParams<TransformerDecoderLayerParams> TransformerDecoderParams;
+
 namespace n3ldg_plus {
 
 vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params,
-        vector<Node *> inputs,
+        vector<Node *> &inputs,
         dtype dropout,
         bool is_training) {
     using namespace n3ldg_plus;
@@ -294,7 +418,7 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
         auto &layer_params = *params.layerParams().ptrs().at(i);
 
         int head_count = params.headCount();
-        vector<MatrixNode *> key_heads, value_heads;
+        vector<Node *> key_heads, value_heads;
         key_heads.reserve(head_count);
         value_heads.reserve(head_count);
         for (int k = 0; k < head_count; ++k) {
@@ -309,9 +433,9 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
                 Node *v = linear(graph, attention_head_params.v(), *kv_input);
                 values.push_back(v);
             }
-            MatrixNode *key_matrix = concatToMatrix(graph, keys);
+            Node *key_matrix = concatToMatrix(graph, keys);
             key_heads.push_back(key_matrix);
-            MatrixNode *value_matrix = concatToMatrix(graph, values);
+            Node *value_matrix = concatToMatrix(graph, values);
             value_heads.push_back(value_matrix);
         }
 
@@ -353,6 +477,102 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
 
     return last_layer;
 }
+
+class TransformerDecoderBuilder {
+public:
+    TransformerDecoderBuilder(Graph &graph, TransformerDecoderParams &params,
+            const vector<Node *> &encoder_hiddens,
+            dtype dropout,
+            bool is_training) :
+        graph_(&graph), params_(&params), encoder_hiddens_(encoder_hiddens), dropout_(dropout),
+    is_training_(is_training) {
+        int layer_count = params.layerCount();
+        for (int i = 0; i < layer_count; ++i) {
+            vector<Node *> keys, values;
+            for (int j = 0; j < params.headCount(); ++j) {
+                keys.push_back(nullptr);
+                values.push_back(nullptr);
+            }
+            key_heads_layers_.push_back(keys);
+            value_heads_layers_.push_back(values);
+        }
+    }
+
+    void forward(Node &decoder_input) {
+        using namespace n3ldg_plus;
+        int decoded_len = pos_encoded_layer_.size();
+        Node *embedding = n3ldg_plus::embedding(*graph_, params_->positionalEncodingParam(),
+                decoded_len, false);
+        Node *input = linear(*graph_, params_->inputLinear(), decoder_input);
+        Node *pos_encoded = add(*graph_, {input, embedding});
+        pos_encoded = n3ldg_plus::dropout(*graph_, *pos_encoded, dropout_, is_training_);
+        pos_encoded_layer_.push_back(pos_encoded);
+
+        int layer_count = params_->layerCount();
+
+        vector<Node *> &last_layer = pos_encoded_layer_;
+        for (int i = 0; i < layer_count; ++i) {
+            auto &layer_params = *params_->layerParams().ptrs().at(i);
+
+            int head_count = params_->headCount();
+            for (int j = 0; j < head_count; ++j) {
+                auto &attention_head_params =
+                    *layer_params.multiHeadAttentionParams().ptrs().at(j);
+                Node *kv_input = last_layer.at(decoded_len);
+                Node *k = linear(*graph_, attention_head_params.k(), *kv_input);
+                Node *&key_matrix = key_heads_layers_.at(i).at(j);
+                key_matrix = key_matrix == nullptr ? k : concat(*graph_, {key_matrix, k});
+                Node *v = linear(*graph_, attention_head_params.v(), *kv_input);
+                Node *&value_matrix = value_heads_layers_.at(i).at(j);
+                value_matrix = value_matrix == nullptr ? v : concat(*graph_, {value_matrix, v});
+            }
+
+            vector<Node *> sub_layer;
+            for (int j = 0; j < decoded_len + 1; ++j) {
+                vector<Node *> attended_segments;
+                attended_segments.reserve(head_count);
+                for (int k = 0; k < head_count; ++k) {
+                    Node *q_input = last_layer.at(j);
+                    auto &attention_head_params =
+                        *layer_params.multiHeadAttentionParams().ptrs().at(k);
+                    Node *q = linear(*graph_, attention_head_params.q(), *q_input);
+
+                    Node *attended = n3ldg_plus::dotAttention(*graph_,
+                            *key_heads_layers_.at(i).at(k), *value_heads_layers_.at(i).at(k),
+                            *q).first;
+                    if (attended->getDim() * head_count != params_->hiddenDim()) {
+                        cerr << boost::format("attended_seg dim:%1% head_count:%2% hiddendim:%3%")
+                            % attended->getDim() % head_count % params_->hiddenDim() << endl;
+                        abort();
+                    }
+                    attended_segments.push_back(attended);
+                }
+
+                Node *concated = concat(*graph_, attended_segments);
+                concated = n3ldg_plus::dropout(*graph_, *concated, dropout_, is_training_);
+                Node *added = add(*graph_, {concated, last_layer.at(j)});
+                Node *normed = layerNormalization(*graph_, layer_params.layerNormA(), *added);
+                Node *t = linear(*graph_, layer_params.ffnInnerParams(), *normed);
+                t = relu(*graph_, *t);
+                t = linear(*graph_, layer_params.ffnOutterParams(), *t);
+                t = n3ldg_plus::dropout(*graph_, *t, dropout_, is_training_);
+                t = add(*graph_, {normed, t});
+                Node *normed2 = layerNormalization(*graph_, layer_params.layerNormB(), *t);
+                sub_layer.push_back(normed2);
+            }
+            last_layer = sub_layer;
+        }
+    }
+
+private:
+    Graph *graph_ = nullptr;
+    TransformerDecoderParams *params_ = nullptr;
+    vector<Node *> encoder_hiddens_;
+    dtype dropout_;
+    bool is_training_;
+    vector<Node *> pos_encoded_layer_;
+    vector<vector<Node *>> key_heads_layers_, value_heads_layers_;
+};
 
 }
 
