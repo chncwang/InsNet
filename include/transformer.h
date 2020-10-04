@@ -92,11 +92,7 @@ public:
         int section_out_dim = dim / head_count;
         cout << boost::format("section_out_dim:%1% dim:%2% head_count:%3%") % section_out_dim %
             dim % head_count << endl;
-        function<void(AttentionHeadParams&, int)> param_init =
-            [&](AttentionHeadParams &params, int len) {
-            params.init(section_out_dim, dim);
-        };
-        multi_head_attention_params_.init(head_count, param_init);
+        multi_head_attention_params_.init(dim, dim);
 
         function<dtype(int, int)> init_relu = [](int out, int in) ->dtype {
             return sqrt(2.0 / (out + in));
@@ -107,7 +103,7 @@ public:
         layer_norm_b_.init(dim);
     }
 
-    ParamArray<AttentionHeadParams> &multiHeadAttentionParams() {
+    AttentionHeadParams &multiHeadAttentionParams() {
         return multi_head_attention_params_;
     }
 
@@ -159,7 +155,7 @@ protected:
     }
 
 private:
-    ParamArray<AttentionHeadParams> multi_head_attention_params_;
+    AttentionHeadParams multi_head_attention_params_;
     UniParams ffn_inner_params_;
     UniParams ffn_outter_params_;
     LayerNormalizationParams layer_norm_a_;
@@ -415,21 +411,31 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
         vector<Node *> key_heads, value_heads;
         key_heads.reserve(head_count);
         value_heads.reserve(head_count);
-        for (int k = 0; k < head_count; ++k) {
-            vector<Node *> keys, values;
-            keys.reserve(sentence_len);
-            values.reserve(sentence_len);
-            auto &attention_head_params = *layer_params.multiHeadAttentionParams().ptrs().at(k);
+        auto &attention_head_params = layer_params.multiHeadAttentionParams();
+        vector<Node *> keys, values;
+        keys.reserve(sentence_len);
+        values.reserve(sentence_len);
+        for (int m = 0; m < sentence_len; ++m) {
+            Node *kv_input = last_layer.at(m);
+            Node *k = linear(graph, attention_head_params.k(), *kv_input);
+            keys.push_back(k);
+            Node *v = linear(graph, attention_head_params.v(), *kv_input);
+            values.push_back(v);
+        }
+        int section_dim = keys.front()->getDim() / head_count;
+        for (int j = 0; j < head_count; ++j) {
+            vector<Node *> split_keys, split_values;
+            split_keys.reserve(sentence_len);
+            split_values.reserve(sentence_len);
             for (int m = 0; m < sentence_len; ++m) {
-                Node *kv_input = last_layer.at(m);
-                Node *k = linear(graph, attention_head_params.k(), *kv_input);
-                keys.push_back(k);
-                Node *v = linear(graph, attention_head_params.v(), *kv_input);
-                values.push_back(v);
+                split_keys.push_back(split(graph, section_dim, *keys.at(m), section_dim * j));
             }
-            Node *key_matrix = concatToMatrix(graph, keys);
+            Node *key_matrix = concatToMatrix(graph, split_keys);
             key_heads.push_back(key_matrix);
-            Node *value_matrix = concatToMatrix(graph, values);
+            for (int m = 0; m < sentence_len; ++m) {
+                split_values.push_back(split(graph, section_dim, *values.at(m), section_dim * j));
+            }
+            Node *value_matrix = concatToMatrix(graph, split_values);
             value_heads.push_back(value_matrix);
         }
         profiler.EndEvent();
@@ -439,14 +445,14 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
             profiler.BeginEvent("multi head");
             vector<Node *> attended_segments;
             attended_segments.reserve(head_count);
-            for (int k = 0; k < head_count; ++k) {
-                Node *q_input = last_layer.at(j);
-                auto &attention_head_params =
-                    *layer_params.multiHeadAttentionParams().ptrs().at(k);
-                Node *q = linear(graph, attention_head_params.q(), *q_input);
+            auto &attention_head_params = layer_params.multiHeadAttentionParams();
+            Node *q_input = last_layer.at(j);
+            Node *q = linear(graph, attention_head_params.q(), *q_input);
 
+            for (int k = 0; k < head_count; ++k) {
+                Node *split_q = split(graph, section_dim, *q, section_dim * k);
                 Node *attended = n3ldg_plus::dotAttention(graph, *key_heads.at(k),
-                        *value_heads.at(k), *q).first;
+                        *value_heads.at(k), *split_q).first;
                 if (attended->getDim() * head_count != params.hiddenDim()) {
                     cerr << boost::format("attended_seg dim:%1% head_count:%2% hiddendim:%3%") %
                         attended->getDim() % head_count % params.hiddenDim()

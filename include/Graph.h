@@ -132,8 +132,8 @@ public:
             for (auto it : free_nodes) {
                 string type_hash = it.first;
                 auto depth_it = node_type_depth.find(type_hash);
-//                int size = it.second.size();
                 float avg_depth = (float)depth_it->second.first / depth_it->second.second;
+//                int size = it.second.size();
 //                cout << boost::format("sig:%1% avg_depth:%2% size:%3%") % type_hash % avg_depth %
 //                    size << endl;
                 if (avg_depth < min_avg_depth) {
