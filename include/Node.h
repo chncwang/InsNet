@@ -230,24 +230,41 @@ public:
 
     virtual ~Node() = default;
 
-    virtual int getColumn() const {
-        cerr << "Node getColumn - unsupported op" << endl;
-        abort();
+    int getColumn() const {
+        if (column_ == 0) {
+            cerr << "Node getColumn - column is 0" << endl;
+            abort();
+        }
+        return column_;
     }
 
-    virtual int getRow() const {
-        cerr << "Node getRow - unsupported op" << endl;
-        abort();
+    int getRow() const {
+        return getDim() / column_;
     }
 
-    virtual Mat valMat() {
-        cerr << "Node valMat - unsupported op" << endl;
-        abort();
+    Mat valMat() {
+        if (column_ == 0) {
+            cerr << "Node valMat - column is 0" << endl;
+            abort();
+        }
+        return Mat(val().v, getRow(), column_);
     }
 
-    virtual Mat gradMat() {
-        cerr << "Node gradMat - unsupported op" << endl;
-        abort();
+    Mat gradMat() {
+        if (column_ == 0) {
+            cerr << "Node gradMat - column is 0" << endl;
+            abort();
+        }
+        return Mat(loss().v, getRow(), column_);
+    }
+
+    void setColumn(int column) {
+        if (getDim() % column != 0) {
+            cerr << boost::format("MatrixNode setColumn - dim:%1% column:%2%") % getDim() % column
+                << endl;
+            abort();
+        }
+        column_ = column;
     }
 
 protected:
@@ -288,6 +305,7 @@ private:
         string node_type_;
         string node_name_;
         int node_index_;
+        int column_ = 0;
 };
 
 set<pair<vector<Node *>, int> *>& globalPoolReferences() {

@@ -7,35 +7,6 @@
 class MatrixNode : public Node {
 public:
     explicit MatrixNode(const string &node_type) : Node(node_type + "-matrix") {}
-
-    int getColumn() const override {
-        return column_;
-    }
-
-    int getRow() const override {
-        return getDim() / column_;
-    }
-
-    Mat valMat() override {
-        return Mat(val().v, getRow(), column_);
-    }
-
-    Mat gradMat() override {
-        return Mat(loss().v, getRow(), column_);
-    }
-
-protected:
-    void setColumn(int column) {
-        if (getDim() % column != 0) {
-            cerr << boost::format("MatrixNode setColumn - dim:%1% column:%2%") % getDim() % column
-                << endl;
-            abort();
-        }
-        column_ = column;
-    }
-
-private:
-    int column_;
 };
 
 class MatrixExecutor : public Executor {
@@ -569,7 +540,7 @@ MatrixNode *concatToMatrix(Graph &graph, const vector<Node *> &inputs) {
     return node;
 }
 
-MatrixNode *pointwiseMultiply(Graph &graph, Node &matrix, Node &vec) {
+MatrixNode *matrixPointwiseMultiply(Graph &graph, Node &matrix, Node &vec) {
     MatrixAndVectorPointwiseMultiNode *node = MatrixAndVectorPointwiseMultiNode::newNode(
             matrix.getDim());
     node->forward(graph, matrix, vec);

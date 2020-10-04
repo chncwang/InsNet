@@ -203,8 +203,7 @@ public:
         initPositionalEncodingParam(positional_encoding_param_, hidden_dim, max_sentence_len);
         input_linear_.init(hidden_dim, input_dim, false);
 
-        function<void(TransformerEncoderLayerParams &, int)> init_param =
-            [&](TransformerEncoderLayerParams &params, int layer) {
+        function<void(T &, int)> init_param = [&](T &params, int layer) {
                 params.init(hidden_dim, head_count);
             };
         layer_params_.init(layer, init_param);
@@ -522,9 +521,11 @@ public:
                 Node *k = linear(*graph_, attention_head_params.k(), *kv_input);
                 Node *&key_matrix = key_heads_layers_.at(i).at(j);
                 key_matrix = key_matrix == nullptr ? k : concat(*graph_, {key_matrix, k});
+                key_matrix->setColumn(key_matrix->getDim() / k->getDim());
                 Node *v = linear(*graph_, attention_head_params.v(), *kv_input);
                 Node *&value_matrix = value_heads_layers_.at(i).at(j);
                 value_matrix = value_matrix == nullptr ? v : concat(*graph_, {value_matrix, v});
+                value_matrix->setColumn(value_matrix->getDim() / v->getDim());
             }
 
             vector<Node *> sub_layer;
@@ -561,7 +562,12 @@ public:
                 sub_layer.push_back(normed2);
             }
             last_layer = sub_layer;
+            hidden_layers_.push_back(last_layer);
         }
+    }
+
+    const vector<vector<Node *>> &hiddenLayers() {
+        return hidden_layers_;
     }
 
 private:
@@ -572,6 +578,7 @@ private:
     bool is_training_;
     vector<Node *> pos_encoded_layer_;
     vector<vector<Node *>> key_heads_layers_, value_heads_layers_;
+    vector<vector<Node *>> hidden_layers_;
 };
 
 }
