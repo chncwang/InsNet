@@ -228,6 +228,8 @@ public:
 #endif
     }
 
+    Node (const Node &) = delete;
+
     virtual ~Node() = default;
 
     int getColumn() const {
@@ -560,7 +562,7 @@ public:
         }
 
         n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-        profiler.BeginEvent(getNodeType() + " forward");
+        profiler.BeginEvent(batch.front()->getNodeType() + " forward");
         forward();
 
         profiler.EndCudaEvent();
