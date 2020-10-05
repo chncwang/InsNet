@@ -21,6 +21,14 @@ public:
         init(dim);
     }
 
+    bool typeEqual(PNode other) override {
+        return getNodeType() == other->getNodeType();
+    }
+
+    string typeSignature() const override {
+        return getNodeType();
+    }
+
     void forward(Graph &graph, Node &input, int offset) {
         if (input.getDim() < offset + getDim()) {
             cerr << boost::format("input dim:%1% offset:%2% this dim:%3%") % input.getDim() %
@@ -74,8 +82,9 @@ public:
             inputs.push_back(split->input_->getVal().value);
             offsets.push_back(split->offset_);
             results.push_back(split->getVal().value);
+            dims.push_back(split->getDim());
         }
-        n3ldg_cuda::SplitForward(inputs, offsets, batch.size(), getDim(), results);
+        n3ldg_cuda::SplitForward(inputs, offsets, batch.size(), dims, results);
 #if TEST_CUDA
         testForward();
         cout << "split tested" << endl;
@@ -92,7 +101,7 @@ public:
             input_losses.push_back(split->input_->getLoss().value);
         }
 
-        n3ldg_cuda::SplitBackward(losses, offsets, batch.size(), getDim(), input_losses);
+        n3ldg_cuda::SplitBackward(losses, offsets, batch.size(), dims, input_losses);
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {
             SplitNode &split = static_cast<SplitNode&>(node);
@@ -106,6 +115,7 @@ public:
 
 private:
         vector<int> offsets;
+        vector<int> dims;
 };
 #else
 class SplitExecutor : public Executor {

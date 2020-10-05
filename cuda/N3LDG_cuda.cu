@@ -2647,60 +2647,64 @@ void FullDivBackward(vector<dtype*> &grads,
     CheckCudaError();
 }
 
-__global__ void KernelSplitForward(dtype **inputs, int *offsets, int count,
-        int dim,
+__global__ void KernelSplitForward(dtype **inputs, int *offsets, int count, int *dims, int max_dim,
         dtype **results) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
 
-    for (int i = index; i < count * dim; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        int offset = offsets[count_i];
-        results[count_i][dim_i] = inputs[count_i][offset + dim_i];
+    for (int i = index; i < count * max_dim; i += step) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+        if (dim_i < dims[count_i]) {
+            int offset = offsets[count_i];
+            results[count_i][dim_i] = inputs[count_i][offset + dim_i];
+        }
     }
 }
 
-void SplitForward(vector<dtype*> &inputs, vector<int> &offsets, int count,
-        int dim,
+void SplitForward(vector<dtype*> &inputs, vector<int> &offsets, int count, vector<int> &dims,
         vector<dtype*> &results) {
     NumberPointerArray input_arr, result_arr;
-    input_arr.init((dtype**)inputs.data(), inputs.size());
-    result_arr.init((dtype**)results.data(), results.size());
-    IntArray offset_arr;
+    input_arr.init(inputs.data(), inputs.size());
+    result_arr.init(results.data(), results.size());
+    IntArray offset_arr, dim_arr;
     offset_arr.init((int*)offsets.data(), offsets.size());
+    dim_arr.init(dims.data(), dims.size());
+    int max_dim = *max_element(dims.begin(), dims.end());
 
-    int block_count = DefaultBlockCount(count * dim);
-    KernelSplitForward<<<block_count, TPB>>>(input_arr.value, offset_arr.value, count, dim,
-            (dtype **)result_arr.value);
+    int block_count = DefaultBlockCount(count * max_dim);
+    KernelSplitForward<<<block_count, TPB>>>(input_arr.value, offset_arr.value, count,
+            dim_arr.value, max_dim, result_arr.value);
     CheckCudaError();
 }
 
-__global__ void KernelSplitBackward(dtype **grads, int *offsets, int count,
-        int dim,
+__global__ void KernelSplitBackward(dtype **grads, int *offsets, int count, int *dims, int max_dim,
         dtype **input_grads) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
 
-    for (int i = index; i < count * dim; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        int offset = offsets[count_i];
-        DeviceAtomicAdd(input_grads[count_i] + offset + dim_i, grads[count_i][dim_i]);
+    for (int i = index; i < count * max_dim; i += step) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+        if (dim_i < dims[count_i]) {
+            int offset = offsets[count_i];
+            DeviceAtomicAdd(input_grads[count_i] + offset + dim_i, grads[count_i][dim_i]);
+        }
     }
 }
 
-void SplitBackward(vector<dtype*> &grads, vector<int> offsets, int count,
-        int dim,
+void SplitBackward(vector<dtype*> &grads, vector<int> offsets, int count, vector<int> &dims,
         vector<dtype*> &input_grads) {
     NumberPointerArray loss_arr, input_loss_arr;
     loss_arr.init((dtype**)grads.data(), grads.size());
     input_loss_arr.init((dtype**)input_grads.data(), input_grads.size());
-    IntArray offset_arr;
+    IntArray offset_arr, dim_arr;
     offset_arr.init((int*)offsets.data(), offsets.size());
-    int block_count = DefaultBlockCount(count * dim);
-    KernelSplitBackward<<<block_count, TPB>>>(loss_arr.value, offset_arr.value, count, dim,
-            (dtype **)input_loss_arr.value);
+    dim_arr.init((int*)dims.data(), dims.size());
+    int max_dim = *max_element(dims.begin(), dims.end());
+    int block_count = DefaultBlockCount(count * max_dim);
+    KernelSplitBackward<<<block_count, TPB>>>(loss_arr.value, offset_arr.value, count,
+            dim_arr.value, max_dim, input_loss_arr.value);
     CheckCudaError();
 }
 
