@@ -390,6 +390,8 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
     for (int i = 0; i < sentence_len; ++i) {
         Node *embedding = n3ldg_plus::embedding(graph, params.positionalEncodingParam(), i, false);
         Node *input = linear(graph, params.inputLinear(), *inputs.at(i));
+        int hidden_dim = params.hiddenDim();
+        input = scaled(graph, *input, ::sqrt(hidden_dim));
         Node *pos_encoded = add(graph, {input, embedding});
         pos_encoded = n3ldg_plus::dropout(graph, *pos_encoded, dropout, is_training);
         pos_encoded_layer.push_back(pos_encoded);
@@ -689,6 +691,8 @@ public:
             Node *embedding = n3ldg_plus::embedding(*graph_, params_->positionalEncodingParam(),
                     i++, false);
             Node *input = linear(*graph_, params_->inputLinear(), *decoder_input);
+            int hidden_dim = params_->hiddenDim();
+            input = scaled(*graph_, *input, ::sqrt(hidden_dim));
             Node *pos_encoded = add(*graph_, {input, embedding});
             pos_encoded = n3ldg_plus::dropout(*graph_, *pos_encoded, dropout_, is_training_);
             pos_encoded_layer.push_back(pos_encoded);
