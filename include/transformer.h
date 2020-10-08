@@ -788,9 +788,9 @@ public:
                 t = n3ldg_plus::dropout(*graph_, *t, dropout_, is_training_);
                 t = add(*graph_, {normed, t});
                 Node *normed3 = layerNormalization(*graph_, layer_params.layerNormC(), *t);
-                last_layer_node = normed3;
-                hidden_layers_.at(i).push_back(last_layer_node);
+                hidden_layers_.at(i).push_back(normed3);
                 ++token_i;
+                last_layer = &hidden_layers_.at(i);
             }
         }
     }
