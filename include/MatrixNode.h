@@ -243,6 +243,10 @@ public:
         for (Node *node : batch) {
             MatrixAndVectorPointwiseMultiNode *multi =
                 static_cast<MatrixAndVectorPointwiseMultiNode *>(node);
+#if TEST_CUDA
+            multi->matrix_->val().copyFromHostToDevice();
+            multi->vector_->val().copyFromHostToDevice();
+#endif
             matrix_vals.push_back(multi->matrix_->getVal().value);
             vector_vals.push_back(multi->vector_->getVal().value);
         }
@@ -473,6 +477,11 @@ public:
             return inputs;
         };
         testForwardInpputs(get_inputs);
+        for (Node *node : batch) {
+            MatrixAndVectorMultiNode *multi = static_cast<MatrixAndVectorMultiNode *>(node);
+            multi->matrix_->val().copyFromHostToDevice();
+            multi->vector_->val().copyFromHostToDevice();
+        }
 #endif
         auto vals = getVals();
         for (Node *node : batch) {
