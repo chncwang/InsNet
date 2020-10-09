@@ -29,7 +29,7 @@ public:
 
     StringToId m_string_to_id;
     IdToString m_id_to_string;
-    int m_size;
+    int m_size = 0;
 
     /**
      * Map a string to its associated ID.
