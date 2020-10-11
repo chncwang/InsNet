@@ -49,7 +49,7 @@ pair<Node *, Node *> dotAttention(Graph &cg, Node& key_matrix, Node& value_matri
     Node *matrix = n3ldg_plus::matrixPointwiseMultiply(cg, key_matrix, guide);
     Node *sum = n3ldg_plus::matrixColSum(cg, *matrix);
     Node *scaled_weight = n3ldg_plus::scaled(cg, *sum, 1.0 / ::sqrt((dtype)guide.getDim()));
-
+    scaled_weight = n3ldg_plus::softmax(cg, *scaled_weight);
     Node *hidden = n3ldg_plus::matrixAndVectorMulti(cg, value_matrix, *scaled_weight);
     return make_pair(hidden, sum);
 }
