@@ -786,8 +786,8 @@ public:
                 Node *normed3 = layerNormalization(*graph_, layer_params.layerNormC(), *t);
                 hidden_layers_.at(i).push_back(normed3);
                 ++token_i;
-                last_layer = &hidden_layers_.at(i);
             }
+            last_layer = &hidden_layers_.at(i);
         }
     }
 };
