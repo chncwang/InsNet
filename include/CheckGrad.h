@@ -9,7 +9,7 @@
 
 using namespace Eigen;
 
-constexpr float CHECK_GRAD_STEP = 1e-6;
+constexpr float CHECK_GRAD_STEP = 1e-3;
 
 class CheckGrad {
 public:
@@ -73,7 +73,7 @@ public:
             mockGrad = (plused_loss - minused_loss) * 0.5 / CHECK_GRAD_STEP;
             computeGrad = _params[i]->grad[idx][idy];
 
-            printf("    mock grad = %.10f,\ncomputed grad = %.10f\n\n", mockGrad, computeGrad);
+            printf("    mock grad = %.20f,\ncomputed grad = %.20f\n\n", mockGrad, computeGrad);
 
             _params[i]->val[idx][idy] = orginValue;
         }
