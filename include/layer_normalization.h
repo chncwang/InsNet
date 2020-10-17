@@ -4,6 +4,8 @@
 #include "MyLib.h"
 #include "LookupTable.h"
 #include "Node.h"
+#include "PAddOP.h"
+#include "BucketOP.h""
 #include "Div.h"
 #include "AtomicOP.h"
 #include "Graph.h"
@@ -72,6 +74,8 @@ Node *layerNormalization(Graph &graph, LayerNormalizationParams &params,
     Node *zeros_around = sub(graph, input_layer, *avg_vector);
     Node *square = pointwiseMultiply(graph, *zeros_around, *zeros_around);
     Node *square_sum = vectorSum(graph, *square);
+    Node *eps = bucket(graph, 1, 1e-6);
+    square_sum = add(graph, {square_sum, eps});
     Node *var = scaled(graph, *square_sum, 1.0 / input_layer.getDim());
     Node *standard_deviation = sqrt(graph, *var);
     Node *g = embedding(graph, params.g(), 0, true);
