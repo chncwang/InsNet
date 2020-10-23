@@ -379,7 +379,7 @@ typedef TransformerParams<TransformerDecoderLayerParams> TransformerDecoderParam
 namespace n3ldg_plus {
 
 Node *scaleWordEmbedding(Graph &graph, Node &e, int hidden_dim, int word_dim) {
-    return scaled(graph, e, ::sqrt((word_dim + hidden_dim) / word_dim / 6));
+    return scaled(graph, e, ::sqrt((word_dim + hidden_dim) / 6));
 }
 
 vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params,
