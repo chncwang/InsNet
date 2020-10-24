@@ -789,7 +789,7 @@ public:
                 }
                 concated = concat(*graph_, encoder_attended_segments);
                 concated = n3ldg_plus::dropout(*graph_, *concated, dropout_, is_training_);
-                added = add(*graph_, {concated, normed});
+                added = add(*graph_, {concated, added});
 
                 normed = layerNormalization(*graph_, layer_params.layerNormC(), *added);
                 Node *t = linear(*graph_, layer_params.ffnInnerParams(), *normed);
