@@ -824,7 +824,6 @@ namespace n3ldg_plus {
         }
 
         MaxPoolNode *pool = MaxPoolNode::newNode(dim);
-        pool->init(dim);
         pool->forward(graph, inputs);
         return pool;
     }
