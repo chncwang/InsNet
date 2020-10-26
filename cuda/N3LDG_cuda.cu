@@ -198,6 +198,13 @@ Tensor1D::Tensor1D(const Tensor1D &t) {
     CallCuda(MyCudaMemcpy(value, t.value, dim * sizeof(dtype), cudaMemcpyDeviceToDevice));
 }
 
+std::vector<dtype> Tensor1D::toCpu() const {
+    std::vector<dtype> result;
+    result.resize(dim);
+    CallCuda(MyCudaMemcpy(result.data(), value, dim * sizeof(dtype), cudaMemcpyDeviceToHost));
+    return result;
+}
+
 Tensor1D::~Tensor1D() {
     if (value != NULL) {
         CallCuda(MemoryPool::Ins().Free(value));

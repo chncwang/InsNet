@@ -143,6 +143,8 @@ struct Tensor1D : public n3ldg_cpu::Tensor1D, public Transferable {
 
     void print() const override;
 
+    virtual std::vector<dtype> toCpu() const override;
+
     void random(dtype bound) override;
 
     bool verify(const char *message) const;

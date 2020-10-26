@@ -85,6 +85,12 @@ Node *bucket(Graph &graph, int dim, float v) {
     return bucket;
 }
 
+Node *bucket(Graph &graph, const vector<float> &v) {
+    BucketNode *bucket = BucketNode::newNode(v.size());
+    bucket->forward(graph, v);
+    return bucket;
+}
+
 }
 
 class BucketExecutor : public Executor {
