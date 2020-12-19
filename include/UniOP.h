@@ -33,8 +33,9 @@ public:
     UniParams(const string &name) : W(name + "-W"), b(name + "-b", true) {}
 
     void init(int nOSize, int nISize, bool useB = true,
-            const std::function<dtype(int, int)> *bound = nullptr) {
-        W.init(nOSize, nISize, bound);
+            const std::function<dtype(int, int)> *bound = nullptr,
+            InitDistribution dist = InitDistribution::UNI) {
+        W.init(nOSize, nISize, bound, dist);
 
         bUseB = useB;
         if (bUseB) {

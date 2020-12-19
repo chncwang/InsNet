@@ -4,6 +4,7 @@
 #include "Eigen/Dense"
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <vector>
+#include <random>
 #include <cmath>
 #include <fstream>
 #include <map>
@@ -242,6 +243,18 @@ void n3ldg_cpu::Tensor2D::random(dtype bound) {
     }
 }
 
+void n3ldg_cpu::Tensor2D::randomNorm(dtype sd) {
+    static std::default_random_engine eng(0);
+    std::normal_distribution<> d(0, sd);
+    for (int i = 0; i < size; i++) {
+        v[i] = d(eng);
+        if (i < 100) {
+            std::cout << v[i] << " ";
+        }
+    }
+    std::cout << std::endl;
+}
+
 void n3ldg_cpu::Tensor2D::norm2one(dtype norm) {
     dtype sum;
     for (int idx = 0; idx < col; idx++) {
@@ -335,6 +348,11 @@ void n3ldg_cuda::Tensor2D::zero() {
 
 void n3ldg_cuda::Tensor2D::random(dtype bound) {
     n3ldg_cpu::Tensor2D::random(bound);
+    copyFromHostToDevice();
+}
+
+void n3ldg_cuda::Tensor2D::randomNorm(dtype sd) {
+    n3ldg_cpu::Tensor2D::randomNorm(sd);
     copyFromHostToDevice();
 }
 

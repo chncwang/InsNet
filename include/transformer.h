@@ -23,9 +23,12 @@ public:
     void init(int out_dim, int in_dim) {
         cout << boost::format("AttentionHeadParams init - out_dim:%1% in_dim:%2%") % out_dim %
             in_dim << endl;
-        q_.init(out_dim, in_dim, false);
-        k_.init(out_dim, in_dim, false);
-        v_.init(out_dim, in_dim, false);
+        function<dtype(int, int)> init_att = [](int out, int in) ->dtype {
+            return sqrt(2.0 / (out * 5));
+        };
+        q_.init(out_dim, in_dim, false, &init_att, InitDistribution::NORM);
+        k_.init(out_dim, in_dim, false, &init_att, InitDistribution::NORM);
+        v_.init(out_dim, in_dim, false, &init_att, InitDistribution::NORM);
     }
 
     UniParams &q() {
@@ -97,8 +100,8 @@ public:
         function<dtype(int, int)> init_relu = [](int out, int in) ->dtype {
             return sqrt(2.0 / (out + in));
         };
-        ffn_inner_params_.init(4 * dim, dim, true, &init_relu);
-        ffn_outter_params_.init(dim, 4 * dim, true, &init_relu);
+        ffn_inner_params_.init(4 * dim, dim, true, &init_relu, InitDistribution::NORM);
+        ffn_outter_params_.init(dim, 4 * dim, true, &init_relu, InitDistribution::NORM);
         layer_norm_a_.init(dim);
         layer_norm_b_.init(dim);
     }
@@ -389,8 +392,8 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
     pos_encoded_layer.reserve(sentence_len);
     for (int i = 0; i < sentence_len; ++i) {
         Node *embedding = n3ldg_plus::embedding(graph, params.positionalEncodingParam(), i, false);
-        embedding = n3ldg_plus::scaled(graph, *embedding, 1.0 / ::sqrt((float)embedding->getDim()));
         Node *input = linear(graph, params.inputLinear(), *inputs.at(i));
+        input = n3ldg_plus::scaled(graph, *input, ::sqrt((float)embedding->getDim()));
         Node *pos_encoded = add(graph, {input, embedding});
         pos_encoded = n3ldg_plus::dropout(graph, *pos_encoded, dropout, is_training);
         pos_encoded_layer.push_back(pos_encoded);

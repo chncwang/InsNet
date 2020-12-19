@@ -101,7 +101,9 @@ struct Tensor2D : public N3LDGSerializable {
 
     Tensor2D& operator=(const Tensor2D &a);
 
-    void random(dtype bound);
+    virtual void random(dtype bound);
+
+    virtual void randomNorm(dtype sd);
 
     void norm2one(dtype norm = 1.0);
 
@@ -171,7 +173,9 @@ struct Tensor2D : public n3ldg_cpu::Tensor2D, public Transferable {
 
     void zero();
 
-    void random(dtype bound);
+    void random(dtype bound) override;
+
+    void randomNorm(dtype sd) override;
 
     bool verify(const char* message);
 
