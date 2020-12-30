@@ -3,6 +3,7 @@
 
 #include "MyLib.h"
 #include "Node.h"
+#include "LSTM1.h"
 #include "AtomicOP.h"
 #include "Graph.h"
 #include "UniOP.h"
@@ -82,7 +83,7 @@ class TransformerEncoderLayerParams : public N3LDGSerializable,
 {
 public:
     TransformerEncoderLayerParams(const string &name) :
-        multi_head_attention_params_(name + "-multi_head_attention_params"),
+        lstm_params_(name + "-lstm_params"),
         ffn_inner_params_(name + "-ffn_inner_params"),
         ffn_outter_params_(name + "-ffn_outter_params"),
         layer_norm_a_(name + "-layer_norm_a"), layer_norm_b_(name + "-layer_norm_b") {}
@@ -95,7 +96,7 @@ public:
         int section_out_dim = dim / head_count;
         cout << boost::format("section_out_dim:%1% dim:%2% head_count:%3%") % section_out_dim %
             dim % head_count << endl;
-        multi_head_attention_params_.init(dim, dim);
+        lstm_params_.init(dim, dim);
 
         function<dtype(int, int)> init_relu = [](int out, int in) ->dtype {
             return sqrt(2.0 / (out + in));
@@ -106,8 +107,8 @@ public:
         layer_norm_b_.init(dim);
     }
 
-    AttentionHeadParams &multiHeadAttentionParams() {
-        return multi_head_attention_params_;
+    LSTM1Params &lstmParams() {
+        return lstm_params_;
     }
 
     UniParams &ffnInnerParams() {
@@ -128,7 +129,7 @@ public:
 
     Json::Value toJson() const override {
         Json::Value json;
-        json["multi_head_attention_params"] = multi_head_attention_params_.toJson();
+        json["lstm_params"] = lstm_params_.toJson();
         json["ffn_inner_params"] = ffn_inner_params_.toJson();
         json["ffn_outter_params"] = ffn_outter_params_.toJson();
         json["layer_norm_a"] = layer_norm_a_.toJson();
@@ -137,7 +138,7 @@ public:
     }
 
     void fromJson(const Json::Value &json) override {
-        multi_head_attention_params_.fromJson(json["multi_head_attention_params"]);
+        lstm_params_.fromJson(json["lstm_params"]);
         ffn_inner_params_.fromJson(json["ffn_inner_params"]);
         ffn_outter_params_.fromJson(json["ffn_outter_params"]);
         layer_norm_a_.fromJson(json["layer_norm_a"]);
@@ -146,19 +147,19 @@ public:
 
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
-        return {&multi_head_attention_params_, &ffn_inner_params_, &ffn_outter_params_,
+        return {&lstm_params_, &ffn_inner_params_, &ffn_outter_params_,
             &layer_norm_a_, &layer_norm_b_};
     }
 #endif
 
 protected:
     virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
-        return {&multi_head_attention_params_, &ffn_inner_params_, &ffn_outter_params_,
+        return {&lstm_params_, &ffn_inner_params_, &ffn_outter_params_,
             &layer_norm_a_, &layer_norm_b_};
     }
 
 private:
-    AttentionHeadParams multi_head_attention_params_;
+    LSTM1Params lstm_params_;
     UniParams ffn_inner_params_;
     UniParams ffn_outter_params_;
     LayerNormalizationParams layer_norm_a_;
@@ -386,14 +387,12 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
         dtype dropout,
         bool is_training) {
     using namespace n3ldg_plus;
-    n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
     vector<Node *> pos_encoded_layer;
     int sentence_len = inputs.size();
     pos_encoded_layer.reserve(sentence_len);
     for (int i = 0; i < sentence_len; ++i) {
         Node *embedding = n3ldg_plus::embedding(graph, params.positionalEncodingParam(), i, false);
         Node *input = linear(graph, params.inputLinear(), *inputs.at(i));
-        input = n3ldg_plus::scaled(graph, *input, ::sqrt((float)embedding->getDim()));
         Node *pos_encoded = add(graph, {input, embedding});
         pos_encoded = n3ldg_plus::dropout(graph, *pos_encoded, dropout, is_training);
         pos_encoded_layer.push_back(pos_encoded);
@@ -403,7 +402,6 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
 
     vector<Node *> last_layer = pos_encoded_layer;
     for (int i = 0; i < layer_count; ++i) {
-        profiler.BeginEvent("multi head");
         if (last_layer.size() != sentence_len) {
             cerr << "transformer - last_layer.size():" << last_layer.size() << " sentence_len:"
                 << sentence_len << endl;
@@ -418,32 +416,14 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
             normed.push_back(input);
         }
 
-        auto &attention_head_params = layer_params.multiHeadAttentionParams();
-        vector<Node *> keys, values;
-        keys.reserve(sentence_len);
-        values.reserve(sentence_len);
-        for (int m = 0; m < sentence_len; ++m) {
-            Node *kv_input = normed.at(m);
-            Node *k = linear(graph, attention_head_params.k(), *kv_input);
-            keys.push_back(k);
-            Node *v = linear(graph, attention_head_params.v(), *kv_input);
-            values.push_back(v);
-        }
-        Node *key_matrix = concatToMatrix(graph, keys);
-        Node *value_matrix = concatToMatrix(graph, keys);
-        profiler.EndEvent();
-
         vector<Node *> sub_layer;
+        DynamicLSTMBuilder builder;
+        Node *bucket = n3ldg_plus::bucket(graph, normed.front()->getDim(), 0);
         for (int j = 0; j < sentence_len; ++j) {
-            auto &attention_head_params = layer_params.multiHeadAttentionParams();
-            Node *q_input = normed.at(j);
-            Node *q = linear(graph, attention_head_params.q(), *q_input);
-
-            Node *attended = n3ldg_plus::dotAttention(graph, *key_matrix,
-                    *value_matrix, *q).first;
-
-            attended = n3ldg_plus::dropout(graph, *attended, dropout, is_training);
-            Node *added = add(graph, {attended, last_layer.at(j)});
+            auto &lstm_params = layer_params.lstmParams();
+            Node *input = normed.at(j);
+            builder.forward(graph, lstm_params, *input, *bucket, *bucket, dropout, is_training);
+            Node *added = add(graph, {builder._hiddens.at(j), last_layer.at(j)});
             Node *normed = layerNormalization(graph, layer_params.layerNormB(), *added);
             Node *t = linear(graph, layer_params.ffnInnerParams(), *normed);
             t = relu(graph, *t);
