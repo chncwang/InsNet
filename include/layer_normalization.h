@@ -86,4 +86,14 @@ Node *layerNormalization(Graph &graph, LayerNormalizationParams &params,
     return biased;
 }
 
+vector<Node *> layerNormalization(Graph &graph, LayerNormalizationParams &params,
+        const vector<Node *> &input_layer) {
+    vector<Node *> results;
+    results.reserve(input_layer.size());
+    for (Node *x : input_layer) {
+        results.push_back(layerNormalization(graph, params, *x));
+    }
+    return results;
+}
+
 #endif
