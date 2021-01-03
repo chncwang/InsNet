@@ -399,12 +399,12 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
         }
         auto &layer_params = *params.layerParams().ptrs().at(i);
 
-//        vector<Node *> normed;
-//        for (int m = 0; m < sentence_len; ++m) {
-//            Node *input = last_layer.at(m);
-//            input = layerNormalization(graph, layer_params.layerNormA(), *input);
-//            normed.push_back(input);
-//        }
+        vector<Node *> normed;
+        for (int m = 0; m < sentence_len; ++m) {
+            Node *input = last_layer.at(m);
+            input = layerNormalization(graph, layer_params.layerNormA(), *input);
+            normed.push_back(input);
+        }
 
         vector<Node *> sub_layer;
         DynamicLSTMBuilder builder;
@@ -413,14 +413,13 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
             auto &lstm_params = layer_params.lstmParams();
             Node *input = last_layer.at(j);
             builder.forward(graph, lstm_params, *input, *bucket, *bucket, dropout, is_training);
-//            Node *added = add(graph, {builder._hiddens.at(j), last_layer.at(j)});
-            Node *added = builder._hiddens.at(j);
-//            Node *normed = layerNormalization(graph, layer_params.layerNormB(), *added);
-//            Node *t = linear(graph, layer_params.ffnInnerParams(), *normed);
-//            t = relu(graph, *t);
-//            t = linear(graph, layer_params.ffnOutterParams(), *t);
-//            t = n3ldg_plus::dropout(graph, *t, dropout, is_training);
-//            t = add(graph, {added, t});
+            Node *added = add(graph, {builder._hiddens.at(j), last_layer.at(j)});
+            Node *normed = layerNormalization(graph, layer_params.layerNormB(), *added);
+            Node *t = linear(graph, layer_params.ffnInnerParams(), *normed);
+            t = relu(graph, *t);
+            t = linear(graph, layer_params.ffnOutterParams(), *t);
+            t = n3ldg_plus::dropout(graph, *t, dropout, is_training);
+            t = add(graph, {added, t});
             sub_layer.push_back(added);
         }
         last_layer = sub_layer;
