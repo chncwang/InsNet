@@ -411,7 +411,7 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
         Node *bucket = n3ldg_plus::bucket(graph, layer_params.lstmParams().outDim(), 0);
         for (int j = 0; j < sentence_len; ++j) {
             auto &lstm_params = layer_params.lstmParams();
-            Node *input = last_layer.at(j);
+            Node *input = normed.at(j);
             builder.forward(graph, lstm_params, *input, *bucket, *bucket, dropout, is_training);
             Node *added = add(graph, {builder._hiddens.at(j), last_layer.at(j)});
             Node *normed = layerNormalization(graph, layer_params.layerNormB(), *added);
@@ -420,7 +420,7 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
             t = linear(graph, layer_params.ffnOutterParams(), *t);
             t = n3ldg_plus::dropout(graph, *t, dropout, is_training);
             t = add(graph, {added, t});
-            sub_layer.push_back(added);
+            sub_layer.push_back(t);
         }
         last_layer = sub_layer;
     }
