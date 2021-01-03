@@ -96,7 +96,7 @@ public:
         int section_out_dim = dim / head_count;
         cout << boost::format("section_out_dim:%1% dim:%2% head_count:%3%") % section_out_dim %
             dim % head_count << endl;
-        lstm_params_.init(dim, 300);
+        lstm_params_.init(dim, dim);
 
         function<dtype(int, int)> init_relu = [](int out, int in) ->dtype {
             return sqrt(2.0 / (out + in));
@@ -385,7 +385,6 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
     for (int i = 0; i < sentence_len; ++i) {
 //        Node *embedding = n3ldg_plus::embedding(graph, params.positionalEncodingParam(), i, false);
         Node *input = inputs.at(i);
-        input = n3ldg_plus::dropout(graph, *input, dropout, is_training);
         pos_encoded_layer.push_back(input);
     }
 
