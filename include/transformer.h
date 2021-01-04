@@ -194,13 +194,12 @@ class TransformerParams : public N3LDGSerializable, public TunableCombination<Ba
 public:
     TransformerParams(const string &name) :
         positional_encoding_param_(name + "-positional_encoding_param"),
-        input_linear_(name + "-input_linear"), layer_params_(name + "-layer_params") {}
+        layer_params_(name + "-layer_params") {}
 
     TransformerParams(const TransformerParams<T> &p) = delete;
 
     void init(int layer, int hidden_dim, int input_dim, int head_count, int max_sentence_len) {
         initPositionalEncodingParam(positional_encoding_param_, hidden_dim, max_sentence_len);
-        input_linear_.init(hidden_dim, input_dim, false);
 
         function<void(T &, int)> init_param = [&](T &params, int layer) {
                 params.init(hidden_dim, head_count);
@@ -218,10 +217,6 @@ public:
         return layer_params_;
     }
 
-    UniParams &inputLinear() {
-        return input_linear_;
-    }
-
     int headCount() const {
         return head_count_;
     }
@@ -237,31 +232,28 @@ public:
     Json::Value toJson() const override {
         Json::Value json;
         json["positional_encoding_param"] = positional_encoding_param_.toJson();
-        json["input_linear"] = input_linear_.toJson();
         json["layer_params"] = layer_params_.toJson();
         return json;
     }
 
     void fromJson(const Json::Value &json) override {
         positional_encoding_param_.fromJson(json["positional_encoding_param"]);
-        input_linear_.fromJson(json["input_linear"]);
         layer_params_.fromJson(json["layer_params"]);
     }
 
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
-        return {&positional_encoding_param_, &input_linear_, &layer_params_};
+        return {&positional_encoding_param_, &layer_params_};
     }
 #endif
 
 protected:
     virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
-        return {&input_linear_, &layer_params_};
+        return {&layer_params_};
     }
 
 private:
     Param positional_encoding_param_;
-    UniParams input_linear_;
     ParamArray<T> layer_params_;
     int head_count_;
     int hidden_dim_;
@@ -392,8 +384,7 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
     pos_encoded_layer.reserve(sentence_len);
     for (int i = 0; i < sentence_len; ++i) {
         Node *embedding = n3ldg_plus::embedding(graph, params.positionalEncodingParam(), i, false);
-        Node *input = linear(graph, params.inputLinear(), *inputs.at(i));
-        input = n3ldg_plus::scaled(graph, *input, ::sqrt((float)embedding->getDim()));
+        Node *input = inputs.at(i);
         Node *pos_encoded = add(graph, {input, embedding});
         pos_encoded = n3ldg_plus::dropout(graph, *pos_encoded, dropout, is_training);
         pos_encoded_layer.push_back(pos_encoded);
@@ -531,250 +522,250 @@ protected:
     bool prepared_ = false;
 };
 
-class TransformerDecoderCellBuilder : public TransformerDecoderBuilderAbs {
-public:
-    TransformerDecoderCellBuilder(Graph &graph, TransformerDecoderParams &params,
-            const vector<Node *> &encoder_hiddens,
-            dtype dropout,
-            bool is_training) :
-        TransformerDecoderBuilderAbs(graph, params, encoder_hiddens, dropout, is_training) {
-            int layer_count = params.layerCount();
-            for (int i = 0; i < layer_count; ++i) {
-                vector<Node *> keys, values;
-                for (int j = 0; j < params.headCount(); ++j) {
-                    keys.push_back(nullptr);
-                    values.push_back(nullptr);
-                }
-                key_heads_layers_.push_back(keys);
-                value_heads_layers_.push_back(values);
-            }
-        }
+//class TransformerDecoderCellBuilder : public TransformerDecoderBuilderAbs {
+//public:
+//    TransformerDecoderCellBuilder(Graph &graph, TransformerDecoderParams &params,
+//            const vector<Node *> &encoder_hiddens,
+//            dtype dropout,
+//            bool is_training) :
+//        TransformerDecoderBuilderAbs(graph, params, encoder_hiddens, dropout, is_training) {
+//            int layer_count = params.layerCount();
+//            for (int i = 0; i < layer_count; ++i) {
+//                vector<Node *> keys, values;
+//                for (int j = 0; j < params.headCount(); ++j) {
+//                    keys.push_back(nullptr);
+//                    values.push_back(nullptr);
+//                }
+//                key_heads_layers_.push_back(keys);
+//                value_heads_layers_.push_back(values);
+//            }
+//        }
 
-    void forward(Node &decoder_input) {
-        if (!prepared_) {
-            cerr << "TransformerDecoderBuilder forward - not prepared" << endl;
-            abort();
-        }
-        using namespace n3ldg_plus;
-        Node *embedding = n3ldg_plus::embedding(*graph_, params_->positionalEncodingParam(),
-                decoded_len_, false);
-        Node *input = linear(*graph_, params_->inputLinear(), decoder_input);
-        Node *pos_encoded = add(*graph_, {input, embedding});
-        pos_encoded = n3ldg_plus::dropout(*graph_, *pos_encoded, dropout_, is_training_);
+//    void forward(Node &decoder_input) {
+//        if (!prepared_) {
+//            cerr << "TransformerDecoderBuilder forward - not prepared" << endl;
+//            abort();
+//        }
+//        using namespace n3ldg_plus;
+//        Node *embedding = n3ldg_plus::embedding(*graph_, params_->positionalEncodingParam(),
+//                decoded_len_, false);
+//        Node *input = linear(*graph_, params_->inputLinear(), decoder_input);
+//        Node *pos_encoded = add(*graph_, {input, embedding});
+//        pos_encoded = n3ldg_plus::dropout(*graph_, *pos_encoded, dropout_, is_training_);
 
-        int layer_count = params_->layerCount();
+//        int layer_count = params_->layerCount();
 
-        Node *last_layer_node = pos_encoded;
-        for (int i = 0; i < layer_count; ++i) {
-            auto &layer_params = *params_->layerParams().ptrs().at(i);
-            auto &attention_head_params = layer_params.maskedMultiHeadAttentionParams();
-            Node *k = linear(*graph_, attention_head_params.k(), *last_layer_node);
-            Node *v = linear(*graph_, attention_head_params.v(), *last_layer_node);
+//        Node *last_layer_node = pos_encoded;
+//        for (int i = 0; i < layer_count; ++i) {
+//            auto &layer_params = *params_->layerParams().ptrs().at(i);
+//            auto &attention_head_params = layer_params.maskedMultiHeadAttentionParams();
+//            Node *k = linear(*graph_, attention_head_params.k(), *last_layer_node);
+//            Node *v = linear(*graph_, attention_head_params.v(), *last_layer_node);
 
-            int head_count = params_->headCount();
-            int section_dim = k->getDim() / head_count;
-            for (int j = 0; j < head_count; ++j) {
-                Node *&key_matrix = key_heads_layers_.at(i).at(j);
-                Node *split_k = split(*graph_, section_dim, *k, section_dim * j);
-                key_matrix = key_matrix == nullptr ? split_k :
-                    concat(*graph_, {key_matrix, split_k});
-                key_matrix->setColumn(key_matrix->getDim() / split_k->getDim());
-                Node *&value_matrix = value_heads_layers_.at(i).at(j);
-                Node *split_v = split(*graph_, section_dim, *v, section_dim * j);
-                value_matrix = value_matrix == nullptr ? split_v :
-                    concat(*graph_, {value_matrix, split_v});
-                value_matrix->setColumn(value_matrix->getDim() / split_v->getDim());
-            }
+//            int head_count = params_->headCount();
+//            int section_dim = k->getDim() / head_count;
+//            for (int j = 0; j < head_count; ++j) {
+//                Node *&key_matrix = key_heads_layers_.at(i).at(j);
+//                Node *split_k = split(*graph_, section_dim, *k, section_dim * j);
+//                key_matrix = key_matrix == nullptr ? split_k :
+//                    concat(*graph_, {key_matrix, split_k});
+//                key_matrix->setColumn(key_matrix->getDim() / split_k->getDim());
+//                Node *&value_matrix = value_heads_layers_.at(i).at(j);
+//                Node *split_v = split(*graph_, section_dim, *v, section_dim * j);
+//                value_matrix = value_matrix == nullptr ? split_v :
+//                    concat(*graph_, {value_matrix, split_v});
+//                value_matrix->setColumn(value_matrix->getDim() / split_v->getDim());
+//            }
 
-            vector<Node *> attended_segments;
-            attended_segments.reserve(head_count);
-            Node *q = linear(*graph_, attention_head_params.q(), *last_layer_node);
-            for (int k = 0; k < head_count; ++k) {
-                Node *split_q = split(*graph_, section_dim, *q, section_dim * k);
-                Node *attended = n3ldg_plus::dotAttention(*graph_,
-                        *key_heads_layers_.at(i).at(k), *value_heads_layers_.at(i).at(k),
-                        *split_q).first;
-                if (attended->getDim() * head_count != params_->hiddenDim()) {
-                    cerr << boost::format("attended_seg dim:%1% head_count:%2% hiddendim:%3%")
-                        % attended->getDim() % head_count % params_->hiddenDim() << endl;
-                    abort();
-                }
-                attended_segments.push_back(attended);
-            }
-            Node *concated = concat(*graph_, attended_segments);
-            concated = n3ldg_plus::dropout(*graph_, *concated, dropout_, is_training_);
-            Node *added = add(*graph_, {concated, last_layer_node});
-            Node *normed = layerNormalization(*graph_, layer_params.layerNormA(), *added);
+//            vector<Node *> attended_segments;
+//            attended_segments.reserve(head_count);
+//            Node *q = linear(*graph_, attention_head_params.q(), *last_layer_node);
+//            for (int k = 0; k < head_count; ++k) {
+//                Node *split_q = split(*graph_, section_dim, *q, section_dim * k);
+//                Node *attended = n3ldg_plus::dotAttention(*graph_,
+//                        *key_heads_layers_.at(i).at(k), *value_heads_layers_.at(i).at(k),
+//                        *split_q).first;
+//                if (attended->getDim() * head_count != params_->hiddenDim()) {
+//                    cerr << boost::format("attended_seg dim:%1% head_count:%2% hiddendim:%3%")
+//                        % attended->getDim() % head_count % params_->hiddenDim() << endl;
+//                    abort();
+//                }
+//                attended_segments.push_back(attended);
+//            }
+//            Node *concated = concat(*graph_, attended_segments);
+//            concated = n3ldg_plus::dropout(*graph_, *concated, dropout_, is_training_);
+//            Node *added = add(*graph_, {concated, last_layer_node});
+//            Node *normed = layerNormalization(*graph_, layer_params.layerNormA(), *added);
 
-            auto &attention_head_params_for_encoder = layer_params.multiHeadAttentionParams();
-            Node *q_for_encoder = linear(*graph_, attention_head_params_for_encoder.q(), *normed);
-            vector<Node *> encoder_attended_segments;
-            for (int k = 0; k < head_count; ++k) {
-                Node *split_q = split(*graph_, section_dim, *q_for_encoder, section_dim * k);
-                Node *attended = n3ldg_plus::dotAttention(*graph_,
-                        *encoder_keys_.at(i).at(k), *encoder_values_.at(i).at(k),
-                        *split_q).first;
-                if (attended->getDim() * head_count != params_->hiddenDim()) {
-                    cerr << boost::format("attended_seg dim:%1% head_count:%2% hiddendim:%3%")
-                        % attended->getDim() % head_count % params_->hiddenDim() << endl;
-                    abort();
-                }
-                encoder_attended_segments.push_back(attended);
-            }
-            concated = concat(*graph_, encoder_attended_segments);
-            concated = n3ldg_plus::dropout(*graph_, *concated, dropout_, is_training_);
-            added = add(*graph_, {concated, normed});
-            normed = layerNormalization(*graph_, layer_params.layerNormB(), *added);
+//            auto &attention_head_params_for_encoder = layer_params.multiHeadAttentionParams();
+//            Node *q_for_encoder = linear(*graph_, attention_head_params_for_encoder.q(), *normed);
+//            vector<Node *> encoder_attended_segments;
+//            for (int k = 0; k < head_count; ++k) {
+//                Node *split_q = split(*graph_, section_dim, *q_for_encoder, section_dim * k);
+//                Node *attended = n3ldg_plus::dotAttention(*graph_,
+//                        *encoder_keys_.at(i).at(k), *encoder_values_.at(i).at(k),
+//                        *split_q).first;
+//                if (attended->getDim() * head_count != params_->hiddenDim()) {
+//                    cerr << boost::format("attended_seg dim:%1% head_count:%2% hiddendim:%3%")
+//                        % attended->getDim() % head_count % params_->hiddenDim() << endl;
+//                    abort();
+//                }
+//                encoder_attended_segments.push_back(attended);
+//            }
+//            concated = concat(*graph_, encoder_attended_segments);
+//            concated = n3ldg_plus::dropout(*graph_, *concated, dropout_, is_training_);
+//            added = add(*graph_, {concated, normed});
+//            normed = layerNormalization(*graph_, layer_params.layerNormB(), *added);
 
-            Node *t = linear(*graph_, layer_params.ffnInnerParams(), *normed);
-            t = relu(*graph_, *t);
-            t = linear(*graph_, layer_params.ffnOutterParams(), *t);
-            t = n3ldg_plus::dropout(*graph_, *t, dropout_, is_training_);
-            t = add(*graph_, {normed, t});
-            Node *normed3 = layerNormalization(*graph_, layer_params.layerNormC(), *t);
-            last_layer_node = normed3;
-            hidden_layers_.at(i).push_back(last_layer_node);
-        }
-        decoded_len_++;
-    }
+//            Node *t = linear(*graph_, layer_params.ffnInnerParams(), *normed);
+//            t = relu(*graph_, *t);
+//            t = linear(*graph_, layer_params.ffnOutterParams(), *t);
+//            t = n3ldg_plus::dropout(*graph_, *t, dropout_, is_training_);
+//            t = add(*graph_, {normed, t});
+//            Node *normed3 = layerNormalization(*graph_, layer_params.layerNormC(), *t);
+//            last_layer_node = normed3;
+//            hidden_layers_.at(i).push_back(last_layer_node);
+//        }
+//        decoded_len_++;
+//    }
 
-private:
+//private:
 //     The outter vector represents layers, and the inner represents heads.
-    vector<vector<Node *>> key_heads_layers_, value_heads_layers_;
+//    vector<vector<Node *>> key_heads_layers_, value_heads_layers_;
 
-    int decoded_len_ = 0;
-};
+//    int decoded_len_ = 0;
+//};
 
-class TransformerDecoderBuilder : public TransformerDecoderBuilderAbs {
-public:
-    TransformerDecoderBuilder(Graph &graph, TransformerDecoderParams &params,
-            const vector<Node *> &encoder_hiddens,
-            dtype dropout,
-            bool is_training) :
-        TransformerDecoderBuilderAbs(graph, params, encoder_hiddens, dropout, is_training) {}
+//class TransformerDecoderBuilder : public TransformerDecoderBuilderAbs {
+//public:
+//    TransformerDecoderBuilder(Graph &graph, TransformerDecoderParams &params,
+//            const vector<Node *> &encoder_hiddens,
+//            dtype dropout,
+//            bool is_training) :
+//        TransformerDecoderBuilderAbs(graph, params, encoder_hiddens, dropout, is_training) {}
 
-    void forward(vector<Node *> &decoder_inputs) {
-        if (!prepared_) {
-            cerr << "TransformerDecoderBuilder forward - not prepared" << endl;
-            abort();
-        }
-        using namespace n3ldg_plus;
+//    void forward(vector<Node *> &decoder_inputs) {
+//        if (!prepared_) {
+//            cerr << "TransformerDecoderBuilder forward - not prepared" << endl;
+//            abort();
+//        }
+//        using namespace n3ldg_plus;
 
-        vector<Node *> pos_encoded_layer;
-        int i = 0;
-        for (Node *decoder_input : decoder_inputs) {
-            Node *embedding = n3ldg_plus::embedding(*graph_, params_->positionalEncodingParam(),
-                    i++, false);
-            Node *input = linear(*graph_, params_->inputLinear(), *decoder_input);
-            Node *pos_encoded = add(*graph_, {input, embedding});
-            pos_encoded = n3ldg_plus::dropout(*graph_, *pos_encoded, dropout_, is_training_);
-            pos_encoded_layer.push_back(pos_encoded);
-        }
+//        vector<Node *> pos_encoded_layer;
+//        int i = 0;
+//        for (Node *decoder_input : decoder_inputs) {
+//            Node *embedding = n3ldg_plus::embedding(*graph_, params_->positionalEncodingParam(),
+//                    i++, false);
+//            Node *input = linear(*graph_, params_->inputLinear(), *decoder_input);
+//            Node *pos_encoded = add(*graph_, {input, embedding});
+//            pos_encoded = n3ldg_plus::dropout(*graph_, *pos_encoded, dropout_, is_training_);
+//            pos_encoded_layer.push_back(pos_encoded);
+//        }
 
-        int layer_count = params_->layerCount();
-        int head_count = params_->headCount();
-        int hidden_dim = pos_encoded_layer.front()->getDim();
-        int section_dim = hidden_dim / head_count;
+//        int layer_count = params_->layerCount();
+//        int head_count = params_->headCount();
+//        int hidden_dim = pos_encoded_layer.front()->getDim();
+//        int section_dim = hidden_dim / head_count;
 
-        vector<Node *> *last_layer = &pos_encoded_layer;
-        for (int i = 0; i < layer_count; ++i) {
-            auto &layer_params = *params_->layerParams().ptrs().at(i);
+//        vector<Node *> *last_layer = &pos_encoded_layer;
+//        for (int i = 0; i < layer_count; ++i) {
+//            auto &layer_params = *params_->layerParams().ptrs().at(i);
 
-            vector<Node *> normed_nodes;
-            for (Node *last_layer_node : *last_layer) {
-                Node *normed = layerNormalization(*graph_, layer_params.layerNormA(),
-                        *last_layer_node);
-                normed_nodes.push_back(normed);
-            }
+//            vector<Node *> normed_nodes;
+//            for (Node *last_layer_node : *last_layer) {
+//                Node *normed = layerNormalization(*graph_, layer_params.layerNormA(),
+//                        *last_layer_node);
+//                normed_nodes.push_back(normed);
+//            }
 
-            auto &attention_head_params = layer_params.maskedMultiHeadAttentionParams();
+//            auto &attention_head_params = layer_params.maskedMultiHeadAttentionParams();
 
-            // The outter vector represents heads, and the inner represents tokens;
-            vector<vector<Node *>> ks, vs;
-            ks.resize(head_count);
-            vs.resize(head_count);
+//             The outter vector represents heads, and the inner represents tokens;
+//            vector<vector<Node *>> ks, vs;
+//            ks.resize(head_count);
+//            vs.resize(head_count);
 
-            for (Node *normed : normed_nodes) {
-                Node *k = linear(*graph_, attention_head_params.k(), *normed);
-                Node *v = linear(*graph_, attention_head_params.v(), *normed);
-                for (int j = 0; j < head_count; ++j) {
-                    ks.at(j).push_back(split(*graph_, section_dim, *k, j * section_dim));
-                    vs.at(j).push_back(split(*graph_, section_dim, *v, j * section_dim));
-                }
-            }
-            vector<Node *> key_matrices, value_matrices;
-            for (int j = 0; j < head_count; ++j) {
-                Node *key_matrix = concat(*graph_, ks.at(j));
-                key_matrices.push_back(key_matrix);
-                Node *value_matrix = concat(*graph_, vs.at(j));
-                value_matrices.push_back(value_matrix);
-            }
-            int token_i = 0;
-            for (Node *normed : normed_nodes) {
-                vector<Node *> key_matrix_heads, value_matrix_heads;
-                for (int j = 0; j < head_count; ++j) {
-                    Node *key_matrix = split(*graph_, (token_i + 1) * section_dim,
-                            *key_matrices.at(j), 0);
-                    key_matrix->setColumn(token_i + 1);
-                    key_matrix_heads.push_back(key_matrix);
-                    Node *value_matrix = split(*graph_, (token_i + 1) * section_dim,
-                            *value_matrices.at(j), 0);
-                    value_matrix->setColumn(token_i + 1);
-                    value_matrix_heads.push_back(value_matrix);
-                }
+//            for (Node *normed : normed_nodes) {
+//                Node *k = linear(*graph_, attention_head_params.k(), *normed);
+//                Node *v = linear(*graph_, attention_head_params.v(), *normed);
+//                for (int j = 0; j < head_count; ++j) {
+//                    ks.at(j).push_back(split(*graph_, section_dim, *k, j * section_dim));
+//                    vs.at(j).push_back(split(*graph_, section_dim, *v, j * section_dim));
+//                }
+//            }
+//            vector<Node *> key_matrices, value_matrices;
+//            for (int j = 0; j < head_count; ++j) {
+//                Node *key_matrix = concat(*graph_, ks.at(j));
+//                key_matrices.push_back(key_matrix);
+//                Node *value_matrix = concat(*graph_, vs.at(j));
+//                value_matrices.push_back(value_matrix);
+//            }
+//            int token_i = 0;
+//            for (Node *normed : normed_nodes) {
+//                vector<Node *> key_matrix_heads, value_matrix_heads;
+//                for (int j = 0; j < head_count; ++j) {
+//                    Node *key_matrix = split(*graph_, (token_i + 1) * section_dim,
+//                            *key_matrices.at(j), 0);
+//                    key_matrix->setColumn(token_i + 1);
+//                    key_matrix_heads.push_back(key_matrix);
+//                    Node *value_matrix = split(*graph_, (token_i + 1) * section_dim,
+//                            *value_matrices.at(j), 0);
+//                    value_matrix->setColumn(token_i + 1);
+//                    value_matrix_heads.push_back(value_matrix);
+//                }
 
-                vector<Node *> attended_segments;
-                attended_segments.reserve(head_count);
-                Node *q = linear(*graph_, attention_head_params.q(), *normed);
-                for (int k = 0; k < head_count; ++k) {
-                    Node *split_q = split(*graph_, section_dim, *q, section_dim * k);
-                    Node *attended = n3ldg_plus::dotAttention(*graph_, *key_matrix_heads.at(k),
-                            *value_matrix_heads.at(k), *split_q).first;
-                    if (attended->getDim() * head_count != params_->hiddenDim()) {
-                        cerr << boost::format("attended_seg dim:%1% head_count:%2% hiddendim:%3%")
-                            % attended->getDim() % head_count % params_->hiddenDim() << endl;
-                        abort();
-                    }
-                    attended_segments.push_back(attended);
-                }
-                Node *concated = concat(*graph_, attended_segments);
-                concated = n3ldg_plus::dropout(*graph_, *concated, dropout_, is_training_);
-                Node *added = add(*graph_, {concated, last_layer->at(token_i)});
+//                vector<Node *> attended_segments;
+//                attended_segments.reserve(head_count);
+//                Node *q = linear(*graph_, attention_head_params.q(), *normed);
+//                for (int k = 0; k < head_count; ++k) {
+//                    Node *split_q = split(*graph_, section_dim, *q, section_dim * k);
+//                    Node *attended = n3ldg_plus::dotAttention(*graph_, *key_matrix_heads.at(k),
+//                            *value_matrix_heads.at(k), *split_q).first;
+//                    if (attended->getDim() * head_count != params_->hiddenDim()) {
+//                        cerr << boost::format("attended_seg dim:%1% head_count:%2% hiddendim:%3%")
+//                            % attended->getDim() % head_count % params_->hiddenDim() << endl;
+//                        abort();
+//                    }
+//                    attended_segments.push_back(attended);
+//                }
+//                Node *concated = concat(*graph_, attended_segments);
+//                concated = n3ldg_plus::dropout(*graph_, *concated, dropout_, is_training_);
+//                Node *added = add(*graph_, {concated, last_layer->at(token_i)});
 
-                normed = layerNormalization(*graph_, layer_params.layerNormB(), *added);
-                auto &attention_head_params_for_encoder = layer_params.multiHeadAttentionParams();
-                Node *q_for_encoder = linear(*graph_, attention_head_params_for_encoder.q(),
-                        *normed);
-                vector<Node *> encoder_attended_segments;
-                for (int k = 0; k < head_count; ++k) {
-                    Node *split_q = split(*graph_, section_dim, *q_for_encoder, section_dim * k);
-                    Node *attended = n3ldg_plus::dotAttention(*graph_,
-                            *encoder_keys_.at(i).at(k), *encoder_values_.at(i).at(k),
-                            *split_q).first;
-                    if (attended->getDim() * head_count != params_->hiddenDim()) {
-                        cerr << boost::format("attended_seg dim:%1% head_count:%2% hiddendim:%3%")
-                            % attended->getDim() % head_count % params_->hiddenDim() << endl;
-                        abort();
-                    }
-                    encoder_attended_segments.push_back(attended);
-                }
-                concated = concat(*graph_, encoder_attended_segments);
-                concated = n3ldg_plus::dropout(*graph_, *concated, dropout_, is_training_);
-                added = add(*graph_, {concated, added});
+//                normed = layerNormalization(*graph_, layer_params.layerNormB(), *added);
+//                auto &attention_head_params_for_encoder = layer_params.multiHeadAttentionParams();
+//                Node *q_for_encoder = linear(*graph_, attention_head_params_for_encoder.q(),
+//                        *normed);
+//                vector<Node *> encoder_attended_segments;
+//                for (int k = 0; k < head_count; ++k) {
+//                    Node *split_q = split(*graph_, section_dim, *q_for_encoder, section_dim * k);
+//                    Node *attended = n3ldg_plus::dotAttention(*graph_,
+//                            *encoder_keys_.at(i).at(k), *encoder_values_.at(i).at(k),
+//                            *split_q).first;
+//                    if (attended->getDim() * head_count != params_->hiddenDim()) {
+//                        cerr << boost::format("attended_seg dim:%1% head_count:%2% hiddendim:%3%")
+//                            % attended->getDim() % head_count % params_->hiddenDim() << endl;
+//                        abort();
+//                    }
+//                    encoder_attended_segments.push_back(attended);
+//                }
+//                concated = concat(*graph_, encoder_attended_segments);
+//                concated = n3ldg_plus::dropout(*graph_, *concated, dropout_, is_training_);
+//                added = add(*graph_, {concated, added});
 
-                normed = layerNormalization(*graph_, layer_params.layerNormC(), *added);
-                Node *t = linear(*graph_, layer_params.ffnInnerParams(), *normed);
-                t = relu(*graph_, *t);
-                t = linear(*graph_, layer_params.ffnOutterParams(), *t);
-                t = n3ldg_plus::dropout(*graph_, *t, dropout_, is_training_);
-                t = add(*graph_, {added, t});
-                hidden_layers_.at(i).push_back(t);
-                ++token_i;
-            }
-            last_layer = &hidden_layers_.at(i);
-        }
-    }
-};
+//                normed = layerNormalization(*graph_, layer_params.layerNormC(), *added);
+//                Node *t = linear(*graph_, layer_params.ffnInnerParams(), *normed);
+//                t = relu(*graph_, *t);
+//                t = linear(*graph_, layer_params.ffnOutterParams(), *t);
+//                t = n3ldg_plus::dropout(*graph_, *t, dropout_, is_training_);
+//                t = add(*graph_, {added, t});
+//                hidden_layers_.at(i).push_back(t);
+//                ++token_i;
+//            }
+//            last_layer = &hidden_layers_.at(i);
+//        }
+//    }
+//};
 
 }
 
