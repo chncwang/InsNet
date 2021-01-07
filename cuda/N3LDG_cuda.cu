@@ -2431,6 +2431,41 @@ void MatrixTransposeForward(vector<dtype *> &matrices, int count, int input_row,
     CheckCudaError();
 }
 
+__global__ void KernelMatrixTransposeBackward(dtype **grads, int count, int input_row,
+        int *input_cols,
+        int max_col,
+        dtype **matrix_grads) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    int max_dim = input_row * max_col;
+    for (int i = index; i < count * max_dim; i += step) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+        int input_col = input_cols[count_i];
+        if (dim_i < input_col * input_row) {
+            int input_col_i = dim_i % input_col;
+            int input_row_i = dim_i / input_col;
+            DeviceAtomicAdd(matrix_grads[count_i] + input_col_i * input_row + input_row_i,
+                    grads[count_i][dim_i]);
+        }
+    }
+}
+
+void MatrixTransposeBackward(vector<dtype *> &grads, int count, int input_row,
+        vector<int> &input_cols,
+        vector<dtype *> &matrix_grads) {
+    NumberPointerArray matrix_grad_arr, grad_arr;
+    matrix_grad_arr.init((dtype **)matrix_grads.data(), count);
+    grad_arr.init((dtype **)grads.data(), count);
+    IntArray input_col_arr;
+    input_col_arr.init(input_cols.data(), count);
+    int max_col = *max_element(input_cols.begin(), input_cols.end());
+    int block_count = DefaultBlockCount(count * input_row * max_col);
+    KernelMatrixTransposeBackward<<<block_count, TPB>>>(grad_arr.value, count, input_row,
+            input_col_arr.value, max_col, matrix_grad_arr.value);
+    CheckCudaError();
+}
+
 __global__ void KernelPMultiForward(dtype **ins1, dtype **ins2, int count, int dim,
         dtype **vals) {
     int index = DeviceDefaultIndex();

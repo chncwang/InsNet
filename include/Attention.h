@@ -57,7 +57,7 @@ pair<Node *, Node *> dotAttention(Graph &graph, Node& key_matrix, Node& value_ma
     sum->setColumn(value_matrix.getColumn());
     Node *transposed_sum = n3ldg_plus::transposeMatrix(graph, *sum);
     Node *scaled_weight = n3ldg_plus::scaled(graph, *transposed_sum,
-            1.0 / ::sqrt((dtype)guide.getDim()));
+            1.0 / ::sqrt((dtype)guide.getDim() / head_count));
     scaled_weight = n3ldg_plus::softmax(graph, *scaled_weight);
     Node *hidden = n3ldg_plus::matrixAndVectorMulti(graph, value_matrix, *scaled_weight,
             head_count);

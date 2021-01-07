@@ -423,7 +423,7 @@ public:
 
     void backward() override {
         for (int i = 0; i < getInput()->getColumn(); ++i) {
-            getInput()->loss()[max_indexes_.at(i)] += getLoss()[i];
+            getInput()->loss()[i * getInput()->getRow() + max_indexes_.at(i)] += getLoss()[i];
         }
     }
 

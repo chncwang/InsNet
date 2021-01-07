@@ -18,6 +18,14 @@ public:
         setDim(dim);
     }
 
+    bool typeEqual(Node *other) override {
+        return getNodeType() == other->getNodeType();
+    }
+
+    string typeSignature() const override {
+        return getNodeType();
+    }
+
     void forward(Graph &graph, Node &numerator, Node &denominator) {
         if (getDim() != numerator.getDim() || getDim() != denominator.getDim()) {
             cerr << boost::format("dim:%1% minuend:%2% subtrahend:%3%") % getDim() %
@@ -54,7 +62,7 @@ private:
 };
 
 #if USE_GPU
-class FullDivExecutor : public Executor {
+class FullDivExecutor : public Executor { // TODO
 public:
     vector<dtype*> numerators;
     vector<dtype*> denominators;

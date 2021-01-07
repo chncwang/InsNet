@@ -476,8 +476,7 @@ public:
 
             for (int j = 0; j < col; ++j) {
                 for (int k = 0; k < head_dim; ++k) {
-                    matrix_->loss().v[row * j + k + i * head_dim] +=
-                        matrix_head[head_dim * j + k];
+                    matrix_->loss()[row * j + k + i * head_dim] += matrix_head[head_dim * j + k];
                 }
             }
 
@@ -638,11 +637,38 @@ protected:
 class MatrixTransposeExecutor : public UniInputExecutor {
 public:
     void forward() override {
+        vector<dtype *> matrices, vals;
+        for (Node *node : batch) {
+            MatrixTransposeNode *m = dynamic_cast<MatrixTransposeNode *>(node);
+            matrices.push_back(m->getInput()->getVal().value);
+            vals.push_back(m->getVal().value);
+            input_cols_.push_back(m->getRow());
+        }
+        n3ldg_cuda::MatrixTransposeForward(matrices, batch.size(), batch.front()->getColumn(),
+                input_cols_, vals);
+#if TEST_CUDA
+        testForward();
+        cout << "MatrixTransposeForward forward tested" << endl;
+#endif
     }
+
     void backward() override {
+        vector<dtype *> grads, matrix_grads;
+        for (Node *node : batch) {
+            MatrixTransposeNode *m = dynamic_cast<MatrixTransposeNode *>(node);
+            matrix_grads.push_back(m->getInput()->getLoss().value);
+            grads.push_back(m->getLoss().value);
+        }
+        n3ldg_cuda::MatrixTransposeBackward(grads, batch.size(), batch.front()->getColumn(),
+                input_cols_, matrix_grads);
+#if TEST_CUDA
+        testBackward();
+        cout << "MatrixTransposeBackward tested" << endl;
+#endif
     }
 
 private:
+    vector<int> input_cols_;
 };
 #else
 class MatrixTransposeExecutor : public Executor {
@@ -686,6 +712,7 @@ Node *matrixAndVectorMulti(Graph &graph, Node &matrix, Node &vec, int head_count
 
 Node *transposeMatrix(Graph &graph, Node &matrix) {
     MatrixTransposeNode *node = MatrixTransposeNode::newNode(matrix.getDim());
+    node->setColumn(matrix.getRow());
     node->forward(graph, matrix);
     return node;
 }
