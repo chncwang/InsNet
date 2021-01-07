@@ -378,7 +378,6 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
         dtype dropout,
         bool is_training) {
     using namespace n3ldg_plus;
-    n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
     vector<Node *> pos_encoded_layer;
     int sentence_len = inputs.size();
     pos_encoded_layer.reserve(sentence_len);
@@ -394,7 +393,6 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
 
     vector<Node *> last_layer = pos_encoded_layer;
     for (int i = 0; i < layer_count; ++i) {
-        profiler.BeginEvent("multi head");
         if (last_layer.size() != sentence_len) {
             cerr << "transformer - last_layer.size():" << last_layer.size() << " sentence_len:"
                 << sentence_len << endl;
@@ -421,8 +419,7 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
             values.push_back(v);
         }
         Node *key_matrix = concatToMatrix(graph, keys);
-        Node *value_matrix = concatToMatrix(graph, keys);
-        profiler.EndEvent();
+        Node *value_matrix = concatToMatrix(graph, values);
 
         vector<Node *> sub_layer;
         for (int j = 0; j < sentence_len; ++j) {
@@ -431,7 +428,7 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
             Node *q = linear(graph, attention_head_params.q(), *q_input);
 
             Node *attended = n3ldg_plus::dotAttention(graph, *key_matrix,
-                    *value_matrix, *q).first;
+                    *value_matrix, *q, params.headCount()).first;
 
             attended = n3ldg_plus::dropout(graph, *attended, dropout, is_training);
             Node *added = add(graph, {attended, last_layer.at(j)});

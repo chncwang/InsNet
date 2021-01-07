@@ -98,11 +98,9 @@ public:
     void forward() override {
         for (Node *node : batch) {
             MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(node);
-//            cout << "in count:" << concat->getColumn() << endl;
             in_counts.push_back(concat->getColumn());
         }
         max_in_count = *max_element(in_counts.begin(), in_counts.end());
-//        cout << "max_in_count:%d" << max_in_count << endl;
         vector<dtype *> vals, in_vals;
         int node_i = -1;
         for (Node *node : batch) {
@@ -433,21 +431,68 @@ public:
         init(dim);
     }
 
-    void forward(Graph &graph, Node &matrix, Node &vec) {
+    void forward(Graph &graph, Node &matrix, Node &vec, int head_count) {
         matrix.addParent(this);
         matrix_ = &matrix;
         vec.addParent(this);
         vector_ = &vec;
         graph.addNode(this);
+        head_count_ = head_count;
     }
 
     void compute() override {
-        val().mat() = matrix_->valMat() * vector_->getVal().mat();
+        int col = matrix_->getColumn();
+        int row = matrix_->getRow();
+        int head_dim = getDim() / head_count_;
+        dtype *matrix_head = new dtype[head_dim * col];
+        for (int i = 0; i < head_count_; ++i) {
+            for (int j = 0; j < col; ++j) {
+                for (int k = 0; k < head_dim; ++k) {
+                    matrix_head[head_dim * j + k] =
+                        matrix_->getVal()[row * j + k + i * head_dim];
+                }
+            }
+            Mat(val().v + head_dim * i, head_dim, 1) = Mat(matrix_head, head_dim, col) *
+                Mat(vector_->getVal().v + col * i, col, 1);
+        }
+        delete [] matrix_head;
     }
 
     void backward() override {
-        matrix_->gradMat() += getLoss().mat() * vector_->getVal().mat().transpose();
-        vector_->loss().mat() += matrix_->valMat().transpose() * getLoss().mat();
+        int col = matrix_->getColumn();
+        int row = matrix_->getRow();
+        int head_dim = getDim() / head_count_;
+        dtype *matrix_head = new dtype[head_dim * col];
+        for (int i = 0; i < head_count_; ++i) {
+            for (int j = 0; j < col; ++j) {
+                for (int k = 0; k < head_dim; ++k) {
+                    matrix_head[head_dim * j + k] =
+                        matrix_->getLoss()[row * j + k + i * head_dim];
+                }
+            }
+
+            Mat(matrix_head, head_dim, col) = Mat(getLoss().v + head_dim * i, head_dim, 1) *
+                Mat(vector_->getVal().v + col * i, col, 1).transpose();
+
+            for (int j = 0; j < col; ++j) {
+                for (int k = 0; k < head_dim; ++k) {
+                    matrix_->loss().v[row * j + k + i * head_dim] +=
+                        matrix_head[head_dim * j + k];
+                }
+            }
+
+            for (int j = 0; j < col; ++j) {
+                for (int k = 0; k < head_dim; ++k) {
+                    matrix_head[head_dim * j + k] =
+                        matrix_->getVal()[row * j + k + i * head_dim];
+                }
+            }
+
+            Mat(vector_->loss().v + i * col, col, 1) +=
+                Mat(matrix_head, head_dim, col).transpose() *
+                Mat(getLoss().v + i * head_dim, head_dim, 1);
+        }
+        delete [] matrix_head;
     }
 
     Executor * generate() override;
@@ -463,6 +508,7 @@ public:
 private:
     Node *vector_ = nullptr;
     Node *matrix_ = nullptr;
+    int head_count_ = 1;
     friend class MatrixAndVectorMultiExecutor;
 };
 
@@ -540,6 +586,76 @@ Executor * MatrixAndVectorMultiNode::generate() {
     return new MatrixAndVectorMultiExecutor;
 }
 
+class MatrixTransposeNode : public UniInputNode, public Poolable<MatrixTransposeNode> {
+public:
+    MatrixTransposeNode() : UniInputNode("MatrixTranspose") {}
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    void compute() override {
+        Node &input = *getInput();
+        int input_row = input.getDim() / input.getColumn();
+        for (int i = 0; i < input_row; ++i) {
+            for (int j = 0; j < input.getColumn(); ++j) {
+                val()[input.getColumn() * i + j] = input.getVal()[input_row * j + i];
+            }
+        }
+    }
+
+    void backward() override {
+        Node &input = *getInput();
+        int input_row = input.getDim() / input.getColumn();
+        for (int i = 0; i < input_row; ++i) {
+            for (int j = 0; j < input.getColumn(); ++j) {
+                input.loss()[input_row * j + i] += getLoss()[input.getColumn() * i + j];
+            }
+        }
+    }
+
+    virtual bool typeEqual(Node *other) override {
+        return getNodeType() == other->getNodeType() && getColumn() == other->getColumn();
+    }
+
+    virtual string typeSignature() const override {
+        return "MatrixTranspose-" + to_string(getColumn());
+    }
+
+    Executor *generate() override;
+
+protected:
+    virtual bool isDimLegal(const Node &input) const override {
+        return input.getDim() == getDim();
+    }
+};
+
+#if USE_GPU
+class MatrixTransposeExecutor : public UniInputExecutor {
+public:
+    void forward() override {
+    }
+    void backward() override {
+    }
+
+private:
+};
+#else
+class MatrixTransposeExecutor : public Executor {
+    int calculateFLOPs() override {
+        return 0; // TODO
+    }
+};
+#endif
+
+Executor *MatrixTransposeNode::generate() {
+    return new MatrixTransposeExecutor;
+}
+
 namespace n3ldg_plus {
 
 MatrixNode *concatToMatrix(Graph &graph, const vector<Node *> &inputs) {
@@ -562,9 +678,15 @@ Node *matrixColSum(Graph &graph, Node &input) {
     return node;
 }
 
-Node *matrixAndVectorMulti(Graph &graph, Node &matrix, Node &vec) {
+Node *matrixAndVectorMulti(Graph &graph, Node &matrix, Node &vec, int head_count) {
     MatrixAndVectorMultiNode *node = MatrixAndVectorMultiNode::newNode(matrix.getRow());
-    node->forward(graph, matrix, vec);
+    node->forward(graph, matrix, vec, head_count);
+    return node;
+}
+
+Node *transposeMatrix(Graph &graph, Node &matrix) {
+    MatrixTransposeNode *node = MatrixTransposeNode::newNode(matrix.getDim());
+    node->forward(graph, matrix);
     return node;
 }
 

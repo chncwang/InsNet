@@ -229,10 +229,6 @@ public:
     virtual ~Node() = default;
 
     int getColumn() const {
-        if (column_ == 0) {
-            cerr << "Node getColumn - column is 0" << endl;
-            abort();
-        }
         return column_;
     }
 
@@ -241,18 +237,10 @@ public:
     }
 
     Mat valMat() {
-        if (column_ == 0) {
-            cerr << "Node valMat - column is 0" << endl;
-            abort();
-        }
         return Mat(val().v, getRow(), column_);
     }
 
     Mat gradMat() {
-        if (column_ == 0) {
-            cerr << "Node gradMat - column is 0" << endl;
-            abort();
-        }
         return Mat(loss().v, getRow(), column_);
     }
 
@@ -303,7 +291,7 @@ private:
         string node_type_;
         string node_name_;
         int node_index_;
-        int column_ = 0;
+        int column_ = 1;
 };
 
 set<pair<vector<Node *>, int> *>& globalPoolReferences() {

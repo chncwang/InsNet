@@ -78,8 +78,9 @@ Node *layerNormalization(Graph &graph, LayerNormalizationParams &params,
     square_sum = add(graph, {square_sum, eps});
     Node *var = scaled(graph, *square_sum, 1.0 / input_layer.getDim());
     Node *standard_deviation = sqrt(graph, *var);
+    standard_deviation = scalarToVector(graph, input_layer.getDim(), *standard_deviation);
     Node *g = embedding(graph, params.g(), 0, true);
-    Node *factor = div(graph, *g, *standard_deviation);
+    Node *factor = fullDiv(graph, *g, *standard_deviation);
 
     Node *scaled = pointwiseMultiply(graph, *factor, *zeros_around);
     Node *biased = bias(graph, params.b(), *scaled);

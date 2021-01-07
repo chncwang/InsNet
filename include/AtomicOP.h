@@ -400,21 +400,31 @@ public:
         return Node::typeSignature();
     }
 
+    void clear() override {
+        max_indexes_.clear();
+        Node::clear();
+    }
+
     void compute() override {
-        float max = getInput()->getVal()[0];
-        int max_i = 0;
-        for (int i = 1; i < getInput()->getDim(); ++i) {
-            if (getInput()->getVal()[i] > max) {
-                max = getInput()->getVal()[i];
-                max_i = i;
+        int input_row = getInput()->getRow();
+        for (int i = 0; i < getInput()->getColumn(); ++i) {
+            float max = getInput()->getVal()[input_row * i];
+            int max_i = 0;
+            for (int j = 1; j < getInput()->getRow(); ++j) {
+                if (getInput()->getVal()[input_row * i + j] > max) {
+                    max = getInput()->getVal()[input_row * i + j];
+                    max_i = j;
+                }
             }
+            max_indexes_.push_back(max_i);
+            val()[i] = max;
         }
-        max_i_ = max_i;
-        val()[0] = max;
     }
 
     void backward() override {
-        getInput()->loss()[max_i_] += getLoss()[0];
+        for (int i = 0; i < getInput()->getColumn(); ++i) {
+            getInput()->loss()[max_indexes_.at(i)] += getLoss()[i];
+        }
     }
 
     Executor* generate() override;
@@ -425,7 +435,7 @@ protected:
     }
 
 private:
-    int max_i_;
+    vector<int> max_indexes_;
     friend class MaxScalarExecutor;
 };
 
@@ -520,33 +530,38 @@ public:
     }
 
     bool typeEqual(Node *other) override {
-        return getNodeType() == other->getNodeType();
+        return getNodeType() == other->getNodeType() &&
+            getInput()->getDim() == dynamic_cast<UniInputNode *>(other)->getInput()->getDim();
     }
 
     string typeSignature() const override {
-        return getNodeType();
+        return getNodeType() + to_string(getInput()->getDim());
     }
 
     void compute() override {
-        for (int i = 0; i < getDim(); ++i) {
-            val()[i] = getInput()->getVal()[0];
+        for (int i = 0; i < getColumn(); ++i) {
+            for (int j = 0; j < getRow(); ++j) {
+                val()[i * getRow() + j] = getInput()->getVal()[i];
+            }
         }
     }
 
     void backward() override {
-        int dim = getDim();
-        dtype sum = 0;
-        for (int i = 0; i < dim; ++i) {
-            sum += getLoss()[i];
+        int row = getRow();
+        for (int i = 0; i < getColumn(); ++i) {
+            dtype sum = 0;
+            for (int j = 0; j < row; ++j) {
+                sum += getLoss()[i * row + j];
+            }
+            getInput()->loss()[i] += sum;
         }
-        getInput()->loss()[0] += sum;
     }
 
     Executor* generate() override;
 
 protected:
     bool isDimLegal(const Node &input) const override {
-        return input.getDim() == 1;
+        return true;
     }
 
 private:
@@ -680,16 +695,20 @@ public:
     }
 
     void compute() override {
-        dtype sum = 0;
-        for (int i = 0; i < getInput()->getDim(); ++i) {
-            sum += getInput()->getVal()[i];
+        for (int i = 0; i < getDim(); ++i) {
+            dtype sum = 0;
+            for (int j = 0; j < getInput()->getRow(); ++j) {
+                sum += getInput()->getVal()[i * getInput()->getRow() + j];
+            }
+            val()[i] = sum;
         }
-        val()[0] = sum;
     }
 
     void backward() override {
-        for (int i = 0; i < getInput()->getDim(); ++i) {
-            getInput()->loss()[i] += getLoss()[0];
+        for (int i = 0; i < getDim(); ++i) {
+            for (int j = 0; j < getInput()->getRow(); ++j) {
+                getInput()->loss()[i * getInput()->getRow() + j] += getLoss()[i];
+            }
         }
     }
 
@@ -855,7 +874,7 @@ Executor *ScaledNode::generate() {
 namespace n3ldg_plus {
 
 Node *maxScalar(Graph &graph, Node &input) {
-    MaxScalarNode *node = MaxScalarNode::newNode(1);
+    MaxScalarNode *node = MaxScalarNode::newNode(input.getColumn());
     node->forward(graph, input);
     return node;
 }
@@ -884,14 +903,15 @@ Node *sqrt(Graph &graph, Node &input) {
     return result;
 }
 
-Node *scalarToVector(Graph &graph, int dim, Node &input) {
-    ScalarToVectorNode *node = ScalarToVectorNode::newNode(dim);
+Node *scalarToVector(Graph &graph, int row, Node &input) {
+    ScalarToVectorNode *node = ScalarToVectorNode::newNode(row * input.getDim());
     node->forward(graph, input);
+    node->setColumn(input.getDim());
     return node;
 }
 
 Node *vectorSum(Graph &graph, Node &input) {
-    SumNode *sum = SumNode::newNode(1);
+    SumNode *sum = SumNode::newNode(input.getColumn());
     sum->forward(graph, input);
     return sum;
 }
@@ -899,6 +919,7 @@ Node *vectorSum(Graph &graph, Node &input) {
 Node *exp(Graph &graph, Node &input) {
     ExpNode *node = ExpNode::newNode(input.getDim());
     node->forward(graph, input);
+    node->setColumn(input.getColumn());
     return node;
 }
 
@@ -914,6 +935,7 @@ Node *scaled(Graph &graph, Node &input, dtype factor) {
     ScaledNode *node = ScaledNode::newNode(input.getDim());
     node->setFactor(factor);
     node->forward(graph, input);
+    node->setColumn(input.getColumn());
     return node;
 }
 
