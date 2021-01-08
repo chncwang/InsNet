@@ -406,11 +406,11 @@ public:
     }
 
     void compute() override {
-        int input_row = getInput()->getRow();
-        for (int i = 0; i < getInput()->getColumn(); ++i) {
+        int input_row = getInput()->getDim() / getDim();
+        for (int i = 0; i < getDim(); ++i) {
             float max = getInput()->getVal()[input_row * i];
             int max_i = 0;
-            for (int j = 1; j < getInput()->getRow(); ++j) {
+            for (int j = 1; j < input_row; ++j) {
                 if (getInput()->getVal()[input_row * i + j] > max) {
                     max = getInput()->getVal()[input_row * i + j];
                     max_i = j;
@@ -422,8 +422,9 @@ public:
     }
 
     void backward() override {
-        for (int i = 0; i < getInput()->getColumn(); ++i) {
-            getInput()->loss()[i * getInput()->getRow() + max_indexes_.at(i)] += getLoss()[i];
+        int input_row = getInput()->getDim() / getDim();
+        for (int i = 0; i < getDim(); ++i) {
+            getInput()->loss()[i * input_row + max_indexes_.at(i)] += getLoss()[i];
         }
     }
 
@@ -431,7 +432,7 @@ public:
 
 protected:
     bool isDimLegal(const Node &input) const override {
-        return true;
+        return input.getDim() % getDim() == 0;
     }
 
 private:
@@ -697,8 +698,9 @@ public:
     void compute() override {
         for (int i = 0; i < getDim(); ++i) {
             dtype sum = 0;
-            for (int j = 0; j < getInput()->getRow(); ++j) {
-                sum += getInput()->getVal()[i * getInput()->getRow() + j];
+            int input_row = getInput()->getDim() / getDim();
+            for (int j = 0; j < input_row; ++j) {
+                sum += getInput()->getVal()[i * input_row + j];
             }
             val()[i] = sum;
         }
@@ -706,15 +708,16 @@ public:
 
     void backward() override {
         for (int i = 0; i < getDim(); ++i) {
-            for (int j = 0; j < getInput()->getRow(); ++j) {
-                getInput()->loss()[i * getInput()->getRow() + j] += getLoss()[i];
+            int input_row = getInput()->getDim() / getDim();
+            for (int j = 0; j < input_row; ++j) {
+                getInput()->loss()[i * input_row + j] += getLoss()[i];
             }
         }
     }
 
 protected:
     bool isDimLegal(const Node &input) const override {
-        return true;
+        return input.getDim() % getDim() == 0;
     }
 
 private:
@@ -873,8 +876,8 @@ Executor *ScaledNode::generate() {
 
 namespace n3ldg_plus {
 
-Node *maxScalar(Graph &graph, Node &input) {
-    MaxScalarNode *node = MaxScalarNode::newNode(input.getColumn());
+Node *maxScalar(Graph &graph, Node &input, int input_col) {
+    MaxScalarNode *node = MaxScalarNode::newNode(input_col);
     node->forward(graph, input);
     return node;
 }
@@ -905,13 +908,13 @@ Node *sqrt(Graph &graph, Node &input) {
 
 Node *scalarToVector(Graph &graph, int row, Node &input) {
     ScalarToVectorNode *node = ScalarToVectorNode::newNode(row * input.getDim());
-    node->forward(graph, input);
     node->setColumn(input.getDim());
+    node->forward(graph, input);
     return node;
 }
 
-Node *vectorSum(Graph &graph, Node &input) {
-    SumNode *sum = SumNode::newNode(input.getColumn());
+Node *vectorSum(Graph &graph, Node &input,  int input_col) {
+    SumNode *sum = SumNode::newNode(input_col);
     sum->forward(graph, input);
     return sum;
 }
@@ -919,7 +922,6 @@ Node *vectorSum(Graph &graph, Node &input) {
 Node *exp(Graph &graph, Node &input) {
     ExpNode *node = ExpNode::newNode(input.getDim());
     node->forward(graph, input);
-    node->setColumn(input.getColumn());
     return node;
 }
 
@@ -935,7 +937,6 @@ Node *scaled(Graph &graph, Node &input, dtype factor) {
     ScaledNode *node = ScaledNode::newNode(input.getDim());
     node->setFactor(factor);
     node->forward(graph, input);
-    node->setColumn(input.getColumn());
     return node;
 }
 

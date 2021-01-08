@@ -12,21 +12,23 @@
 
 namespace n3ldg_plus {
 
-Node *minusMaxScalar(Graph &graph, Node &input) {
+Node *minusMaxScalar(Graph &graph, Node &input, int input_col) {
     using namespace n3ldg_plus;
 
-    Node *max_scalar = maxScalar(graph, input);
-    Node *scalar_to_vector = scalarToVector(graph, input.getRow(), *max_scalar);
+    Node *max_scalar = maxScalar(graph, input, input_col);
+    int input_row = input.getDim() / input_col;
+    Node *scalar_to_vector = scalarToVector(graph, input_row, *max_scalar);
     Node *subtracted = sub(graph, input, *scalar_to_vector);
     return subtracted;
 }
 
-Node* softmax(Graph &graph, Node &input) {
+Node* softmax(Graph &graph, Node &input, int input_col) {
     using namespace n3ldg_plus;
-    Node *subtracted = minusMaxScalar(graph, input);
+    Node *subtracted = minusMaxScalar(graph, input, input_col);
     Node *exp = n3ldg_plus::exp(graph, *subtracted);
-    Node *sum = vectorSum(graph, *exp);
-    sum = scalarToVector(graph, exp->getRow(), *sum);
+    Node *sum = vectorSum(graph, *exp, input_col);
+    int input_row = input.getDim() / input_col;
+    sum = scalarToVector(graph, input_row, *sum);
     Node *div = n3ldg_plus::fullDiv(graph, *exp, *sum);
     return div;
 }

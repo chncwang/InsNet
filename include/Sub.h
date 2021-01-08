@@ -32,11 +32,6 @@ public:
                 minuend.getDim() % subtrahend.getDim() << endl;
             abort();
         }
-        if (minuend.getColumn() != subtrahend.getColumn()) {
-            cerr << boost::format("minuend col:%1% sub col:%2%") % minuend.getColumn() %
-                subtrahend.getColumn() << endl;
-            abort();
-        }
         minuend_ = &minuend;
         subtrahend_ = &subtrahend;
         vector<Node*> ins = {minuend_, subtrahend_};
@@ -65,7 +60,6 @@ namespace n3ldg_plus {
 Node *sub(Graph &graph, Node &minuend, Node &subtrahend) {
     SubNode *result = SubNode::newNode(minuend.getDim());
     result->forward(graph, minuend, subtrahend);
-    result->setColumn(minuend.getColumn());
     return result;
 }
 

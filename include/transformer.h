@@ -428,7 +428,7 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
             Node *q = linear(graph, attention_head_params.q(), *q_input);
 
             Node *attended = n3ldg_plus::dotAttention(graph, *key_matrix,
-                    *value_matrix, *q, params.headCount()).first;
+                    *value_matrix, *q, sentence_len, params.headCount()).first;
 
             attended = n3ldg_plus::dropout(graph, *attended, dropout, is_training);
             Node *added = add(graph, {attended, last_layer.at(j)});

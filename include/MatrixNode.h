@@ -182,22 +182,23 @@ public:
     }
 
     void forward(Graph &graph, Node &matrix, Node &vec) {
-        if (matrix.getRow() != vec.getDim()) {
-            cerr << boost::format("MatrixConcatNode forward - matrix row:%1% vec dim:%2%") %
-                matrix.getRow() % vec.getDim() << endl;
+        if (getDim() % vec.getDim() != 0) {
+            cerr << boost::format("MatrixConcatNode forward - dim:%1% vec dim:%2%") % getDim() %
+                vec.getDim() << endl;
             abort();
         }
         matrix.addParent(this);
         vec.addParent(this);
         matrix_ = &matrix;
         vector_ = &vec;
-        setColumn(matrix.getColumn());
+        setColumn(matrix.getDim() / vec.getDim());
         graph.addNode(this);
     }
 
     void compute() override {
         int in_dim = vector_->getDim();
-        for (int i = 0; i < matrix_->getColumn(); ++i) {
+        int col = getDim() / in_dim;
+        for (int i = 0; i < col; ++i) {
             int matrix_i = i * in_dim;
             Vec(val().v + matrix_i, in_dim) = vector_->getVal().vec() *
                 Vec(matrix_->getVal().v + matrix_i, in_dim);
@@ -206,7 +207,8 @@ public:
 
     void backward() override {
         int in_dim = vector_->getDim();
-        for (int i = 0; i < matrix_->getColumn(); ++i) {
+        int col = getDim() / in_dim;
+        for (int i = 0; i < col; ++i) {
             int matrix_i = i * in_dim;
             Vec(matrix_->loss().v + matrix_i, in_dim) += Vec(getLoss().v + matrix_i, in_dim) *
                 vector_->getVal().vec();
@@ -325,10 +327,11 @@ public:
 
     void compute() override {
         Node &input = *getInput();
-        for (int i = 0; i < input.getColumn(); ++i) {
+        int input_row  = input.getDim() / getDim();
+        for (int i = 0; i < getDim(); ++i) {
             dtype sum = 0;
-            for (int j = 0; j < input.getRow(); ++j) {
-                sum += input.getVal()[i * input.getRow() + j];
+            for (int j = 0; j < input_row; ++j) {
+                sum += input.getVal()[i * input_row + j];
             }
             val()[i] = sum;
         }
@@ -336,9 +339,10 @@ public:
 
     void backward() override {
         Node &input = *static_cast<MatrixNode *>(getInput());
-        for (int i = 0; i < input.getColumn(); ++i) {
-            for (int j = 0; j < input.getRow(); ++j) {
-                input.loss()[i * input.getRow() + j] += getLoss()[i];
+        int input_row  = input.getDim() / getDim();
+        for (int i = 0; i < getDim(); ++i) {
+            for (int j = 0; j < input_row; ++j) {
+                input.loss()[i * input_row + j] += getLoss()[i];
             }
         }
     }
@@ -348,21 +352,22 @@ public:
             return false;
         } else {
             MatrixColSumNode &matrix = *static_cast<MatrixColSumNode *>(other);
-            return static_cast<MatrixNode *>(getInput())->getRow() ==
-                static_cast<MatrixNode *>(matrix.getInput())->getRow();
+            int input_row = getInput()->getDim() / getDim();
+            int other_input_row = matrix.getInput()->getDim() / matrix.getDim();
+            return input_row == other_input_row;
         }
     }
 
     virtual string typeSignature() const override {
-        return "MatrixColSum-" + to_string(static_cast<MatrixNode *>(getInput())->getRow());
+        int input_row = getInput()->getDim() / getDim();
+        return "MatrixColSum-" + to_string(input_row);
     }
 
     Executor *generate() override;
 
 protected:
     virtual bool isDimLegal(const Node &input) const override {
-        const Node &matrix = static_cast<const Node &>(input);
-        return matrix.getColumn() == getDim();
+        return true;
     }
 };
 
@@ -371,8 +376,8 @@ class MatrixColSumExecutor : public UniInputExecutor {
 public:
     void forward() override {
         vector<dtype *> in_vals;
-        row = static_cast<MatrixNode *>(static_cast<MatrixColSumNode*>(
-                    batch.front())->getInput())->getRow();
+        MatrixColSumNode *first = dynamic_cast<MatrixColSumNode *>(batch.front());
+        row = first->getInput()->getDim() / first->getDim();
         for (Node *node : batch) {
             MatrixColSumNode &sum = *static_cast<MatrixColSumNode *>(node);
             in_vals.push_back(sum.getInput()->getVal().value);
@@ -441,8 +446,8 @@ public:
     }
 
     void compute() override {
-        int col = matrix_->getColumn();
-        int row = matrix_->getRow();
+        int col = vector_->getDim() / head_count_;
+        int row = getDim();
         int head_dim = getDim() / head_count_;
         dtype *matrix_head = new dtype[head_dim * col];
         for (int i = 0; i < head_count_; ++i) {
@@ -459,8 +464,8 @@ public:
     }
 
     void backward() override {
-        int col = matrix_->getColumn();
-        int row = matrix_->getRow();
+        int col = vector_->getDim() / head_count_;
+        int row = getDim();
         int head_dim = getDim() / head_count_;
         dtype *matrix_head = new dtype[head_dim * col];
         for (int i = 0; i < head_count_; ++i) {
@@ -599,20 +604,22 @@ public:
 
     void compute() override {
         Node &input = *getInput();
-        int input_row = input.getDim() / input.getColumn();
+        int input_row = getColumn();
+        int input_col = getRow();
         for (int i = 0; i < input_row; ++i) {
-            for (int j = 0; j < input.getColumn(); ++j) {
-                val()[input.getColumn() * i + j] = input.getVal()[input_row * j + i];
+            for (int j = 0; j < input_col; ++j) {
+                val()[input_col * i + j] = input.getVal()[input_row * j + i];
             }
         }
     }
 
     void backward() override {
         Node &input = *getInput();
-        int input_row = input.getDim() / input.getColumn();
+        int input_row = getColumn();
+        int input_col = getRow();
         for (int i = 0; i < input_row; ++i) {
-            for (int j = 0; j < input.getColumn(); ++j) {
-                input.loss()[input_row * j + i] += getLoss()[input.getColumn() * i + j];
+            for (int j = 0; j < input_col; ++j) {
+                input.loss()[input_row * j + i] += getLoss()[input_col * i + j];
             }
         }
     }
@@ -698,21 +705,46 @@ MatrixNode *matrixPointwiseMultiply(Graph &graph, Node &matrix, Node &vec) {
     return node;
 }
 
-Node *matrixColSum(Graph &graph, Node &input) {
-    MatrixColSumNode *node = MatrixColSumNode::newNode(input.getColumn());
+Node *matrixColSum(Graph &graph, Node &input, int input_col) {
+    if (input.getDim() % input_col != 0) {
+        cerr << boost::format("input dim:%1% input col:%2%") % input.getDim() % input_col << endl;
+        abort();
+    }
+    MatrixColSumNode *node = MatrixColSumNode::newNode(input_col);
     node->forward(graph, input);
     return node;
 }
 
 Node *matrixAndVectorMulti(Graph &graph, Node &matrix, Node &vec, int head_count) {
-    MatrixAndVectorMultiNode *node = MatrixAndVectorMultiNode::newNode(matrix.getRow());
+    int dim = matrix.getDim() * head_count / vec.getDim();
+    if (matrix.getDim() % head_count != 0) {
+        cerr << boost::format("matrix dim:%1% head_count:%2%") % matrix.getDim() % head_count <<
+            endl;
+        abort();
+    }
+    if (vec.getDim() % head_count != 0) {
+        cerr << boost::format("vec dim:%1% head_count:%2%") % vec.getDim() % head_count <<
+            endl;
+        abort();
+    }
+    if (matrix.getDim() % vec.getDim() != 0) {
+        cerr << boost::format("vec dim:%1% matrix dim:%2%") % vec.getDim() % matrix.getDim() <<
+            endl;
+        abort();
+    }
+    MatrixAndVectorMultiNode *node = MatrixAndVectorMultiNode::newNode(dim);
     node->forward(graph, matrix, vec, head_count);
     return node;
 }
 
-Node *transposeMatrix(Graph &graph, Node &matrix) {
+Node *transposeMatrix(Graph &graph, Node &matrix, int input_row) {
+    if (matrix.getDim() % input_row != 0) {
+        cerr << boost::format("matrix dim:%1% input_row:%2%") % matrix.getDim() % input_row <<
+            endl;
+        abort();
+    }
     MatrixTransposeNode *node = MatrixTransposeNode::newNode(matrix.getDim());
-    node->setColumn(matrix.getRow());
+    node->setColumn(input_row);
     node->forward(graph, matrix);
     return node;
 }

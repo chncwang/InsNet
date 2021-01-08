@@ -32,11 +32,6 @@ public:
                 numerator.getDim() % denominator.getDim() << endl;
             abort();
         }
-        if (numerator.getColumn() != denominator.getColumn()) {
-            cerr << boost::format("numerator col:%1% denominator col:%2%") % numerator.getColumn()
-                % denominator.getColumn() << endl;
-            abort();
-        }
         numerator_ = &numerator;
         denominator_ = &denominator;
         vector<Node*> ins = {numerator_, denominator_};
@@ -125,7 +120,6 @@ namespace n3ldg_plus {
     Node *fullDiv(Graph &graph, Node &numerator, Node &denominator) {
         FullDivNode *result = FullDivNode::newNode(numerator.getDim());
         result->forward(graph, numerator, denominator);
-        result->setColumn(numerator.getColumn());
         return result;
     }
 }
