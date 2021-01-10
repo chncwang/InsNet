@@ -3603,7 +3603,8 @@ void SoftMaxLossByExp(dtype **exps, int count, int dim, dtype **vals,
     CheckCudaError();
 }
 
-__global__ void KernelMaxScalarForward(dtype **v, int count, int* dims, int max_dim,
+__global__ void KernelMaxScalarForward(dtype **v, int count, int head_count, int* head_dims,
+        int max_dim,
         volatile dtype *block_maxes,
         volatile int *block_max_is,
         int *block_counters,
@@ -3619,10 +3620,12 @@ __global__ void KernelMaxScalarForward(dtype **v, int count, int* dims, int max_
         is_last_block = false;
     }
 
-    int count_i = blockIdx.x;
-    int offset = blockIdx.y * blockDim.x + threadIdx.x;
-    shared_max[threadIdx.x] = offset < dims[count_i] ? v[count_i][offset] : -1e10;
-    shared_max_i[threadIdx.x] = offset;
+    int head_count_i = blockIdx.x % head_count;
+    int head_offset = blockIdx.y * blockDim.x + threadIdx.x;
+    int count_i = blockIdx.x / head_count;
+    int offset = head_offset + head_dims[count_i] * head_count_i;
+    shared_max[threadIdx.x] = head_offset < head_dims[count_i] ? v[count_i][offset] : -1e10;
+    shared_max_i[threadIdx.x] = head_offset;
     __syncthreads();
 
     for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
@@ -3671,7 +3674,6 @@ __global__ void KernelMaxScalarForward(dtype **v, int count, int* dims, int max_
 
         shared_max[threadIdx.x] = max;
         shared_max_i[threadIdx.x] = max_i;
-//        printf("max:%f max_i:%d\n", max, max_i);
         __syncthreads();
 
         for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
@@ -3683,31 +3685,31 @@ __global__ void KernelMaxScalarForward(dtype **v, int count, int* dims, int max_
         }
 
         if (threadIdx.x == 0) {
-            max_vals[count_i][0] = shared_max[0];
-            max_indexes[count_i] = shared_max_i[0];
-            int max_ii = max_indexes[count_i];
+            max_vals[count_i][head_count_i] = shared_max[0];
+            int max_ii = shared_max_i[0];
+            max_indexes[blockIdx.x] = max_ii;
             if (max_ii < 0 || max_ii >= max_dim) {
-                printf("threadIdx.x == 0 max_i:%d count_i:%d max_val:%f\n", max_indexes[count_i],
-                        count_i, max_vals[count_i][0]);
+                printf("threadIdx.x == 0 max_i:%d head_count_i:%d max_val:%f\n",
+                        max_indexes[blockIdx.x], head_count_i, max_vals[count_i][head_count_i]);
                 assert(false);
             }
         }
     }
 }
 
-void MaxScalarForward(vector<dtype*> &inputs, int count, vector<int> &dims,
+void MaxScalarForward(vector<dtype*> &inputs, int count, int head_count, vector<int> &head_dims,
         vector<dtype*> &results,
         vector<int> &max_indexes) {
-    int max_dim = *max_element(dims.begin(), dims.end());
+    int max_dim = *max_element(head_dims.begin(), head_dims.end());
     int thread_count = min(NextTwoIntegerPowerNumber(max_dim), TPB);
     int block_y_count = (max_dim - 1 + thread_count) / thread_count;
-    dim3 block_dim(count, block_y_count, 1);
+    dim3 block_dim(count * head_count, block_y_count, 1);
 
     NumberArray block_maxes;
-    block_maxes.init(block_y_count * count);
+    block_maxes.init(block_y_count * count * head_count);
     IntArray block_max_is, block_counters;
-    block_max_is.init(block_y_count * count);
-    block_counters.init(count);
+    block_max_is.init(block_y_count * count * head_count);
+    block_counters.init(count * head_count);
 
     NumberPointerArray input_arr;
     input_arr.init((dtype**)inputs.data(), inputs.size());
@@ -3716,11 +3718,11 @@ void MaxScalarForward(vector<dtype*> &inputs, int count, vector<int> &dims,
     IntArray max_index_arr;
     max_index_arr.init(max_indexes.size());
 
-    IntArray dim_arr;
-    dim_arr.init(dims.data(), dims.size());
+    IntArray head_dim_arr;
+    head_dim_arr.init(head_dims.data(), head_dims.size());
 
     KernelMaxScalarForward<<<block_dim, thread_count>>>((dtype **)input_arr.value,
-            count, dim_arr.value, max_dim, block_maxes.value, block_max_is.value,
+            count, head_count, head_dim_arr.value, max_dim, block_maxes.value, block_max_is.value,
             block_counters.value,
             max_index_arr.value, (dtype **)result_arr.value);
     CheckCudaError();

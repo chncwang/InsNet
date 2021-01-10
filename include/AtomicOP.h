@@ -446,39 +446,31 @@ public:
     void forward() override {
         vector<dtype*> inputs;
         vector<dtype*> results;
-        max_indexes.resize(batch.size());
-        vector<int> dims;
+        max_indexes.resize(batch.size() * batch.front()->getDim());
+        vector<int> head_dims;
+        int dim = Executor::getDim();
         for (int i = 0; i < batch.size(); ++i) {
             MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));
             inputs.push_back(node->getInput()->getVal().value);
             results.push_back(node->getVal().value);
-            dims.push_back(node->getInput()->getDim());
-        }
-        bool succeeded = true;
-        do {
-            succeeded = true;
-            n3ldg_cuda::MaxScalarForward(inputs, batch.size(), dims, results, max_indexes);
-
-            for (int i = 0; i < batch.size(); ++i) {
-                MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));
-                if (max_indexes.at(i) > 100000 || max_indexes.at(i) < 0) {
-                    cerr << "illegal max index returned " << max_indexes.at(i) << endl;
-                    cerr << "node dim:" << node->getInput()->getDim() << endl;
-                    node->getVal().print();
-                    succeeded = false;
-                    break;
-                }
-                node->max_i_ = max_indexes.at(i);
+            int head_dim = node->getInput()->getDim() / dim;
+            if (head_dim * dim != node->getInput()->getDim()) {
+                cerr << boost::format(
+                        "MaxScalarExecutor forward head_dim:%1% dim:%2% input dim:%3%") % head_dim
+                    % dim % node->getInput()->getDim() << endl;
+                abort();
             }
-        } while (!succeeded);
+            head_dims.push_back(head_dim);
+        }
+        n3ldg_cuda::MaxScalarForward(inputs, batch.size(), dim,head_dims, results, max_indexes);
+
 #if TEST_CUDA
         Executor::forward();
-        int i = 0;
         for (Node *node : batch) {
             MaxScalarNode *max_scalar = static_cast<MaxScalarNode*>(node);
-            n3ldg_cuda::Assert(max_scalar->getInput()->getVal().verify("max scalar forward input"));
+            n3ldg_cuda::Assert(max_scalar->getInput()->getVal().verify(
+                        "max scalar forward input"));
             n3ldg_cuda::Assert(max_scalar->getVal().verify("max scalar forward"));
-            ++i;
         }
         cout << "max scalar forward tested:" << endl;
 #endif
