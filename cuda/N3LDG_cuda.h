@@ -284,13 +284,14 @@ void MatrixColSumBackward(vector<dtype *> &grads, int count, vector<int> &cols, 
         vector<dtype *> &in_grads);
 void MatrixAndVectorMultiForward(vector<dtype *> &matrices, vector<dtype *> &vectors, int count,
         int head_count,
-        int row,
+        int head_dim,
         vector<int> &cols,
         vector<dtype *> &vals);
 void MatrixAndVectorMultiBackward(vector<dtype *> &grads, vector<dtype *> &matrices,
         vector<dtype *> &vectors,
         int count,
-        int row,
+        int head_count,
+        int head_dim,
         vector<int> &cols,
         vector<dtype *> &matrix_grads,
         vector<dtype *> &vector_grads);

@@ -631,8 +631,14 @@ protected:
         for (Node *node : batch) {
             auto inputs = get_inputs(*node);
             for (pair<Node*, string> &input : inputs) {
-                n3ldg_cuda::Assert(input.first->getLoss().verify((getNodeType() +
-                                " backward " + input.second).c_str()));
+                if (!input.first->getLoss().verify((getNodeType() +
+                                " backward " + input.second).c_str())) {
+                    cout << "cpu:" << endl << input.first->getLoss().toString() << endl;;
+                    cerr << "gpu:" << endl;
+                    input.first->getLoss().print();
+                    cerr << input.second << endl;
+                    abort();
+                }
             }
         }
     }

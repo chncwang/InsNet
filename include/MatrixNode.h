@@ -562,8 +562,9 @@ public:
             matrix_grads.push_back(multi->matrix_->getLoss().value);
             vector_grads.push_back(multi->vector_->getLoss().value);
         }
+        int head_count = dynamic_cast<MatrixAndVectorMultiNode*>(batch.front())->head_count_;
         n3ldg_cuda::MatrixAndVectorMultiBackward(grads, matrix_vals_, vector_vals_, batch.size(),
-                row_, cols_, matrix_grads, vector_grads);
+                head_count, row_, cols_, matrix_grads, vector_grads);
 #if TEST_CUDA
         auto get_inputs = [&](Node &node) {
             MatrixAndVectorMultiNode &multi = static_cast<MatrixAndVectorMultiNode&>(node);
