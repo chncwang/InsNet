@@ -148,7 +148,7 @@ public:
     }
 
     virtual string typeSignature() const {
-        return node_type_ + "-" + std::to_string(dim_);
+        return node_type_ + "-" + std::to_string(dim_) + "-";
     }
 
     virtual void addParent(Node* parent) {
@@ -410,7 +410,7 @@ public:
     }
 
     virtual string typeSignature() const override {
-        return Node::typeSignature() + "-" + to_string(input_->getDim());
+        return Node::typeSignature() + "-" + to_string(input_->getDim()) + "-";
     }
 
     void forward(NodeContainer &container, Node &input) {
@@ -605,7 +605,13 @@ protected:
         Executor::forward();
 
         for (Node *node : batch) {
-            n3ldg_cuda::Assert(node->getVal().verify((getNodeType() + " forward").c_str()));
+            if(!node->getVal().verify((getNodeType() + " forward").c_str())) {
+                cout << "cpu:" << endl;
+                cout << node->getVal().toJson();
+                cout << "gpu:" << endl;
+                node->getVal().print();
+                abort();
+            }
         }
     }
 

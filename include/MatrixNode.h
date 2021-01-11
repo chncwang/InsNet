@@ -191,7 +191,6 @@ public:
         vec.addParent(this);
         matrix_ = &matrix;
         vector_ = &vec;
-        setColumn(matrix.getDim() / vec.getDim());
         graph.addNode(this);
     }
 
@@ -249,9 +248,11 @@ public:
 #endif
             matrix_vals.push_back(multi->matrix_->getVal().value);
             vector_vals.push_back(multi->vector_->getVal().value);
+            cols.push_back(multi->matrix_->getDim() / multi->vector_->getDim());
         }
-        int row = getRow();
-        cols = getCols();
+        MatrixAndVectorPointwiseMultiNode *x = dynamic_cast<MatrixAndVectorPointwiseMultiNode *>(
+                batch.front());
+        int row = x->vector_->getDim();
         n3ldg_cuda::MatrixAndVectorPointwiseMultiForward(matrix_vals, vector_vals, batch.size(),
                 row, cols, vals);
 #if TEST_CUDA
@@ -437,12 +438,12 @@ public:
     }
 
     void forward(Graph &graph, Node &matrix, Node &vec, int head_count) {
+        head_count_ = head_count;
         matrix.addParent(this);
         matrix_ = &matrix;
         vec.addParent(this);
         vector_ = &vec;
         graph.addNode(this);
-        head_count_ = head_count;
     }
 
     void compute() override {
@@ -502,11 +503,12 @@ public:
     Executor * generate() override;
 
     bool typeEqual(Node *other) override {
-        return Node::typeEqual(other);
+        return Node::typeEqual(other) && head_count_ ==
+            dynamic_cast<MatrixAndVectorMultiNode *>(other)->head_count_;;
     }
 
     string typeSignature() const override {
-        return Node::typeSignature();
+        return Node::typeSignature() + to_string(head_count_);
     }
 
 private:
@@ -534,15 +536,17 @@ public:
         }
 #endif
         auto vals = getVals();
+        int head_count = dynamic_cast<MatrixAndVectorMultiNode*>(batch.front())->head_count_;
         for (Node *node : batch) {
             MatrixAndVectorMultiNode *multi = static_cast<MatrixAndVectorMultiNode *>(node);
             matrix_vals_.push_back(multi->matrix_->getVal().value);
             vector_vals_.push_back(multi->vector_->getVal().value);
-            cols_.push_back(multi->matrix_->getColumn());
+            cols_.push_back(multi->vector_->getDim() / head_count);
         }
-        row_ = static_cast<MatrixAndVectorMultiNode *>(batch.front())->matrix_->getRow();
-        n3ldg_cuda::MatrixAndVectorMultiForward(matrix_vals_, vector_vals_, batch.size(), row_,
-                cols_, vals);
+        MatrixAndVectorMultiNode *x = static_cast<MatrixAndVectorMultiNode *>(batch.front());
+        row_ = x->getDim() / head_count;
+        n3ldg_cuda::MatrixAndVectorMultiForward(matrix_vals_, vector_vals_, batch.size(),
+                head_count, row_, cols_, vals);
 #if TEST_CUDA
         testForward();
         cout << "MatrixAndVectorMultiExecutor forward tested" << endl;

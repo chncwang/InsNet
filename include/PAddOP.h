@@ -133,6 +133,10 @@ public:
             for (PNode n : batch) {
                 PAddNode *padd = static_cast<PAddNode*>(n);
                 ins.push_back(padd->ins.at(i)->val().value);
+#if TEST_CUDA
+                cout << "input type:" << padd->ins.at(i)->typeSignature() << endl;
+                n3ldg_cuda::Assert(padd->ins.at(i)->val().verify("PAdd forward input"));
+#endif
             }
             in_vals.push_back(ins);
         }

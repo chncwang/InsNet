@@ -223,6 +223,7 @@ public:
             }
             n3ldg_cuda::Assert(ptr->val().verify("linear forward val"));
         }
+        cout << "linear forward tested" << endl;
 #endif
     }
 

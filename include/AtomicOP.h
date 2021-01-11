@@ -462,7 +462,7 @@ public:
             }
             head_dims.push_back(head_dim);
         }
-        n3ldg_cuda::MaxScalarForward(inputs, batch.size(), dim,head_dims, results, max_indexes);
+        n3ldg_cuda::MaxScalarForward(inputs, batch.size(), dim, head_dims, results, max_indexes);
 
 #if TEST_CUDA
         Executor::forward();
@@ -574,9 +574,10 @@ public:
             ScalarToVectorNode *n = static_cast<ScalarToVectorNode*>(node);
             inputs.push_back(n->getInput()->getVal().value);
             results.push_back(n->getVal().value);
-            dims_.push_back(n->getDim());
+            dims_.push_back(n->getDim() / n->getInput()->getDim());
         }
-        n3ldg_cuda::ScalarToVectorForward(inputs, batch.size(), dims_, results);
+        int dim = dynamic_cast<ScalarToVectorNode *>(batch.front())->getInput()->getDim();
+        n3ldg_cuda::ScalarToVectorForward(inputs, batch.size(), dim, dims_, results);
 #if TEST_CUDA
         Executor::testForward();
         cout << "scalarToVector tested" << endl;
@@ -725,9 +726,15 @@ class SumExecutor : public UniInputExecutor {
             SumNode *sum = static_cast<SumNode*>(node);
             inputs.push_back(sum->getInput()->getVal().value);
             results.push_back(sum->getVal().value);
-            dims_.push_back(sum->getInput()->getDim());
+            int row = sum->getInput()->getDim()/ getDim();
+            if (row * getDim() != sum->getInput()->getDim()) {
+                cerr << boost::format("SumExecutor forward row:%1% dim:%2% input dim:%3%") %
+                    row % getDim() % sum->getInput()->getDim() << endl;
+                abort();
+            }
+            dims_.push_back(row);
         }
-        n3ldg_cuda::VectorSumForward(inputs, batch.size(), dims_, results);
+        n3ldg_cuda::VectorSumForward(inputs, batch.size(), getDim(), dims_, results);
 #if TEST_CUDA
         Executor::testForward();
         cout << "sum tested" << endl;

@@ -57,10 +57,11 @@ private:
 };
 
 #if USE_GPU
-class FullDivExecutor : public Executor { // TODO
+class FullDivExecutor : public Executor {
 public:
     vector<dtype*> numerators;
     vector<dtype*> denominators;
+    vector<int> dims;
 
     void forward() override {
         vector<dtype*> results;
@@ -69,9 +70,10 @@ public:
             numerators.push_back(div->numerator_->getVal().value);
             denominators.push_back(div->denominator_->getVal().value);
             results.push_back(div->getVal().value);
+            dims.push_back(node->getDim());
         }
 
-        n3ldg_cuda::FullDivForward(numerators, denominators, batch.size(), getDim(), results);
+        n3ldg_cuda::FullDivForward(numerators, denominators, batch.size(), dims, results);
 #if TEST_CUDA
         Executor::testForward();
         cout << "div tested" << endl;
@@ -88,7 +90,7 @@ public:
             denominator_losses.push_back(div->denominator_->getLoss().value);
         }
 
-        n3ldg_cuda::FullDivBackward(losses, denominators, numerators, batch.size(), getDim(),
+        n3ldg_cuda::FullDivBackward(losses, denominators, numerators, batch.size(), dims,
                 numerator_losses, denominator_losses);
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {

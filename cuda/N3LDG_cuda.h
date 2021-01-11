@@ -283,6 +283,7 @@ void MatrixColSumForward(vector<dtype *> &in_vals, int count, vector<int> &cols,
 void MatrixColSumBackward(vector<dtype *> &grads, int count, vector<int> &cols, int row,
         vector<dtype *> &in_grads);
 void MatrixAndVectorMultiForward(vector<dtype *> &matrices, vector<dtype *> &vectors, int count,
+        int head_count,
         int row,
         vector<int> &cols,
         vector<dtype *> &vals);
@@ -313,14 +314,16 @@ void DivBackward(vector<dtype*> &losses, vector<dtype*> &denominator_vals,
         vector<int> &dims,
         vector<dtype*> &numerator_losses,
         vector<dtype*> &denominator_losses);
-void FullDivForward(vector<dtype*> numerators, vector<dtype*> denominators, int count, int dim,
+void FullDivForward(vector<dtype*> &numerators, vector<dtype*> &denominators, int count,
+        vector<int> &dims,
         vector<dtype*> &results);
-void FullDivBackward(vector<dtype*> &losses, vector<dtype*> &denominator_vals,
+void FullDivBackward(vector<dtype*> &grads,
+        vector<dtype*> &denominator_vals,
         vector<dtype*> &numerator_vals,
         int count,
-        int dim,
-        vector<dtype*> &numerator_losses,
-        vector<dtype*> &denominator_losses);
+        vector<int> &dims,
+        vector<dtype*> &numerator_grads,
+        vector<dtype*> &denominator_grads);
 void SplitForward(vector<dtype*> &inputs, vector<int> &offsets, int count, vector<int> &dims,
         vector<dtype*> &results);
 void SplitBackward(vector<dtype*> &losses, vector<int> offsets, int count, vector<int> &dims,
@@ -355,7 +358,7 @@ void MaxScalarForward(vector<dtype*> &inputs, int count, int head_count, vector<
 void MaxScalarBackward(vector<dtype *> &losses, vector<int> &indexes,
         int count,
         vector<dtype*> &input_losses);
-void VectorSumForward(vector<dtype *> &inputs, int count, vector<int> &dims,
+void VectorSumForward(vector<dtype *> &inputs, int count, int col, vector<int> &dims,
         vector<dtype*> &results);
 void VectorSumBackward(vector<dtype*> &losses, int count, vector<int> &dims,
         vector<dtype*> &input_losses);
@@ -363,7 +366,7 @@ void ScaledForward(vector<dtype *> &in_vals, int count, vector<int> &dims, vecto
         vector<dtype *> &vals);
 void ScaledBackward(vector<dtype *> &grads, int count, vector<int> &dims, vector<dtype> &factors,
         vector<dtype *> &in_grads);
-void ScalarToVectorForward(vector<dtype*> &inputs, int count, vector<int> &dims,
+void ScalarToVectorForward(vector<dtype*> &inputs, int count, int input_col, vector<int> &rows,
         vector<dtype*> &results);
 void ScalarToVectorBackward(vector<dtype*> &losses, int count, vector<int> &dims,
         vector<dtype*> &input_losses);
