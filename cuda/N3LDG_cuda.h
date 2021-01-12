@@ -361,7 +361,7 @@ void MaxScalarBackward(vector<dtype *> &losses, vector<int> &indexes,
         vector<dtype*> &input_losses);
 void VectorSumForward(vector<dtype *> &inputs, int count, int col, vector<int> &dims,
         vector<dtype*> &results);
-void VectorSumBackward(vector<dtype*> &losses, int count, vector<int> &dims,
+void VectorSumBackward(vector<dtype*> &losses, int count, int col, vector<int> &dims,
         vector<dtype*> &input_losses);
 void ScaledForward(vector<dtype *> &in_vals, int count, vector<int> &dims, vector<dtype> &factors,
         vector<dtype *> &vals);

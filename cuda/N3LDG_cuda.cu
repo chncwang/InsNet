@@ -3878,31 +3878,35 @@ void VectorSumForward(vector<dtype *> &inputs, int count, int col, vector<int> &
     CheckCudaError();
 }
 
-__global__ void KernelVectorSumBackward(dtype **grads, int count, int *dims, int max_dim,
+__global__ void KernelVectorSumBackward(dtype **grads, int count, int col, int *rows, int max_row,
         dtype **input_grads) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
-    for (int i = index; i < count * max_dim; i += step) {
-        int count_i = i / max_dim;
-        int dim_i = i % max_dim;
+    for (int i = index; i < count * max_row * col; i += step) {
+        int n = col * max_row;
+        int count_i = i / n;
+        int row = rows[count_i];
+        int x = i % n;
+        int row_i = x % max_row;
+        int col_i = x / max_row;
 
-        if (dim_i < dims[count_i]) {
-            DeviceAtomicAdd(input_grads[count_i] + dim_i, grads[count_i][0]);
+        if (row_i < row) {
+            DeviceAtomicAdd(input_grads[count_i] + col_i * row + row_i, grads[count_i][col_i]);
         }
     }
 }
 
-void VectorSumBackward(vector<dtype*> &grads, int count, vector<int> &dims,
+void VectorSumBackward(vector<dtype*> &grads, int count, int col, vector<int> &rows,
         vector<dtype*> &input_grads) {
-    int max_dim = *max_element(dims.begin(), dims.end());
-    int block_count = DefaultBlockCount(count * max_dim);
+    int max_row = *max_element(rows.begin(), rows.end());
+    int block_count = DefaultBlockCount(count * max_row);
     NumberPointerArray grad_arr, input_grad_arr;
     grad_arr.init((dtype**)grads.data(), grads.size());
     input_grad_arr.init((dtype**)input_grads.data(), input_grads.size());
-    IntArray dim_arr;
-    dim_arr.init(dims.data(), dims.size());
-    KernelVectorSumBackward<<<block_count, TPB>>>((dtype **)grad_arr.value, count,
-            dim_arr.value, max_dim, (dtype **)input_grad_arr.value);
+    IntArray row_arr;
+    row_arr.init(rows.data(), rows.size());
+    KernelVectorSumBackward<<<block_count, TPB>>>((dtype **)grad_arr.value, count, col,
+            row_arr.value, max_row, (dtype **)input_grad_arr.value);
     CheckCudaError();
 }
 

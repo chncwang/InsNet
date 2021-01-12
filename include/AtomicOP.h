@@ -747,6 +747,7 @@ class SumExecutor : public UniInputExecutor {
         vector<dtype*> input_losses;
         for (Node *node : batch) {
 #if TEST_CUDA
+            n3ldg_cuda::Assert(node->loss().verify("input loss"));
             node->loss().copyFromDeviceToHost();
 #endif
             losses.push_back(node->getLoss().value);
@@ -754,7 +755,7 @@ class SumExecutor : public UniInputExecutor {
             input_losses.push_back(sum->getInput()->getLoss().value);
         }
 
-        n3ldg_cuda::VectorSumBackward(losses, batch.size(), dims_, input_losses);
+        n3ldg_cuda::VectorSumBackward(losses, batch.size(), getDim(), dims_, input_losses);
 #if TEST_CUDA
         UniInputExecutor::testBackward();
         cout << "sum backward tested" << endl;

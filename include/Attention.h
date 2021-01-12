@@ -42,9 +42,9 @@ pair<Node *, Node *> dotAttention(Graph &graph, Node& key_matrix, Node& value_ma
 
 Node * dotAttentionWeights(Graph &cg, Node& key_matrix, Node& guide) {
     Node *matrix = n3ldg_plus::matrixPointwiseMultiply(cg, key_matrix, guide);
-    Node *sum = n3ldg_plus::matrixColSum(cg, *matrix);
+    Node *sum = n3ldg_plus::matrixColSum(cg, *matrix, 1);
     Node *scaled_weight = n3ldg_plus::scaled(cg, *sum, 1.0 / ::sqrt((dtype)guide.getDim()));
-    scaled_weight = n3ldg_plus::softmax(cg, *scaled_weight);
+    scaled_weight = n3ldg_plus::softmax(cg, *scaled_weight, 1);
     return scaled_weight;
 }
 
