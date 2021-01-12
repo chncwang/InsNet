@@ -83,6 +83,7 @@ class TransformerEncoderLayerParams : public N3LDGSerializable,
 public:
     TransformerEncoderLayerParams(const string &name) :
         multi_head_attention_params_(name + "-multi_head_attention_params"),
+        heads_fusion_params_(name + "-heads_fusion_params"),
         ffn_inner_params_(name + "-ffn_inner_params"),
         ffn_outter_params_(name + "-ffn_outter_params"),
         layer_norm_a_(name + "-layer_norm_a"), layer_norm_b_(name + "-layer_norm_b") {}
@@ -92,14 +93,12 @@ public:
             cerr << "out_dim:" << dim << " head_count:" << head_count << endl;
             abort();
         }
-        int section_out_dim = dim / head_count;
-        cout << boost::format("section_out_dim:%1% dim:%2% head_count:%3%") % section_out_dim %
-            dim % head_count << endl;
         multi_head_attention_params_.init(dim, dim);
 
         function<dtype(int, int)> init_relu = [](int out, int in) ->dtype {
             return sqrt(2.0 / (out + in));
         };
+        heads_fusion_params_.init(dim, dim, false, &init_relu, InitDistribution::NORM);
         ffn_inner_params_.init(4 * dim, dim, true, &init_relu, InitDistribution::NORM);
         ffn_outter_params_.init(dim, 4 * dim, true, &init_relu, InitDistribution::NORM);
         layer_norm_a_.init(dim);
@@ -108,6 +107,10 @@ public:
 
     AttentionHeadParams &multiHeadAttentionParams() {
         return multi_head_attention_params_;
+    }
+
+    UniParams &headsFusionParams() {
+        return heads_fusion_params_;
     }
 
     UniParams &ffnInnerParams() {
@@ -129,6 +132,7 @@ public:
     Json::Value toJson() const override {
         Json::Value json;
         json["multi_head_attention_params"] = multi_head_attention_params_.toJson();
+        json["heads_fusion_params"] = heads_fusion_params_.toJson();
         json["ffn_inner_params"] = ffn_inner_params_.toJson();
         json["ffn_outter_params"] = ffn_outter_params_.toJson();
         json["layer_norm_a"] = layer_norm_a_.toJson();
@@ -138,6 +142,7 @@ public:
 
     void fromJson(const Json::Value &json) override {
         multi_head_attention_params_.fromJson(json["multi_head_attention_params"]);
+        heads_fusion_params_.fromJson(json["heads_fusion_params"]);
         ffn_inner_params_.fromJson(json["ffn_inner_params"]);
         ffn_outter_params_.fromJson(json["ffn_outter_params"]);
         layer_norm_a_.fromJson(json["layer_norm_a"]);
@@ -146,19 +151,20 @@ public:
 
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
-        return {&multi_head_attention_params_, &ffn_inner_params_, &ffn_outter_params_,
-            &layer_norm_a_, &layer_norm_b_};
+        return {&multi_head_attention_params_, &heads_fusion_params_,
+            &ffn_inner_params_, &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_};
     }
 #endif
 
 protected:
     virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
-        return {&multi_head_attention_params_, &ffn_inner_params_, &ffn_outter_params_,
-            &layer_norm_a_, &layer_norm_b_};
+        return {&multi_head_attention_params_, &heads_fusion_params_, &ffn_inner_params_,
+            &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_};
     }
 
 private:
     AttentionHeadParams multi_head_attention_params_;
+    UniParams heads_fusion_params_;
     UniParams ffn_inner_params_;
     UniParams ffn_outter_params_;
     LayerNormalizationParams layer_norm_a_;
@@ -429,7 +435,7 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
 
             Node *attended = n3ldg_plus::dotAttention(graph, *key_matrix,
                     *value_matrix, *q, sentence_len, params.headCount()).first;
-
+            attended = n3ldg_plus::linear(graph, layer_params.headsFusionParams(), *attended);
             attended = n3ldg_plus::dropout(graph, *attended, dropout, is_training);
             Node *added = add(graph, {attended, last_layer.at(j)});
             Node *normed = layerNormalization(graph, layer_params.layerNormB(), *added);
