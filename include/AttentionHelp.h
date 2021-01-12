@@ -50,7 +50,7 @@ Node* attention(Graph &graph, vector<Node *>& inputs, vector<Node *>& scores) {
 
     Node *concated = scalarConcat(graph, scores);
 
-    Node *softmax = n3ldg_plus::softmax(graph, *concated);
+    Node *softmax = n3ldg_plus::softmax(graph, *concated, 1);
 
     vector<Node*> splitted_vector;
     for (int i = 0; i < scores.size(); ++i) {

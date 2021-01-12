@@ -96,7 +96,6 @@ public:
         }
         static int index;
         x->setNodeIndex(index++);
-        nodes.push_back(x);
         if (x->getDegree() == 0) {
             Insert(x, free_nodes);
         }
@@ -105,6 +104,8 @@ public:
         string x_type_hash = x->typeSignature();
         auto it = node_type_depth.find(x_type_hash);
         if (it == node_type_depth.end()) {
+//            cout << "addNode insert " << x->getNodeType() << " " << x->typeSignature() << " " <<
+//                x->getDepth() << endl;
             node_type_depth.insert(std::pair<string, std::pair<int, int>>(
                         x_type_hash, std::pair<int, int>(x->getDepth(), 1)));
         } else {
@@ -129,19 +130,27 @@ public:
             float min_avg_depth = 100000000;
             std::vector<Node*> shallow_nodes;
             string min_hash;
+//            for (auto &it : node_type_depth) {
+//                cerr << it.first << " " << it.second.first << " " << it.second.second << endl;
+//            }
             for (auto it : free_nodes) {
                 string type_hash = it.first;
                 auto depth_it = node_type_depth.find(type_hash);
+                if (depth_it == node_type_depth.end()) {
+                    cerr << boost::format("type not found in depth map:%1%") % type_hash << endl;
+                    abort();
+                }
                 float avg_depth = (float)depth_it->second.first / depth_it->second.second;
 //                int size = it.second.size();
-//                cout << boost::format("sig:%1% avg_depth:%2% size:%3%") % type_hash % avg_depth %
-//                    size << endl;
+//                cout << boost::format("sig:%1% avg_depth:%2% size:%3% total:%4%") % type_hash %
+//                    avg_depth % size % depth_it->second.first << endl;
                 if (avg_depth < min_avg_depth) {
                     min_avg_depth = avg_depth;
                     shallow_nodes = it.second;
                     min_hash = type_hash;
                 }
             }
+//            cout << "min_hash:" <<min_hash << endl;
             Node *first_node = shallow_nodes.at(0);
             PExecutor cur_exec = first_node->generate();
             cur_exec->batch = std::move(shallow_nodes);
@@ -250,7 +259,6 @@ public:
 
 protected:
     vector<PExecutor> execs;
-    vector<Node *> nodes;
     NodeMap free_nodes;
     std::map<string, std::pair<int, int>> node_type_depth;
     vector<PNode> finish_nodes;

@@ -18,39 +18,25 @@
 #include <memory>
 #include <boost/format.hpp>
 
-class DotAttentionBuilder {
-public:
-    vector<Node *> _weights;
-    Node* _hidden;
-
-    void forward(Graph &cg, vector<Node*> &keys, vector<Node *>& values, Node& guide) {
-        using namespace n3ldg_plus;
-
-        if (values.empty()) {
-            std::cerr << "empty inputs for attention operation" << std::endl;
-            abort();
-        }
-
-        for (int idx = 0; idx < values.size(); idx++) {
-            Node *pro = n3ldg_plus::pointwiseMultiply(cg, *keys.at(idx), guide);
-            Node *sum = n3ldg_plus::vectorSum(cg, *pro);
-            Node *scaled = n3ldg_plus::scaled(cg, *sum, 1.0 / sqrt((dtype)guide.getDim()));
-            _weights.push_back(scaled);
-        }
-
-        _hidden = attention(cg, values, _weights);
-    }
-};
-
 namespace n3ldg_plus {
 
-pair<Node *, Node *> dotAttention(Graph &cg, Node& key_matrix, Node& value_matrix,
-        Node& guide) {
-    Node *matrix = n3ldg_plus::matrixPointwiseMultiply(cg, key_matrix, guide);
-    Node *sum = n3ldg_plus::matrixColSum(cg, *matrix);
-    Node *scaled_weight = n3ldg_plus::scaled(cg, *sum, 1.0 / ::sqrt((dtype)guide.getDim()));
-    scaled_weight = n3ldg_plus::softmax(cg, *scaled_weight);
-    Node *hidden = n3ldg_plus::matrixAndVectorMulti(cg, value_matrix, *scaled_weight);
+pair<Node *, Node *> dotAttention(Graph &graph, Node& key_matrix, Node& value_matrix,
+        Node& guide,
+        int col,
+        int head_count) {
+    if (guide.getDim() % head_count != 0) {
+        cerr << boost::format("head count is %1%, guide dim is %2%") % head_count % guide.getDim()
+            << endl;
+        abort();
+    }
+    Node *matrix = n3ldg_plus::matrixPointwiseMultiply(graph, key_matrix, guide);
+    Node *sum = n3ldg_plus::matrixColSum(graph, *matrix, head_count * col);
+    Node *transposed_sum = n3ldg_plus::transposeMatrix(graph, *sum, head_count);
+    Node *scaled_weight = n3ldg_plus::scaled(graph, *transposed_sum,
+            1.0 / ::sqrt((dtype)guide.getDim() / head_count));
+    scaled_weight = n3ldg_plus::softmax(graph, *scaled_weight, head_count);
+    Node *hidden = n3ldg_plus::matrixAndVectorMulti(graph, value_matrix, *scaled_weight,
+            head_count);
     return make_pair(hidden, sum);
 }
 

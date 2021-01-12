@@ -148,7 +148,7 @@ public:
     }
 
     virtual string typeSignature() const {
-        return node_type_ + "-" + std::to_string(dim_);
+        return node_type_ + "-" + std::to_string(dim_) + "-";
     }
 
     virtual void addParent(Node* parent) {
@@ -229,10 +229,6 @@ public:
     virtual ~Node() = default;
 
     int getColumn() const {
-        if (column_ == 0) {
-            cerr << "Node getColumn - column is 0" << endl;
-            abort();
-        }
         return column_;
     }
 
@@ -241,18 +237,10 @@ public:
     }
 
     Mat valMat() {
-        if (column_ == 0) {
-            cerr << "Node valMat - column is 0" << endl;
-            abort();
-        }
         return Mat(val().v, getRow(), column_);
     }
 
     Mat gradMat() {
-        if (column_ == 0) {
-            cerr << "Node gradMat - column is 0" << endl;
-            abort();
-        }
         return Mat(loss().v, getRow(), column_);
     }
 
@@ -303,7 +291,7 @@ private:
         string node_type_;
         string node_name_;
         int node_index_;
-        int column_ = 0;
+        int column_ = 1;
 };
 
 set<pair<vector<Node *>, int> *>& globalPoolReferences() {
@@ -422,7 +410,7 @@ public:
     }
 
     virtual string typeSignature() const override {
-        return Node::typeSignature() + "-" + to_string(input_->getDim());
+        return Node::typeSignature() + "-" + to_string(input_->getDim()) + "-";
     }
 
     void forward(NodeContainer &container, Node &input) {
@@ -617,7 +605,13 @@ protected:
         Executor::forward();
 
         for (Node *node : batch) {
-            n3ldg_cuda::Assert(node->getVal().verify((getNodeType() + " forward").c_str()));
+            if(!node->getVal().verify((getNodeType() + " forward").c_str())) {
+                cout << "cpu:" << endl;
+                cout << node->getVal().toJson();
+                cout << "gpu:" << endl;
+                node->getVal().print();
+                abort();
+            }
         }
     }
 
@@ -637,8 +631,14 @@ protected:
         for (Node *node : batch) {
             auto inputs = get_inputs(*node);
             for (pair<Node*, string> &input : inputs) {
-                n3ldg_cuda::Assert(input.first->getLoss().verify((getNodeType() +
-                                " backward " + input.second).c_str()));
+                if (!input.first->getLoss().verify((getNodeType() +
+                                " backward " + input.second).c_str())) {
+                    cout << "cpu:" << endl << input.first->getLoss().toString() << endl;;
+                    cerr << "gpu:" << endl;
+                    input.first->getLoss().print();
+                    cerr << input.second << endl;
+                    abort();
+                }
             }
         }
     }

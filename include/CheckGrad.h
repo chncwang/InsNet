@@ -9,7 +9,7 @@
 
 using namespace Eigen;
 
-constexpr float CHECK_GRAD_STEP = 1e-3;
+constexpr float CHECK_GRAD_STEP = 1e-4;
 
 class CheckGrad {
 public:

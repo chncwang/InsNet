@@ -400,32 +400,43 @@ public:
         return Node::typeSignature();
     }
 
+    void clear() override {
+        max_indexes_.clear();
+        Node::clear();
+    }
+
     void compute() override {
-        float max = getInput()->getVal()[0];
-        int max_i = 0;
-        for (int i = 1; i < getInput()->getDim(); ++i) {
-            if (getInput()->getVal()[i] > max) {
-                max = getInput()->getVal()[i];
-                max_i = i;
+        int input_row = getInput()->getDim() / getDim();
+        for (int i = 0; i < getDim(); ++i) {
+            float max = getInput()->getVal()[input_row * i];
+            int max_i = 0;
+            for (int j = 1; j < input_row; ++j) {
+                if (getInput()->getVal()[input_row * i + j] > max) {
+                    max = getInput()->getVal()[input_row * i + j];
+                    max_i = j;
+                }
             }
+            max_indexes_.push_back(max_i);
+            val()[i] = max;
         }
-        max_i_ = max_i;
-        val()[0] = max;
     }
 
     void backward() override {
-        getInput()->loss()[max_i_] += getLoss()[0];
+        int input_row = getInput()->getDim() / getDim();
+        for (int i = 0; i < getDim(); ++i) {
+            getInput()->loss()[i * input_row + max_indexes_.at(i)] += getLoss()[i];
+        }
     }
 
     Executor* generate() override;
 
 protected:
     bool isDimLegal(const Node &input) const override {
-        return true;
+        return input.getDim() % getDim() == 0;
     }
 
 private:
-    int max_i_;
+    vector<int> max_indexes_;
     friend class MaxScalarExecutor;
 };
 
@@ -435,39 +446,31 @@ public:
     void forward() override {
         vector<dtype*> inputs;
         vector<dtype*> results;
-        max_indexes.resize(batch.size());
-        vector<int> dims;
+        max_indexes.resize(batch.size() * batch.front()->getDim());
+        vector<int> head_dims;
+        int dim = Executor::getDim();
         for (int i = 0; i < batch.size(); ++i) {
             MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));
             inputs.push_back(node->getInput()->getVal().value);
             results.push_back(node->getVal().value);
-            dims.push_back(node->getInput()->getDim());
-        }
-        bool succeeded = true;
-        do {
-            succeeded = true;
-            n3ldg_cuda::MaxScalarForward(inputs, batch.size(), dims, results, max_indexes);
-
-            for (int i = 0; i < batch.size(); ++i) {
-                MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));
-                if (max_indexes.at(i) > 100000 || max_indexes.at(i) < 0) {
-                    cerr << "illegal max index returned " << max_indexes.at(i) << endl;
-                    cerr << "node dim:" << node->getInput()->getDim() << endl;
-                    node->getVal().print();
-                    succeeded = false;
-                    break;
-                }
-                node->max_i_ = max_indexes.at(i);
+            int head_dim = node->getInput()->getDim() / dim;
+            if (head_dim * dim != node->getInput()->getDim()) {
+                cerr << boost::format(
+                        "MaxScalarExecutor forward head_dim:%1% dim:%2% input dim:%3%") % head_dim
+                    % dim % node->getInput()->getDim() << endl;
+                abort();
             }
-        } while (!succeeded);
+            head_dims.push_back(head_dim);
+        }
+        n3ldg_cuda::MaxScalarForward(inputs, batch.size(), dim, head_dims, results, max_indexes);
+
 #if TEST_CUDA
         Executor::forward();
-        int i = 0;
         for (Node *node : batch) {
             MaxScalarNode *max_scalar = static_cast<MaxScalarNode*>(node);
-            n3ldg_cuda::Assert(max_scalar->getInput()->getVal().verify("max scalar forward input"));
+            n3ldg_cuda::Assert(max_scalar->getInput()->getVal().verify(
+                        "max scalar forward input"));
             n3ldg_cuda::Assert(max_scalar->getVal().verify("max scalar forward"));
-            ++i;
         }
         cout << "max scalar forward tested:" << endl;
 #endif
@@ -520,33 +523,38 @@ public:
     }
 
     bool typeEqual(Node *other) override {
-        return getNodeType() == other->getNodeType();
+        return getNodeType() == other->getNodeType() &&
+            getInput()->getDim() == dynamic_cast<UniInputNode *>(other)->getInput()->getDim();
     }
 
     string typeSignature() const override {
-        return getNodeType();
+        return getNodeType() + to_string(getInput()->getDim());
     }
 
     void compute() override {
-        for (int i = 0; i < getDim(); ++i) {
-            val()[i] = getInput()->getVal()[0];
+        for (int i = 0; i < getColumn(); ++i) {
+            for (int j = 0; j < getRow(); ++j) {
+                val()[i * getRow() + j] = getInput()->getVal()[i];
+            }
         }
     }
 
     void backward() override {
-        int dim = getDim();
-        dtype sum = 0;
-        for (int i = 0; i < dim; ++i) {
-            sum += getLoss()[i];
+        int row = getRow();
+        for (int i = 0; i < getColumn(); ++i) {
+            dtype sum = 0;
+            for (int j = 0; j < row; ++j) {
+                sum += getLoss()[i * row + j];
+            }
+            getInput()->loss()[i] += sum;
         }
-        getInput()->loss()[0] += sum;
     }
 
     Executor* generate() override;
 
 protected:
     bool isDimLegal(const Node &input) const override {
-        return input.getDim() == 1;
+        return true;
     }
 
 private:
@@ -566,9 +574,10 @@ public:
             ScalarToVectorNode *n = static_cast<ScalarToVectorNode*>(node);
             inputs.push_back(n->getInput()->getVal().value);
             results.push_back(n->getVal().value);
-            dims_.push_back(n->getDim());
+            dims_.push_back(n->getDim() / n->getInput()->getDim());
         }
-        n3ldg_cuda::ScalarToVectorForward(inputs, batch.size(), dims_, results);
+        int dim = dynamic_cast<ScalarToVectorNode *>(batch.front())->getInput()->getDim();
+        n3ldg_cuda::ScalarToVectorForward(inputs, batch.size(), dim, dims_, results);
 #if TEST_CUDA
         Executor::testForward();
         cout << "scalarToVector tested" << endl;
@@ -578,11 +587,11 @@ public:
     void backward() override {
 #if TEST_CUDA
         cout << "scalarToVector test before backward..." << endl;
+        UniInputExecutor::testBeforeBackward();
         for (Node *node : batch) {
             ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(node);
-            cout << n->getInput()->getNodeType() << endl;
+            n->loss().copyFromHostToDevice();
         }
-        UniInputExecutor::testBeforeBackward();
 #endif
         vector<dtype*> losses;
         vector<dtype*> input_losses;
@@ -591,7 +600,8 @@ public:
             losses.push_back(n->getLoss().value);
             input_losses.push_back(n->getInput()->getLoss().value);
         }
-        n3ldg_cuda::ScalarToVectorBackward(losses, batch.size(), dims_, input_losses);
+        int dim = dynamic_cast<ScalarToVectorNode *>(batch.front())->getInput()->getDim();
+        n3ldg_cuda::ScalarToVectorBackward(losses, batch.size(), dim, dims_, input_losses);
 #if TEST_CUDA
         cout << "scalarToVector test backward..." << endl;
         UniInputExecutor::testBackward();
@@ -680,22 +690,28 @@ public:
     }
 
     void compute() override {
-        dtype sum = 0;
-        for (int i = 0; i < getInput()->getDim(); ++i) {
-            sum += getInput()->getVal()[i];
+        for (int i = 0; i < getDim(); ++i) {
+            dtype sum = 0;
+            int input_row = getInput()->getDim() / getDim();
+            for (int j = 0; j < input_row; ++j) {
+                sum += getInput()->getVal()[i * input_row + j];
+            }
+            val()[i] = sum;
         }
-        val()[0] = sum;
     }
 
     void backward() override {
-        for (int i = 0; i < getInput()->getDim(); ++i) {
-            getInput()->loss()[i] += getLoss()[0];
+        for (int i = 0; i < getDim(); ++i) {
+            int input_row = getInput()->getDim() / getDim();
+            for (int j = 0; j < input_row; ++j) {
+                getInput()->loss()[i * input_row + j] += getLoss()[i];
+            }
         }
     }
 
 protected:
     bool isDimLegal(const Node &input) const override {
-        return true;
+        return input.getDim() % getDim() == 0;
     }
 
 private:
@@ -711,9 +727,15 @@ class SumExecutor : public UniInputExecutor {
             SumNode *sum = static_cast<SumNode*>(node);
             inputs.push_back(sum->getInput()->getVal().value);
             results.push_back(sum->getVal().value);
-            dims_.push_back(sum->getInput()->getDim());
+            int row = sum->getInput()->getDim()/ getDim();
+            if (row * getDim() != sum->getInput()->getDim()) {
+                cerr << boost::format("SumExecutor forward row:%1% dim:%2% input dim:%3%") %
+                    row % getDim() % sum->getInput()->getDim() << endl;
+                abort();
+            }
+            dims_.push_back(row);
         }
-        n3ldg_cuda::VectorSumForward(inputs, batch.size(), dims_, results);
+        n3ldg_cuda::VectorSumForward(inputs, batch.size(), getDim(), dims_, results);
 #if TEST_CUDA
         Executor::testForward();
         cout << "sum tested" << endl;
@@ -854,8 +876,8 @@ Executor *ScaledNode::generate() {
 
 namespace n3ldg_plus {
 
-Node *maxScalar(Graph &graph, Node &input) {
-    MaxScalarNode *node = MaxScalarNode::newNode(1);
+Node *maxScalar(Graph &graph, Node &input, int input_col) {
+    MaxScalarNode *node = MaxScalarNode::newNode(input_col);
     node->forward(graph, input);
     return node;
 }
@@ -884,14 +906,15 @@ Node *sqrt(Graph &graph, Node &input) {
     return result;
 }
 
-Node *scalarToVector(Graph &graph, int dim, Node &input) {
-    ScalarToVectorNode *node = ScalarToVectorNode::newNode(dim);
+Node *scalarToVector(Graph &graph, int row, Node &input) {
+    ScalarToVectorNode *node = ScalarToVectorNode::newNode(row * input.getDim());
+    node->setColumn(input.getDim());
     node->forward(graph, input);
     return node;
 }
 
-Node *vectorSum(Graph &graph, Node &input) {
-    SumNode *sum = SumNode::newNode(1);
+Node *vectorSum(Graph &graph, Node &input,  int input_col) {
+    SumNode *sum = SumNode::newNode(input_col);
     sum->forward(graph, input);
     return sum;
 }

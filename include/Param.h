@@ -16,6 +16,11 @@
 #endif
 #include "Node.h"
 
+enum InitDistribution {
+    UNI = 0,
+    NORM = 1
+};
+
 // Notice: aux is an auxiliary variable to help parameter updating
 class Param : public BaseParam {
 public:
@@ -30,7 +35,8 @@ public:
         init(outDim, inDim, nullptr);
     }
 
-    void init(int outDim, int inDim, const std::function<dtype(int, int)> *cal_bound) {
+    void init(int outDim, int inDim, const std::function<dtype(int, int)> *cal_bound,
+            InitDistribution dist = InitDistribution::UNI) {
 #if USE_GPU
         val.initOnMemoryAndDevice(outDim, inDim);
         aux_square.initOnMemoryAndDevice(outDim, inDim);
@@ -44,9 +50,13 @@ public:
         if (isBias()) {
             val.assignAll(0.0f);
         } else {
-            dtype bound = cal_bound == nullptr ? sqrt(6.0 / (outDim + inDim + 1)) :
+            dtype bound = cal_bound == nullptr ? sqrt(6.0 / (outDim + inDim)) :
                 (*cal_bound)(outDim, inDim);
-            val.random(bound);
+            if (dist == InitDistribution::UNI) {
+                val.random(bound);
+            } else {
+                val.randomNorm(bound);
+            }
         }
         iter = 0;
 #if USE_GPU
