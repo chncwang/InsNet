@@ -151,7 +151,7 @@ public:
 class LinearExecutor :public Executor {
 public:
     Tensor2D x, y, b;
-    int inDim, outDim, count;
+    int inDim, outDim;
     UniParams* param;
 
     void  forward() {
@@ -228,20 +228,26 @@ public:
     }
 
     void backward() {
+        int count = batch.size();
 #if TEST_CUDA
         if (param->bUseB) {
-            n3ldg_cuda::Assert(param->b.grad.verify("before uni backward b grad"));
+            n3ldg_cuda::Assert(param->b.grad.verify("before linear backward b grad"));
             param->b.grad.copyFromDeviceToHost();
         }
+        n3ldg_cuda::Assert(param->W.val.verify("before linear backward W val"));
         param->W.val.copyFromDeviceToHost();
+        n3ldg_cuda::Assert(param->W.grad.verify("before linear backward W grad"));
         param->W.grad.copyFromDeviceToHost();
         for (int i = 0; i < count; ++i) {
             LinearNode* ptr = (LinearNode*)batch[i];
+            n3ldg_cuda::Assert(ptr->loss().verify("before linear backward grad"));
+            ptr->loss().copyFromDeviceToHost();
+            n3ldg_cuda::Assert(ptr->val().verify("before linear val"));
             ptr->val().copyFromDeviceToHost();
+            n3ldg_cuda::Assert(ptr->in->loss().verify("before linear backward in grad"));
             ptr->in->loss().copyFromDeviceToHost();
         }
 #endif
-        int count = batch.size();
         Tensor2D lx, ly;
         lx.init(inDim, count);
         ly.init(outDim, count);

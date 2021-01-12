@@ -3978,8 +3978,6 @@ __global__ void KernelScalarToVectorForward(dtype **inputs, int count, int input
         int row_i = dim_i % max_row;
         int row = rows[count_i];
         if (row_i < row) {
-//            if (count_i == 0)
-//                KernelPrintLine("col_i:%d input:%f", col_i, inputs[count_i][col_i]);
             results[count_i][col_i * row + row_i] = inputs[count_i][col_i];
         }
     }
@@ -3997,15 +3995,12 @@ void ScalarToVectorForward(vector<dtype*> &inputs, int count, int input_col,
     IntArray row_arr;
     row_arr.init(rows.data(), rows.size());
 
-    cout << boost::format("maxrow:%1% input_col:%2% count:%3%") % max_row % input_col % count <<
-        endl;
-    cout << "block_count:" << block_count << endl;
     KernelScalarToVectorForward<<<block_count, TPB>>>((dtype **)input_arr.value,
             count, input_col, row_arr.value, max_row, (dtype **)result_arr.value);
     CheckCudaError();
 }
 
-__global__ void KernelScalarToVectorBackward(dtype **grads, int count, int *dims,
+__global__ void KernelScalarToVectorBackward(dtype **grads, int count, int input_col, int *rows,
         volatile dtype *block_sums,
         int *block_counters,
         dtype **input_grads) {
@@ -4018,9 +4013,11 @@ __global__ void KernelScalarToVectorBackward(dtype **grads, int count, int *dims
         is_last_block = false;
     }
 
-    int count_i = blockIdx.x;
-    int offset = blockIdx.y * blockDim.x + threadIdx.x;
-    shared_sum[threadIdx.x] = offset < dims[count_i] ? grads[count_i][offset] : 0.0f;
+    int count_i = blockIdx.x / input_col;
+    int col_i = blockIdx.x % input_col;
+    int row_i = blockIdx.y * blockDim.x + threadIdx.x;
+    int row = rows[count_i];
+    shared_sum[threadIdx.x] = row_i < rows[count_i] ? grads[count_i][row * col_i + row_i] : 0.0f;
     __syncthreads();
 
     for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
@@ -4057,35 +4054,35 @@ __global__ void KernelScalarToVectorBackward(dtype **grads, int count, int *dims
         }
 
         if (threadIdx.x == 0) {
-            DeviceAtomicAdd(input_grads[count_i], shared_sum[0]);
+            DeviceAtomicAdd(input_grads[count_i] + col_i, shared_sum[0]);
         }
     }
 }
 
-void ScalarToVectorBackward(vector<dtype*> &grads, int count, vector<int> &dims,
+void ScalarToVectorBackward(vector<dtype*> &grads, int count, int input_col, vector<int> &rows,
         vector<dtype*> &input_grads) {
-    int max_dim = *max_element(dims.begin(), dims.end());
+    int max_dim = *max_element(rows.begin(), rows.end());
 
     int thread_count = min(NextTwoIntegerPowerNumber(max_dim), TPB);
     int block_y_count = (max_dim - 1 + thread_count) / thread_count;
-    dim3 block_dim(count, block_y_count, 1);
+    dim3 block_dim(count * input_col, block_y_count, 1);
 
     NumberArray block_sums;
-    block_sums.init(block_y_count * count);
+    block_sums.init(block_y_count * count * input_col);
     IntArray block_counters;
-    block_counters.init(count);
+    block_counters.init(count * input_col);
 
     NumberPointerArray grad_arr;
     grad_arr.init((dtype**)grads.data(), grads.size());
     NumberPointerArray input_grad_arr;
     input_grad_arr.init((dtype**)input_grads.data(), input_grads.size());
 
-    IntArray dim_arr;
-    dim_arr.init(dims.data(), dims.size());
+    IntArray row_arr;
+    row_arr.init(rows.data(), rows.size());
 
     KernelScalarToVectorBackward<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(
-            (dtype **)grad_arr.value, count, dim_arr.value, block_sums.value, block_counters.value,
-            (dtype **)input_grad_arr.value);
+            (dtype **)grad_arr.value, count, input_col, row_arr.value, block_sums.value,
+            block_counters.value, (dtype **)input_grad_arr.value);
     CheckCudaError();
 }
 

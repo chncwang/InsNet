@@ -587,11 +587,11 @@ public:
     void backward() override {
 #if TEST_CUDA
         cout << "scalarToVector test before backward..." << endl;
+        UniInputExecutor::testBeforeBackward();
         for (Node *node : batch) {
             ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(node);
-            cout << n->getInput()->getNodeType() << endl;
+            n->loss().copyFromHostToDevice();
         }
-        UniInputExecutor::testBeforeBackward();
 #endif
         vector<dtype*> losses;
         vector<dtype*> input_losses;
@@ -600,7 +600,8 @@ public:
             losses.push_back(n->getLoss().value);
             input_losses.push_back(n->getInput()->getLoss().value);
         }
-        n3ldg_cuda::ScalarToVectorBackward(losses, batch.size(), dims_, input_losses);
+        int dim = dynamic_cast<ScalarToVectorNode *>(batch.front())->getInput()->getDim();
+        n3ldg_cuda::ScalarToVectorBackward(losses, batch.size(), dim, dims_, input_losses);
 #if TEST_CUDA
         cout << "scalarToVector test backward..." << endl;
         UniInputExecutor::testBackward();

@@ -369,7 +369,7 @@ void ScaledBackward(vector<dtype *> &grads, int count, vector<int> &dims, vector
         vector<dtype *> &in_grads);
 void ScalarToVectorForward(vector<dtype*> &inputs, int count, int input_col, vector<int> &rows,
         vector<dtype*> &results);
-void ScalarToVectorBackward(vector<dtype*> &losses, int count, vector<int> &dims,
+void ScalarToVectorBackward(vector<dtype*> &losses, int count, int input_col, vector<int> &rows,
         vector<dtype*> &input_losses);
 void BiasForward(vector<dtype*> &in_vals, dtype *bias, int count, int dim,
         vector<dtype *> &vals);

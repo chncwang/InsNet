@@ -270,8 +270,11 @@ public:
             matrix_grads.push_back(multi->matrix_->getLoss().value);
             vector_grads.push_back(multi->vector_->getLoss().value);
         }
+        MatrixAndVectorPointwiseMultiNode *x = dynamic_cast<MatrixAndVectorPointwiseMultiNode *>(
+                batch.front());
+        int row = x->vector_->getDim();
         n3ldg_cuda::MatrixAndVectorPointwiseMultiBackward(grads, matrix_vals, vector_vals,
-                    batch.size(), getRow(), cols, matrix_grads, vector_grads);
+                    batch.size(), row, cols, matrix_grads, vector_grads);
 #if TEST_CUDA
         auto get_inputs = [](Node &node)->vector<pair<Node *, string>> {
             MatrixAndVectorPointwiseMultiNode &multi =
