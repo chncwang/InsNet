@@ -275,8 +275,10 @@ class TransformerDecoderLayerParams : public N3LDGSerializable,
 {
 public:
     TransformerDecoderLayerParams(const string &name) :
-        masked_multi_head_attention_params_(name + "-masked_multi_head_attention_params"),
-        multi_head_attention_params_(name + "-multi_head_attention_params"),
+        self_attention_(name + "-self_attention"),
+        encoder_attention_(name + "-encoder_attention"),
+        self_fusion_(name + "-self_fusion"),
+        encoder_fusion_(name+"encoder_fusion"),
         ffn_inner_params_(name + "-ffn_inner_params"),
         ffn_outter_params_(name + "-ffn_outter_params"),
         layer_norm_a_(name + "-layer_norm_a"), layer_norm_b_(name + "-layer_norm_b"),
@@ -287,8 +289,10 @@ public:
             cerr << "out_dim:" << dim << " head_count:" << head_count << endl;
             abort();
         }
-        masked_multi_head_attention_params_.init(dim, dim);
-        multi_head_attention_params_.init(dim, dim);
+        self_attention_.init(dim, dim);
+        encoder_attention_.init(dim, dim);
+        self_fusion_.init(dim, dim);
+        encoder_fusion_.init(dim, dim);
 
         function<dtype(int, int)> init_relu = [](int out, int in) ->dtype {
             return sqrt(2.0 / (out + in));
@@ -300,12 +304,20 @@ public:
         layer_norm_c_.init(dim);
     }
 
-    AttentionHeadParams &maskedMultiHeadAttentionParams() {
-        return masked_multi_head_attention_params_;
+    AttentionHeadParams &selfAttention() {
+        return self_attention_;
     }
 
-    AttentionHeadParams &multiHeadAttentionParams() {
-        return multi_head_attention_params_;
+    AttentionHeadParams &encoderAttention() {
+        return encoder_attention_;
+    }
+
+    UniParams &selfFusion() {
+        return self_fusion_;
+    }
+
+    UniParams &encoderFusion() {
+        return encoder_fusion_;
     }
 
     UniParams &ffnInnerParams() {
@@ -330,8 +342,10 @@ public:
 
     Json::Value toJson() const override {
         Json::Value json;
-        json["masked_multi_head_attention_params"] = masked_multi_head_attention_params_.toJson();
-        json["multi_head_attention_params"] = multi_head_attention_params_.toJson();
+        json["self_attention"] = self_attention_.toJson();
+        json["encoder_attention"] = encoder_attention_.toJson();
+        json["self_fusion"] = self_fusion_.toJson();
+        json["encoder_fusion"] = encoder_fusion_.toJson();
         json["ffn_inner_params"] = ffn_inner_params_.toJson();
         json["ffn_outter_params"] = ffn_outter_params_.toJson();
         json["layer_norm_a"] = layer_norm_a_.toJson();
@@ -341,8 +355,10 @@ public:
     }
 
     void fromJson(const Json::Value &json) override {
-        masked_multi_head_attention_params_.fromJson(json["masked_multi_head_attention_params"]);
-        multi_head_attention_params_.fromJson(json["multi_head_attention_params"]);
+        self_attention_.fromJson(json["self_attention"]);
+        encoder_attention_.fromJson(json["encoder_attention"]);
+        self_fusion_.fromJson(json["self_fusion"]);
+        encoder_fusion_.fromJson(json["encoder_fusion"]);
         ffn_inner_params_.fromJson(json["ffn_inner_params"]);
         ffn_outter_params_.fromJson(json["ffn_outter_params"]);
         layer_norm_a_.fromJson(json["layer_norm_a"]);
@@ -352,22 +368,22 @@ public:
 
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
-        return {&masked_multi_head_attention_params_, &multi_head_attention_params_,
-            &ffn_inner_params_, &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_,
-            &layer_norm_c_};
+        return {&self_attention_, &encoder_attention_, &ffn_inner_params_, &ffn_outter_params_,
+            &layer_norm_a_, &layer_norm_b_, &layer_norm_c_};
     }
 #endif
 
 protected:
     virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
-        return {&masked_multi_head_attention_params_, &multi_head_attention_params_,
-            &ffn_inner_params_, &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_,
-            &layer_norm_c_};
+        return {&self_attention_, &encoder_attention_, &ffn_inner_params_, &ffn_outter_params_,
+            &layer_norm_a_, &layer_norm_b_, &layer_norm_c_};
     }
 
 private:
-    AttentionHeadParams masked_multi_head_attention_params_;
-    AttentionHeadParams multi_head_attention_params_;
+    AttentionHeadParams self_attention_;
+    AttentionHeadParams encoder_attention_;
+    UniParams self_fusion_;
+    UniParams encoder_fusion_;
     UniParams ffn_inner_params_;
     UniParams ffn_outter_params_;
     LayerNormalizationParams layer_norm_a_;
@@ -468,20 +484,21 @@ public:
 
     void prepare() {
         int layer_count = params_->layerCount();
-        vector<Node *> encoder_keys, encoder_values;
         for (int i = 0; i < layer_count; ++i) {
+            vector<Node *> encoder_keys, encoder_values;
             auto &layer_params = *params_->layerParams().ptrs().at(i);
-            auto &attention_head_params = layer_params.multiHeadAttentionParams();
+            auto &attention_head_params = layer_params.encoderAttention();
             for (Node *hidden : encoder_hiddens_) {
                 Node *k = linear(*graph_, attention_head_params.k(), *hidden);
                 encoder_keys.push_back(k);
                 Node *v = linear(*graph_, attention_head_params.v(), *hidden);
                 encoder_values.push_back(v);
             }
+            Node *encoder_key_matrix = concat(*graph_, encoder_keys);
+            encoder_key_matrices_.push_back(encoder_key_matrix);
+            Node *encoder_value_matrix = concat(*graph_, encoder_values);
+            encoder_value_matrices_.push_back(encoder_value_matrix);
         }
-
-        encoder_key_matrix_ = concat(*graph_, encoder_keys);
-        encoder_value_matrix_ = concat(*graph_, encoder_values);
 
         prepared_ = true;
     }
@@ -496,8 +513,8 @@ protected:
 
     vector<Node *> encoder_hiddens_;
 
-    Node *encoder_key_matrix_;
-    Node *encoder_value_matrix_;
+    vector<Node *> encoder_key_matrices_;
+    vector<Node *> encoder_value_matrices_;
 
     dtype dropout_;
     bool is_training_;
@@ -528,6 +545,7 @@ public:
         using namespace n3ldg_plus;
         Node *embedding = n3ldg_plus::embedding(*graph_, params_->positionalEncodingParam(),
                 decoded_len_, false);
+        embedding = n3ldg_plus::scaled(*graph_, *embedding, ::sqrt(embedding->getDim()));
         Node *pos_encoded = add(*graph_, {&decoder_input, embedding});
         pos_encoded = n3ldg_plus::dropout(*graph_, *pos_encoded, dropout_, is_training_);
 
@@ -536,7 +554,7 @@ public:
         Node *last_layer_node = pos_encoded;
         for (int i = 0; i < layer_count; ++i) {
             auto &layer_params = *params_->layerParams().ptrs().at(i);
-            auto &attention_head_params = layer_params.maskedMultiHeadAttentionParams();
+            auto &attention_head_params = layer_params.selfAttention();
             Node *normed = layerNormalization(*graph_, layer_params.layerNormA(),
                     *last_layer_node);
             Node *k = linear(*graph_, attention_head_params.k(), *normed);
@@ -547,17 +565,20 @@ public:
             Node *&value_matrix = value_matrix_layers_.at(i);
             value_matrix = value_matrix == nullptr ? v : concat(*graph_, {value_matrix, v});
 
-            Node *q = linear(*graph_, attention_head_params.q(), *last_layer_node);
+            Node *q = linear(*graph_, attention_head_params.q(), *normed);
             Node *attended = n3ldg_plus::dotAttention(*graph_, *key_matrix, *value_matrix, *q,
                     decoded_len_ + 1, params_->headCount()).first;
+            attended = n3ldg_plus::linear(*graph_, layer_params.selfFusion(), *attended);
             attended = n3ldg_plus::dropout(*graph_, *attended, dropout_, is_training_);
             Node *added = add(*graph_, {attended, last_layer_node});
             normed = layerNormalization(*graph_, layer_params.layerNormB(), *added);
 
-            auto &attention_head_params_for_encoder = layer_params.multiHeadAttentionParams();
+            auto &attention_head_params_for_encoder = layer_params.encoderAttention();
             q = linear(*graph_, attention_head_params_for_encoder.q(), *normed);
-            attended = dotAttention(*graph_, *encoder_key_matrix_, *encoder_value_matrix_, *q,
-                    encoder_hiddens_.size(), params_->headCount()).first;
+            attended = dotAttention(*graph_, *encoder_key_matrices_.at(i),
+                    *encoder_value_matrices_.at(i), *q, encoder_hiddens_.size(),
+                    params_->headCount()).first;
+            attended = n3ldg_plus::linear(*graph_, layer_params.encoderFusion(), *attended);
             attended = n3ldg_plus::dropout(*graph_, *attended, dropout_, is_training_);
             added = add(*graph_, {added, attended});
             normed = layerNormalization(*graph_, layer_params.layerNormC(), *added);
