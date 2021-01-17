@@ -37,7 +37,7 @@ pair<Node *, Node *> dotAttention(Graph &graph, Node& key_matrix, Node& value_ma
     scaled_weight = n3ldg_plus::softmax(graph, *scaled_weight, head_count);
     Node *hidden = n3ldg_plus::matrixAndVectorMulti(graph, value_matrix, *scaled_weight,
             head_count);
-    return make_pair(hidden, sum);
+    return make_pair(hidden, scaled_weight);
 }
 
 Node * dotAttentionWeights(Graph &cg, Node& key_matrix, Node& guide) {

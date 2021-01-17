@@ -150,7 +150,7 @@ public:
                     min_hash = type_hash;
                 }
             }
-//            cout << "min_hash:" <<min_hash << endl;
+//            cout << "type:" <<min_hash << " " << shallow_nodes.size() << endl;
             Node *first_node = shallow_nodes.at(0);
             PExecutor cur_exec = first_node->generate();
             cur_exec->batch = std::move(shallow_nodes);
