@@ -543,10 +543,11 @@ public:
             abort();
         }
         using namespace n3ldg_plus;
+        Node *scaled_input = n3ldg_plus::scaled(*graph_, decoder_input,
+                ::sqrt(decoder_input.getDim()));
         Node *embedding = n3ldg_plus::embedding(*graph_, params_->positionalEncodingParam(),
                 decoded_len_, false);
-        embedding = n3ldg_plus::scaled(*graph_, *embedding, ::sqrt(embedding->getDim()));
-        Node *pos_encoded = add(*graph_, {&decoder_input, embedding});
+        Node *pos_encoded = add(*graph_, {scaled_input, embedding});
         pos_encoded = n3ldg_plus::dropout(*graph_, *pos_encoded, dropout_, is_training_);
 
         int layer_count = params_->layerCount();
