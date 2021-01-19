@@ -406,6 +406,7 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
     for (int i = 0; i < sentence_len; ++i) {
         Node *embedding = n3ldg_plus::embedding(graph, params.positionalEncodingParam(), i, false);
         Node *input = inputs.at(i);
+        input = n3ldg_plus::scaled(graph, *input, ::sqrt(input->getDim()));
         Node *pos_encoded = add(graph, {input, embedding});
         pos_encoded = n3ldg_plus::dropout(graph, *pos_encoded, dropout, is_training);
         pos_encoded_layer.push_back(pos_encoded);
