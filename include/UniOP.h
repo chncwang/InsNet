@@ -131,17 +131,6 @@ public:
 
     Executor * generate() override;
 
-    bool typeEqual(PNode other) override {
-        bool result = Node::typeEqual(other);
-        if (!result) return false;
-        LinearNode* conv_other = (LinearNode*)other;
-        if (param != conv_other->param) {
-            return false;
-        }
-
-        return true;
-    }
-
     string typeSignature() const override {
         return Node::typeSignature() + "-" + addressToString(param);
     }
@@ -432,12 +421,6 @@ public:
 
     Executor* generate() override;
 
-    bool typeEqual(PNode other) override {
-        LinearWordVectorNode* conv_other = (LinearWordVectorNode*)other;
-        return Node::typeEqual(other) && param_ == conv_other->param_ &&
-            offset_ == conv_other->offset_;
-    }
-
     string typeSignature() const override {
         return Node::typeSignature() + "-" + addressToString(param_) + "-" + to_string(offset_);
     }
@@ -720,11 +703,6 @@ public:
 
     void init(int dim) override {
         UniInputNode::init(dim);
-    }
-
-    virtual bool typeEqual(Node *other) override {
-        return UniInputNode::typeEqual(other) && bias_param_ ==
-            static_cast<BiasNode *>(other)->bias_param_;
     }
 
     virtual string typeSignature() const override {

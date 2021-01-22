@@ -73,11 +73,6 @@ public:
         }
     }
 
-    bool typeEqual(Node *other) override {
-        MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(other);
-        return concat->getNodeType() == getNodeType() && concat->getRow() == getRow();
-    }
-
     string typeSignature() const override {
         return "MatrixConcatNode-" + to_string(getRow());
     }
@@ -221,11 +216,6 @@ public:
         return "MatrixAndVectorPointwiseMulti-" + to_string(vector_->getDim());
     }
 
-    bool typeEqual(Node *other) override {
-        return getNodeType() == other->getNodeType() && vector_->getDim() ==
-            static_cast<MatrixAndVectorPointwiseMultiNode *>(other)->vector_->getDim();
-    }
-
     Executor *generate() override;
 
 private:
@@ -348,17 +338,6 @@ public:
             for (int j = 0; j < input_row; ++j) {
                 input.loss()[i * input_row + j] += getLoss()[i];
             }
-        }
-    }
-
-    virtual bool typeEqual(Node *other) override {
-        if (getNodeType() != other->getNodeType()) {
-            return false;
-        } else {
-            MatrixColSumNode &matrix = *static_cast<MatrixColSumNode *>(other);
-            int input_row = getInput()->getDim() / getDim();
-            int other_input_row = matrix.getInput()->getDim() / matrix.getDim();
-            return input_row == other_input_row;
         }
     }
 
@@ -505,11 +484,6 @@ public:
 
     Executor * generate() override;
 
-    bool typeEqual(Node *other) override {
-        return Node::typeEqual(other) && head_count_ ==
-            dynamic_cast<MatrixAndVectorMultiNode *>(other)->head_count_;;
-    }
-
     string typeSignature() const override {
         return Node::typeSignature() + to_string(head_count_);
     }
@@ -630,10 +604,6 @@ public:
                 input.loss()[input_row * j + i] += getLoss()[input_col * i + j];
             }
         }
-    }
-
-    virtual bool typeEqual(Node *other) override {
-        return getNodeType() == other->getNodeType() && getColumn() == other->getColumn();
     }
 
     virtual string typeSignature() const override {

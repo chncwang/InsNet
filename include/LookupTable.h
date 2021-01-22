@@ -271,19 +271,6 @@ public:
 
     PExecutor generate() override;
 
-    // better to rewrite for deep understanding
-    bool typeEqual(PNode other) override {
-        bool result = Node::typeEqual(other);
-        if (!result) return false;
-
-        LookupNode* conv_other = (LookupNode*)other;
-        if (param != conv_other->param) {
-            return false;
-        }
-
-        return true;
-    }
-
     string typeSignature() const override {
         return Node::typeSignature() + "-" + addressToString(param);
     }

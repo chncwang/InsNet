@@ -67,22 +67,6 @@ public:
 
     PExecutor generate() override;
 
-    bool typeEqual(PNode other) override {
-        if (!Node::typeEqual(other)) {
-            return false;
-        }
-        ConcatNode *o = static_cast<ConcatNode*>(other);
-        if (inDims.size() != o->inDims.size()) {
-            return false;
-        }
-        for (int i = 0; i < inDims.size(); ++i) {
-            if (inDims.at(i) != o->inDims.at(i)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     string typeSignature() const override {
         string hash_code = Node::typeSignature() + "-" + to_string(inDims.size());
         for (int dim : inDims) {
@@ -246,10 +230,6 @@ public:
 
     const vector<Node *> ins() const {
         return ins_;
-    }
-
-    bool typeEqual(Node *other) override {
-        return getNodeType() == other->getNodeType();
     }
 
     string typeSignature() const override {

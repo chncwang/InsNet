@@ -698,10 +698,6 @@ public:
 
     PExecutor generate() override;
 
-    bool typeEqual(PNode other) override {
-        return Node::typeEqual(other);
-    }
-
     void clear() override {
         ins.clear();
         Node::clear();

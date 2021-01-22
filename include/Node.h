@@ -110,8 +110,8 @@ class Executor;
 class Node;
 
 class NodeContainer {
-    public:
-        virtual void addNode(Node *node) = 0;
+public:
+    virtual void addNode(Node *node) = 0;
 };
 
 string addressToString(const void* p) {
@@ -136,16 +136,6 @@ public:
     virtual void backward() = 0;
 
     virtual Executor* generate() = 0;
-
-    virtual bool typeEqual(Node* other) {
-        if (node_type_.compare(other->node_type_) != 0) {
-            return false;
-        }
-        if (dim_ != other->dim_) {
-            return false;
-        }
-        return true;
-    }
 
     virtual string typeSignature() const {
         return node_type_ + "-" + std::to_string(dim_) + "-";
@@ -404,11 +394,6 @@ class UniInputNode : public Node {
 public:
     UniInputNode(const string &node_type) : Node(node_type) {}
 
-    virtual bool typeEqual(Node *other) override {
-        UniInputNode *o = static_cast<UniInputNode *>(other);
-        return Node::typeEqual(other) && input_->getDim() == o->input_->getDim();
-    }
-
     virtual string typeSignature() const override {
         return Node::typeSignature() + "-" + to_string(input_->getDim()) + "-";
     }
@@ -536,15 +521,6 @@ public:
     }
 
     void forwardFully() {
-        Node *first = batch.front();
-        for (int i = 1; i < batch.size(); ++i) {
-            if (!first->typeEqual(batch.at(i))) {
-                cerr << "type not equal in the same batch - node_type:" << first->getNodeType() <<
-                    endl;
-                abort();
-            }
-        }
-
         n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
         profiler.BeginEvent(batch.front()->getNodeType() + " forward");
         forward();
@@ -568,22 +544,22 @@ public:
         }
     }
 
-    virtual bool addNode(PNode in) {
-        if (in == nullptr) {
-            cerr << "in is nullptr" << endl;
-            abort();
-        }
-        if (batch.empty()) {
-            return false;
-        }
+//    virtual bool addNode(PNode in) {
+//        if (in == nullptr) {
+//            cerr << "in is nullptr" << endl;
+//            abort();
+//        }
+//        if (batch.empty()) {
+//            return false;
+//        }
 
-        if (batch[0]->typeEqual(in)) {
-            batch.push_back(in);
-            return true;
-        }
+//        if (batch.front()->typeSignature() == in->typeSignature()) {
+//            batch.push_back(in);
+//            return true;
+//        }
 
-        return false;
-    }
+//        return false;
+//    }
 
 protected:
     virtual void forward() {

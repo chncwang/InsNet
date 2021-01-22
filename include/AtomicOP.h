@@ -245,15 +245,6 @@ public:
         in_->loss().vec() += loss().vec() * drop_mask_.vec();
     }
 
-    bool typeEqual(Node *other) override {
-        DropoutNode *o = static_cast<DropoutNode*>(other);
-        if (o->is_training_ != is_training_) {
-            std::cerr << "is_training not equal" << std::endl;
-            abort();
-        }
-        return Node::typeEqual(other) && abs(drop_value_ - o->drop_value_) < 0.001f;
-    }
-
     string typeSignature() const override {
         return Node::typeSignature() + "-" + to_string(drop_value_);
     }
@@ -392,10 +383,6 @@ public:
         setDim(dim);
     }
 
-    bool typeEqual(Node *other) override {
-        return Node::typeEqual(other);
-    }
-
     string typeSignature() const override {
         return Node::typeSignature();
     }
@@ -522,11 +509,6 @@ public:
         setDim(dim);
     }
 
-    bool typeEqual(Node *other) override {
-        return getNodeType() == other->getNodeType() &&
-            getInput()->getDim() == dynamic_cast<UniInputNode *>(other)->getInput()->getDim();
-    }
-
     string typeSignature() const override {
         return getNodeType() + to_string(getInput()->getDim());
     }
@@ -642,10 +624,6 @@ public:
         return new ActivationExecutor<ActivatedEnum::EXP>;
     }
 
-    bool typeEqual(Node *other) override {
-        return getNodeType() == other->getNodeType();
-    }
-
     string typeSignature() const override {
         return getNodeType();
     }
@@ -680,10 +658,6 @@ public:
     }
 
     Executor* generate() override;
-
-    virtual bool typeEqual(Node *other) override {
-        return Node::typeEqual(other);
-    }
 
     virtual string typeSignature() const override {
         return Node::typeSignature();
@@ -806,10 +780,6 @@ public:
     }
 
     Executor* generate() override;
-
-    virtual bool typeEqual(Node *other) override {
-        return getNodeType() == other->getNodeType();
-    }
 
     virtual string typeSignature() const override {
         return getNodeType();

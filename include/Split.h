@@ -21,10 +21,6 @@ public:
         init(dim);
     }
 
-    bool typeEqual(PNode other) override {
-        return getNodeType() == other->getNodeType();
-    }
-
     string typeSignature() const override {
         return getNodeType();
     }

@@ -80,15 +80,6 @@ public:
 public:
     PExecutor generate() override;
 
-    // better to rewrite for deep understanding
-    bool typeEqual(PNode other) override {
-        if (!Node::typeEqual(other)) {
-            return false;
-        }
-        PAddNode *add = static_cast<PAddNode*>(other);
-        return ins.size() == add->ins.size();
-    }
-
     string typeSignature() const override {
         return Node::typeSignature() + "-" + to_string(ins.size());
     }

@@ -18,10 +18,6 @@ public:
         setDim(dim);
     }
 
-    bool typeEqual(Node *other) override {
-        return getNodeType() == other->getNodeType();
-    }
-
     string typeSignature() const override {
         return getNodeType();
     }

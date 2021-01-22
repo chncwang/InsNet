@@ -1,7 +1,6 @@
 #ifndef N3LDG_PLUS_SOFTMAX_NODE
 #define N3LDG_PLUS_SOFTMAX_NODE
 
-#include "Layer.h"
 #include "AtomicOP.h"
 #include "Sub.h"
 #include "AtomicOP.h"
