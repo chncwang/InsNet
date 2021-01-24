@@ -203,7 +203,7 @@ public:
         }
 
         n3ldg_cuda::Assert(x.verify("forward x"));
-        n3ldg_cuda::Assert(y.verify("linear forward y"), batch.at(0)->getNodeName());
+        n3ldg_cuda::Assert(y.verify("linear forward y"), batch.at(0)->typeSignature());
 
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];

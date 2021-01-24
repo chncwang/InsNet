@@ -205,13 +205,6 @@ public:
         drop_mask_.init(dimm);
     }
 
-#if USE_GPU
-    void initOnHostAndDevice(int ndim) override {
-        Node::initOnHostAndDevice(ndim);
-        drop_mask_.init(ndim);
-    }
-#endif
-
     virtual void generate_dropmask() {
         int dropNum = (int)(getDim() * drop_value_);
         std::vector<int> tmp_masks(getDim());

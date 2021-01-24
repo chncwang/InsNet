@@ -32,14 +32,15 @@ void DecreaseDegree(std::map<void*, int> &degree_map, PNode p) {
     }
 }
 
-typedef std::unordered_map<string, vector<PNode>> NodeMap;
+typedef std::unordered_map<string, vector<NodeAbs *>> NodeMap;
 
-void Insert(const PNode node, NodeMap& node_map) {
+void Insert(NodeAbs *node, NodeMap& node_map) {
     string x_hash = node->typeSignature();
     auto it = node_map.find(x_hash);
     if (it == node_map.end()) {
-        std::vector<PNode> v = {node};
-        node_map.insert(std::make_pair<string, std::vector<PNode>>(std::move(x_hash), std::move(v)));
+        std::vector<NodeAbs *> v = {node};
+        node_map.insert(std::make_pair<string, std::vector<NodeAbs *>>(std::move(x_hash),
+                    std::move(v)));
     } else {
         it->second.push_back(node);
     }
@@ -73,7 +74,7 @@ public:
                 e->second = 0;
             }
         } else {
-            for (Node *node : all_nodes) {
+            for (NodeAbs *node : all_nodes) {
                 delete node;
             }
         }
@@ -89,13 +90,11 @@ public:
         profiler.EndCudaEvent();
     }
 
-    void addNode(Node *x) override {
+    void addNode(NodeAbs *x) override {
         if (x == nullptr) {
             cerr << "x is nullptr" << endl;
             abort();
         }
-        static int index;
-        x->setNodeIndex(index++);
         if (x->getDegree() == 0) {
             Insert(x, free_nodes);
         }
@@ -128,7 +127,7 @@ public:
                 break;
             }
             float min_avg_depth = 100000000;
-            std::vector<Node*> shallow_nodes;
+            std::vector<NodeAbs *> shallow_nodes;
             string min_hash;
 //            for (auto &it : node_type_depth) {
 //                cerr << it.first << " " << it.second.first << " " << it.second.second << endl;
@@ -151,9 +150,15 @@ public:
                 }
             }
 //            cout << "type:" <<min_hash << " " << shallow_nodes.size() << endl;
-            Node *first_node = shallow_nodes.at(0);
-            PExecutor cur_exec = first_node->generate();
-            cur_exec->batch = std::move(shallow_nodes);
+            NodeAbs *first_node = shallow_nodes.front();
+            Executor *cur_exec = first_node->generate();
+            if (first_node->isBatched()) {
+            } else {
+                cur_exec->batch.clear();
+                for (NodeAbs *node : shallow_nodes) {
+                    cur_exec->batch.push_back(dynamic_cast<Node *>(node));
+                }
+            }
             free_nodes.erase(min_hash);
             profiler.EndEvent();
 #if USE_GPU
@@ -224,11 +229,10 @@ public:
             int total_node_num = all_nodes.size();
             int unprocessed = 0;
             for (int idx = 0; idx < total_node_num; idx++) {
-                PNode curNode = all_nodes.at(idx);
+                NodeAbs *curNode = all_nodes.at(idx);
                 if (curNode->getDegree() > 0) {
                     std::cerr << "unprocessed node:" << curNode->getNodeType() <<
                         " degree:" << curNode->getDegree() <<
-                        " name:" << curNode->getNodeName() <<
                         std::endl;
                     unprocessed++;
                 }
@@ -258,11 +262,11 @@ public:
     }
 
 protected:
-    vector<PExecutor> execs;
+    vector<Executor *> execs;
     NodeMap free_nodes;
     std::map<string, std::pair<int, int>> node_type_depth;
-    vector<PNode> finish_nodes;
-    vector<PNode> all_nodes;
+    vector<NodeAbs *> finish_nodes;
+    vector<NodeAbs *> all_nodes;
 
 private:
     bool eager_ = false;
