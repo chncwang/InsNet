@@ -14,11 +14,11 @@
 #include "Node.h"
 #include "Graph.h"
 
-class PAddNode : public Node, public Poolable<PAddNode> {
+class PAddNode : public AtomicNode, public Poolable<PAddNode> {
 public:
-    vector<PNode> ins;
+    vector<AtomicNode *> ins;
 
-    PAddNode() : Node("point-add") {}
+    PAddNode() : AtomicNode("point-add") {}
 
     void initNode(int dim) override {
         init(dim);
@@ -28,12 +28,12 @@ public:
         setDim(dim);
     }
 
-    void forward(Graph &graph, Node &input1, Node &input2) {
-        vector<Node *> inputs = {&input1, &input2};
+    void forward(Graph &graph, AtomicNode &input1, AtomicNode &input2) {
+        vector<AtomicNode *> inputs = {&input1, &input2};
         this->forward(graph, inputs);
     }
 
-    void forward(Graph &cg, vector<Node *>& x) {
+    void forward(Graph &cg, vector<AtomicNode *>& x) {
         if (x.empty()) {
             std::cerr << "empty inputs for add" << std::endl;
             abort();
@@ -81,12 +81,12 @@ public:
     PExecutor generate() override;
 
     string typeSignature() const override {
-        return Node::typeSignature() + "-" + to_string(ins.size());
+        return AtomicNode::typeSignature() + "-" + to_string(ins.size());
     }
 };
 
 namespace n3ldg_plus {
-    Node *add(Graph &graph, vector<Node*> inputs) {
+    AtomicNode *add(Graph &graph, vector<AtomicNode*> inputs) {
         int dim = inputs.front()->getDim();
         PAddNode *result = PAddNode::newNode(dim);
         result->forward(graph, inputs);
@@ -104,7 +104,7 @@ public:
 #if !USE_GPU
     int calculateFLOPs() override {
         int sum = 0;
-        for (Node *node : batch) {
+        for (AtomicNode *node : batch) {
             PAddNode *add = static_cast<PAddNode*>(node);
             sum += add->getDim() * add->ins.size();
         }
@@ -121,7 +121,7 @@ public:
         for (int i = 0; i < in_count; ++i) {
             std::vector<dtype*> ins;
             ins.reserve(count);
-            for (PNode n : batch) {
+            for (AtomicNode * n : batch) {
                 PAddNode *padd = static_cast<PAddNode*>(n);
                 ins.push_back(padd->ins.at(i)->val().value);
 #if TEST_CUDA
@@ -133,7 +133,7 @@ public:
         }
         std::vector<dtype *> outs;
         outs.reserve(count);
-        for (PNode n : batch) {
+        for (AtomicNode * n : batch) {
             PAddNode *padd = static_cast<PAddNode*>(n);
             outs.push_back(padd->val().value);
         }
@@ -142,7 +142,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
         }
-        for (Node *n : batch) {
+        for (AtomicNode *n : batch) {
             n3ldg_cuda::Assert(n->val().verify("PAdd forward"));
         }
 #endif
@@ -164,7 +164,7 @@ public:
         for (int i = 0; i < in_count; ++i) {
             std::vector<dtype*> ins;
             ins.reserve(count);
-            for (PNode n : batch) {
+            for (AtomicNode * n : batch) {
                 PAddNode *padd = static_cast<PAddNode*>(n);
                 ins.push_back(padd->ins.at(i)->loss().value);
             }
@@ -172,7 +172,7 @@ public:
         }
         std::vector<dtype *> out_losses;
         out_losses.reserve(count);
-        for (PNode n : batch) {
+        for (AtomicNode * n : batch) {
             PAddNode *padd = static_cast<PAddNode*>(n);
             out_losses.push_back(padd->loss().value);
         }
@@ -182,9 +182,9 @@ public:
             batch[idx]->backward();
         }
 
-        for (Node *n : batch) {
+        for (AtomicNode *n : batch) {
             PAddNode *add = static_cast<PAddNode*>(n);
-            for (Node *in : add->ins) {
+            for (AtomicNode *in : add->ins) {
                 n3ldg_cuda::Assert(in->loss().verify("PAddExecutor backward"));
             }
         }

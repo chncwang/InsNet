@@ -81,9 +81,9 @@ protected:
     }
 };
 
-class LinearNode : public Node, public Poolable<LinearNode> {
+class LinearNode : public AtomicNode, public Poolable<LinearNode> {
 public:
-    PNode in;
+    AtomicNode * in;
     UniParams* param;
 
     void initNode(int dim) override {
@@ -94,7 +94,7 @@ public:
         setDim(dim);
     }
 
-    LinearNode() : Node("linear") {
+    LinearNode() : AtomicNode("linear") {
         in = NULL;
         param = NULL;
     }
@@ -110,7 +110,7 @@ public:
         param = paramInit;
     }
 
-    void forward(Graph &graph, Node &x) {
+    void forward(Graph &graph, AtomicNode &x) {
         if (x.getDim() != param->W.inDim()) {
             cerr << boost::format("input dim:%1% preset in dim:%2%") % x.getDim() % param->W.inDim()
                 << endl;
@@ -132,7 +132,7 @@ public:
     Executor * generate() override;
 
     string typeSignature() const override {
-        return Node::typeSignature() + "-" + addressToString(param);
+        return AtomicNode::typeSignature() + "-" + addressToString(param);
     }
 };
 
@@ -179,7 +179,7 @@ public:
 
         std::vector<dtype*> vals;
         vals.reserve(count);
-        for (Node *node : batch) {
+        for (AtomicNode *node : batch) {
             vals.push_back(node->val().value);
         }
 
@@ -295,7 +295,7 @@ public:
             }
         }
 
-        for (Node * n : batch) {
+        for (AtomicNode * n : batch) {
             LinearNode *ptr = static_cast<LinearNode *>(n);
             n3ldg_cuda::Assert(ptr->in->loss().verify("backward loss"));
         }
@@ -397,7 +397,7 @@ public:
         setDim(dim);
     }
 
-    bool isDimLegal(const Node &input) const override {
+    bool isDimLegal(const AtomicNode &input) const override {
         return input.getDim() == param_->outDim();
     }
 
@@ -422,7 +422,7 @@ public:
     Executor* generate() override;
 
     string typeSignature() const override {
-        return Node::typeSignature() + "-" + addressToString(param_) + "-" + to_string(offset_);
+        return AtomicNode::typeSignature() + "-" + addressToString(param_) + "-" + to_string(offset_);
     }
 
     int getOffset() const {
@@ -436,7 +436,7 @@ private:
 };
 
 namespace n3ldg_plus {
-    Node *linearWordVector(Graph &graph, int dim, Param &word_vectors, Node &input,
+    AtomicNode *linearWordVector(Graph &graph, int dim, Param &word_vectors, AtomicNode &input,
             int offset = 0) {
         if (dim + offset > word_vectors.inDim()) {
             cerr << boost::format("linearWordVector - dim:%1% offset%2% vocabulary_size:%3%") %
@@ -494,7 +494,7 @@ public:
 
         std::vector<dtype*> vals;
         vals.reserve(count);
-        for (Node *node : batch) {
+        for (AtomicNode *node : batch) {
             vals.push_back(node->val().value);
         }
 
@@ -591,7 +591,7 @@ public:
             }
         }
 
-        for (Node * n : batch) {
+        for (AtomicNode * n : batch) {
             LinearWordVectorNode *ptr = static_cast<LinearWordVectorNode *>(n);
             n3ldg_cuda::Assert(ptr->getInput()->loss().verify("backward loss"));
         }
@@ -734,7 +734,7 @@ public:
     }
 
 protected:
-    virtual bool isDimLegal(const Node &input) const override {
+    virtual bool isDimLegal(const AtomicNode &input) const override {
         return input.getDim() == getDim();
     }
 
@@ -749,7 +749,7 @@ public:
     void forward() override {
         dtype *bias = param()->val.value;
         vector<dtype*> inputs, vals;
-        for (Node *node : batch) {
+        for (AtomicNode *node : batch) {
             BiasNode *bias_node = static_cast<BiasNode *>(node);
             inputs.push_back(bias_node->getInput()->getVal().value);
             vals.push_back(bias_node->getVal().value);
@@ -764,7 +764,7 @@ public:
     void backward() override {
         dtype *bias = param()->grad.value;
         vector<dtype *> losses, in_losses;
-        for (Node *node : batch) {
+        for (AtomicNode *node : batch) {
             BiasNode *bias_node = static_cast<BiasNode *>(node);
             losses.push_back(bias_node->getLoss().value);
             in_losses.push_back(bias_node->getInput()->getLoss().value);
@@ -798,7 +798,7 @@ Executor *BiasNode::generate() {
 
 namespace n3ldg_plus {
 
-Node *linear(Graph &graph, UniParams &params, Node &input) {
+AtomicNode *linear(Graph &graph, UniParams &params, AtomicNode &input) {
     int dim = params.W.outDim();
     LinearNode *uni = LinearNode::newNode(dim);
     uni->setParam(params);
@@ -806,11 +806,11 @@ Node *linear(Graph &graph, UniParams &params, Node &input) {
     return uni;
 }
 
-Node *uni(Graph &graph, UniParams &params, Node &input, ActivatedEnum activated_type =
+AtomicNode *uni(Graph &graph, UniParams &params, AtomicNode &input, ActivatedEnum activated_type =
         ActivatedEnum::TANH) {
     int dim = params.W.outDim();
 
-    Node *uni = linear(graph, params, input);
+    AtomicNode *uni = linear(graph, params, input);
 
     UniInputNode *activated;
     if (activated_type == ActivatedEnum::TANH) {
@@ -829,7 +829,7 @@ Node *uni(Graph &graph, UniParams &params, Node &input, ActivatedEnum activated_
     return activated;
 }
 
-Node *bias(Graph &graph, BiasParam &param, Node &input) {
+AtomicNode *bias(Graph &graph, BiasParam &param, AtomicNode &input) {
     int dim = input.getDim();
     BiasNode *node = BiasNode::newNode(dim);
     node->setParam(param);

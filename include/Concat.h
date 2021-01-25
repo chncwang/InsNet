@@ -18,12 +18,12 @@
 #endif
 #include "profiler.h"
 
-class ConcatNode : public Node, public Poolable<ConcatNode> {
+class ConcatNode : public AtomicNode, public Poolable<ConcatNode> {
 public:
     vector<int> inDims;
-    vector<PNode> ins;
+    vector<AtomicNode *> ins;
 
-    ConcatNode() : Node("concat") {}
+    ConcatNode() : AtomicNode("concat") {}
 
     void initNode(int dim) override {
         init(dim);
@@ -36,10 +36,10 @@ public:
     void clear() override {
         inDims.clear();
         ins.clear();
-        Node::clear();
+        AtomicNode::clear();
     }
 
-    void forward(Graph &cg, const vector<PNode>& x) {
+    void forward(Graph &cg, const vector<AtomicNode *>& x) {
         if (x.size() == 0) {
             std::cerr << "empty inputs for concat" << std::endl;
             abort();
@@ -68,7 +68,7 @@ public:
     PExecutor generate() override;
 
     string typeSignature() const override {
-        string hash_code = Node::typeSignature() + "-" + to_string(inDims.size());
+        string hash_code = AtomicNode::typeSignature() + "-" + to_string(inDims.size());
         for (int dim : inDims) {
             hash_code += "-" + to_string(dim);
         }
@@ -109,9 +109,9 @@ public:
         std::vector<dtype*> in_vals, vals;
         in_vals.reserve(inCount * count);
         vals.reserve(count);
-        for (Node *node : batch) {
+        for (AtomicNode *node : batch) {
             ConcatNode *concat = static_cast<ConcatNode*>(node);
-            for (Node *in : concat->ins) {
+            for (AtomicNode *in : concat->ins) {
                 in_vals.push_back(in->val().value);
             }
             vals.push_back(node->getVal().value);
@@ -133,9 +133,9 @@ public:
         std::vector<dtype*> in_losses, losses;
         in_losses.reserve(inCount * count);
         losses.reserve(count);
-        for (Node *node : batch) {
+        for (AtomicNode *node : batch) {
             ConcatNode *concat = static_cast<ConcatNode*>(node);
-            for (Node *in : concat->ins) {
+            for (AtomicNode *in : concat->ins) {
                 in_losses.push_back(in->loss().value);
             }
             losses.push_back(node->loss().value);
@@ -182,9 +182,9 @@ PExecutor ConcatNode::generate() {
     return exec;
 }
 
-class ScalarConcatNode : public Node, public Poolable<ScalarConcatNode> {
+class ScalarConcatNode : public AtomicNode, public Poolable<ScalarConcatNode> {
 public:
-    ScalarConcatNode() : Node("scalar_concat") {}
+    ScalarConcatNode() : AtomicNode("scalar_concat") {}
 
     void setNodeDim(int dim) override {
         setDim(dim);
@@ -194,7 +194,7 @@ public:
         init(dim);
     }
 
-    void forward(Graph &graph, const vector<Node *> &ins) {
+    void forward(Graph &graph, const vector<AtomicNode *> &ins) {
         if (ins.size() != getDim()) {
             cerr << "ScalarConcatNode forward - ins size error" << endl;
             cerr << boost::format("ins size:%1% dim:%2%") % ins.size() % getDim() << endl;
@@ -202,7 +202,7 @@ public:
         }
 
         ins_ = ins;
-        for (Node *n : ins) {
+        for (AtomicNode *n : ins) {
             if (n->getDim() != 1) {
                 cerr << "ScalarConcatNode forward - non scalar found" << endl;
                 abort();
@@ -216,19 +216,19 @@ public:
 
     void compute() override {
         int i = 0;
-        for (Node *in : ins_) {
+        for (AtomicNode *in : ins_) {
             val()[i++] = in->getVal()[0];
         }
     }
 
     void backward() override {
         int i = 0;
-        for (Node *in : ins_) {
+        for (AtomicNode *in : ins_) {
             in->loss()[0] += getLoss()[i++];
         }
     }
 
-    const vector<Node *> ins() const {
+    const vector<AtomicNode *> ins() const {
         return ins_;
     }
 
@@ -237,7 +237,7 @@ public:
     }
 
 private:
-    vector<Node *> ins_;
+    vector<AtomicNode *> ins_;
 };
 
 #if USE_GPU
@@ -245,13 +245,13 @@ class ScalarConcatExecutor : public Executor {
 public:
     void forward() override {
         vector<dtype *> in_vals, vals;
-        for (Node *node : batch) {
+        for (AtomicNode *node : batch) {
             dims_.push_back(node->getDim());
         }
         max_dim_ = *max_element(dims_.begin(), dims_.end());
-        for (Node *node : batch) {
+        for (AtomicNode *node : batch) {
             ScalarConcatNode *concat = static_cast<ScalarConcatNode *>(node);
-            for (Node *in : concat->ins()) {
+            for (AtomicNode *in : concat->ins()) {
                 in_vals.push_back(in->getVal().value);
             }
             for (int i = 0; i < max_dim_ - concat->ins().size(); ++i) {
@@ -267,9 +267,9 @@ public:
 
     void backward() override {
         vector<dtype *> losses, in_losses;
-        for (Node *node : batch) {
+        for (AtomicNode *node : batch) {
             ScalarConcatNode *concat = static_cast<ScalarConcatNode *>(node);
-            for (Node *in : concat->ins()) {
+            for (AtomicNode *in : concat->ins()) {
                 in_losses.push_back(in->getLoss().value);
             }
             for (int i = 0; i < max_dim_ - concat->ins().size(); ++i) {
@@ -278,10 +278,10 @@ public:
             losses.push_back(node->getLoss().value);
         }
 #if TEST_CUDA
-        auto get_inputs = [](Node &node) {
+        auto get_inputs = [](AtomicNode &node) {
             ScalarConcatNode &concat = static_cast<ScalarConcatNode&>(node);
-            vector<pair<Node *, string>> results;
-            for (Node *n : concat.ins()) {
+            vector<pair<AtomicNode *, string>> results;
+            for (AtomicNode *n : concat.ins()) {
                 results.push_back(make_pair(n, "input"));
             }
             return results;
@@ -322,9 +322,9 @@ Executor *ScalarConcatNode::generate() {
 
 namespace n3ldg_plus {
 
-Node *concat(Graph &graph, vector<Node*> inputs) {
+AtomicNode *concat(Graph &graph, vector<AtomicNode*> inputs) {
     int dim = 0;
-    for (Node *in : inputs) {
+    for (AtomicNode *in : inputs) {
         dim += in->getDim();
     }
     ConcatNode *concat = ConcatNode::newNode(dim);
@@ -332,7 +332,7 @@ Node *concat(Graph &graph, vector<Node*> inputs) {
     return concat;
 }
 
-Node *scalarConcat(Graph &graph, vector<Node *> inputs) {
+AtomicNode *scalarConcat(Graph &graph, vector<AtomicNode *> inputs) {
     ScalarConcatNode *concat = ScalarConcatNode::newNode(inputs.size());
     concat->forward(graph, inputs);
     return concat;

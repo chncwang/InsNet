@@ -5,7 +5,7 @@
 #include "Metric.h"
 #include "Node.h"
 
-dtype softMaxLoss(PNode x, const vector<dtype> &answer, Metric& eval,
+dtype softMaxLoss(AtomicNode * x, const vector<dtype> &answer, Metric& eval,
     dtype batchsize) {
     int nDim = x->getDim();
     int labelsize = answer.size();
@@ -50,7 +50,7 @@ dtype softMaxLoss(PNode x, const vector<dtype> &answer, Metric& eval,
 
 }
 
-dtype softMaxLoss(Node &node, int answer, Metric &metric, int batchsize) {
+dtype softMaxLoss(AtomicNode &node, int answer, Metric &metric, int batchsize) {
     std::vector<dtype> fit_answer;
     for (int i = 0; i < node.getDim(); ++i) {
         fit_answer.push_back(i == answer);
@@ -59,7 +59,7 @@ dtype softMaxLoss(Node &node, int answer, Metric &metric, int batchsize) {
 }
 
 #if USE_GPU
-dtype softMaxLoss(const std::vector<PNode> &x, const std::vector<int> &answers,
+dtype softMaxLoss(const std::vector<AtomicNode *> &x, const std::vector<int> &answers,
         n3ldg_cuda::DeviceInt &correct,
         int batchsize = 1) {
     cerr << "unsupported operation" << endl;
@@ -67,7 +67,7 @@ dtype softMaxLoss(const std::vector<PNode> &x, const std::vector<int> &answers,
 }
 #endif
 
-dtype cost(PNode x, const vector<dtype> &answer, int batchsize = 1) {
+dtype cost(AtomicNode * x, const vector<dtype> &answer, int batchsize = 1) {
     int nDim = x->getDim();
     int labelsize = answer.size();
     if (labelsize != nDim) {

@@ -128,7 +128,7 @@ public:
     virtual Executor* generate() = 0;
     virtual string typeSignature() const = 0;
 
-    const string &getNodeType() const {
+    virtual const string &getNodeType() const {
         return node_type_;
     }
 
@@ -165,6 +165,8 @@ public:
 
     virtual bool isBatched() const = 0;
 
+    virtual NodeAbs &topologicalNode() = 0;
+
 private:
     string node_type_;
     int degree_ = 0;
@@ -172,7 +174,7 @@ private:
     std::vector<NodeAbs *> parents_;
 };
 
-class Node : public NodeAbs {
+class AtomicNode : public NodeAbs {
 public:
     virtual void compute() = 0;
     virtual void backward() = 0;
@@ -205,12 +207,13 @@ public:
 #if !USE_GPU || TEST_CUDA
         loss_.zero();
 #endif
+        batched_node_ = this;
         NodeAbs::clear();
     }
 
-    Node (const Node &) = delete;
+    AtomicNode (const AtomicNode &) = delete;
 
-    virtual ~Node() = default;
+    virtual ~AtomicNode() = default;
 
     int getColumn() const {
         return column_;
@@ -241,15 +244,19 @@ public:
         return false;
     }
 
+    virtual NodeAbs &topologicalNode() override {
+        return *batched_node_;
+    }
+
 protected:
-    void afterForward(NodeContainer &container, vector<Node*> &ins) {
-        for (Node *in : ins) {
+    void afterForward(NodeContainer &container, vector<AtomicNode*> &ins) {
+        for (AtomicNode *in : ins) {
             in->addParent(this);
         }
         container.addNode(this);
     }
 
-    Node(const string &node_type, int dim = 0) : NodeAbs(node_type), dim_(dim) {}
+    AtomicNode(const string &node_type, int dim = 0) : NodeAbs(node_type), dim_(dim) {}
 
     virtual void setDim(int dim) {
         dim_ = dim;
@@ -267,15 +274,70 @@ protected:
     }
 
 private:
-        Tensor1D val_;
-        Tensor1D loss_;
-        int dim_;
-        string node_name_;
-        int column_ = 1;
+    Tensor1D val_;
+    Tensor1D loss_;
+    int dim_;
+    string node_name_;
+    int column_ = 1;
+    NodeAbs *batched_node_;
 };
 
-set<pair<vector<Node *>, int> *>& globalPoolReferences() {
-    static set<pair<vector<Node *>, int> *> o;
+template<typename NodeType>
+class BatchedNode : public NodeAbs {
+public:
+    virtual string typeSignature() const {
+        return "Batched-" + batch_.front()->typeSignature();
+    }
+
+    bool isBatched() const {
+        return true;
+    }
+
+    NodeAbs &topologicalNode() {
+        return *this;
+    }
+
+    virtual void clear() override {
+        batch_.clear();
+        NodeAbs::clear();
+    }
+
+    BatchedNode() : NodeAbs("") {}
+
+    virtual const string &getNodeType() const override {
+        return batch_.front()->getNodeType();
+    }
+
+protected:
+    void allocateBatch(int dim, int size) {
+        if (!batch_.empty()) {
+            cerr << "batch not empty" << endl;
+            abort();
+        }
+        batch_ = NodeType::newNodeVector(dim, size);
+    }
+
+    void allocateBatch(const vector<int> &dims) {
+        if (!batch_.empty()) {
+            cerr << "batch not empty" << endl;
+            abort();
+        }
+
+        for (int dim : dims) {
+            batch_.push_back(NodeType::newNode(dim));
+        }
+    }
+
+    vector<NodeType *> &batch() {
+        return batch_;
+    }
+
+private:
+    vector<NodeType *> batch_;
+};
+
+set<pair<vector<AtomicNode *>, int> *>& globalPoolReferences() {
+    static set<pair<vector<AtomicNode *>, int> *> o;
     return o;
 }
 
@@ -300,6 +362,54 @@ int NextTwoIntegerPowerNumber(int number) {
 template <typename T>
 class Poolable {
 public:
+    static vector<T *> newNodeVector(int key, int size) {
+        vector<T *> results;
+        if (!globalPoolEnabled()) {
+            for (int i = 0; i < size; ++i) {
+                T *node = new T;
+                node->initNode(key);
+                results.push_back(node);
+            }
+            return results;
+        }
+
+        int original_key = key;
+        if (globalLimitedDimEnabled()) {
+            key = NextTwoIntegerPowerNumber(key);
+        }
+
+        auto it = pool_.find(key);
+        if (it == pool_.end()) {
+            pool_.insert(make_pair(key, make_pair(vector<AtomicNode *>(), 0)));
+            it = pool_.find(key);
+            globalPoolReferences().insert(&it->second);
+        }
+        auto &p = it->second;
+        vector<AtomicNode *> &v = p.first;
+        if (p.second > v.size()) {
+            abort();
+        } else if (v.size() < p.second + size) {
+            for (int i = 0; i < p.second + size - v.size(); ++i) {
+                T *node = new T;
+                node->initNode(key);
+                v.push_back(node);
+            }
+        }
+
+        vector<T *> nodes;
+        nodes.reserve(size);
+        for (int i = 0; i < size; ++i) {
+            T *node = dynamic_cast<T*>(v.at(v.size() - i));
+            node->setNodeDim(original_key);
+            static_cast<AtomicNode *>(node)->clear();
+            nodes.push_back(node);
+        }
+
+        p.second += size;
+
+        return nodes;
+    }
+
     static T *newNode(int key) {
         if (!globalPoolEnabled()) {
             T *node = new T;
@@ -312,12 +422,12 @@ public:
         }
         auto it = pool_.find(key);
         if (it == pool_.end()) {
-            pool_.insert(make_pair(key, make_pair(vector<Node *>(), 0)));
+            pool_.insert(make_pair(key, make_pair(vector<AtomicNode *>(), 0)));
             it = pool_.find(key);
             globalPoolReferences().insert(&it->second);
         }
         auto &p = it->second;
-        vector<Node *> &v = p.first;
+        vector<AtomicNode *> &v = p.first;
         T *node;
         if (p.second > v.size()) {
             abort();
@@ -328,10 +438,10 @@ public:
             v.push_back(node);
             ++p.second;
         } else {
-            node = static_cast<T*>(v.at(p.second));
+            node = dynamic_cast<T*>(v.at(p.second));
             node->setNodeDim(original_key);
             ++p.second;
-            Node *n = static_cast<Node *>(node);
+            AtomicNode *n = static_cast<AtomicNode *>(node);
             n->clear();
         }
         return node;
@@ -341,13 +451,13 @@ public:
     virtual void setNodeDim(int dim) = 0;
 
 private:
-    static map<int, pair<vector<Node *>, int>> pool_;
+    static map<int, pair<vector<AtomicNode *>, int>> pool_;
 };
 
 template<typename T>
-map<int, pair<vector<Node *>, int>> Poolable<T>::pool_;
+map<int, pair<vector<AtomicNode *>, int>> Poolable<T>::pool_;
 
-void validateEqualNodeDims(const vector<Node *> &nodes) {
+void validateEqualNodeDims(const vector<AtomicNode *> &nodes) {
     for (int i = 1; i < nodes.size(); ++i) {
         if (nodes.at(i)->getDim() != nodes.front()->getDim()) {
             cerr << boost::format(
@@ -358,102 +468,80 @@ void validateEqualNodeDims(const vector<Node *> &nodes) {
     }
 }
 
-auto cpu_get_node_val = [](Node *node) {
+auto cpu_get_node_val = [](AtomicNode *node) {
     return node->val().v;
 };
 
-auto cpu_get_node_loss = [](Node *node) {
+auto cpu_get_node_loss = [](AtomicNode *node) {
     return node->loss().v;
 };
 
 #if USE_GPU
 
-auto gpu_get_node_val = [](Node *node) {
+auto gpu_get_node_val = [](AtomicNode *node) {
     return node->val().value;
 };
 
-auto gpu_get_node_loss = [](Node *node) {
+auto gpu_get_node_loss = [](AtomicNode *node) {
     return node->loss().value;
 };
 
 #endif
 
-typedef Node* PNode;
-
-class UniInputNode : public Node {
+class UniInputNode : public AtomicNode {
 public:
-    UniInputNode(const string &node_type) : Node(node_type) {}
+    UniInputNode(const string &node_type) : AtomicNode(node_type) {}
 
     virtual string typeSignature() const override {
-        return Node::typeSignature() + "-" + to_string(input_->getDim()) + "-";
+        return AtomicNode::typeSignature() + "-" + to_string(input_->getDim()) + "-";
     }
 
-    void forward(NodeContainer &container, Node &input) {
+    void forward(NodeContainer &container, AtomicNode &input) {
         if (!isDimLegal(input)) {
-            cerr << boost::format("dim:%1% input dim:%2%") % Node::getDim() % input.getDim() <<
+            cerr << boost::format("dim:%1% input dim:%2%") % AtomicNode::getDim() % input.getDim() <<
                 endl;
             abort();
         }
         input_ = &input;
-        vector<Node*> ins = {input_};
-        Node::afterForward(container, ins);
+        vector<AtomicNode*> ins = {input_};
+        AtomicNode::afterForward(container, ins);
     }
 
-    Node *getInput() const {
+    AtomicNode *getInput() const {
         return input_;
     }
 
 protected:
-    virtual bool isDimLegal(const Node &input) const = 0;
+    virtual bool isDimLegal(const AtomicNode &input) const = 0;
 
 private:
-    Node *input_;
+    AtomicNode *input_;
     friend class UniInputExecutor;
 };
 
 template<typename T>
-std::vector<Node*> toNodePointers(const std::vector<T *> &vec) {
-    std::vector<Node *> results;
+std::vector<AtomicNode*> toNodePointers(const std::vector<T *> &vec) {
+    std::vector<AtomicNode *> results;
     for (T *p : vec) {
         results.push_back(p);
     }
     return results;
 }
 
-/* *
- * return tuple<exp, pair<max_i, max>, sum>
- * */
-std::tuple<std::unique_ptr<n3ldg_cpu::Tensor1D>, std::pair<int, dtype>, dtype> toExp(const Node &node) {
-    dtype max = node.getVal().v[0];
-    int max_j = 0;
-    for (int j = 1; j < node.getDim(); ++j) {
-        if (node.getVal().v[j] > max) {
-            max = node.getVal().v[j];
-            max_j = j;
-        }
-    }
-
-    std::unique_ptr<n3ldg_cpu::Tensor1D> exp(new n3ldg_cpu::Tensor1D);
-    exp->init(node.getDim());
-    exp->vec() = (node.getVal().vec() - max).exp();
-    dtype sum = static_cast<Eigen::Tensor<dtype, 0>>(exp->vec().sum())(0);
-    return std::make_tuple(std::move(exp), std::make_pair(max_j, max), sum);
-}
-
 #if USE_GPU
-void clearNodes(std::vector<Node*> &nodes) {
+void clearNodes(std::vector<AtomicNode*> &nodes) {
     n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
     profiler.BeginEvent("clearNodes");
     std::vector<dtype*> val_and_losses;
     vector<int> dims;
     val_and_losses.reserve(2 * nodes.size());
-    for (Node *n : nodes) {
+    for (AtomicNode *n : nodes) {
         val_and_losses.push_back(n->getLoss().value);
         dims.push_back(n->getDim());
     }
     n3ldg_cuda::BatchMemset(val_and_losses, val_and_losses.size(), dims, 0.0f);
 #if TEST_CUDA
-    for (Node *node : nodes) {
+    for (AtomicNode *node : nodes) {
         node->loss().verify("clearNodes");
     }
 #endif
@@ -463,14 +551,14 @@ void clearNodes(std::vector<Node*> &nodes) {
 
 class Executor {
 public:
-    std::vector<Node *> batch;
+    std::vector<AtomicNode *> batch;
     virtual ~Executor() = default;
 
 #if USE_GPU
     vector<dtype *> getVals() {
         vector<dtype *> vals;
         for (NodeAbs *node : batch) {
-            Node *x = dynamic_cast<Node *>(node);
+            AtomicNode *x = dynamic_cast<AtomicNode *>(node);
             vals.push_back(x->getVal().value);
         }
         return vals;
@@ -479,7 +567,7 @@ public:
     vector<dtype *> getGrads() {
         vector<dtype *> grads;
         for (NodeAbs *node : batch) {
-            Node *x = dynamic_cast<Node *>(node);
+            AtomicNode *x = dynamic_cast<AtomicNode *>(node);
             grads.push_back(x->getLoss().value);
         }
         return grads;
@@ -489,7 +577,7 @@ public:
 
     virtual int calculateActivations() {
         int sum = 0;
-        for (Node *node : batch) {
+        for (AtomicNode *node : batch) {
             sum += node->getDim();
         }
         return sum;
@@ -497,7 +585,7 @@ public:
 #endif
 
     int getDim() const {
-        return dynamic_cast<Node *>(batch.back())->getDim();
+        return dynamic_cast<AtomicNode *>(batch.back())->getDim();
     }
 
     string getNodeType() const {
@@ -532,7 +620,7 @@ public:
 
     virtual void backward() {
         for (NodeAbs *node : batch) {
-            Node *x = dynamic_cast<Node *>(node);
+            AtomicNode *x = dynamic_cast<AtomicNode *>(node);
             x->backward();
         }
     }
@@ -540,7 +628,7 @@ public:
 protected:
     virtual void forward() {
         for (NodeAbs *node : batch) {
-            Node *x = dynamic_cast<Node *>(node);
+            AtomicNode *x = dynamic_cast<AtomicNode *>(node);
             x->compute();
         }
     }
@@ -548,7 +636,7 @@ protected:
     int defaultFLOPs() {
         int sum = 0;
         for (NodeAbs *node : batch) {
-            Node *x = dynamic_cast<Node *>(node);
+            AtomicNode *x = dynamic_cast<AtomicNode *>(node);
             sum += x->getDim();
         }
         return sum;
@@ -613,9 +701,9 @@ protected:
 #endif
 };
 
-auto get_inputs = [](Node &node) {
+auto get_inputs = [](AtomicNode &node) {
     UniInputNode &uni_input = static_cast<UniInputNode&>(node);
-    vector<Node*> inputs = {uni_input.getInput()};
+    vector<AtomicNode*> inputs = {uni_input.getInput()};
     return inputs;
 };
 

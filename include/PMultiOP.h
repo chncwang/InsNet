@@ -14,11 +14,11 @@
 #include "Node.h"
 #include "Graph.h"
 
-class PMultiNode : public Node, public Poolable<PMultiNode> {
+class PMultiNode : public AtomicNode, public Poolable<PMultiNode> {
 public:
-    Node *in1, *in2;
+    AtomicNode *in1, *in2;
 
-    PMultiNode() : Node("point-multiply") {
+    PMultiNode() : AtomicNode("point-multiply") {
         in1 = nullptr;
         in2 = nullptr;
     }
@@ -31,11 +31,11 @@ public:
         init(dim);
     }
 
-    void forward(Graph &graph, Node &input1, Node &input2) {
+    void forward(Graph &graph, AtomicNode &input1, AtomicNode &input2) {
         this->forward(&graph, &input1, &input2);
     }
 
-    void forward(Graph *cg, Node * x1, Node * x2) {
+    void forward(Graph *cg, AtomicNode * x1, AtomicNode * x2) {
         in1 = x1;
         in2 = x2;
         x1->addParent(this);
@@ -74,7 +74,7 @@ public:
 #if USE_GPU
     void  forward() {
         int count = batch.size();
-        for (Node *n : batch) {
+        for (AtomicNode *n : batch) {
             PMultiNode *pmulti = static_cast<PMultiNode*>(n);
             in_vals1.push_back(pmulti->in1->val().value);
             in_vals2.push_back(pmulti->in2->val().value);
@@ -97,7 +97,7 @@ public:
         vals2.reserve(count);
         losses1.reserve(count);
         losses2.reserve(count);
-        for (Node *n : batch) {
+        for (AtomicNode *n : batch) {
             PMultiNode *pmulti = static_cast<PMultiNode*>(n);
             losses.push_back(pmulti->loss().value);
             vals1.push_back(pmulti->in1->val().value);
@@ -110,7 +110,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward();
         }
-        for (Node *n : batch) {
+        for (AtomicNode *n : batch) {
             PMultiNode *pmulti = static_cast<PMultiNode*>(n);
             n3ldg_cuda::Assert(pmulti->in1->loss().verify(
                         "PMultiExecutor backward in1 loss"));
@@ -131,7 +131,7 @@ Executor * PMultiNode::generate() {
 
 namespace n3ldg_plus {
 
-Node *pointwiseMultiply(Graph &graph, Node &a, Node &b) {
+AtomicNode *pointwiseMultiply(Graph &graph, AtomicNode &a, AtomicNode &b) {
     if (a.getDim() != b.getDim()) {
         cerr << boost::format("a dim:%1% b dim:%2%") % a.getDim() % b.getDim() << endl;
         abort();

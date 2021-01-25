@@ -23,7 +23,7 @@
 
 namespace n3ldg_plus {
 
-Node* attention(Graph &graph, vector<Node *>& inputs, vector<Node *>& scores) {
+AtomicNode* attention(Graph &graph, vector<AtomicNode *>& inputs, vector<AtomicNode *>& scores) {
     using namespace n3ldg_plus;
 
     if (inputs.empty() || inputs.size() != scores.size()) {
@@ -41,20 +41,20 @@ Node* attention(Graph &graph, vector<Node *>& inputs, vector<Node *>& scores) {
         }
     }
 
-    for (Node *score : scores) {
+    for (AtomicNode *score : scores) {
         if (score->getDim() != 1) {
             cerr << "score dim:" << score->getDim() << endl;
             abort();
         }
     }
 
-    Node *concated = scalarConcat(graph, scores);
+    AtomicNode *concated = scalarConcat(graph, scores);
 
-    Node *softmax = n3ldg_plus::softmax(graph, *concated, 1);
+    AtomicNode *softmax = n3ldg_plus::softmax(graph, *concated, 1);
 
-    vector<Node*> splitted_vector;
+    vector<AtomicNode*> splitted_vector;
     for (int i = 0; i < scores.size(); ++i) {
-        Node * split = n3ldg_plus::split(graph, 1, *softmax, i);
+        AtomicNode * split = n3ldg_plus::split(graph, 1, *softmax, i);
         splitted_vector.push_back(scalarToVector(graph, input_dim, *split));
     }
 
@@ -63,13 +63,13 @@ Node* attention(Graph &graph, vector<Node *>& inputs, vector<Node *>& scores) {
         abort();
     }
 
-    vector<Node*> multiplied_nodes;
+    vector<AtomicNode*> multiplied_nodes;
     for (int i = 0; i < inputs.size(); ++i) {
-        Node *node = pointwiseMultiply(graph, *inputs.at(i), *splitted_vector.at(i));
+        AtomicNode *node = pointwiseMultiply(graph, *inputs.at(i), *splitted_vector.at(i));
         multiplied_nodes.push_back(node);
     }
 
-    Node *result = n3ldg_plus::sumPool(graph, multiplied_nodes);
+    AtomicNode *result = n3ldg_plus::sumPool(graph, multiplied_nodes);
 
     return result;
 }

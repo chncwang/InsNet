@@ -65,33 +65,33 @@ private:
     BiasParam b_;
 };
 
-Node *layerNormalization(Graph &graph, LayerNormalizationParams &params,
-        Node &input_layer) {
+AtomicNode *layerNormalization(Graph &graph, LayerNormalizationParams &params,
+        AtomicNode &input_layer) {
     using namespace n3ldg_plus;
-    Node *sum = vectorSum(graph, input_layer, 1);
-    Node *avg = scaled(graph, *sum, 1.0 / input_layer.getDim());
-    Node *avg_vector = scalarToVector(graph, input_layer.getDim(), *avg);
-    Node *zeros_around = sub(graph, input_layer, *avg_vector);
-    Node *square = pointwiseMultiply(graph, *zeros_around, *zeros_around);
-    Node *square_sum = vectorSum(graph, *square, 1);
-    Node *eps = bucket(graph, 1, 1e-6);
+    AtomicNode *sum = vectorSum(graph, input_layer, 1);
+    AtomicNode *avg = scaled(graph, *sum, 1.0 / input_layer.getDim());
+    AtomicNode *avg_vector = scalarToVector(graph, input_layer.getDim(), *avg);
+    AtomicNode *zeros_around = sub(graph, input_layer, *avg_vector);
+    AtomicNode *square = pointwiseMultiply(graph, *zeros_around, *zeros_around);
+    AtomicNode *square_sum = vectorSum(graph, *square, 1);
+    AtomicNode *eps = bucket(graph, 1, 1e-6);
     square_sum = add(graph, {square_sum, eps});
-    Node *var = scaled(graph, *square_sum, 1.0 / input_layer.getDim());
-    Node *standard_deviation = sqrt(graph, *var);
+    AtomicNode *var = scaled(graph, *square_sum, 1.0 / input_layer.getDim());
+    AtomicNode *standard_deviation = sqrt(graph, *var);
     standard_deviation = scalarToVector(graph, input_layer.getDim(), *standard_deviation);
-    Node *g = embedding(graph, params.g(), 0, true);
-    Node *factor = fullDiv(graph, *g, *standard_deviation);
+    AtomicNode *g = embedding(graph, params.g(), 0, true);
+    AtomicNode *factor = fullDiv(graph, *g, *standard_deviation);
 
-    Node *scaled = pointwiseMultiply(graph, *factor, *zeros_around);
-    Node *biased = bias(graph, params.b(), *scaled);
+    AtomicNode *scaled = pointwiseMultiply(graph, *factor, *zeros_around);
+    AtomicNode *biased = bias(graph, params.b(), *scaled);
     return biased;
 }
 
-vector<Node *> layerNormalization(Graph &graph, LayerNormalizationParams &params,
-        const vector<Node *> &input_layer) {
-    vector<Node *> results;
+vector<AtomicNode *> layerNormalization(Graph &graph, LayerNormalizationParams &params,
+        const vector<AtomicNode *> &input_layer) {
+    vector<AtomicNode *> results;
     results.reserve(input_layer.size());
-    for (Node *x : input_layer) {
+    for (AtomicNode *x : input_layer) {
         results.push_back(layerNormalization(graph, params, *x));
     }
     return results;

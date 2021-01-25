@@ -6,9 +6,9 @@
 #include "Node.h"
 #include "Graph.h"
 
-class FullDivNode : public Node, public Poolable<FullDivNode>  {
+class FullDivNode : public AtomicNode, public Poolable<FullDivNode>  {
 public:
-    FullDivNode() : Node("full_div") {}
+    FullDivNode() : AtomicNode("full_div") {}
 
     void initNode(int dim) override {
         init(dim);
@@ -22,7 +22,7 @@ public:
         return getNodeType();
     }
 
-    void forward(Graph &graph, Node &numerator, Node &denominator) {
+    void forward(Graph &graph, AtomicNode &numerator, AtomicNode &denominator) {
         if (getDim() != numerator.getDim() || getDim() != denominator.getDim()) {
             cerr << boost::format("dim:%1% minuend:%2% subtrahend:%3%") % getDim() %
                 numerator.getDim() % denominator.getDim() << endl;
@@ -30,7 +30,7 @@ public:
         }
         numerator_ = &numerator;
         denominator_ = &denominator;
-        vector<Node*> ins = {numerator_, denominator_};
+        vector<AtomicNode*> ins = {numerator_, denominator_};
         afterForward(graph, ins);
     }
 
@@ -47,8 +47,8 @@ public:
     PExecutor generate() override;
 
 private:
-    Node *numerator_;
-    Node *denominator_;
+    AtomicNode *numerator_;
+    AtomicNode *denominator_;
     friend class FullDivExecutor;
 };
 
@@ -61,7 +61,7 @@ public:
 
     void forward() override {
         vector<dtype*> results;
-        for (Node *node : batch) {
+        for (AtomicNode *node : batch) {
             FullDivNode *div = static_cast<FullDivNode*>(node);
             numerators.push_back(div->numerator_->getVal().value);
             denominators.push_back(div->denominator_->getVal().value);
@@ -79,7 +79,7 @@ public:
     void backward() override {
         vector<dtype*> losses;
         vector<dtype*> numerator_losses, denominator_losses;
-        for (Node *node : batch) {
+        for (AtomicNode *node : batch) {
             FullDivNode *div = static_cast<FullDivNode*>(node);
             losses.push_back(node->getLoss().value);
             numerator_losses.push_back(div->numerator_->getLoss().value);
@@ -89,9 +89,9 @@ public:
         n3ldg_cuda::FullDivBackward(losses, denominators, numerators, batch.size(), dims,
                 numerator_losses, denominator_losses);
 #if TEST_CUDA
-        auto get_inputs = [](Node &node) {
+        auto get_inputs = [](AtomicNode &node) {
             FullDivNode &div = static_cast<FullDivNode&>(node);
-            vector<pair<Node*, string>> results = {make_pair(div.denominator_, "denominator"),
+            vector<pair<AtomicNode*, string>> results = {make_pair(div.denominator_, "denominator"),
                     make_pair(div.numerator_, "numerator")};
             return results;
         };
@@ -115,7 +115,7 @@ Executor *FullDivNode::generate() {
 }
 
 namespace n3ldg_plus {
-    Node *fullDiv(Graph &graph, Node &numerator, Node &denominator) {
+    AtomicNode *fullDiv(Graph &graph, AtomicNode &numerator, AtomicNode &denominator) {
         FullDivNode *result = FullDivNode::newNode(numerator.getDim());
         result->forward(graph, numerator, denominator);
         return result;

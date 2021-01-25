@@ -18,9 +18,9 @@
 using namespace Eigen;
 using std::vector;
 
-class BucketNode : public Node, public Poolable<BucketNode> {
+class BucketNode : public AtomicNode, public Poolable<BucketNode> {
 public:
-    BucketNode() : Node("bucket") {}
+    BucketNode() : AtomicNode("bucket") {}
 
     void initNode(int dim) override {
         init(dim);
@@ -29,14 +29,6 @@ public:
     void setNodeDim(int dim) override {
         setDim(dim);
     }
-
-//    virtual void init(int ndim) override {
-//#if USE_GPU
-//        Node::initOnHostAndDevice(ndim);
-//#else
-//        Node::init(ndim);
-//#endif
-//    }
 
     void forward(Graph &graph, const vector<dtype> &input) {
         if (input.size() != getDim()) {
@@ -79,13 +71,13 @@ private:
 
 namespace n3ldg_plus {
 
-Node *bucket(Graph &graph, int dim, float v) {
+AtomicNode *bucket(Graph &graph, int dim, float v) {
     BucketNode *bucket = BucketNode::newNode(dim);
     bucket->forward(graph, v);
     return bucket;
 }
 
-Node *bucket(Graph &graph, const vector<float> &v) {
+AtomicNode *bucket(Graph &graph, const vector<float> &v) {
     BucketNode *bucket = BucketNode::newNode(v.size());
     bucket->forward(graph, v);
     return bucket;
@@ -107,7 +99,7 @@ public:
         vector<dtype*> ys;
         vector<dtype> cpu_x;
         cpu_x.reserve(getDim() * count);
-        for (Node *node : batch) {
+        for (AtomicNode *node : batch) {
             BucketNode *bucket = static_cast<BucketNode*>(node);
             ys.push_back(bucket->val().value);
             for (int i = 0; i < getDim(); ++i) {
@@ -116,7 +108,7 @@ public:
         }
         n3ldg_cuda::BucketForward(cpu_x, count, getDim(), ys);
 #if TEST_CUDA
-        for (Node *node : batch) {
+        for (AtomicNode *node : batch) {
             BucketNode *bucket = static_cast<BucketNode*>(node);
             dtype *v = node->val().v;
             for (int i = 0; i < getDim(); ++i) {
@@ -126,7 +118,7 @@ public:
         }
 #endif
 #else
-        for (Node *node : batch) {
+        for (AtomicNode *node : batch) {
             BucketNode *bucket = static_cast<BucketNode*>(node);
             node->val() = bucket->input_;
         }

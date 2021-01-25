@@ -13,7 +13,7 @@
 
 using namespace Eigen;
 
-int GetDegree(std::map<void*, int> &degree_map, PNode p) {
+int GetDegree(std::map<void*, int> &degree_map, NodeAbs *p) {
     auto it = degree_map.find(p);
     if (it == degree_map.end()) {
         degree_map.insert(std::pair<void*, int>(p, p->getDegree()));
@@ -23,7 +23,7 @@ int GetDegree(std::map<void*, int> &degree_map, PNode p) {
     }
 }
 
-void DecreaseDegree(std::map<void*, int> &degree_map, PNode p) {
+void DecreaseDegree(std::map<void*, int> &degree_map, NodeAbs *p) {
     auto it = degree_map.find(p);
     if (it == degree_map.end()) {
         degree_map.insert(std::pair<void*, int>(p, p->getDegree() - 1));
@@ -156,7 +156,7 @@ public:
             } else {
                 cur_exec->batch.clear();
                 for (NodeAbs *node : shallow_nodes) {
-                    cur_exec->batch.push_back(dynamic_cast<Node *>(node));
+                    cur_exec->batch.push_back(dynamic_cast<AtomicNode *>(node));
                 }
             }
             free_nodes.erase(min_hash);
@@ -171,7 +171,7 @@ public:
             profiler.BeginEvent("computation forward");
             cur_exec->forwardFully();
             if (eager_) {
-                for (Node *node : cur_exec->batch) {
+                for (AtomicNode *node : cur_exec->batch) {
                     node->getVal().checkIsNumber();
                 }
             }
@@ -197,7 +197,7 @@ public:
             execs.push_back(cur_exec);
 
             int depth_sum = 0;
-            for (Node* free_node : cur_exec->batch) {
+            for (AtomicNode* free_node : cur_exec->batch) {
                 finish_nodes.push_back(free_node);
                 depth_sum += free_node->getDepth();
                 for (auto parent_it : free_node->getParents()) {
