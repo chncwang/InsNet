@@ -6,9 +6,9 @@
 #include "Node.h"
 #include "Graph.h"
 
-class SubNode : public AtomicNode, public Poolable<SubNode> {
+class SubNode : public Node, public Poolable<SubNode> {
 public:
-    SubNode() : AtomicNode("sub") {}
+    SubNode() : Node("sub") {}
 
     void initNode(int dim) override {
         init(dim);
@@ -22,7 +22,7 @@ public:
         return getNodeType();
     }
 
-    void forward(Graph &graph, AtomicNode &minuend, AtomicNode &subtrahend) {
+    void forward(Graph &graph, Node &minuend, Node &subtrahend) {
         if (getDim() != minuend.getDim() || getDim() != subtrahend.getDim()) {
             cerr << boost::format("dim:%1% minuend:%2% subtrahend:%3%") % getDim() %
                 minuend.getDim() % subtrahend.getDim() << endl;
@@ -30,7 +30,7 @@ public:
         }
         minuend_ = &minuend;
         subtrahend_ = &subtrahend;
-        vector<AtomicNode*> ins = {minuend_, subtrahend_};
+        vector<Node*> ins = {minuend_, subtrahend_};
         afterForward(graph, ins);
     }
 
@@ -45,15 +45,15 @@ public:
 
     PExecutor generate() override;
 private:
-    AtomicNode *minuend_;
-    AtomicNode *subtrahend_;
+    Node *minuend_;
+    Node *subtrahend_;
 
     friend class SubExecutor;
 };
 
 namespace n3ldg_plus {
 
-AtomicNode *sub(Graph &graph, AtomicNode &minuend, AtomicNode &subtrahend) {
+Node *sub(Graph &graph, Node &minuend, Node &subtrahend) {
     SubNode *result = SubNode::newNode(minuend.getDim());
     result->forward(graph, minuend, subtrahend);
     return result;
@@ -67,7 +67,7 @@ class SubExecutor : public Executor {
         vector<dtype*> minuend, subtrahend;
         vector<dtype*> results;
 
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             SubNode *sub = static_cast<SubNode*>(node);
             minuend.push_back(sub->minuend_->getVal().value);
             subtrahend.push_back(sub->subtrahend_->getVal().value);
@@ -85,16 +85,16 @@ class SubExecutor : public Executor {
     void backward() override {
         std::vector<dtype*> losses;
         std::vector<dtype*> minuend_losses, subtrahend_losses;
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             SubNode *sub = static_cast<SubNode*>(n);
             losses.push_back(sub->loss().value);
             minuend_losses.push_back(sub->minuend_->loss().value);
             subtrahend_losses.push_back(sub->subtrahend_->loss().value);
         }
 #if TEST_CUDA
-        auto get_inputs = [](AtomicNode &node) {
+        auto get_inputs = [](Node &node) {
             SubNode &sub = static_cast<SubNode&>(node);
-            vector<pair<AtomicNode*, string>> inputs = {make_pair(sub.minuend_, "minuend"),
+            vector<pair<Node*, string>> inputs = {make_pair(sub.minuend_, "minuend"),
                 make_pair(sub.subtrahend_, "subtrahend")};
             return inputs;
         };

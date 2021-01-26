@@ -17,31 +17,31 @@
 #endif
 #include "profiler.h"
 
-class PoolNode : public AtomicNode {
+class PoolNode : public Node {
   public:
     vector<int> masks;
-    vector<AtomicNode *> ins;
+    vector<Node *> ins;
 
-    PoolNode(const string &node_type) : AtomicNode(node_type) {}
+    PoolNode(const string &node_type) : Node(node_type) {}
 
     void clear() override {
         ins.clear();
-        AtomicNode::clear();
+        Node::clear();
     }
 
     void init(int ndim) override {
-        AtomicNode::init(ndim);
+        Node::init(ndim);
         masks.resize(ndim);
         for(int idx = 0; idx < ndim; idx++) {
             masks[idx] = -1;
         }
     }
 
-    void forward(Graph &graph, vector<AtomicNode *> &x) {
+    void forward(Graph &graph, vector<Node *> &x) {
         forward(&graph, x);
     }
 
-    void forward(Graph *cg, vector<AtomicNode *>& x) {
+    void forward(Graph *cg, vector<Node *>& x) {
         if (x.size() == 0) {
             std::cerr << "empty inputs for max|min|sum|avg pooling" << std::endl;
             abort();
@@ -175,7 +175,7 @@ class MinPoolNode : public PoolNode, public Poolable<MinPoolNode>
 {
 public:
 #if !TEST_CUDA
-    vector<AtomicNode *> ins;
+    vector<Node *> ins;
 #endif
     MinPoolNode() : PoolNode("min-pooling") {}
 
@@ -224,11 +224,11 @@ public:
         abort();
     }
 #endif
-    void forward(Graph &cg, const vector<AtomicNode *>& x) {
+    void forward(Graph &cg, const vector<Node *>& x) {
         forward(&cg, x);
     }
 
-    void forward(Graph *cg, const vector<AtomicNode *>& x) {
+    void forward(Graph *cg, const vector<Node *>& x) {
         assert(!x.empty());
         int nSize = x.size();
         for (int i = 0; i < nSize; i++) {
@@ -286,7 +286,7 @@ public:
         int count = batch.size();
         hit_inputs.init(count * dim);
         in_counts.reserve(count);
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             MaxPoolNode *m = static_cast<MaxPoolNode*>(n);
             in_counts.push_back(m->ins.size());
         }
@@ -295,10 +295,10 @@ public:
         in_vals.reserve(count * max_in_count);
         std::vector<dtype*> vals;
         vals.reserve(count);
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             MaxPoolNode *m = static_cast<MaxPoolNode*>(n);
             vals.push_back(m->val().value);
-            for (AtomicNode *in : m->ins) {
+            for (Node *in : m->ins) {
                 in_vals.push_back(in->val().value);
             }
             for (int i = 0; i < max_in_count - m->ins.size(); ++i) {
@@ -327,10 +327,10 @@ public:
         in_losses.reserve(count * max_in_count);
         std::vector<dtype*> losses;
         losses.reserve(count);
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             MaxPoolNode *m = static_cast<MaxPoolNode*>(n);
             losses.push_back(m->loss().value);
-            for (AtomicNode *in : m->ins) {
+            for (Node *in : m->ins) {
                 in_losses.push_back(in->loss().value);
             }
             for (int i = 0; i < max_in_count - m->ins.size(); ++i) {
@@ -347,7 +347,7 @@ public:
         }
 
         for (int idx = 0; idx < count; idx++) {
-            for (AtomicNode *n : static_cast<MaxPoolNode*>(batch[idx])->ins) {
+            for (Node *n : static_cast<MaxPoolNode*>(batch[idx])->ins) {
                 n3ldg_cuda::Assert(n->loss().verify("max pooling backward"));
             }
         }
@@ -376,7 +376,7 @@ public:
         int count = batch.size();
         hit_inputs.init(count * dim);
         in_counts.reserve(count);
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             MinPoolNode *m = static_cast<MinPoolNode*>(n);
             in_counts.push_back(m->ins.size());
         }
@@ -385,10 +385,10 @@ public:
         in_vals.reserve(count * max_in_count);
         std::vector<dtype*> vals;
         vals.reserve(count);
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             MaxPoolNode *m = static_cast<MaxPoolNode*>(n);
             vals.push_back(m->val().value);
-            for (AtomicNode *in : m->ins) {
+            for (Node *in : m->ins) {
                 in_vals.push_back(in->val().value);
             }
             for (int i = 0; i < max_in_count - m->ins.size(); ++i) {
@@ -416,10 +416,10 @@ public:
         in_losses.reserve(count * max_in_count);
         std::vector<dtype*> losses;
         losses.reserve(count);
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             MaxPoolNode *m = static_cast<MaxPoolNode*>(n);
             losses.push_back(m->loss().value);
-            for (AtomicNode *in : m->ins) {
+            for (Node *in : m->ins) {
                 in_losses.push_back(in->loss().value);
             }
             for (int i = 0; i < max_in_count - m->ins.size(); ++i) {
@@ -436,7 +436,7 @@ public:
         }
 
         for (int idx = 0; idx < count; idx++) {
-            for (AtomicNode *n : static_cast<MaxPoolNode*>(batch[idx])->ins) {
+            for (Node *n : static_cast<MaxPoolNode*>(batch[idx])->ins) {
                 n3ldg_cuda::Assert(n->loss().verify("max pooling backward"));
             }
         }
@@ -470,16 +470,16 @@ PExecutor PoolNode::generate() {
 
 
 
-class SumPoolNode : public AtomicNode, public Poolable<SumPoolNode> {
+class SumPoolNode : public Node, public Poolable<SumPoolNode> {
 public:
-    vector<AtomicNode *> ins;
+    vector<Node *> ins;
 
     void clear() override {
         ins.clear();
-        AtomicNode::clear();
+        Node::clear();
     }
 
-    SumPoolNode() : AtomicNode("sum-pool") {}
+    SumPoolNode() : Node("sum-pool") {}
 
     void initNode(int dim) override {
         init(dim);
@@ -489,7 +489,7 @@ public:
         setDim(dim);
     }
 
-    void forward(Graph &cg, const vector<AtomicNode *>& x) {
+    void forward(Graph &cg, const vector<Node *>& x) {
         if (x.size() == 0) {
             std::cerr << "empty inputs for add" << std::endl;
             abort();
@@ -545,14 +545,14 @@ public:
     void  forward() {
         int count = batch.size();
         in_counts.reserve(count);
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             SumPoolNode *sum = static_cast<SumPoolNode*>(n);
             in_counts.push_back(sum->ins.size());
         }
 
         max_in_count = *std::max_element(in_counts.begin(), in_counts.end());
 
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             SumPoolNode *sum = static_cast<SumPoolNode*>(n);
             in_counts.push_back(sum->ins.size());
         }
@@ -561,7 +561,7 @@ public:
         in_vals.reserve(count * max_in_count);
         vals.reserve(count);
 
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             SumPoolNode *sum = static_cast<SumPoolNode*>(n);
             vals.push_back(sum->val().value);
             for (int i = 0; i < sum->ins.size(); ++i) {
@@ -579,7 +579,7 @@ public:
             batch[idx]->compute();
         }
 
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             n3ldg_cuda::Assert(n->val().verify("sum pool forward"));
         }
 #endif
@@ -591,10 +591,10 @@ public:
         losses.reserve(count);
         std::vector<dtype*> in_losses;
         in_losses.reserve(max_in_count * count);
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             SumPoolNode *sum = static_cast<SumPoolNode*>(n);
             losses.push_back(n->loss().value);
-            for (AtomicNode *in : sum->ins) {
+            for (Node *in : sum->ins) {
                 in_losses.push_back(in->loss().value);
             }
             for (int i = 0; i < max_in_count - sum->ins.size(); ++i) {
@@ -604,12 +604,12 @@ public:
         n3ldg_cuda::SumPoolBackward(n3ldg_cuda::PoolingEnum::SUM, losses,
                 in_counts, count, dim, in_losses);
 #if TEST_CUDA
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             n->backward();
         }
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             SumPoolNode *sum = static_cast<SumPoolNode*>(n);
-            for (AtomicNode *in : sum->ins) {
+            for (Node *in : sum->ins) {
                 n3ldg_cuda::Assert(in->loss().verify("SumPoolExecutor backward"));
             }
         }
@@ -621,7 +621,7 @@ class SumPoolExecutor : public Executor {
 public:
     int calculateFLOPs() override {
         int sum = 0;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             SumPoolNode *s = static_cast<SumPoolNode*>(node);
             sum += s->getDim() * s->ins.size();
         }
@@ -639,11 +639,11 @@ PExecutor SumPoolNode::generate() {
     return exec;
 }
 
-class AvgPoolNode : public AtomicNode, public Poolable<AvgPoolNode> {
+class AvgPoolNode : public Node, public Poolable<AvgPoolNode> {
 public:
-    vector<AtomicNode *> ins;
+    vector<Node *> ins;
 
-    AvgPoolNode() : AtomicNode("avg-pool") {}
+    AvgPoolNode() : Node("avg-pool") {}
 
     void initNode(int dim) override {
         init(dim);
@@ -653,7 +653,7 @@ public:
         setDim(dim);
     }
 
-    void forward(Graph *cg, const vector<AtomicNode *>& x) {
+    void forward(Graph *cg, const vector<Node *>& x) {
         if (x.size() == 0) {
             std::cerr << "empty inputs for add" << std::endl;
             abort();
@@ -700,7 +700,7 @@ public:
 
     void clear() override {
         ins.clear();
-        AtomicNode::clear();
+        Node::clear();
     }
 };
 
@@ -715,14 +715,14 @@ public:
     void  forward() {
         int count = batch.size();
         in_counts.reserve(count);
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             AvgPoolNode *sum = static_cast<AvgPoolNode*>(n);
             in_counts.push_back(sum->ins.size());
         }
 
         max_in_count = *std::max_element(in_counts.begin(), in_counts.end());
 
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             AvgPoolNode *sum = static_cast<AvgPoolNode*>(n);
             in_counts.push_back(sum->ins.size());
         }
@@ -731,7 +731,7 @@ public:
         in_vals.reserve(count * max_in_count);
         vals.reserve(count);
 
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             AvgPoolNode *sum = static_cast<AvgPoolNode*>(n);
             vals.push_back(sum->val().value);
             for (int i = 0; i < sum->ins.size(); ++i) {
@@ -749,7 +749,7 @@ public:
             batch[idx]->compute();
         }
 
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             n3ldg_cuda::Assert(n->val().verify("avg pool forward"));
         }
 #endif
@@ -761,10 +761,10 @@ public:
         losses.reserve(count);
         std::vector<dtype*> in_losses;
         in_losses.reserve(max_in_count * count);
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             AvgPoolNode *sum = static_cast<AvgPoolNode*>(n);
             losses.push_back(n->loss().value);
-            for (AtomicNode *in : sum->ins) {
+            for (Node *in : sum->ins) {
                 in_losses.push_back(in->loss().value);
             }
             for (int i = 0; i < max_in_count - sum->ins.size(); ++i) {
@@ -774,12 +774,12 @@ public:
         n3ldg_cuda::SumPoolBackward(n3ldg_cuda::PoolingEnum::AVG, losses,
                 in_counts, count, dim, in_losses);
 #if TEST_CUDA
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             n->backward();
         }
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             AvgPoolNode *sum = static_cast<AvgPoolNode*>(n);
-            for (AtomicNode *in : sum->ins) {
+            for (Node *in : sum->ins) {
                 n3ldg_cuda::Assert(in->loss().verify("AvgPoolExecutor backward"));
             }
         }
@@ -791,7 +791,7 @@ class AvgPoolExecutor : public Executor {
 public:
     int calculateFLOPs() override {
         int sum = 0;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             AvgPoolNode *s = static_cast<AvgPoolNode*>(node);
             sum += s->getDim() * s->ins.size();
         }
@@ -810,7 +810,7 @@ PExecutor AvgPoolNode::generate() {
 }
 
 namespace n3ldg_plus {
-    AtomicNode *maxPool(Graph &graph, vector<AtomicNode *> &inputs) {
+    Node *maxPool(Graph &graph, vector<Node *> &inputs) {
         int dim = inputs.front()->getDim();
         for (int i = 1; i < inputs.size(); ++i) {
             if (dim != inputs.at(i)->getDim()) {
@@ -824,14 +824,14 @@ namespace n3ldg_plus {
         return pool;
     }
 
-    AtomicNode *sumPool(Graph &graph, vector<AtomicNode *> &inputs) {
+    Node *sumPool(Graph &graph, vector<Node *> &inputs) {
         int dim = inputs.front()->getDim();
         SumPoolNode *pool = SumPoolNode::newNode(dim);
         pool->forward(graph, inputs);
         return pool;
     }
 
-    AtomicNode *averagePool(Graph &graph, vector<AtomicNode *> &inputs) {
+    Node *averagePool(Graph &graph, vector<Node *> &inputs) {
         int dim = inputs.front()->getDim();
         AvgPoolNode *pool = AvgPoolNode::newNode(dim);
         pool->forward(&graph, inputs);

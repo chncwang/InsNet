@@ -86,41 +86,41 @@ protected:
 };
 
 struct DynamicGRUBuilder {
-    vector<AtomicNode*> hiddens;
+    vector<Node*> hiddens;
 
     int size() {
         return hiddens.size();
     }
 
-    void forward(Graph &graph, GRUParams &gru_params, AtomicNode &input, AtomicNode &h0,
+    void forward(Graph &graph, GRUParams &gru_params, Node &input, Node &h0,
             dtype dropout,
             bool is_training) {
         int len = hiddens.size();
-        AtomicNode *last_hidden = len == 0 ? &h0 : hiddens.at(len - 1);
+        Node *last_hidden = len == 0 ? &h0 : hiddens.at(len - 1);
         using namespace n3ldg_plus;
 
-        AtomicNode *update_input = linear(graph, gru_params.update_input, input);
-        AtomicNode *update_hidden = linear(graph, gru_params.update_hidden, *last_hidden);
-        AtomicNode *update_gate = add(graph, {update_input, update_hidden});
+        Node *update_input = linear(graph, gru_params.update_input, input);
+        Node *update_hidden = linear(graph, gru_params.update_hidden, *last_hidden);
+        Node *update_gate = add(graph, {update_input, update_hidden});
         update_gate = sigmoid(graph, *update_gate);
 
-        AtomicNode *reset_input = linear(graph, gru_params.reset_input, input);
-        AtomicNode *reset_hidden = linear(graph, gru_params.reset_hidden, *last_hidden);
-        AtomicNode *reset_gate = add(graph, {reset_input, reset_hidden});
+        Node *reset_input = linear(graph, gru_params.reset_input, input);
+        Node *reset_hidden = linear(graph, gru_params.reset_hidden, *last_hidden);
+        Node *reset_gate = add(graph, {reset_input, reset_hidden});
         reset_gate = sigmoid(graph, *reset_gate);
 
-        AtomicNode *candidate_input = linear(graph, gru_params.candidate_input, input);
-        AtomicNode *updated_hidden = pointwiseMultiply(graph, *reset_gate, *last_hidden);
-        AtomicNode *candidate_hidden = linear(graph, gru_params.candidate_hidden, *updated_hidden);
-        AtomicNode *candidate = add(graph, {candidate_input, candidate_hidden});
+        Node *candidate_input = linear(graph, gru_params.candidate_input, input);
+        Node *updated_hidden = pointwiseMultiply(graph, *reset_gate, *last_hidden);
+        Node *candidate_hidden = linear(graph, gru_params.candidate_hidden, *updated_hidden);
+        Node *candidate = add(graph, {candidate_input, candidate_hidden});
         candidate = tanh(graph, *candidate);
 
         int hidden_dim = h0.getDim();
-        AtomicNode *one = bucket(graph, hidden_dim, 1);
-        AtomicNode *reversal_update = sub(graph, *one, *update_gate);
-        AtomicNode *passed_last_hidden = pointwiseMultiply(graph, *reversal_update, *last_hidden);
-        AtomicNode *updated_candidate = pointwiseMultiply(graph, *update_gate, *candidate);
-        AtomicNode *h = add(graph, {passed_last_hidden, updated_candidate});
+        Node *one = bucket(graph, hidden_dim, 1);
+        Node *reversal_update = sub(graph, *one, *update_gate);
+        Node *passed_last_hidden = pointwiseMultiply(graph, *reversal_update, *last_hidden);
+        Node *updated_candidate = pointwiseMultiply(graph, *update_gate, *candidate);
+        Node *h = add(graph, {passed_last_hidden, updated_candidate});
         hiddens.push_back(h);
     }
 };

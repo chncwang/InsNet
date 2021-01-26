@@ -3,9 +3,9 @@
 
 #include <Node.h>
 
-vector<int> cpuPredict(const vector<AtomicNode *> &nodes) {
+vector<int> cpuPredict(const vector<Node *> &nodes) {
     vector<int> result;
-    for (AtomicNode *node : nodes) {
+    for (Node *node : nodes) {
         result.push_back(std::max_element(node->getVal().v,
                     node->getVal().v + node->getDim()) - node->getVal().v);
     }
@@ -14,7 +14,7 @@ vector<int> cpuPredict(const vector<AtomicNode *> &nodes) {
 
 #if USE_GPU
 
-vector<int> gpuPredict(const vector<AtomicNode *> &nodes) {
+vector<int> gpuPredict(const vector<Node *> &nodes) {
     vector<dtype*> vals;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     return n3ldg_cuda::Predict(vals, nodes.size(), nodes.front()->getDim());
@@ -22,7 +22,7 @@ vector<int> gpuPredict(const vector<AtomicNode *> &nodes) {
 
 #endif
 
-vector<int> predict(const vector<AtomicNode *> &nodes) {
+vector<int> predict(const vector<Node *> &nodes) {
     validateEqualNodeDims(nodes);
 #if USE_GPU
     return gpuPredict(nodes);
@@ -31,7 +31,7 @@ vector<int> predict(const vector<AtomicNode *> &nodes) {
 #endif
 }
 
-dtype cpuCrossEntropyLoss(vector<AtomicNode *> &nodes, const vector<int> &answers, dtype factor) {
+dtype cpuCrossEntropyLoss(vector<Node *> &nodes, const vector<int> &answers, dtype factor) {
     dtype loss = 0;
     for (int i = 0; i < nodes.size(); ++i) {
         int answer = answers.at(i);
@@ -41,7 +41,7 @@ dtype cpuCrossEntropyLoss(vector<AtomicNode *> &nodes, const vector<int> &answer
     return loss * factor;
 }
 
-dtype crossEntropyLoss(vector<AtomicNode *> &nodes, const vector<int> &answers, dtype factor) {
+dtype crossEntropyLoss(vector<Node *> &nodes, const vector<int> &answers, dtype factor) {
     if (nodes.size() != answers.size()) {
         cerr << boost::format("crossEntropyLoss - node size is %1%, but answer size is %2%") %
             nodes.size() % answers.size() << endl;
@@ -56,7 +56,7 @@ dtype crossEntropyLoss(vector<AtomicNode *> &nodes, const vector<int> &answers, 
             nodes.size(), factor, losses);
 #if TEST_CUDA
     dtype cpu_loss = cpuCrossEntropyLoss(nodes, answers, factor);
-    for (AtomicNode *node : nodes) {
+    for (Node *node : nodes) {
         n3ldg_cuda::Assert(node->loss().verify("crossEntropyLoss"));
     }
     cout << boost::format("cpu loss:%1% gpu:%2%") % cpu_loss % loss << endl;
@@ -67,11 +67,11 @@ dtype crossEntropyLoss(vector<AtomicNode *> &nodes, const vector<int> &answers, 
 #endif
 }
 
-float cpuMultiCrossEntropyLoss(vector<AtomicNode *> &nodes, const vector<vector<int>> &answers,
+float cpuMultiCrossEntropyLoss(vector<Node *> &nodes, const vector<vector<int>> &answers,
         dtype factor) {
     dtype loss = 0;
     for (int i = 0; i < nodes.size(); ++i) {
-        AtomicNode &node = *nodes.at(i);
+        Node &node = *nodes.at(i);
         const auto &answer = answers.at(i);
         for (int j = 0; j < node.getDim(); ++j) {
             dtype val = node.getVal()[j];
@@ -82,12 +82,12 @@ float cpuMultiCrossEntropyLoss(vector<AtomicNode *> &nodes, const vector<vector<
     return loss * factor;
 }
 
-float cpuKLLoss(vector<AtomicNode *> &nodes, const vector<shared_ptr<vector<dtype>>> &answers,
+float cpuKLLoss(vector<Node *> &nodes, const vector<shared_ptr<vector<dtype>>> &answers,
         dtype factor) {
     cout << "node size:" << nodes.size() << endl;
     dtype loss = 0;
     for (int i = 0; i < nodes.size(); ++i) {
-        AtomicNode *node = nodes.at(i);
+        Node *node = nodes.at(i);
         const auto &answer = answers.at(i);
         if (answer->size() < node->getDim()) {
             cerr << boost::format("cpuKLLoss - answer size is %1%, but node dim is %2%") %
@@ -103,7 +103,7 @@ float cpuKLLoss(vector<AtomicNode *> &nodes, const vector<shared_ptr<vector<dtyp
     return loss * factor;
 }
 
-pair<float, vector<int>> KLLoss(vector<AtomicNode *> &nodes,
+pair<float, vector<int>> KLLoss(vector<Node *> &nodes,
         const vector<shared_ptr<vector<dtype>>> &answers,
         dtype factor) {
     if (nodes.size() != answers.size()) {
@@ -121,7 +121,7 @@ pair<float, vector<int>> KLLoss(vector<AtomicNode *> &nodes,
 #if TEST_CUDA
     dtype cpu_loss = cpuKLLoss(nodes, answers, factor);
     cout << "KLLoss - gpu loss:" << gpu_loss << " cpu_loss:" << cpu_loss << endl;
-    for (AtomicNode *node : nodes) {
+    for (Node *node : nodes) {
         n3ldg_cuda::Assert(node->getLoss().verify("multiCrossEntropyLoss"));
     }
 #endif
@@ -134,7 +134,7 @@ pair<float, vector<int>> KLLoss(vector<AtomicNode *> &nodes,
     return result;
 }
 
-float multiCrossEntropyLoss(vector<AtomicNode *> &nodes, const vector<vector<int>> &answers,
+float multiCrossEntropyLoss(vector<Node *> &nodes, const vector<vector<int>> &answers,
         dtype factor) {
     if (nodes.size() != answers.size()) {
         cerr << "multiCrossEntropyLoss - nodes size is not equal to answers size" << endl;
@@ -151,7 +151,7 @@ float multiCrossEntropyLoss(vector<AtomicNode *> &nodes, const vector<vector<int
 #if TEST_CUDA
     dtype cpu_loss = cpuMultiCrossEntropyLoss(nodes, answers, factor);
     cout << "multiCrossEntropyLoss - gpu loss:" << gpu_loss << " cpu_loss:" << cpu_loss << endl;
-    for (AtomicNode *node : nodes) {
+    for (Node *node : nodes) {
         n3ldg_cuda::Assert(node->getLoss().verify("multiCrossEntropyLoss"));
     }
 #endif

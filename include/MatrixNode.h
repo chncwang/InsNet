@@ -4,9 +4,9 @@
 #include "Node.h"
 #include "Graph.h"
 
-class MatrixNode : public AtomicNode {
+class MatrixNode : public Node {
 public:
-    explicit MatrixNode(const string &node_type) : AtomicNode(node_type + "-matrix") {}
+    explicit MatrixNode(const string &node_type) : Node(node_type + "-matrix") {}
 };
 
 class MatrixExecutor : public Executor {
@@ -18,7 +18,7 @@ public:
     vector<int> getCols() const {
         vector<int> cols;
         cols.reserve(batch.size());
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             MatrixNode *matrix = static_cast<MatrixNode *>(node);
             cols.push_back(matrix->getColumn());
         }
@@ -38,7 +38,7 @@ public:
 
     MatrixConcatNode(): MatrixNode("concat") {}
 
-    void forward(Graph &graph, const vector<AtomicNode *> &inputs) {
+    void forward(Graph &graph, const vector<Node *> &inputs) {
         int input_dim = inputs.front()->getDim();
         for (auto it = inputs.begin() + 1; it != inputs.end(); ++it) {
             if (input_dim != (*it)->getDim()) {
@@ -48,7 +48,7 @@ public:
         }
 
         in_nodes = inputs;
-        for (AtomicNode *in : inputs) {
+        for (Node *in : inputs) {
             in->addParent(this);
         }
         setColumn(inputs.size());
@@ -79,26 +79,26 @@ public:
 
     Executor* generate() override;
 
-    const vector<AtomicNode *> &getInputs() const {
+    const vector<Node *> &getInputs() const {
         return in_nodes;
     }
 
 private:
-    vector<AtomicNode *> in_nodes;
+    vector<Node *> in_nodes;
 };
 
 #if USE_GPU
 class MatrixConcatExecutor : public MatrixExecutor {
 public:
     void forward() override {
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(node);
             in_counts.push_back(concat->getColumn());
         }
         max_in_count = *max_element(in_counts.begin(), in_counts.end());
         vector<dtype *> vals, in_vals;
         int node_i = -1;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             ++node_i;
             MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(node);
             vals.push_back(concat->getVal().value);
@@ -117,7 +117,7 @@ public:
     void backward() override {
         vector<dtype *> grads, in_grads;
         int node_i = -1;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             ++node_i;
             MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(node);
             grads.push_back(concat->getLoss().value);
@@ -128,10 +128,10 @@ public:
         }
         n3ldg_cuda::MatrixConcatBackward(grads, getCount(), getRow(), in_counts, in_grads);
 #if TEST_CUDA
-        auto get_inputs = [&](AtomicNode &node) {
-            vector<pair<AtomicNode*, string>> pairs;
+        auto get_inputs = [&](Node &node) {
+            vector<pair<Node*, string>> pairs;
             MatrixConcatNode &concat = static_cast<MatrixConcatNode&>(node);
-            for (AtomicNode *input : concat.getInputs()) {
+            for (Node *input : concat.getInputs()) {
                 pairs.push_back(make_pair(input, input->getNodeType()));
             }
             return pairs;
@@ -176,7 +176,7 @@ public:
         init(dim);
     }
 
-    void forward(Graph &graph, AtomicNode &matrix, AtomicNode &vec) {
+    void forward(Graph &graph, Node &matrix, Node &vec) {
         if (getDim() % vec.getDim() != 0) {
             cerr << boost::format("MatrixConcatNode forward - dim:%1% vec dim:%2%") % getDim() %
                 vec.getDim() << endl;
@@ -219,8 +219,8 @@ public:
     Executor *generate() override;
 
 private:
-    AtomicNode *matrix_ = nullptr;
-    AtomicNode *vector_ = nullptr;
+    Node *matrix_ = nullptr;
+    Node *vector_ = nullptr;
     friend class MatrixAndVectorPointwiseMultiExecutor;
 };
 
@@ -229,7 +229,7 @@ class MatrixAndVectorPointwiseMultiExecutor : public MatrixExecutor {
 public:
     void forward() override {
         vector<dtype *> vals = getVals();
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             MatrixAndVectorPointwiseMultiNode *multi =
                 static_cast<MatrixAndVectorPointwiseMultiNode *>(node);
 #if TEST_CUDA
@@ -254,7 +254,7 @@ public:
     void backward() override {
         vector<dtype *> grads = getGrads();
         vector<dtype *> matrix_grads, vector_grads;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             MatrixAndVectorPointwiseMultiNode *multi =
                 static_cast<MatrixAndVectorPointwiseMultiNode *>(node);
             matrix_grads.push_back(multi->matrix_->getLoss().value);
@@ -266,12 +266,12 @@ public:
         n3ldg_cuda::MatrixAndVectorPointwiseMultiBackward(grads, matrix_vals, vector_vals,
                     batch.size(), row, cols, matrix_grads, vector_grads);
 #if TEST_CUDA
-        auto get_inputs = [](AtomicNode &node)->vector<pair<AtomicNode *, string>> {
+        auto get_inputs = [](Node &node)->vector<pair<Node *, string>> {
             MatrixAndVectorPointwiseMultiNode &multi =
                 static_cast<MatrixAndVectorPointwiseMultiNode&>(node);
             return {make_pair(multi.matrix_, "matrix"), make_pair(multi.vector_, "vector")};
         };
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             MatrixAndVectorPointwiseMultiNode *multi =
                 static_cast<MatrixAndVectorPointwiseMultiNode *>(node);
             cout << boost::format("matrix:%1% vec:%2%") % multi->matrix_ % multi->vector_ << endl;
@@ -320,7 +320,7 @@ public:
     }
 
     void compute() override {
-        AtomicNode &input = *getInput();
+        Node &input = *getInput();
         int input_row  = input.getDim() / getDim();
         for (int i = 0; i < getDim(); ++i) {
             dtype sum = 0;
@@ -332,7 +332,7 @@ public:
     }
 
     void backward() override {
-        AtomicNode &input = *static_cast<MatrixNode *>(getInput());
+        Node &input = *static_cast<MatrixNode *>(getInput());
         int input_row  = input.getDim() / getDim();
         for (int i = 0; i < getDim(); ++i) {
             for (int j = 0; j < input_row; ++j) {
@@ -349,7 +349,7 @@ public:
     Executor *generate() override;
 
 protected:
-    virtual bool isDimLegal(const AtomicNode &input) const override {
+    virtual bool isDimLegal(const Node &input) const override {
         return true;
     }
 };
@@ -361,7 +361,7 @@ public:
         vector<dtype *> in_vals;
         MatrixColSumNode *first = dynamic_cast<MatrixColSumNode *>(batch.front());
         row = first->getInput()->getDim() / first->getDim();
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             MatrixColSumNode &sum = *static_cast<MatrixColSumNode *>(node);
             in_vals.push_back(sum.getInput()->getVal().value);
             cols.push_back(sum.getDim());
@@ -377,7 +377,7 @@ public:
     void backward() override {
         vector<dtype *> grads = getGrads();
         vector<dtype *> in_grads;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             MatrixColSumNode &sum = *static_cast<MatrixColSumNode *>(node);
             in_grads.push_back(sum.getInput()->getLoss().value);
             cols.push_back(sum.getDim());
@@ -407,9 +407,9 @@ Executor *MatrixColSumNode::generate() {
 
 class MatrixAndVectorMultiExecutor;
 
-class MatrixAndVectorMultiNode : public AtomicNode, public Poolable<MatrixAndVectorMultiNode> {
+class MatrixAndVectorMultiNode : public Node, public Poolable<MatrixAndVectorMultiNode> {
 public:
-    MatrixAndVectorMultiNode() : AtomicNode("MatrixAndVectorMulti") {}
+    MatrixAndVectorMultiNode() : Node("MatrixAndVectorMulti") {}
 
     void setNodeDim(int dim) override {
         setDim(dim);
@@ -419,7 +419,7 @@ public:
         init(dim);
     }
 
-    void forward(Graph &graph, AtomicNode &matrix, AtomicNode &vec, int head_count) {
+    void forward(Graph &graph, Node &matrix, Node &vec, int head_count) {
         head_count_ = head_count;
         matrix.addParent(this);
         matrix_ = &matrix;
@@ -485,12 +485,12 @@ public:
     Executor * generate() override;
 
     string typeSignature() const override {
-        return AtomicNode::typeSignature() + to_string(head_count_);
+        return Node::typeSignature() + to_string(head_count_);
     }
 
 private:
-    AtomicNode *vector_ = nullptr;
-    AtomicNode *matrix_ = nullptr;
+    Node *vector_ = nullptr;
+    Node *matrix_ = nullptr;
     int head_count_ = 1;
     friend class MatrixAndVectorMultiExecutor;
 };
@@ -500,13 +500,13 @@ class MatrixAndVectorMultiExecutor : public Executor {
 public:
     void forward() override {
 #if TEST_CUDA
-        auto get_inputs = [&](AtomicNode &node)->vector<AtomicNode *> {
+        auto get_inputs = [&](Node &node)->vector<Node *> {
             MatrixAndVectorMultiNode &multi = static_cast<MatrixAndVectorMultiNode&>(node);
-            vector<AtomicNode *> inputs = {multi.matrix_, multi.vector_};
+            vector<Node *> inputs = {multi.matrix_, multi.vector_};
             return inputs;
         };
         testForwardInpputs(get_inputs);
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             MatrixAndVectorMultiNode *multi = static_cast<MatrixAndVectorMultiNode *>(node);
             multi->matrix_->val().copyFromHostToDevice();
             multi->vector_->val().copyFromHostToDevice();
@@ -514,7 +514,7 @@ public:
 #endif
         auto vals = getVals();
         int head_count = dynamic_cast<MatrixAndVectorMultiNode*>(batch.front())->head_count_;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             MatrixAndVectorMultiNode *multi = static_cast<MatrixAndVectorMultiNode *>(node);
             matrix_vals_.push_back(multi->matrix_->getVal().value);
             vector_vals_.push_back(multi->vector_->getVal().value);
@@ -534,7 +534,7 @@ public:
         auto grads = getGrads();
 
         vector<dtype *> matrix_grads, vector_grads;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             MatrixAndVectorMultiNode *multi = static_cast<MatrixAndVectorMultiNode *>(node);
             matrix_grads.push_back(multi->matrix_->getLoss().value);
             vector_grads.push_back(multi->vector_->getLoss().value);
@@ -543,9 +543,9 @@ public:
         n3ldg_cuda::MatrixAndVectorMultiBackward(grads, matrix_vals_, vector_vals_, batch.size(),
                 head_count, row_, cols_, matrix_grads, vector_grads);
 #if TEST_CUDA
-        auto get_inputs = [&](AtomicNode &node) {
+        auto get_inputs = [&](Node &node) {
             MatrixAndVectorMultiNode &multi = static_cast<MatrixAndVectorMultiNode&>(node);
-            vector<pair<AtomicNode *, string>> inputs = {make_pair(multi.matrix_, "matrix"),
+            vector<pair<Node *, string>> inputs = {make_pair(multi.matrix_, "matrix"),
             make_pair(multi.vector_, "vector")};
             return inputs;
         };
@@ -585,7 +585,7 @@ public:
     }
 
     void compute() override {
-        AtomicNode &input = *getInput();
+        Node &input = *getInput();
         int input_row = getColumn();
         int input_col = getRow();
         for (int i = 0; i < input_row; ++i) {
@@ -596,7 +596,7 @@ public:
     }
 
     void backward() override {
-        AtomicNode &input = *getInput();
+        Node &input = *getInput();
         int input_row = getColumn();
         int input_col = getRow();
         for (int i = 0; i < input_row; ++i) {
@@ -613,7 +613,7 @@ public:
     Executor *generate() override;
 
 protected:
-    virtual bool isDimLegal(const AtomicNode &input) const override {
+    virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
     }
 };
@@ -623,7 +623,7 @@ class MatrixTransposeExecutor : public UniInputExecutor {
 public:
     void forward() override {
         vector<dtype *> matrices, vals;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             MatrixTransposeNode *m = dynamic_cast<MatrixTransposeNode *>(node);
             matrices.push_back(m->getInput()->getVal().value);
             vals.push_back(m->getVal().value);
@@ -639,7 +639,7 @@ public:
 
     void backward() override {
         vector<dtype *> grads, matrix_grads;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             MatrixTransposeNode *m = dynamic_cast<MatrixTransposeNode *>(node);
             matrix_grads.push_back(m->getInput()->getLoss().value);
             grads.push_back(m->getLoss().value);
@@ -669,21 +669,21 @@ Executor *MatrixTransposeNode::generate() {
 
 namespace n3ldg_plus {
 
-MatrixNode *concatToMatrix(Graph &graph, const vector<AtomicNode *> &inputs) {
+MatrixNode *concatToMatrix(Graph &graph, const vector<Node *> &inputs) {
     int input_dim = inputs.front()->getDim();
     MatrixConcatNode *node = MatrixConcatNode::newNode(inputs.size() * input_dim);
     node->forward(graph, inputs);
     return node;
 }
 
-MatrixNode *matrixPointwiseMultiply(Graph &graph, AtomicNode &matrix, AtomicNode &vec) {
+MatrixNode *matrixPointwiseMultiply(Graph &graph, Node &matrix, Node &vec) {
     MatrixAndVectorPointwiseMultiNode *node = MatrixAndVectorPointwiseMultiNode::newNode(
             matrix.getDim());
     node->forward(graph, matrix, vec);
     return node;
 }
 
-AtomicNode *matrixColSum(Graph &graph, AtomicNode &input, int input_col) {
+Node *matrixColSum(Graph &graph, Node &input, int input_col) {
     if (input.getDim() % input_col != 0) {
         cerr << boost::format("input dim:%1% input col:%2%") % input.getDim() % input_col << endl;
         abort();
@@ -693,7 +693,7 @@ AtomicNode *matrixColSum(Graph &graph, AtomicNode &input, int input_col) {
     return node;
 }
 
-AtomicNode *matrixAndVectorMulti(Graph &graph, AtomicNode &matrix, AtomicNode &vec, int head_count) {
+Node *matrixAndVectorMulti(Graph &graph, Node &matrix, Node &vec, int head_count) {
     int dim = matrix.getDim() * head_count / vec.getDim();
     if (matrix.getDim() % head_count != 0) {
         cerr << boost::format("matrix dim:%1% head_count:%2%") % matrix.getDim() % head_count <<
@@ -715,7 +715,7 @@ AtomicNode *matrixAndVectorMulti(Graph &graph, AtomicNode &matrix, AtomicNode &v
     return node;
 }
 
-AtomicNode *transposeMatrix(Graph &graph, AtomicNode &matrix, int input_row) {
+Node *transposeMatrix(Graph &graph, Node &matrix, int input_row) {
     if (matrix.getDim() % input_row != 0) {
         cerr << boost::format("matrix dim:%1% input_row:%2%") % matrix.getDim() % input_row <<
             endl;

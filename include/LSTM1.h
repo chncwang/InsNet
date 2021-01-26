@@ -96,18 +96,18 @@ protected:
 };
 
 struct DynamicLSTMBuilder {
-    std::vector<AtomicNode*> _cells;
-    std::vector<AtomicNode*> _hiddens;
+    std::vector<Node*> _cells;
+    std::vector<Node*> _hiddens;
 
     int size() {
         return _hiddens.size();
     }
 
-    void forward(Graph &graph, LSTM1Params &lstm_params, AtomicNode &input, AtomicNode &h0,
-            AtomicNode &c0,
+    void forward(Graph &graph, LSTM1Params &lstm_params, Node &input, Node &h0,
+            Node &c0,
             dtype dropout,
             bool is_training) {
-        AtomicNode *last_hidden, *last_cell;
+        Node *last_hidden, *last_cell;
         int len = _hiddens.size();
         if (len == 0) {
             last_hidden = &h0;
@@ -118,30 +118,30 @@ struct DynamicLSTMBuilder {
         }
 
         using namespace n3ldg_plus;
-        AtomicNode *inputgate_hidden = linear(graph, lstm_params.input_hidden, *last_hidden);
-        AtomicNode *inputgate_input = linear(graph, lstm_params.input_input, input);
-        AtomicNode *inputgate_add = add(graph, {inputgate_hidden, inputgate_input});
-        AtomicNode *inputgate = sigmoid(graph, *inputgate_add);
+        Node *inputgate_hidden = linear(graph, lstm_params.input_hidden, *last_hidden);
+        Node *inputgate_input = linear(graph, lstm_params.input_input, input);
+        Node *inputgate_add = add(graph, {inputgate_hidden, inputgate_input});
+        Node *inputgate = sigmoid(graph, *inputgate_add);
 
-        AtomicNode *forgetgate_hidden = linear(graph, lstm_params.forget_hidden, *last_hidden);
-        AtomicNode *forgetgate_input = linear(graph, lstm_params.forget_input, input);
-        AtomicNode *forgetgate_add = add(graph, {forgetgate_hidden, forgetgate_input});
-        AtomicNode *forgetgate = sigmoid(graph, *forgetgate_add);
+        Node *forgetgate_hidden = linear(graph, lstm_params.forget_hidden, *last_hidden);
+        Node *forgetgate_input = linear(graph, lstm_params.forget_input, input);
+        Node *forgetgate_add = add(graph, {forgetgate_hidden, forgetgate_input});
+        Node *forgetgate = sigmoid(graph, *forgetgate_add);
 
-        AtomicNode *outputgate_hidden = linear(graph, lstm_params.output_hidden, *last_hidden);
-        AtomicNode *outputgate_input = linear(graph, lstm_params.output_input, input);
-        AtomicNode *outputgate_add = add(graph, {outputgate_hidden, outputgate_input});
-        AtomicNode *outputgate = sigmoid(graph, *outputgate_add);
+        Node *outputgate_hidden = linear(graph, lstm_params.output_hidden, *last_hidden);
+        Node *outputgate_input = linear(graph, lstm_params.output_input, input);
+        Node *outputgate_add = add(graph, {outputgate_hidden, outputgate_input});
+        Node *outputgate = sigmoid(graph, *outputgate_add);
 
-        AtomicNode *halfcell_hidden = linear(graph, lstm_params.cell_hidden, *last_hidden);
-        AtomicNode *halfcell_input = linear(graph, lstm_params.cell_input, input);
-        AtomicNode *halfcell_add = add(graph, {halfcell_hidden, halfcell_input});
-        AtomicNode *halfcell = tanh(graph, *halfcell_add);
-        AtomicNode *inputfilter = pointwiseMultiply(graph, *inputgate, *halfcell);
-        AtomicNode *forgetfilter = pointwiseMultiply(graph, *last_cell, *forgetgate);
-        AtomicNode *cell = add(graph, {inputfilter, forgetfilter});
-        AtomicNode *halfhidden = tanh(graph, *cell);
-        AtomicNode *hidden = pointwiseMultiply(graph, *halfhidden, *outputgate);
+        Node *halfcell_hidden = linear(graph, lstm_params.cell_hidden, *last_hidden);
+        Node *halfcell_input = linear(graph, lstm_params.cell_input, input);
+        Node *halfcell_add = add(graph, {halfcell_hidden, halfcell_input});
+        Node *halfcell = tanh(graph, *halfcell_add);
+        Node *inputfilter = pointwiseMultiply(graph, *inputgate, *halfcell);
+        Node *forgetfilter = pointwiseMultiply(graph, *last_cell, *forgetgate);
+        Node *cell = add(graph, {inputfilter, forgetfilter});
+        Node *halfhidden = tanh(graph, *cell);
+        Node *hidden = pointwiseMultiply(graph, *halfhidden, *outputgate);
         hidden = n3ldg_plus::dropout(graph, *hidden, dropout, is_training);
         _hiddens.push_back(hidden);
         _cells.push_back(cell);

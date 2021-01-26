@@ -18,9 +18,9 @@
 using namespace Eigen;
 using std::vector;
 
-class BucketNode : public AtomicNode, public Poolable<BucketNode> {
+class BucketNode : public Node, public Poolable<BucketNode> {
 public:
-    BucketNode() : AtomicNode("bucket") {}
+    BucketNode() : Node("bucket") {}
 
     void initNode(int dim) override {
         init(dim);
@@ -71,13 +71,13 @@ private:
 
 namespace n3ldg_plus {
 
-AtomicNode *bucket(Graph &graph, int dim, float v) {
+Node *bucket(Graph &graph, int dim, float v) {
     BucketNode *bucket = BucketNode::newNode(dim);
     bucket->forward(graph, v);
     return bucket;
 }
 
-AtomicNode *bucket(Graph &graph, const vector<float> &v) {
+Node *bucket(Graph &graph, const vector<float> &v) {
     BucketNode *bucket = BucketNode::newNode(v.size());
     bucket->forward(graph, v);
     return bucket;
@@ -99,7 +99,7 @@ public:
         vector<dtype*> ys;
         vector<dtype> cpu_x;
         cpu_x.reserve(getDim() * count);
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             BucketNode *bucket = static_cast<BucketNode*>(node);
             ys.push_back(bucket->val().value);
             for (int i = 0; i < getDim(); ++i) {
@@ -108,7 +108,7 @@ public:
         }
         n3ldg_cuda::BucketForward(cpu_x, count, getDim(), ys);
 #if TEST_CUDA
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             BucketNode *bucket = static_cast<BucketNode*>(node);
             dtype *v = node->val().v;
             for (int i = 0; i < getDim(); ++i) {
@@ -118,7 +118,7 @@ public:
         }
 #endif
 #else
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             BucketNode *bucket = static_cast<BucketNode*>(node);
             node->val() = bucket->input_;
         }
@@ -129,9 +129,7 @@ public:
 };
 
 PExecutor BucketNode::generate() {
-    BucketExecutor* exec = new BucketExecutor();
-    exec->batch.push_back(this);
-    return exec;
+    return new BucketExecutor();
 }
 
 #endif

@@ -14,11 +14,11 @@
 #include "Node.h"
 #include "Graph.h"
 
-class PMultiNode : public AtomicNode, public Poolable<PMultiNode> {
+class PMultiNode : public Node, public Poolable<PMultiNode> {
 public:
-    AtomicNode *in1, *in2;
+    Node *in1, *in2;
 
-    PMultiNode() : AtomicNode("point-multiply") {
+    PMultiNode() : Node("point-multiply") {
         in1 = nullptr;
         in2 = nullptr;
     }
@@ -31,11 +31,11 @@ public:
         init(dim);
     }
 
-    void forward(Graph &graph, AtomicNode &input1, AtomicNode &input2) {
+    void forward(Graph &graph, Node &input1, Node &input2) {
         this->forward(&graph, &input1, &input2);
     }
 
-    void forward(Graph *cg, AtomicNode * x1, AtomicNode * x2) {
+    void forward(Graph *cg, Node * x1, Node * x2) {
         in1 = x1;
         in2 = x2;
         x1->addParent(this);
@@ -60,7 +60,6 @@ public:
     std::vector<dtype*> in_vals1;
     std::vector<dtype*> in_vals2;
     std::vector<dtype*> vals;
-    int dim;
     Tensor1D y, x1, x2;
     int sumDim;
 
@@ -74,13 +73,13 @@ public:
 #if USE_GPU
     void  forward() {
         int count = batch.size();
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             PMultiNode *pmulti = static_cast<PMultiNode*>(n);
             in_vals1.push_back(pmulti->in1->val().value);
             in_vals2.push_back(pmulti->in2->val().value);
             vals.push_back(pmulti->val().value);
         }
-        n3ldg_cuda::PMultiForward(in_vals1, in_vals2, count, dim, vals);
+        n3ldg_cuda::PMultiForward(in_vals1, in_vals2, count, getDim(), vals);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -97,7 +96,7 @@ public:
         vals2.reserve(count);
         losses1.reserve(count);
         losses2.reserve(count);
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             PMultiNode *pmulti = static_cast<PMultiNode*>(n);
             losses.push_back(pmulti->loss().value);
             vals1.push_back(pmulti->in1->val().value);
@@ -105,12 +104,12 @@ public:
             losses1.push_back(pmulti->in1->loss().value);
             losses2.push_back(pmulti->in2->loss().value);
         }
-        n3ldg_cuda::PMultiBackward(losses, vals1, vals2, count, dim, losses1, losses2);
+        n3ldg_cuda::PMultiBackward(losses, vals1, vals2, count, getDim(), losses1, losses2);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward();
         }
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             PMultiNode *pmulti = static_cast<PMultiNode*>(n);
             n3ldg_cuda::Assert(pmulti->in1->loss().verify(
                         "PMultiExecutor backward in1 loss"));
@@ -124,14 +123,12 @@ public:
 
 Executor * PMultiNode::generate() {
     PMultiExecutor* exec = new PMultiExecutor();
-    exec->batch.push_back(this);
-    exec->dim = getDim();
     return exec;
 };
 
 namespace n3ldg_plus {
 
-AtomicNode *pointwiseMultiply(Graph &graph, AtomicNode &a, AtomicNode &b) {
+Node *pointwiseMultiply(Graph &graph, Node &a, Node &b) {
     if (a.getDim() != b.getDim()) {
         cerr << boost::format("a dim:%1% b dim:%2%") % a.getDim() % b.getDim() << endl;
         abort();

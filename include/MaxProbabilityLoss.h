@@ -8,7 +8,7 @@
 
 #include "MyLib.h"
 
-std::pair<dtype, std::vector<int>> maxLogProbabilityLoss(std::vector<AtomicNode *> &nodes,
+std::pair<dtype, std::vector<int>> maxLogProbabilityLoss(std::vector<Node *> &nodes,
         const std::vector<int> &answers,
         dtype factor) {
     n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();

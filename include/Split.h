@@ -9,9 +9,9 @@
 #endif
 #include <boost/format.hpp>
 
-class SplitNode : public AtomicNode, public Poolable<SplitNode> {
+class SplitNode : public Node, public Poolable<SplitNode> {
 public:
-    SplitNode() : AtomicNode("split") {}
+    SplitNode() : Node("split") {}
 
     void setNodeDim(int dim) override {
         setDim(dim);
@@ -25,7 +25,7 @@ public:
         return getNodeType();
     }
 
-    void forward(Graph &graph, AtomicNode &input, int offset) {
+    void forward(Graph &graph, Node &input, int offset) {
         if (input.getDim() < offset + getDim()) {
             cerr << boost::format("input dim:%1% offset:%2% this dim:%3%") % input.getDim() %
                 offset % getDim() << endl;
@@ -54,13 +54,13 @@ public:
     }
 
 private:
-    AtomicNode *input_ = nullptr;
+    Node *input_ = nullptr;
     int offset_ = 0;
     friend class SplitExecutor;
 };
 
 namespace n3ldg_plus {
-AtomicNode* split(Graph &graph, int dim, AtomicNode &input, int offset) {
+Node* split(Graph &graph, int dim, Node &input, int offset) {
     SplitNode *split = SplitNode::newNode(dim);
     split->forward(graph, input, offset);
     return split;
@@ -73,7 +73,7 @@ public:
     void forward() override {
         vector<dtype*> inputs;
         vector<dtype*> results;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             SplitNode *split = static_cast<SplitNode*>(node);
             inputs.push_back(split->input_->getVal().value);
             offsets.push_back(split->offset_);
@@ -91,7 +91,7 @@ public:
         vector<dtype*> losses;
         vector<dtype *> input_losses;
 
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             SplitNode *split = static_cast<SplitNode*>(node);
             losses.push_back(split->getLoss().value);
             input_losses.push_back(split->input_->getLoss().value);
@@ -99,9 +99,9 @@ public:
 
         n3ldg_cuda::SplitBackward(losses, offsets, batch.size(), dims, input_losses);
 #if TEST_CUDA
-        auto get_inputs = [](AtomicNode &node) {
+        auto get_inputs = [](Node &node) {
             SplitNode &split = static_cast<SplitNode&>(node);
-            vector<pair<AtomicNode *, string>> inputs = {make_pair(split.input_, "input")};
+            vector<pair<Node *, string>> inputs = {make_pair(split.input_, "input")};
             return inputs;
         };
         Executor::testBackward(get_inputs);

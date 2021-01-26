@@ -11,24 +11,24 @@
 
 namespace n3ldg_plus {
 
-AtomicNode *minusMaxScalar(Graph &graph, AtomicNode &input, int input_col) {
+Node *minusMaxScalar(Graph &graph, Node &input, int input_col) {
     using namespace n3ldg_plus;
 
-    AtomicNode *max_scalar = maxScalar(graph, input, input_col);
+    Node *max_scalar = maxScalar(graph, input, input_col);
     int input_row = input.getDim() / input_col;
-    AtomicNode *scalar_to_vector = scalarToVector(graph, input_row, *max_scalar);
-    AtomicNode *subtracted = sub(graph, input, *scalar_to_vector);
+    Node *scalar_to_vector = scalarToVector(graph, input_row, *max_scalar);
+    Node *subtracted = sub(graph, input, *scalar_to_vector);
     return subtracted;
 }
 
-AtomicNode* softmax(Graph &graph, AtomicNode &input, int input_col) {
+Node* softmax(Graph &graph, Node &input, int input_col) {
     using namespace n3ldg_plus;
-    AtomicNode *subtracted = minusMaxScalar(graph, input, input_col);
-    AtomicNode *exp = n3ldg_plus::exp(graph, *subtracted);
-    AtomicNode *sum = vectorSum(graph, *exp, input_col);
+    Node *subtracted = minusMaxScalar(graph, input, input_col);
+    Node *exp = n3ldg_plus::exp(graph, *subtracted);
+    Node *sum = vectorSum(graph, *exp, input_col);
     int input_row = input.getDim() / input_col;
     sum = scalarToVector(graph, input_row, *sum);
-    AtomicNode *div = n3ldg_plus::fullDiv(graph, *exp, *sum);
+    Node *div = n3ldg_plus::fullDiv(graph, *exp, *sum);
     return div;
 }
 

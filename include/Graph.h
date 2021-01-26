@@ -152,11 +152,18 @@ public:
 //            cout << "type:" <<min_hash << " " << shallow_nodes.size() << endl;
             NodeAbs *first_node = shallow_nodes.front();
             Executor *cur_exec = first_node->generate();
+            cur_exec->batch.clear();
             if (first_node->isBatched()) {
-            } else {
-                cur_exec->batch.clear();
                 for (NodeAbs *node : shallow_nodes) {
-                    cur_exec->batch.push_back(dynamic_cast<AtomicNode *>(node));
+                    auto &v = node->batch();
+                    for (Node *atom : v) {
+                        cur_exec->batch.push_back(atom);
+                    }
+                }
+            } else {
+                cur_exec->batch.reserve(shallow_nodes.size());
+                for (NodeAbs *node : shallow_nodes) {
+                    cur_exec->batch.push_back(dynamic_cast<Node *>(node));
                 }
             }
             free_nodes.erase(min_hash);
@@ -171,7 +178,7 @@ public:
             profiler.BeginEvent("computation forward");
             cur_exec->forwardFully();
             if (eager_) {
-                for (AtomicNode *node : cur_exec->batch) {
+                for (Node *node : cur_exec->batch) {
                     node->getVal().checkIsNumber();
                 }
             }
@@ -197,7 +204,7 @@ public:
             execs.push_back(cur_exec);
 
             int depth_sum = 0;
-            for (AtomicNode* free_node : cur_exec->batch) {
+            for (Node* free_node : cur_exec->batch) {
                 finish_nodes.push_back(free_node);
                 depth_sum += free_node->getDepth();
                 for (auto parent_it : free_node->getParents()) {

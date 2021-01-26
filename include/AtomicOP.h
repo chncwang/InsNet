@@ -15,7 +15,7 @@ public:
 
     void forward() override {
         vector<dtype*> inputs;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             UniInputNode *expnode = static_cast<UniInputNode*>(node);
             inputs.push_back(expnode->getInput()->getVal().value);
             vals.push_back(expnode->getVal().value);
@@ -33,7 +33,7 @@ public:
         vector<dtype*> vals;
         vector<dtype*> input_losses;
 
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             UniInputNode *exp = static_cast<UniInputNode*>(node);
             vals.push_back(node->getVal().value);
             losses.push_back(exp->getLoss().value);
@@ -86,7 +86,7 @@ public:
     PExecutor generate() override;
 
 protected:
-    virtual bool isDimLegal(const AtomicNode &input) const override {
+    virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
     }
 };
@@ -122,7 +122,7 @@ public:
     }
 
 protected:
-    virtual bool isDimLegal(const AtomicNode &input) const override {
+    virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
     }
 };
@@ -153,7 +153,7 @@ public:
     }
 
 protected:
-    virtual bool isDimLegal(const AtomicNode &input) const override {
+    virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
     }
 };
@@ -183,25 +183,25 @@ public:
     }
 
 protected:
-    virtual bool isDimLegal(const AtomicNode &input) const override {
+    virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
     }
 };
 
-class DropoutNode : public AtomicNode, public Poolable<DropoutNode> {
+class DropoutNode : public Node, public Poolable<DropoutNode> {
 public:
-    DropoutNode() : AtomicNode("dropout") {}
+    DropoutNode() : Node("dropout") {}
 
     void initNode(int dim) override {
         init(dim);
     }
 
     void setNodeDim(int dim) override {
-        AtomicNode::setDim(dim);
+        Node::setDim(dim);
     }
 
     void init(int dimm) override {
-        AtomicNode::init(dimm);
+        Node::init(dimm);
         drop_mask_.init(dimm);
     }
 
@@ -217,7 +217,7 @@ public:
         }
     }
 
-    void forward(Graph &graph, AtomicNode &x) {
+    void forward(Graph &graph, Node &x) {
         in_ = &x;
         in_->addParent(this);
         graph.addNode(this);
@@ -239,16 +239,16 @@ public:
     }
 
     string typeSignature() const override {
-        return AtomicNode::typeSignature() + "-" + to_string(drop_value_);
+        return Node::typeSignature() + "-" + to_string(drop_value_);
     }
 
     PExecutor generate() override;
 
-    AtomicNode* in() {
+    Node* in() {
         return in_;
     }
 
-    bool isTraning() {
+    bool isTraining() {
         return is_training_;
     }
 
@@ -264,24 +264,35 @@ public:
         drop_value_ = drop_value;
     }
 
+    dtype dropoutValue() const {
+        return drop_value_;
+    }
+
 private:
-    AtomicNode* in_ = nullptr;
+    Node* in_ = nullptr;
     Tensor1D drop_mask_;
     dtype drop_value_ = 0.0f;
     bool is_training_ = true;
 };
 
 class DropoutExecutor :public Executor {
-  public:
+public:
     Tensor2D drop_mask;
-    dtype drop_value;
-    int dim;
-    bool is_training;
+
+    bool isTraining() const {
+        DropoutNode *node = dynamic_cast<DropoutNode *>(batch.front());
+        return node->isTraining();
+    }
+
+    dtype dropoutValue() const {
+        DropoutNode *node = dynamic_cast<DropoutNode *>(batch.front());
+        return node->dropoutValue();
+    }
 
 #if USE_GPU
     void CalculateDropMask(int count, int dim, const Tensor2D &mask) {
-        if (is_training) {
-            n3ldg_cuda::CalculateDropoutMask(drop_value, count, dim, mask.value);
+        if (isTraining()) {
+            n3ldg_cuda::CalculateDropoutMask(dropoutValue(), count, dim, mask.value);
         }
     }
 
@@ -290,8 +301,8 @@ class DropoutExecutor :public Executor {
         std::vector<dtype*> xs, ys;
         xs.reserve(count);
         ys.reserve(count);
-        drop_mask.init(dim, count);
-        for (AtomicNode *n : batch) {
+        drop_mask.init(getDim(), count);
+        for (Node *n : batch) {
             DropoutNode *tanh = static_cast<DropoutNode*>(n);
 #if TEST_CUDA
             tanh->in()->val().copyFromHostToDevice();
@@ -300,8 +311,9 @@ class DropoutExecutor :public Executor {
             ys.push_back(tanh->getVal().value);
         }
 
-        CalculateDropMask(count, dim, drop_mask);
-        n3ldg_cuda::DropoutForward(xs, count, dim, is_training, drop_mask.value, drop_value, ys);
+        CalculateDropMask(count, getDim(), drop_mask);
+        n3ldg_cuda::DropoutForward(xs, count, getDim(), isTraining(), drop_mask.value,
+                dropoutValue(), ys);
 #if TEST_CUDA
         if (is_training) {
             drop_mask.copyFromDeviceToHost();
@@ -326,7 +338,7 @@ class DropoutExecutor :public Executor {
         vals.reserve(count);
         losses.reserve(count);
         in_losses.reserve(count);
-        for (AtomicNode *n : batch) {
+        for (Node *n : batch) {
             DropoutNode *tanh = static_cast<DropoutNode*>(n);
 #if TEST_CUDA
             tanh->loss().copyFromHostToDevice();
@@ -336,8 +348,8 @@ class DropoutExecutor :public Executor {
             losses.push_back(tanh->loss().value);
             in_losses.push_back(tanh->in()->loss().value);
         }
-        n3ldg_cuda::DropoutBackward(losses, vals, count, dim, is_training, drop_mask.value,
-                drop_value, in_losses);
+        n3ldg_cuda::DropoutBackward(losses, vals, count, getDim(), isTraining(), drop_mask.value,
+                dropoutValue(), in_losses);
 #if TEST_CUDA
         for (Node *n : batch) {
             n->backward();
@@ -356,12 +368,7 @@ class DropoutExecutor :public Executor {
 };
 
 PExecutor DropoutNode::generate() {
-    DropoutExecutor* exec = new DropoutExecutor();
-    exec->batch.push_back(this);
-    exec->is_training = isTraning();
-    exec->drop_value = drop_value_;
-    exec->dim = getDim();
-    return exec;
+    return new DropoutExecutor();
 }
 
 class MaxScalarNode : public UniInputNode, public Poolable<MaxScalarNode> {
@@ -377,12 +384,12 @@ public:
     }
 
     string typeSignature() const override {
-        return AtomicNode::typeSignature();
+        return Node::typeSignature();
     }
 
     void clear() override {
         max_indexes_.clear();
-        AtomicNode::clear();
+        Node::clear();
     }
 
     void compute() override {
@@ -411,7 +418,7 @@ public:
     Executor* generate() override;
 
 protected:
-    bool isDimLegal(const AtomicNode &input) const override {
+    bool isDimLegal(const Node &input) const override {
         return input.getDim() % getDim() == 0;
     }
 
@@ -460,7 +467,7 @@ public:
         vector<dtype*> losses;
         vector<dtype *> input_losses;
 
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             MaxScalarNode *max_scalar = static_cast<MaxScalarNode*>(node);
             losses.push_back(max_scalar->getLoss().value);
             input_losses.push_back(max_scalar->getInput()->getLoss().value);
@@ -486,8 +493,7 @@ public:
 #endif
 
 Executor *MaxScalarNode::generate() {
-    MaxScalarExecutor * executor = new MaxScalarExecutor();
-    return executor;
+    return new MaxScalarExecutor();
 }
 
 class ScalarToVectorNode : public UniInputNode, public Poolable<ScalarToVectorNode> {
@@ -528,7 +534,7 @@ public:
     Executor* generate() override;
 
 protected:
-    bool isDimLegal(const AtomicNode &input) const override {
+    bool isDimLegal(const Node &input) const override {
         return true;
     }
 
@@ -545,7 +551,7 @@ public:
 #endif
         vector<dtype*> inputs;
         vector<dtype*> results;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             ScalarToVectorNode *n = static_cast<ScalarToVectorNode*>(node);
             inputs.push_back(n->getInput()->getVal().value);
             results.push_back(n->getVal().value);
@@ -570,7 +576,7 @@ public:
 #endif
         vector<dtype*> losses;
         vector<dtype*> input_losses;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(node);
             losses.push_back(n->getLoss().value);
             input_losses.push_back(n->getInput()->getLoss().value);
@@ -597,8 +603,7 @@ public:
 #endif
 
 Executor *ScalarToVectorNode::generate() {
-    ScalarToVectorExecutor * executor = new ScalarToVectorExecutor();
-    return executor;
+    return new ScalarToVectorExecutor();
 }
 
 class ExpNode : public UniInputNode, public Poolable<ExpNode> {
@@ -630,7 +635,7 @@ public:
     }
 
 protected:
-    bool isDimLegal(const AtomicNode &input) const override {
+    bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
     }
 
@@ -653,7 +658,7 @@ public:
     Executor* generate() override;
 
     virtual string typeSignature() const override {
-        return AtomicNode::typeSignature();
+        return Node::typeSignature();
     }
 
     void compute() override {
@@ -677,7 +682,7 @@ public:
     }
 
 protected:
-    bool isDimLegal(const AtomicNode &input) const override {
+    bool isDimLegal(const Node &input) const override {
         return input.getDim() % getDim() == 0;
     }
 
@@ -690,7 +695,7 @@ class SumExecutor : public UniInputExecutor {
     void forward() override {
         vector<dtype*> inputs;
         vector<dtype*> results;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             SumNode *sum = static_cast<SumNode*>(node);
             inputs.push_back(sum->getInput()->getVal().value);
             results.push_back(sum->getVal().value);
@@ -712,7 +717,7 @@ class SumExecutor : public UniInputExecutor {
     void backward() override {
         vector<dtype*> losses;
         vector<dtype*> input_losses;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
 #if TEST_CUDA
             n3ldg_cuda::Assert(node->loss().verify("input loss"));
             node->loss().copyFromDeviceToHost();
@@ -742,8 +747,7 @@ public:
 #endif
 
 Executor *SumNode::generate() {
-    SumExecutor *e = new SumExecutor();
-    return e;
+    return new SumExecutor();
 }
 
 class ScaledExecutor;
@@ -779,7 +783,7 @@ public:
     }
 
 protected:
-    bool isDimLegal(const AtomicNode &input) const override {
+    bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
     }
 
@@ -793,7 +797,7 @@ class ScaledExecutor : public UniInputExecutor {
 public:
     void forward() override {
         vector<dtype *> in_vals;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             ScaledNode *scaled = static_cast<ScaledNode *>(node);
             in_vals.push_back(scaled->getInput()->getVal().value);
             dims.push_back(scaled->getDim());
@@ -809,7 +813,7 @@ public:
 
     void backward() override {
         vector<dtype *> in_grads;
-        for (AtomicNode *node : batch) {
+        for (Node *node : batch) {
             ScaledNode *scaled = static_cast<ScaledNode *>(node);
             in_grads.push_back(scaled->getInput()->getLoss().value);
         }
@@ -840,56 +844,56 @@ Executor *ScaledNode::generate() {
 
 namespace n3ldg_plus {
 
-AtomicNode *maxScalar(Graph &graph, AtomicNode &input, int input_col) {
+Node *maxScalar(Graph &graph, Node &input, int input_col) {
     MaxScalarNode *node = MaxScalarNode::newNode(input_col);
     node->forward(graph, input);
     return node;
 }
 
-AtomicNode *tanh(Graph &graph, AtomicNode &input) {
+Node *tanh(Graph &graph, Node &input) {
     TanhNode *result = TanhNode::newNode(input.getDim());
     result->forward(graph, input);
     return result;
 }
 
-AtomicNode *sigmoid(Graph &graph, AtomicNode &input) {
+Node *sigmoid(Graph &graph, Node &input) {
     SigmoidNode *result = SigmoidNode::newNode(input.getDim());
     result->forward(graph, input);
     return result;
 }
 
-AtomicNode *relu(Graph &graph, AtomicNode &input) {
+Node *relu(Graph &graph, Node &input) {
     ReluNode *result = ReluNode::newNode(input.getDim());
     result->forward(graph, input);
     return result;
 }
 
-AtomicNode *sqrt(Graph &graph, AtomicNode &input) {
+Node *sqrt(Graph &graph, Node &input) {
     SqrtNode *result = SqrtNode::newNode(input.getDim());
     result->forward(graph, input);
     return result;
 }
 
-AtomicNode *scalarToVector(Graph &graph, int row, AtomicNode &input) {
+Node *scalarToVector(Graph &graph, int row, Node &input) {
     ScalarToVectorNode *node = ScalarToVectorNode::newNode(row * input.getDim());
     node->setColumn(input.getDim());
     node->forward(graph, input);
     return node;
 }
 
-AtomicNode *vectorSum(Graph &graph, AtomicNode &input,  int input_col) {
+Node *vectorSum(Graph &graph, Node &input,  int input_col) {
     SumNode *sum = SumNode::newNode(input_col);
     sum->forward(graph, input);
     return sum;
 }
 
-AtomicNode *exp(Graph &graph, AtomicNode &input) {
+Node *exp(Graph &graph, Node &input) {
     ExpNode *node = ExpNode::newNode(input.getDim());
     node->forward(graph, input);
     return node;
 }
 
-AtomicNode *dropout(Graph &graph, AtomicNode &input, dtype dropout, bool is_training) {
+Node *dropout(Graph &graph, Node &input, dtype dropout, bool is_training) {
     DropoutNode *node = DropoutNode::newNode(input.getDim());
     node->setIsTraining(is_training);
     node->setDropValue(dropout);
@@ -897,7 +901,7 @@ AtomicNode *dropout(Graph &graph, AtomicNode &input, dtype dropout, bool is_trai
     return node;
 }
 
-AtomicNode *scaled(Graph &graph, AtomicNode &input, dtype factor) {
+Node *scaled(Graph &graph, Node &input, dtype factor) {
     ScaledNode *node = ScaledNode::newNode(input.getDim());
     node->setFactor(factor);
     node->forward(graph, input);
