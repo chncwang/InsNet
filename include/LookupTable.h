@@ -295,7 +295,7 @@ template <typename ParamType>
 class BatchedLookupNode : public BatchedNodeImpl<LookupNode<ParamType>> {
 public:
     void init(Graph &graph, ParamType &param, const vector<int> &ids, bool should_backward) {
-        allocateBatch(param.outDim(), ids.size());
+        BatchedNodeImpl<LookupNode<ParamType>>::allocateBatch(param.outDim(), ids.size());
         auto &batch = BatchedNode::batch();
         int i = 0;
         for (Node *x : batch) {
@@ -355,7 +355,7 @@ BatchedNode *embedding(Graph &graph, ParamType &param, const vector<int> &ids,
 }
 
 template <typename ParamType>
-BatchedNode *embedding(Graph &graph, ParamType &param, const vector<string> &words,
+BatchedNode *embedding(Graph &graph, LookupTable<ParamType> &param, const vector<string> &words,
         bool should_backward = true) {
     vector<int> ids;
     for (const string &w : words) {
@@ -371,7 +371,7 @@ BatchedNode *embedding(Graph &graph, ParamType &param, const vector<string> &wor
         }
         ids.push_back(id);
     }
-    return embedding<ParamType>(graph, param, ids, should_backward);
+    return embedding<ParamType>(graph, param.E, ids, should_backward);
 }
 
 }

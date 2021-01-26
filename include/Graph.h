@@ -153,6 +153,7 @@ public:
             NodeAbs *first_node = shallow_nodes.front();
             Executor *cur_exec = first_node->generate();
             cur_exec->batch.clear();
+            cur_exec->topo_nodes = shallow_nodes;
             if (first_node->isBatched()) {
                 for (NodeAbs *node : shallow_nodes) {
                     auto &v = node->batch();
@@ -204,7 +205,7 @@ public:
             execs.push_back(cur_exec);
 
             int depth_sum = 0;
-            for (Node* free_node : cur_exec->batch) {
+            for (NodeAbs* free_node : cur_exec->topo_nodes) {
                 finish_nodes.push_back(free_node);
                 depth_sum += free_node->getDepth();
                 for (auto parent_it : free_node->getParents()) {
@@ -218,9 +219,9 @@ public:
                 }
             }
 
-            auto &it = node_type_depth.at(cur_exec->batch.front()->typeSignature());
+            auto &it = node_type_depth.at(cur_exec->topo_nodes.front()->typeSignature());
             it.first -= depth_sum;
-            it.second -= cur_exec->batch.size();
+            it.second -= cur_exec->topo_nodes.size();
             if (it.first < 0 || it.second < 0) {
                 cerr << boost::format("Graph compute - it first:%1% second:%2%") % it.first %
                     it.second;

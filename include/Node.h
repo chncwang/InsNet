@@ -153,7 +153,6 @@ public:
         degree_ = degree;
     }
 
-
     int getDepth() const {
         return depth_;
     }
@@ -256,6 +255,10 @@ public:
         return *batched_node_;
     }
 
+    void setBatchedNode(NodeAbs *node) {
+        batched_node_ = node;
+    }
+
 protected:
     void afterForward(NodeContainer &container, vector<Node*> &ins) {
         for (Node *in : ins) {
@@ -338,7 +341,11 @@ protected:
             cerr << "batch not empty" << endl;
             abort();
         }
-        batch() = NodeType::newNodeVector(dim, size);
+        auto v = NodeType::newNodeVector(dim, size);
+        for (auto *x : v) {
+            x->setBatchedNode(this);
+            batch().push_back(x);
+        }
     }
 
     void allocateBatch(const vector<int> &dims) {
@@ -348,7 +355,9 @@ protected:
         }
 
         for (int dim : dims) {
-            batch().push_back(NodeType::newNode(dim));
+            auto node = NodeType::newNode(dim);
+            node->setBatchedNode(this);
+            batch().push_back(node);
         }
     }
 };
@@ -406,7 +415,8 @@ public:
         if (p.second > v.size()) {
             abort();
         } else if (v.size() < p.second + size) {
-            for (int i = 0; i < p.second + size - v.size(); ++i) {
+            int vsize = v.size();
+            for (int i = 0; i < p.second + size - vsize; ++i) {
                 T *node = new T;
                 node->initNode(key);
                 v.push_back(node);
@@ -416,7 +426,9 @@ public:
         vector<T *> nodes;
         nodes.reserve(size);
         for (int i = 0; i < size; ++i) {
-            T *node = dynamic_cast<T*>(v.at(v.size() - i));
+//            cout << boost::format("v.size:%1% p.second:%2% i:%3% size:%4%") % v.size() % p.second %
+//                i % size << endl;
+            T *node = dynamic_cast<T*>(v.at(p.second + i));
             node->setNodeDim(original_key);
             static_cast<Node *>(node)->clear();
             nodes.push_back(node);
@@ -452,6 +464,7 @@ public:
             node = new T;
             node->initNode(key);
             node->setNodeDim(original_key);
+            node->setBatchedNode(node);
             v.push_back(node);
             ++p.second;
         } else {
@@ -569,6 +582,7 @@ void clearNodes(std::vector<Node*> &nodes) {
 class Executor {
 public:
     std::vector<Node *> batch;
+    std::vector<NodeAbs *> topo_nodes;
     virtual ~Executor() = default;
 
 #if USE_GPU
@@ -623,7 +637,7 @@ public:
         forward();
 
         profiler.EndCudaEvent();
-        for (NodeAbs *node : batch) {
+        for (NodeAbs *node : topo_nodes) {
             node->setDegree(-1);
         }
     }
