@@ -517,11 +517,19 @@ public:
         if (globalLimitedDimEnabled()) {
             key = NextTwoIntegerPowerNumber(key);
         }
-        auto it = pool_.find(key);
-        if (it == pool_.end()) {
-            pool_.insert(make_pair(key, make_pair(vector<Node *>(), 0)));
+
+        map<int, pair<vector<Node *>, int>>::iterator it;
+        if (last_key_ == key) {
+            it = last_it_;
+        } else {
             it = pool_.find(key);
-            globalPoolReferences().insert(&it->second);
+            if (it == pool_.end()) {
+                pool_.insert(make_pair(key, make_pair(vector<Node *>(), 0)));
+                it = pool_.find(key);
+                globalPoolReferences().insert(&it->second);
+            }
+            last_it_ = it;
+            last_key_ = key;
         }
         auto &p = it->second;
         vector<Node *> &v = p.first;
@@ -550,10 +558,16 @@ public:
 
 private:
     static map<int, pair<vector<Node *>, int>> pool_;
+    static map<int, pair<vector<Node *>, int>>::iterator last_it_;
+    static int last_key_;
 };
 
 template<typename T>
 map<int, pair<vector<Node *>, int>> Poolable<T>::pool_;
+template<typename T>
+map<int, pair<vector<Node *>, int>>::iterator Poolable<T>::last_it_;
+template<typename T>
+int Poolable<T>::last_key_;
 
 void validateEqualNodeDims(const vector<Node *> &nodes) {
     for (int i = 1; i < nodes.size(); ++i) {
