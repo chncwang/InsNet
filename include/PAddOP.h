@@ -28,32 +28,24 @@ public:
         setDim(dim);
     }
 
-    void forward(Graph &graph, Node &input1, Node &input2) {
-        vector<Node *> inputs = {&input1, &input2};
-        this->forward(graph, inputs);
+    void setInputs(const vector<Node *> &ins) override {
+        this->ins = ins;
     }
 
-    void forward(Graph &cg, vector<Node *>& x) {
+    void forward(Graph &cg, const vector<Node *>& x) {
         if (x.empty()) {
             std::cerr << "empty inputs for add" << std::endl;
             abort();
         }
 
         for (int i = 0; i < x.size(); i++) {
-            if (x.front()->getDim() != getDim()) {
+            if (x.at(i)->getDim() != getDim()) {
                 std::cerr << "dim does not match" << std::endl;
                 abort();
             }
         }
-
-        ins = x;
-
-        int nSize = ins.size();
-        for (int i = 0; i < nSize; ++i) {
-            ins.at(i)->addParent(this);
-        }
-
-        cg.addNode(this);
+        setInputs(x);
+        afterForward(cg, x);
     }
 
     void compute() override {
@@ -85,12 +77,35 @@ public:
     }
 };
 
+class BatchedPAddNode : public BatchedNodeImpl<PAddNode> {
+public:
+    void init(Graph &graph, const vector<BatchedNode *> &inputs) {
+        allocateBatch(inputs.front()->getDim(), inputs.front()->batch().size());
+
+        for (BatchedNode *in : inputs) {
+            if (in->getDim() != getDim()) {
+                std::cerr << "dim does not match" << std::endl;
+                abort();
+            }
+        }
+
+        setInputsPerNode(inputs);
+        afterInit(graph, inputs);
+    }
+};
+
 namespace n3ldg_plus {
-    Node *add(Graph &graph, vector<Node*> inputs) {
+    Node *add(Graph &graph, const vector<Node*> &inputs) {
         int dim = inputs.front()->getDim();
         PAddNode *result = PAddNode::newNode(dim);
         result->forward(graph, inputs);
         return result;
+    }
+
+    BatchedNode *addInBatch(Graph &graph, const vector<BatchedNode *> &inputs) {
+        BatchedPAddNode *node = new BatchedPAddNode;
+        node->init(graph, inputs);
+        return node;
     }
 }
 

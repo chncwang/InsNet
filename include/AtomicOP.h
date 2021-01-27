@@ -188,9 +188,9 @@ protected:
     }
 };
 
-class DropoutNode : public Node, public Poolable<DropoutNode> {
+class DropoutNode : public UniInputNode, public Poolable<DropoutNode> {
 public:
-    DropoutNode() : Node("dropout") {}
+    DropoutNode() : UniInputNode("dropout") {}
 
     void initNode(int dim) override {
         init(dim);
@@ -217,12 +217,6 @@ public:
         }
     }
 
-    void forward(Graph &graph, Node &x) {
-        in_ = &x;
-        in_->addParent(this);
-        graph.addNode(this);
-    }
-
     void compute() override {
         if (is_training_) {
 #if !TEST_CUDA
@@ -231,11 +225,11 @@ public:
         } else {
             drop_mask_ = 1 - drop_value_;
         }
-        val().vec() = in_->val().vec() * drop_mask_.vec();
+        val().vec() = getInput()->val().vec() * drop_mask_.vec();
     }
 
     void backward() override {
-        in_->loss().vec() += loss().vec() * drop_mask_.vec();
+        getInput()->loss().vec() += loss().vec() * drop_mask_.vec();
     }
 
     string typeSignature() const override {
@@ -243,10 +237,6 @@ public:
     }
 
     PExecutor generate() override;
-
-    Node* in() {
-        return in_;
-    }
 
     bool isTraining() {
         return is_training_;
@@ -268,11 +258,36 @@ public:
         return drop_value_;
     }
 
+    Json::Value toJson() const override {
+        Json::Value json = UniInputNode::toJson();
+        json["dropout"] = drop_value_;
+        json["is_training"] = is_training_;
+        return json;
+    }
+
+protected:
+    virtual bool isDimLegal(const Node &input) const override {
+        return true;
+    }
+
 private:
-    Node* in_ = nullptr;
     Tensor1D drop_mask_;
     dtype drop_value_ = 0.0f;
     bool is_training_ = true;
+};
+
+class BatchedDropoutNode : public BatchedNodeImpl<DropoutNode> {
+public:
+    void init(Graph &graph, BatchedNode &input, dtype dropout, bool is_traning) {
+        allocateBatch(input.getDim(), input.batch().size());
+        for (Node *node : batch()) {
+            DropoutNode *d = dynamic_cast<DropoutNode *>(node);
+            d->setIsTraining(is_traning);
+            d->setDropValue(dropout);
+        }
+        setInputsPerNode({&input});
+        afterInit(graph, {&input});
+    }
 };
 
 class DropoutExecutor :public Executor {
@@ -303,12 +318,12 @@ public:
         ys.reserve(count);
         drop_mask.init(getDim(), count);
         for (Node *n : batch) {
-            DropoutNode *tanh = static_cast<DropoutNode*>(n);
+            DropoutNode *dropout_node = static_cast<DropoutNode*>(n);
 #if TEST_CUDA
-            tanh->in()->val().copyFromHostToDevice();
+            dropout_node->in()->val().copyFromHostToDevice();
 #endif
-            xs.push_back(tanh->in()->getVal().value);
-            ys.push_back(tanh->getVal().value);
+            xs.push_back(dropout_node->getInput()->getVal().value);
+            ys.push_back(dropout_node->getVal().value);
         }
 
         CalculateDropMask(count, getDim(), drop_mask);
@@ -339,14 +354,14 @@ public:
         losses.reserve(count);
         in_losses.reserve(count);
         for (Node *n : batch) {
-            DropoutNode *tanh = static_cast<DropoutNode*>(n);
+            DropoutNode *dropout_node = static_cast<DropoutNode*>(n);
 #if TEST_CUDA
-            tanh->loss().copyFromHostToDevice();
-            tanh->in()->loss().copyFromHostToDevice();
+            dropout_node->loss().copyFromHostToDevice();
+            dropout_node->in()->loss().copyFromHostToDevice();
 #endif
-            vals.push_back(tanh->val().value);
-            losses.push_back(tanh->loss().value);
-            in_losses.push_back(tanh->in()->loss().value);
+            vals.push_back(dropout_node->val().value);
+            losses.push_back(dropout_node->loss().value);
+            in_losses.push_back(dropout_node->getInput()->loss().value);
         }
         n3ldg_cuda::DropoutBackward(losses, vals, count, getDim(), isTraining(), drop_mask.value,
                 dropoutValue(), in_losses);
@@ -355,8 +370,8 @@ public:
             n->backward();
         }
         for (Node *n : batch) {
-            DropoutNode *tanh = static_cast<DropoutNode*>(n);
-            n3ldg_cuda::Assert(tanh->in()->loss().verify("DropoutExecutor backward"));
+            DropoutNode *dropout_node = static_cast<DropoutNode*>(n);
+            n3ldg_cuda::Assert(dropout_node->in()->loss().verify("DropoutExecutor backward"));
         }
 #endif
     }
@@ -792,6 +807,23 @@ private:
     friend class ScaledExecutor;
 };
 
+class BatchedScaledNode : public BatchedNodeImpl<ScaledNode> {
+public:
+    void init(Graph &graph, BatchedNode &input, const vector<dtype> &factors) {
+        const auto &dims = input.getDims();
+        allocateBatch(dims);
+
+        int i = 0;
+        for (Node *node : batch()) {
+            ScaledNode *s = dynamic_cast<ScaledNode *>(node);
+            s->setFactor(factors.at(i++));
+        }
+
+        setInputsPerNode({&input});
+        afterInit(graph, {&input});
+    }
+};
+
 #if USE_GPU
 class ScaledExecutor : public UniInputExecutor {
 public:
@@ -901,11 +933,32 @@ Node *dropout(Graph &graph, Node &input, dtype dropout, bool is_training) {
     return node;
 }
 
+BatchedNode *dropout(Graph &graph, BatchedNode &input, dtype dropout, bool is_training) {
+    BatchedDropoutNode *node = new BatchedDropoutNode;
+    node->init(graph, input, dropout, is_training);
+    return node;
+}
+
 Node *scaled(Graph &graph, Node &input, dtype factor) {
     ScaledNode *node = ScaledNode::newNode(input.getDim());
     node->setFactor(factor);
     node->forward(graph, input);
     return node;
+}
+
+BatchedNode *scaled(Graph &graph, BatchedNode &input, const vector<dtype> &factors) {
+    BatchedScaledNode *node = new BatchedScaledNode;
+    node->init(graph, input, factors);
+    return node;
+}
+
+BatchedNode *scaled(Graph &graph, BatchedNode &input, dtype factor) {
+    vector<dtype> factors;
+    factors.reserve(input.batch().size());
+    for (int i = 0; i < input.batch().size(); ++i) {
+        factors.push_back(factor);
+    }
+    return scaled(graph, input, factors);
 }
 
 }

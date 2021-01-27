@@ -39,20 +39,8 @@ public:
         Node::clear();
     }
 
-    void forward(Graph &cg, const vector<Node *>& x) {
-        if (x.size() == 0) {
-            std::cerr << "empty inputs for concat" << std::endl;
-            abort();
-        }
-
-        for (int i = 0; i < x.size(); i++) {
-            ins.push_back(x[i]);
-        }
-
+    void setInputs(const vector<Node *> &ins) override {
         int nSize = ins.size();
-        for (int i = 0; i < nSize; ++i) {
-            ins[i]->addParent(this);
-        }
         int curDim = 0;
         for (int i = 0; i < nSize; ++i) {
             inDims.push_back(ins.at(i)->getDim());
@@ -62,7 +50,17 @@ public:
             std::cerr << "input dim size not match" << curDim << "\t" << getDim() << std::endl;
             abort();
         }
-        cg.addNode(this);
+        this->ins = ins;
+    }
+
+    void forward(Graph &cg, const vector<Node *>& x) {
+        if (x.empty()) {
+            std::cerr << "empty inputs for concat" << std::endl;
+            abort();
+        }
+
+        setInputs(x);
+        afterForward(cg, x);
     }
 
     PExecutor generate() override;
@@ -186,24 +184,11 @@ public:
     void init(Graph &graph, const vector<BatchedNode *> &ins) {
         int dim = 0;
         for (BatchedNode *node : ins) {
-            dim += node->batch().front()->getDim();
+            dim += node->getDim();
         }
-
         allocateBatch(dim, ins.size());
-        auto &batch = BatchedNode::batch();
-        int i = 0;
-        for (Node *x : batch) {
-            ConcatNode *node = dynamic_cast<ConcatNode *>(x);
-            for (BatchedNode *in : ins) {
-                node->ins.push_back(in->batch().at(i));
-                node->inDims.push_back(in->batch().front()->getDim());
-            }
-            ++i;
-        }
-        for (BatchedNode *in : ins) {
-            in->addParent(this);
-        }
-        graph.addNode(this);
+        setInputsPerNode(ins);
+        afterInit(graph, ins);
     }
 };
 

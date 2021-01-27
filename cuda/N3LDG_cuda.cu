@@ -82,7 +82,10 @@ void CallCnmem(cnmemStatus_t status) {
 }
 
 void CallCublas(cublasStatus_t status) {
-    assert(status == CUBLAS_STATUS_SUCCESS);
+    if (status != CUBLAS_STATUS_SUCCESS) {
+        cerr << "cublasstatus:" << status << endl;
+        abort();
+    }
 }
 
 void CallCurand(curandStatus status) {

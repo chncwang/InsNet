@@ -400,21 +400,26 @@ vector<Node *> transformerEncoder(Graph &graph, TransformerEncoderParams &params
         dtype dropout,
         bool is_training) {
     using namespace n3ldg_plus;
-    vector<Node *> pos_encoded_layer;
     int sentence_len = inputs.batch().size();
-    pos_encoded_layer.reserve(sentence_len);
+    vector<int> pos_ids;
+    pos_ids.reserve(sentence_len);
     for (int i = 0; i < sentence_len; ++i) {
-        Node *embedding = n3ldg_plus::embedding(graph, params.positionalEncodingParam(), i, false);
-        Node *input = inputs.batch().at(i);
-        input = n3ldg_plus::scaled(graph, *input, ::sqrt(input->getDim()));
-        Node *pos_encoded = add(graph, {input, embedding});
-        pos_encoded = n3ldg_plus::dropout(graph, *pos_encoded, dropout, is_training);
-        pos_encoded_layer.push_back(pos_encoded);
+        pos_ids.push_back(i);
     }
+
+//    cout << "sen len:" << sentence_len << endl;
+    BatchedNode *pos_emb = embedding(graph, params.positionalEncodingParam(), pos_ids, false);
+//    cout << "pos_emb size:" << pos_emb->batch().size() << endl;
+    BatchedNode *scaled_input = scaled(graph, inputs, ::sqrt(inputs.getDim()));
+//    cout << "scaled_input size:" << scaled_input->batch().size() << endl;
+    BatchedNode *pos_encoded = addInBatch(graph, {&pos_emb, &scaled_input});
+//    cout << "pos_encoded size:" << pos_encoded->batch().size() << endl;
+    pos_encoded = n3ldg_plus::dropout(graph, *pos_encoded, dropout, is_training);
+//    cout << "pos_encoded size:" << pos_encoded->batch().size() << endl;
 
     int layer_count = params.layerCount();
 
-    vector<Node *> last_layer = pos_encoded_layer;
+    vector<Node *> last_layer = pos_encoded->batch();
     for (int i = 0; i < layer_count; ++i) {
         if (last_layer.size() != sentence_len) {
             cerr << "transformer - last_layer.size():" << last_layer.size() << " sentence_len:"

@@ -129,6 +129,7 @@ public:
 
     virtual Executor* generate() = 0;
     virtual string typeSignature() const = 0;
+    virtual int getDim() const = 0;
 
     virtual string getNodeType() const {
         return node_type_;
@@ -174,6 +175,22 @@ public:
 
     virtual NodeAbs &topologicalNode() = 0;
 
+    string toString() const {
+        return toJson().toStyledString();
+    }
+
+    virtual Json::Value toJson() const {
+        Json::Value json;
+        json["node_type"] = node_type_;
+        json["degree"] = degree_;
+        json["depth"] = depth_;
+        int i = 0;
+        for (NodeAbs *node : parents_) {
+            json["parent" + to_string(i++)] = node->toJson();
+        }
+        return json;
+    }
+
 private:
     string node_type_;
     int degree_ = 0;
@@ -206,7 +223,7 @@ public:
         return loss_;
     }
 
-    int getDim() const {
+    int getDim() const override {
         return dim_;
     }
 
@@ -259,8 +276,18 @@ public:
         batched_node_ = node;
     }
 
+    virtual void setInputs(const vector<Node*> &inputs) {}
+
+    Json::Value toJson() const override {
+        Json::Value json = NodeAbs::toJson();
+        json["dim"] = dim_;
+        json["col"] = column_;
+        json["batched_node"] = batched_node_;
+        return json;
+    }
+
 protected:
-    void afterForward(NodeContainer &container, vector<Node*> &ins) {
+    void afterForward(NodeContainer &container, const vector<Node*> &ins) {
         for (Node *in : ins) {
             in->addParent(this);
         }
@@ -288,7 +315,6 @@ private:
     Tensor1D val_;
     Tensor1D loss_;
     int dim_;
-    string node_name_;
     int column_ = 1;
     NodeAbs *batched_node_;
 };
@@ -312,6 +338,10 @@ public:
         NodeAbs::clear();
     }
 
+    int getDim() const override {
+        return batch_.front()->getDim();
+    }
+
     BatchedNode() : NodeAbs("") {}
 
     virtual string getNodeType() const override {
@@ -326,8 +356,46 @@ public:
         return batch_.front()->generate();
     }
 
+    const vector<int> &getDims() const {
+        if (dims_ == nullptr) {
+            dims_ = new vector<int>;
+            for (Node *node : batch_) {
+                dims_->push_back(node->getDim());
+            }
+        }
+        return *dims_;
+    }
+
+protected:
+    void afterInit(NodeContainer &graph, const vector<BatchedNode *> &ins) {
+        for (BatchedNode *x : ins) {
+            x->addParent(this);
+        }
+        graph.addNode(this);
+    }
+
+    void setInputsPerNode(const vector<BatchedNode *> &batched_inputs) {
+        for (int i = 0; i < batch_.size(); ++i) {
+            vector<Node *> ins;
+            for (BatchedNode *in : batched_inputs) {
+                ins.push_back(in->batch().at(i));
+            }
+            batch().at(i)->setInputs(ins);
+        }
+    }
+
+    Json::Value toJson() const override {
+        Json::Value json = NodeAbs::toJson();
+        int i = 0;
+        for (Node *node : batch_) {
+            json["batch" + to_string(i++)] = node->toJson();
+        }
+        return json;
+    }
+
 private:
     vector<Node *> batch_;
+    mutable vector<int> *dims_ = nullptr;
 };
 
 template<typename NodeType>
@@ -526,19 +594,29 @@ public:
         return Node::typeSignature() + "-" + to_string(input_->getDim()) + "-";
     }
 
+    void setInputs(const vector<Node *> &ins) override {
+        input_ = ins.front();
+    }
+
     void forward(NodeContainer &container, Node &input) {
         if (!isDimLegal(input)) {
             cerr << boost::format("dim:%1% input dim:%2%") % Node::getDim() % input.getDim() <<
                 endl;
             abort();
         }
-        input_ = &input;
-        vector<Node*> ins = {input_};
+        vector<Node*> ins = {&input};
+        setInputs(ins);
         Node::afterForward(container, ins);
     }
 
     Node *getInput() const {
         return input_;
+    }
+
+    Json::Value toJson() const override {
+        Json::Value json = NodeAbs::toJson();
+        json["input"] = input_ == nullptr ? nullptr : input_->toJson();
+        return json;
     }
 
 protected:

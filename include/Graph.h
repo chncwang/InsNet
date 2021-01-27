@@ -69,6 +69,11 @@ public:
         }
 
         if (globalPoolEnabled()) {
+            for (NodeAbs *node : all_nodes) {
+                if (node->isBatched()) {
+                    delete node;
+                }
+            }
             auto &refs = globalPoolReferences();
             for (auto &e : refs) {
                 e->second = 0;
