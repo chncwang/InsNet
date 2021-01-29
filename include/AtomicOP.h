@@ -152,9 +152,22 @@ public:
         return new ActivationExecutor<ActivatedEnum::RELU>;
     }
 
+    string typeSignature() const override {
+        return Node::typeSignature();
+    }
+
 protected:
     virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
+    }
+};
+
+class BatchedReluNode : public BatchedNodeImpl<ReluNode> {
+public:
+    void init(Graph &graph, BatchedNode &input) {
+        allocateBatch(input.getDim(), input.batch().size());
+        setInputsPerNode({&input});
+        afterInit(graph, {&input});
     }
 };
 
@@ -949,6 +962,12 @@ Node *relu(Graph &graph, Node &input) {
     ReluNode *result = ReluNode::newNode(input.getDim());
     result->forward(graph, input);
     return result;
+}
+
+BatchedNode *relu(Graph &graph, BatchedNode &input) {
+    BatchedReluNode *node = new BatchedReluNode;
+    node->init(graph, input);
+    return node;
 }
 
 Node *sqrt(Graph &graph, Node &input) {

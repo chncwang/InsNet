@@ -35,7 +35,7 @@ public:
     }
 
     void forward(Graph &graph, Node &minuend, Node &subtrahend) {
-        vector<Node*> ins = {minuend_, subtrahend_};
+        vector<Node*> ins = {&minuend, &subtrahend};
         setInputs(ins);
         afterForward(graph, ins);
     }

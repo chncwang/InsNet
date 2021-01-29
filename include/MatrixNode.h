@@ -539,11 +539,11 @@ public:
             MatrixAndVectorMultiNode *m = dynamic_cast<MatrixAndVectorMultiNode *>(node);
             m->head_count_ = head_count;
             m->setInputs({&matrix, vec.batch().at(+i++)});
-
-            matrix.addParent(this);
-            vec.addParent(this);
-            graph.addNode(this);
         }
+
+        matrix.addParent(this);
+        vec.addParent(this);
+        graph.addNode(this);
     }
 };
 

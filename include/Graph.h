@@ -251,6 +251,29 @@ public:
                 }
             }
             std::cerr << "unprocessed: " << unprocessed << std::endl;
+
+            set<void *> node_addr_table;
+            for (NodeAbs *node : finish_nodes) {
+                node_addr_table.insert(node);
+            }
+
+            for (NodeAbs *node : all_nodes) {
+                if (node_addr_table.find(node) == node_addr_table.end()) {
+                    cerr << "node: " << node->typeSignature() << endl;
+                }
+            }
+
+            set<void *> all_node_table;
+            for (NodeAbs *node : all_nodes) {
+                auto it = all_node_table.find(node);
+                if (it == all_node_table.end()) {
+                    all_node_table.insert(node);
+                } else {
+                    cerr << "duplicated node:" << node->typeSignature() << endl;
+                    abort();
+                }
+            }
+
             abort();
         }
     }
