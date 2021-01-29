@@ -118,23 +118,23 @@ struct DynamicLSTMBuilder {
         }
 
         using namespace n3ldg_plus;
-        Node *inputgate_hidden = linear(graph, lstm_params.input_hidden, *last_hidden);
-        Node *inputgate_input = linear(graph, lstm_params.input_input, input);
+        Node *inputgate_hidden = linear(graph, *last_hidden, lstm_params.input_hidden);
+        Node *inputgate_input = linear(graph, input, lstm_params.input_input);
         Node *inputgate_add = add(graph, {inputgate_hidden, inputgate_input});
         Node *inputgate = sigmoid(graph, *inputgate_add);
 
-        Node *forgetgate_hidden = linear(graph, lstm_params.forget_hidden, *last_hidden);
-        Node *forgetgate_input = linear(graph, lstm_params.forget_input, input);
+        Node *forgetgate_hidden = linear(graph, *last_hidden, lstm_params.forget_hidden);
+        Node *forgetgate_input = linear(graph, input, lstm_params.forget_input);
         Node *forgetgate_add = add(graph, {forgetgate_hidden, forgetgate_input});
         Node *forgetgate = sigmoid(graph, *forgetgate_add);
 
-        Node *outputgate_hidden = linear(graph, lstm_params.output_hidden, *last_hidden);
-        Node *outputgate_input = linear(graph, lstm_params.output_input, input);
+        Node *outputgate_hidden = linear(graph, *last_hidden, lstm_params.output_hidden);
+        Node *outputgate_input = linear(graph, input, lstm_params.output_input);
         Node *outputgate_add = add(graph, {outputgate_hidden, outputgate_input});
         Node *outputgate = sigmoid(graph, *outputgate_add);
 
-        Node *halfcell_hidden = linear(graph, lstm_params.cell_hidden, *last_hidden);
-        Node *halfcell_input = linear(graph, lstm_params.cell_input, input);
+        Node *halfcell_hidden = linear(graph, *last_hidden, lstm_params.cell_hidden);
+        Node *halfcell_input = linear(graph, input, lstm_params.cell_input);
         Node *halfcell_add = add(graph, {halfcell_hidden, halfcell_input});
         Node *halfcell = tanh(graph, *halfcell_add);
         Node *inputfilter = pointwiseMultiply(graph, *inputgate, *halfcell);

@@ -32,15 +32,18 @@ public:
     }
 
     void forward(Graph &graph, Node &input1, Node &input2) {
-        this->forward(&graph, &input1, &input2);
+        setInputs({&input1, &input2});
+        afterForward(graph, {&input1, &input2});
     }
 
-    void forward(Graph *cg, Node * x1, Node * x2) {
-        in1 = x1;
-        in2 = x2;
-        x1->addParent(this);
-        x2->addParent(this);
-        cg->addNode(this);
+    void setInputs(const vector<Node *> &inputs) override {
+        in1 = inputs.at(0);
+        in2 = inputs.at(1);
+        if (in1->getDim() != getDim() || in2->getDim() != getDim()) {
+            cerr << boost::format("PMultiNode setInputs dim error a:%1% b:%2% self:%3%") %
+                in1->getDim() % in2->getDim() % getDim() << endl;
+            abort();
+        }
     }
 
     void compute() override {
@@ -53,6 +56,15 @@ public:
     }
 
     Executor * generate() override;
+};
+
+class BatchedPMultiNode : public BatchedNodeImpl<PMultiNode> {
+public:
+    void init(Graph &graph, BatchedNode &a, BatchedNode &b) {
+        allocateBatch(a.getDim(), a.batch().size());
+        setInputsPerNode({&a, &b});
+        afterInit(graph, {&a, &b});
+    }
 };
 
 class PMultiExecutor :public Executor {
@@ -135,6 +147,16 @@ Node *pointwiseMultiply(Graph &graph, Node &a, Node &b) {
     }
     PMultiNode *node = PMultiNode::newNode(a.getDim());
     node->forward(graph, a, b);
+    return node;
+}
+
+BatchedNode *pointwiseMultiply(Graph &graph, BatchedNode &a, BatchedNode &b) {
+    if (a.getDim() != b.getDim()) {
+        cerr << boost::format("a dim:%1% b dim:%2%") % a.getDim() % b.getDim() << endl;
+        abort();
+    }
+    BatchedPMultiNode *node = new BatchedPMultiNode;
+    node->init(graph, a, b);
     return node;
 }
 

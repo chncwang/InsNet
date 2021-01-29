@@ -368,7 +368,7 @@ public:
 
 protected:
     void afterInit(NodeContainer &graph, const vector<BatchedNode *> &ins) {
-        for (BatchedNode *x : ins) {
+        for (NodeAbs *x : ins) {
             x->addParent(this);
         }
         graph.addNode(this);

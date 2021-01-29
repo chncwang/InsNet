@@ -70,7 +70,7 @@ Node *layerNormalization(Graph &graph, LayerNormalizationParams &params,
     using namespace n3ldg_plus;
     Node *sum = vectorSum(graph, input_layer, 1);
     Node *avg = scaled(graph, *sum, 1.0 / input_layer.getDim());
-    Node *avg_vector = scalarToVector(graph, input_layer.getDim(), *avg);
+    Node *avg_vector = scalarToVector(graph, *avg, input_layer.getDim());
     Node *zeros_around = sub(graph, input_layer, *avg_vector);
     Node *square = pointwiseMultiply(graph, *zeros_around, *zeros_around);
     Node *square_sum = vectorSum(graph, *square, 1);
@@ -78,12 +78,34 @@ Node *layerNormalization(Graph &graph, LayerNormalizationParams &params,
     square_sum = add(graph, {square_sum, eps});
     Node *var = scaled(graph, *square_sum, 1.0 / input_layer.getDim());
     Node *standard_deviation = sqrt(graph, *var);
-    standard_deviation = scalarToVector(graph, input_layer.getDim(), *standard_deviation);
+    standard_deviation = scalarToVector(graph, *standard_deviation, input_layer.getDim());
     Node *g = embedding(graph, params.g(), 0, true);
     Node *factor = fullDiv(graph, *g, *standard_deviation);
 
     Node *scaled = pointwiseMultiply(graph, *factor, *zeros_around);
-    Node *biased = bias(graph, params.b(), *scaled);
+    Node *biased = bias(graph, *scaled, params.b());
+    return biased;
+}
+
+BatchedNode *layerNormalization(Graph &graph, LayerNormalizationParams &params,
+        BatchedNode &input_layer) {
+    using namespace n3ldg_plus;
+    BatchedNode *sum = vectorSum(graph, input_layer, 1);
+    BatchedNode *avg = scaled(graph, *sum, 1.0 / input_layer.getDim());
+    BatchedNode *avg_vector = scalarToVector(graph, *avg, input_layer.getDim());
+    BatchedNode *zeros_around = sub(graph, input_layer, *avg_vector);
+    BatchedNode *square = pointwiseMultiply(graph, *zeros_around, *zeros_around);
+    BatchedNode *square_sum = vectorSum(graph, *square, 1);
+    BatchedNode *eps = bucket(graph, 1, input_layer.batch().size(), 1e-6);
+    square_sum = addInBatch(graph, {square_sum, eps});
+    BatchedNode *var = scaled(graph, *square_sum, 1.0 / input_layer.getDim());
+    BatchedNode *standard_deviation = sqrt(graph, *var);
+    standard_deviation = scalarToVector(graph, *standard_deviation, input_layer.getDim());
+    BatchedNode *g = embedding(graph, params.g(), 0, input_layer.batch().size(), true);
+    BatchedNode *factor = fullDiv(graph, *g, *standard_deviation);
+
+    BatchedNode *scaled = pointwiseMultiply(graph, *factor, *zeros_around);
+    BatchedNode *biased = bias(graph, *scaled, params.b());
     return biased;
 }
 

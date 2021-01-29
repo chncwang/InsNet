@@ -41,6 +41,27 @@ pair<Node *, Node *> dotAttention(Graph &graph, Node& key_matrix,
     return make_pair(hidden, scaled_weight);
 }
 
+pair<BatchedNode *, BatchedNode *> dotAttention(Graph &graph, Node& key_matrix,
+        Node& value_matrix,
+        BatchedNode& guide,
+        int col,
+        int head_count) {
+    if (guide.getDim() % head_count != 0) {
+        cerr << boost::format("head count is %1%, guide dim is %2%") % head_count % guide.getDim()
+            << endl;
+        abort();
+    }
+    BatchedNode *matrix = n3ldg_plus::matrixPointwiseMultiply(graph, key_matrix, guide);
+    BatchedNode *sum = n3ldg_plus::matrixColSum(graph, *matrix, head_count * col);
+    BatchedNode *transposed_sum = n3ldg_plus::transposeMatrix(graph, *sum, head_count);
+    BatchedNode *scaled_weight = n3ldg_plus::scaled(graph, *transposed_sum,
+            1.0 / ::sqrt((dtype)guide.getDim() / head_count));
+    scaled_weight = n3ldg_plus::softmax(graph, *scaled_weight, head_count);
+    BatchedNode *hidden = n3ldg_plus::matrixAndVectorMulti(graph, value_matrix, *scaled_weight,
+            head_count);
+    return make_pair(hidden, scaled_weight);
+}
+
 Node * dotAttentionWeights(Graph &cg, Node& key_matrix, Node& guide) {
     Node *matrix = n3ldg_plus::matrixPointwiseMultiply(cg, key_matrix, guide);
     Node *sum = n3ldg_plus::matrixColSum(cg, *matrix, 1);
@@ -112,13 +133,13 @@ public:
             abort();
         }
 
-        Node *q = linear(graph, params.q, guide);
+        Node *q = linear(graph, guide, params.q);
 
         for (int idx = 0; idx < values.size(); idx++) {
-            Node *k = linear(graph, params.k, *values.at(idx));
+            Node *k = linear(graph, *values.at(idx), params.k);
             Node *sum = add(graph, {k, q});
             Node *nonlinear = tanh(graph, *sum);
-            Node *w = linear(graph, params.w3t, *nonlinear);
+            Node *w = linear(graph, *nonlinear, params.w3t);
             _weights.push_back(w);
         }
 
@@ -131,14 +152,14 @@ namespace n3ldg_plus {
 vector<Node *> additiveAttentionWeights(Graph &graph, AdditiveAttentionParams &params,
         vector<Node *> &values,
         Node& guide) {
-    Node *q = linear(graph, params.q, guide);
+    Node *q = linear(graph, guide, params.q);
     vector<Node *> weights;
 
     for (int idx = 0; idx < values.size(); idx++) {
-        Node *k = linear(graph, params.k, *values.at(idx));
+        Node *k = linear(graph, *values.at(idx), params.k);
         Node *sum = add(graph, {k, q});
         Node *nonlinear = tanh(graph, *sum);
-        Node *w = linear(graph, params.w3t, *nonlinear);
+        Node *w = linear(graph, *nonlinear, params.w3t);
         weights.push_back(w);
     }
     return weights;

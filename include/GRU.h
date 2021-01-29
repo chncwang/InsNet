@@ -99,19 +99,19 @@ struct DynamicGRUBuilder {
         Node *last_hidden = len == 0 ? &h0 : hiddens.at(len - 1);
         using namespace n3ldg_plus;
 
-        Node *update_input = linear(graph, gru_params.update_input, input);
-        Node *update_hidden = linear(graph, gru_params.update_hidden, *last_hidden);
+        Node *update_input = linear(graph, input, gru_params.update_input);
+        Node *update_hidden = linear(graph, *last_hidden, gru_params.update_hidden);
         Node *update_gate = add(graph, {update_input, update_hidden});
         update_gate = sigmoid(graph, *update_gate);
 
-        Node *reset_input = linear(graph, gru_params.reset_input, input);
-        Node *reset_hidden = linear(graph, gru_params.reset_hidden, *last_hidden);
+        Node *reset_input = linear(graph, input, gru_params.reset_input);
+        Node *reset_hidden = linear(graph, *last_hidden, gru_params.reset_hidden);
         Node *reset_gate = add(graph, {reset_input, reset_hidden});
         reset_gate = sigmoid(graph, *reset_gate);
 
-        Node *candidate_input = linear(graph, gru_params.candidate_input, input);
+        Node *candidate_input = linear(graph, input, gru_params.candidate_input);
         Node *updated_hidden = pointwiseMultiply(graph, *reset_gate, *last_hidden);
-        Node *candidate_hidden = linear(graph, gru_params.candidate_hidden, *updated_hidden);
+        Node *candidate_hidden = linear(graph, *updated_hidden, gru_params.candidate_hidden);
         Node *candidate = add(graph, {candidate_input, candidate_hidden});
         candidate = tanh(graph, *candidate);
 

@@ -40,18 +40,6 @@ public:
         graph.addNode(this);
     }
 
-    void forward(Graph &graph, dtype v) {
-        vector<dtype> input;
-        for (int i = 0; i < getDim(); ++i) {
-            input.push_back(v);
-        }
-        forward(graph, input);
-    }
-
-    void forward(Graph &graph) {
-        forward(graph, 0);
-    }
-
     void compute() override {
         abort();
     }
@@ -62,18 +50,37 @@ public:
 
     PExecutor generate() override;
 
-protected:
+    void setVals(const vector<dtype> &vals) {
+        input_ = vals;
+    }
 
 private:
     vector<dtype> input_;
     friend class BucketExecutor;
 };
 
+class BatchedBucketNode : public BatchedNodeImpl<BucketNode> {
+public:
+    void init(Graph &graph, const vector<dtype> &vals, int batch_size) {
+        allocateBatch(vals.size(), batch_size);
+        for (Node *node : batch()) {
+            BucketNode *b = dynamic_cast<BucketNode *>(node);
+            b->setVals(vals);
+        }
+        graph.addNode(this);
+    }
+};
+
 namespace n3ldg_plus {
 
 Node *bucket(Graph &graph, int dim, float v) {
+    vector<dtype> vals;
+    vals.reserve(dim);
+    for (int i = 0; i < dim; ++i) {
+        vals.push_back(v);
+    }
     BucketNode *bucket = BucketNode::newNode(dim);
-    bucket->forward(graph, v);
+    bucket->forward(graph, vals);
     return bucket;
 }
 
@@ -81,6 +88,23 @@ Node *bucket(Graph &graph, const vector<float> &v) {
     BucketNode *bucket = BucketNode::newNode(v.size());
     bucket->forward(graph, v);
     return bucket;
+}
+
+BatchedBucketNode *bucket(Graph &graph, int batch_size, const vector<dtype> &v) {
+    BatchedBucketNode *node = new BatchedBucketNode;
+    node->init(graph, v, batch_size);
+    return node;
+}
+
+BatchedBucketNode *bucket(Graph &graph, int dim, int batch_size, dtype v) {
+    vector<dtype> vals;
+    vals.reserve(dim);
+    for (int i = 0; i < dim; ++i) {
+        vals.push_back(v);
+    }
+    BatchedBucketNode *node = new BatchedBucketNode;
+    node->init(graph, vals, batch_size);
+    return node;
 }
 
 }

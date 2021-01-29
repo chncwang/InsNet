@@ -188,6 +188,15 @@ protected:
     }
 };
 
+class BatchedSqrtNode : public BatchedNodeImpl<SqrtNode> {
+public:
+    void init(Graph &graph, BatchedNode &input) {
+        allocateBatch(input.getDim(), input.batch().size());
+        setInputsPerNode({&input});
+        afterInit(graph, {&input});
+    }
+};
+
 class DropoutNode : public UniInputNode, public Poolable<DropoutNode> {
 public:
     DropoutNode() : UniInputNode("dropout") {}
@@ -442,6 +451,15 @@ private:
     friend class MaxScalarExecutor;
 };
 
+class BatchedMaxScalarNode : public BatchedNodeImpl<MaxScalarNode> {
+public:
+    void init(Graph &graph, BatchedNode &input, int input_col) {
+        allocateBatch(input_col, input.batch().size());
+        setInputsPerNode({&input});
+        afterInit(graph, {&input});
+    }
+};
+
 #if USE_GPU
 class MaxScalarExecutor : public UniInputExecutor {
 public:
@@ -557,6 +575,15 @@ private:
     friend class ScalarToVectorExecutor;
 };
 
+class BatchedScalarToVectorNode : public BatchedNodeImpl<ScalarToVectorNode> {
+public:
+    void init(Graph &graph, BatchedNode &input, int row) {
+        allocateBatch(row * input.getDim(), input.batch().size());
+        setInputsPerNode({&input});
+        afterInit(graph, {&input});
+    }
+};
+
 #if USE_GPU
 class ScalarToVectorExecutor : public UniInputExecutor {
 public:
@@ -658,6 +685,15 @@ private:
     friend class ExpExecutor;
 };
 
+class BatchedExpNode : public BatchedNodeImpl<ExpNode> {
+public:
+    void init(Graph &graph, BatchedNode &input) {
+        allocateBatch(input.getDims());
+        setInputsPerNode({&input});
+        afterInit(graph, {&input});
+    }
+};
+
 class SumNode : public UniInputNode, public Poolable<SumNode> {
 public:
     SumNode(): UniInputNode("sum") {}
@@ -703,6 +739,15 @@ protected:
 
 private:
     friend class SumExecutor;
+};
+
+class BatchedSumNode : public BatchedNodeImpl<SumNode> {
+public:
+    void init(Graph &graph, BatchedNode &input, dtype dim) {
+        allocateBatch(dim, input.batch().size());
+        setInputsPerNode({&input});
+        afterInit(graph, {&input});
+    }
 };
 
 #if USE_GPU
@@ -882,6 +927,12 @@ Node *maxScalar(Graph &graph, Node &input, int input_col) {
     return node;
 }
 
+BatchedNode *maxScalar(Graph &graph, BatchedNode &input, int input_col) {
+    BatchedMaxScalarNode *node = new BatchedMaxScalarNode;
+    node->init(graph, input, input_col);
+    return node;
+};
+
 Node *tanh(Graph &graph, Node &input) {
     TanhNode *result = TanhNode::newNode(input.getDim());
     result->forward(graph, input);
@@ -906,10 +957,22 @@ Node *sqrt(Graph &graph, Node &input) {
     return result;
 }
 
-Node *scalarToVector(Graph &graph, int row, Node &input) {
+BatchedNode *sqrt(Graph &graph, BatchedNode &input) {
+    BatchedSqrtNode *node = new BatchedSqrtNode;
+    node->init(graph, input);
+    return node;
+}
+
+Node *scalarToVector(Graph &graph, Node &input, int row) {
     ScalarToVectorNode *node = ScalarToVectorNode::newNode(row * input.getDim());
     node->setColumn(input.getDim());
     node->forward(graph, input);
+    return node;
+}
+
+BatchedNode *scalarToVector(Graph &graph, BatchedNode &input, int row) {
+    BatchedScalarToVectorNode *node = new BatchedScalarToVectorNode;
+    node->init(graph, input, row);
     return node;
 }
 
@@ -919,9 +982,21 @@ Node *vectorSum(Graph &graph, Node &input,  int input_col) {
     return sum;
 }
 
+BatchedNode *vectorSum(Graph &graph, BatchedNode &input,  int input_col) {
+    BatchedSumNode *node = new BatchedSumNode;
+    node->init(graph, input, input_col);
+    return node;
+}
+
 Node *exp(Graph &graph, Node &input) {
     ExpNode *node = ExpNode::newNode(input.getDim());
     node->forward(graph, input);
+    return node;
+}
+
+BatchedNode *exp(Graph &graph, BatchedNode &input) {
+    BatchedExpNode *node = new BatchedExpNode;
+    node->init(graph, input);
     return node;
 }
 

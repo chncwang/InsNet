@@ -55,7 +55,7 @@ Node* attention(Graph &graph, vector<Node *>& inputs, vector<Node *>& scores) {
     vector<Node*> splitted_vector;
     for (int i = 0; i < scores.size(); ++i) {
         Node * split = n3ldg_plus::split(graph, 1, *softmax, i);
-        splitted_vector.push_back(scalarToVector(graph, input_dim, *split));
+        splitted_vector.push_back(scalarToVector(graph, *split, input_dim));
     }
 
     if (splitted_vector.size() != inputs.size()) {

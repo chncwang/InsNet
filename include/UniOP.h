@@ -81,11 +81,8 @@ protected:
     }
 };
 
-class LinearNode : public Node, public Poolable<LinearNode> {
+class LinearNode : public UniInputNode, public Poolable<LinearNode> {
 public:
-    Node * in;
-    UniParams* param;
-
     void initNode(int dim) override {
         init(dim);
     }
@@ -94,31 +91,14 @@ public:
         setDim(dim);
     }
 
-    LinearNode() : Node("linear") {
-        in = NULL;
-        param = NULL;
-    }
+    LinearNode() : UniInputNode("linear") {}
 
     void setParam(UniParams &uni_params) {
-        this->setParam(&uni_params);
+        param_ = &uni_params;
     }
 
-    void setParam(UniParams* paramInit) {
-        if (paramInit->bUseB) {
-            assert(paramInit->W.outDim() == paramInit->b.outDim());
-        }
-        param = paramInit;
-    }
-
-    void forward(Graph &graph, Node &x) {
-        if (x.getDim() != param->W.inDim()) {
-            cerr << boost::format("input dim:%1% preset in dim:%2%") % x.getDim() % param->W.inDim()
-                << endl;
-            abort();
-        }
-        in = &x;
-        in->addParent(this);
-        graph.addNode(this);
+    UniParams &getParams() {
+        return *param_;
     }
 
     void compute() override {
@@ -132,7 +112,28 @@ public:
     Executor * generate() override;
 
     string typeSignature() const override {
-        return Node::typeSignature() + "-" + addressToString(param);
+        return Node::typeSignature() + "-" + addressToString(param_);
+    }
+
+protected:
+    virtual bool isDimLegal(const Node &input) const override {
+        return input.getDim() == param_->W.inDim();
+    }
+
+private:
+    UniParams* param_ = nullptr;
+};
+
+class BatchedLinearNode : public BatchedNodeImpl<LinearNode> {
+public:
+    void init(Graph &graph, BatchedNode &input, UniParams &params) {
+        allocateBatch(params.W.outDim(), input.batch().size());
+        for (Node *node : batch()) {
+            LinearNode *l = dynamic_cast<LinearNode*>(node);
+            l->setParam(params);
+        }
+        setInputsPerNode({&input});
+        afterInit(graph, {&input});
     }
 };
 
@@ -140,8 +141,19 @@ public:
 class LinearExecutor :public Executor {
 public:
     Tensor2D x, y, b;
-    int inDim, outDim;
-    UniParams* param;
+
+    UniParams &params() {
+        LinearNode *l = dynamic_cast<LinearNode *>(batch.front());
+        return l->getParams();
+    }
+
+    int inDim() {
+        return params().W.inDim();
+    }
+
+    int outDim() {
+        return params().W.outDim();
+    }
 
     void  forward() {
         int count = batch.size();
@@ -152,8 +164,8 @@ public:
         }
 #endif
 
-        x.init(inDim, count);
-        y.init(outDim, count);
+        x.init(inDim(), count);
+        y.init(outDim(), count);
 #if TEST_CUDA
         b.init(outDim, count);
 #endif
@@ -164,18 +176,18 @@ public:
         for (int i = 0; i < batch.size(); ++i) {
             LinearNode *n = static_cast<LinearNode*>(batch.at(i));
 
-            xs.push_back(n->in->val().value);
+            xs.push_back(n->getInput()->val().value);
             ys.push_back(n->val().value);
 #if TEST_CUDA
             n->in->val().copyFromDeviceToHost();
 #endif
         }
 
-        n3ldg_cuda::CopyForUniNodeForward(xs, param->b.val.value,
-                x.value, y.value, count, inDim, outDim, param->bUseB);
+        n3ldg_cuda::CopyForUniNodeForward(xs, params().b.val.value,
+                x.value, y.value, count, inDim(), outDim(), params().bUseB);
 
-        n3ldg_cuda::MatrixMultiplyMatrix(param->W.val.value, x.value, y.value,
-                outDim, inDim, count, param->bUseB);
+        n3ldg_cuda::MatrixMultiplyMatrix(params().W.val.value, x.value, y.value,
+                outDim(), inDim(), count, params().bUseB);
 
         std::vector<dtype*> vals;
         vals.reserve(count);
@@ -183,7 +195,7 @@ public:
             vals.push_back(node->val().value);
         }
 
-        n3ldg_cuda::CopyFromOneVectorToMultiVals(y.value, vals, count, outDim);
+        n3ldg_cuda::CopyFromOneVectorToMultiVals(y.value, vals, count, outDim());
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
@@ -238,8 +250,8 @@ public:
         }
 #endif
         Tensor2D lx, ly;
-        lx.init(inDim, count);
-        ly.init(outDim, count);
+        lx.init(inDim(), count);
+        ly.init(outDim(), count);
 
         std::vector<dtype*> ly_vec;
         ly_vec.reserve(count);
@@ -247,21 +259,20 @@ public:
             LinearNode* ptr = (LinearNode*)batch[i];
             ly_vec.push_back(ptr->loss().value);
         }
-        n3ldg_cuda::CopyFromMultiVectorsToOneVector(ly_vec, ly.value, count, outDim);
-        n3ldg_cuda::MatrixMultiplyMatrix(ly.value, x.value,
-                param->W.grad.value, outDim, count, inDim, true, true, false);
-        n3ldg_cuda::MatrixMultiplyMatrix(param->W.val.value, ly.value,
-                lx.value, inDim, outDim, count, false, false, true);
+        n3ldg_cuda::CopyFromMultiVectorsToOneVector(ly_vec, ly.value, count, outDim());
+        n3ldg_cuda::MatrixMultiplyMatrix(ly.value, x.value, params().W.grad.value, outDim(), count,
+                inDim(), true, true, false);
+        n3ldg_cuda::MatrixMultiplyMatrix(params().W.val.value, ly.value, lx.value, inDim(),
+                outDim(), count, false, false, true);
         std::vector<dtype*> losses;
         losses.reserve(count);
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
-            losses.push_back(ptr->in->loss().value);
+            losses.push_back(ptr->getInput()->loss().value);
         }
 
-        n3ldg_cuda::AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(
-                ly.value, lx.value, param->b.grad.value, losses, count,
-                outDim, inDim, param->bUseB);
+        n3ldg_cuda::AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(ly.value, lx.value,
+                params().b.grad.value, losses, count, outDim(), inDim(), params().bUseB);
 
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
@@ -375,12 +386,7 @@ public:
 #endif
 
 Executor * LinearNode::generate() {
-    LinearExecutor* exec = new LinearExecutor();
-    exec->batch.push_back(this);
-    exec->inDim = param->W.inDim();
-    exec->outDim = param->W.outDim();
-    exec->param = param;
-    return exec;
+    return new LinearExecutor();
 };
 
 class LinearWordVectorExecutor;
@@ -706,7 +712,7 @@ public:
     }
 
     virtual string typeSignature() const override {
-        return UniInputNode::typeSignature() + "-" + addressToString(bias_param_);
+        return Node::typeSignature() + "-" + addressToString(bias_param_);
     }
 
     void compute() override {
@@ -741,6 +747,19 @@ protected:
 private:
     BiasParam *bias_param_;
     friend class BiasExecutor;
+};
+
+class BatchedBiasNode : public BatchedNodeImpl<BiasNode> {
+public:
+    void init(Graph &graph, BatchedNode &input, BiasParam &param) {
+        allocateBatch(input.getDim(), input.batch().size());
+        for (Node *node : batch()) {
+            BiasNode *b = dynamic_cast<BiasNode *>(node);
+            b->setParam(param);
+        }
+        setInputsPerNode({&input});
+        afterInit(graph, {&input});
+    }
 };
 
 #if USE_GPU
@@ -798,7 +817,7 @@ Executor *BiasNode::generate() {
 
 namespace n3ldg_plus {
 
-Node *linear(Graph &graph, UniParams &params, Node &input) {
+Node *linear(Graph &graph, Node &input, UniParams &params) {
     int dim = params.W.outDim();
     LinearNode *uni = LinearNode::newNode(dim);
     uni->setParam(params);
@@ -806,11 +825,17 @@ Node *linear(Graph &graph, UniParams &params, Node &input) {
     return uni;
 }
 
+BatchedNode *linear(Graph &graph, BatchedNode &input, UniParams &params) {
+    BatchedLinearNode *node = new BatchedLinearNode;
+    node->init(graph, input, params);
+    return node;
+}
+
 Node *uni(Graph &graph, UniParams &params, Node &input, ActivatedEnum activated_type =
         ActivatedEnum::TANH) {
     int dim = params.W.outDim();
 
-    Node *uni = linear(graph, params, input);
+    Node *uni = linear(graph, input, params);
 
     UniInputNode *activated;
     if (activated_type == ActivatedEnum::TANH) {
@@ -829,11 +854,17 @@ Node *uni(Graph &graph, UniParams &params, Node &input, ActivatedEnum activated_
     return activated;
 }
 
-Node *bias(Graph &graph, BiasParam &param, Node &input) {
+Node *bias(Graph &graph, Node &input, BiasParam &param) {
     int dim = input.getDim();
     BiasNode *node = BiasNode::newNode(dim);
     node->setParam(param);
     node->forward(graph, input);
+    return node;
+}
+
+BatchedNode *bias(Graph &graph, BatchedNode &input, BiasParam &param) {
+    BatchedBiasNode *node = new BatchedBiasNode;
+    node->init(graph, input, param);
     return node;
 }
 

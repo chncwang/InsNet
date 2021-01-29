@@ -22,7 +22,9 @@ public:
         return getNodeType();
     }
 
-    void forward(Graph &graph, Node &minuend, Node &subtrahend) {
+    void setInputs(const vector<Node *> &inputs) override {
+        Node &minuend = *inputs.at(0);
+        Node &subtrahend = *inputs.at(1);
         if (getDim() != minuend.getDim() || getDim() != subtrahend.getDim()) {
             cerr << boost::format("dim:%1% minuend:%2% subtrahend:%3%") % getDim() %
                 minuend.getDim() % subtrahend.getDim() << endl;
@@ -30,7 +32,11 @@ public:
         }
         minuend_ = &minuend;
         subtrahend_ = &subtrahend;
+    }
+
+    void forward(Graph &graph, Node &minuend, Node &subtrahend) {
         vector<Node*> ins = {minuend_, subtrahend_};
+        setInputs(ins);
         afterForward(graph, ins);
     }
 
@@ -51,12 +57,27 @@ private:
     friend class SubExecutor;
 };
 
+class BatchedSubNode : public BatchedNodeImpl<SubNode> {
+public:
+    void init(Graph &graph, BatchedNode &minuend, BatchedNode &subtrahend) {
+        allocateBatch(minuend.getDims());
+        setInputsPerNode({&minuend, &subtrahend});
+        afterInit(graph, {&minuend, &subtrahend});
+    }
+};
+
 namespace n3ldg_plus {
 
 Node *sub(Graph &graph, Node &minuend, Node &subtrahend) {
     SubNode *result = SubNode::newNode(minuend.getDim());
     result->forward(graph, minuend, subtrahend);
     return result;
+}
+
+BatchedNode *sub(Graph &graph, BatchedNode &minuend, BatchedNode &subtrahend) {
+    BatchedSubNode *node = new BatchedSubNode;
+    node->init(graph, minuend, subtrahend);
+    return node;
 }
 
 }

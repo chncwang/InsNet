@@ -22,15 +22,19 @@ public:
         return getNodeType();
     }
 
-    void forward(Graph &graph, Node &numerator, Node &denominator) {
-        if (getDim() != numerator.getDim() || getDim() != denominator.getDim()) {
+    void setInputs(const vector<Node *> &inputs) override {
+        if (getDim() != inputs.at(0)->getDim() || getDim() != inputs.at(1)->getDim()) {
             cerr << boost::format("dim:%1% minuend:%2% subtrahend:%3%") % getDim() %
-                numerator.getDim() % denominator.getDim() << endl;
+                inputs.at(0)->getDim() % inputs.at(1)->getDim() << endl;
             abort();
         }
-        numerator_ = &numerator;
-        denominator_ = &denominator;
-        vector<Node*> ins = {numerator_, denominator_};
+        numerator_ = inputs.at(0);
+        denominator_ = inputs.at(1);
+    }
+
+    void forward(Graph &graph, Node &numerator, Node &denominator) {
+        vector<Node*> ins = {&numerator, &denominator};
+        setInputs(ins);
         afterForward(graph, ins);
     }
 
@@ -50,6 +54,16 @@ private:
     Node *numerator_;
     Node *denominator_;
     friend class FullDivExecutor;
+};
+
+class BatchedFullDivNode : public BatchedNodeImpl<FullDivNode> {
+public:
+    void init(Graph &graph, BatchedNode &numerator, BatchedNode &denominator) {
+        allocateBatch(numerator.getDims());
+        auto ins = {&numerator, &denominator};
+        setInputsPerNode(ins);
+        afterInit(graph, ins);
+    }
 };
 
 #if USE_GPU
@@ -99,7 +113,6 @@ public:
         cout << "div backward tested" << endl;
 #endif
     }
-
 };
 #else
 class FullDivExecutor : public Executor {
@@ -119,6 +132,12 @@ namespace n3ldg_plus {
         FullDivNode *result = FullDivNode::newNode(numerator.getDim());
         result->forward(graph, numerator, denominator);
         return result;
+    }
+
+    BatchedNode *fullDiv(Graph &graph, BatchedNode &numerator, BatchedNode &denominator) {
+        BatchedFullDivNode *node = new BatchedFullDivNode;
+        node->init(graph, numerator, denominator);
+        return node;
     }
 }
 

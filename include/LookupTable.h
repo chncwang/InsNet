@@ -355,6 +355,19 @@ BatchedNode *embedding(Graph &graph, ParamType &param, const vector<int> &ids,
 }
 
 template <typename ParamType>
+BatchedNode *embedding(Graph &graph, ParamType &param, int id, int batch_size,
+        bool should_backward = true) {
+    vector<int> ids;
+    ids.reserve(batch_size);
+    for (int i = 0; i < batch_size; ++i) {
+        ids.push_back(id);
+    }
+    auto *node = new BatchedLookupNode<ParamType>;
+    node->init(graph, param, ids, should_backward);
+    return node;
+}
+
+template <typename ParamType>
 BatchedNode *embedding(Graph &graph, LookupTable<ParamType> &param, const vector<string> &words,
         bool should_backward = true) {
     vector<int> ids;
