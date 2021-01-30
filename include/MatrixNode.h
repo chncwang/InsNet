@@ -85,6 +85,27 @@ public:
 
 private:
     vector<Node *> in_nodes;
+    friend class BatchedMatrixConcatNode;
+};
+
+class BatchedMatrixConcatNode : public BatchedNodeImpl<MatrixConcatNode> {
+public:
+    void init(Graph &graph, BatchedNode &input, const vector<vector<Node *>> &cols) {
+        vector<int> dims;
+        for (const auto &v : cols) {
+            dims.push_back(v.front()->getDim() * v.size());
+        }
+        allocateBatch(dims);
+
+        for (int i = 0; i < batch().size(); ++i) {
+            MatrixConcatNode *node = dynamic_cast<MatrixConcatNode *>(batch().at(i));
+            node->in_nodes = cols.at(i);
+            node->setColumn(cols.at(i).size());
+        }
+
+        input.addParent(this);
+        graph.addNode(this);
+    }
 };
 
 #if USE_GPU
@@ -244,6 +265,13 @@ public:
         vec.addParent(this);
         graph.addNode(this);
     }
+
+    void init(Graph &graph, BatchedNode &matrices, BatchedNode &vec) {
+        vector<int> dims = matrices.getDims();
+        allocateBatch(dims);
+        setInputsPerNode({&matrices, &vec});
+        afterInit(graph, {&matrices, &vec});
+    }
 };
 
 #if USE_GPU
@@ -380,6 +408,12 @@ class BatchedMatrixColSumNode : public BatchedNodeImpl<MatrixColSumNode> {
 public:
     void init(Graph &graph, BatchedNode &input, int dim) {
         allocateBatch(dim, input.batch().size());
+        setInputsPerNode({&input});
+        afterInit(graph, {&input});
+    }
+
+    void init(Graph &graph, BatchedNode &input, const vector<int> &dims) {
+        allocateBatch(dims);
         setInputsPerNode({&input});
         afterInit(graph, {&input});
     }
@@ -544,6 +578,17 @@ public:
         matrix.addParent(this);
         vec.addParent(this);
         graph.addNode(this);
+    }
+
+    void init(Graph &graph, BatchedNode &matrices, BatchedNode &vec, int head_count) {
+        int dim = matrices.getDim() * head_count / vec.getDim();
+        allocateBatch(dim, vec.batch().size());
+        for (Node *node : batch()) {
+            MatrixAndVectorMultiNode *m = dynamic_cast<MatrixAndVectorMultiNode *>(node);
+            m->head_count_ = head_count;
+        }
+        setInputsPerNode({&matrices, &vec});
+        afterInit(graph, {&matrices, &vec});
     }
 };
 
@@ -741,6 +786,12 @@ Node *concatToMatrix(Graph &graph, const vector<Node *> &inputs) {
     return node;
 }
 
+BatchedNode *concatToMatrix(Graph &graph, BatchedNode &input, const vector<vector<Node *>> &cols) {
+    BatchedMatrixConcatNode *concat = new BatchedMatrixConcatNode;
+    concat->init(graph, input, cols);
+    return concat;
+}
+
 Node *matrixPointwiseMultiply(Graph &graph, Node &matrix, Node &vec) {
     MatrixAndVectorPointwiseMultiNode *node = MatrixAndVectorPointwiseMultiNode::newNode(
             matrix.getDim());
@@ -751,6 +802,12 @@ Node *matrixPointwiseMultiply(Graph &graph, Node &matrix, Node &vec) {
 BatchedNode *matrixPointwiseMultiply(Graph &graph, Node &matrix, BatchedNode &vec) {
     BatchedMatrixAndVectorPointwiseMultiNode *node = new BatchedMatrixAndVectorPointwiseMultiNode;
     node->init(graph, matrix, vec);
+    return node;
+}
+
+BatchedNode *matrixPointwiseMultiply(Graph &graph, BatchedNode &matrices, BatchedNode &vec) {
+    BatchedMatrixAndVectorPointwiseMultiNode *node = new BatchedMatrixAndVectorPointwiseMultiNode;
+    node->init(graph, matrices, vec);
     return node;
 }
 
@@ -767,6 +824,12 @@ Node *matrixColSum(Graph &graph, Node &input, int input_col) {
 BatchedNode *matrixColSum(Graph &graph, BatchedNode &input, int input_col) {
     BatchedMatrixColSumNode *node = new BatchedMatrixColSumNode;
     node->init(graph, input, input_col);
+    return node;
+}
+
+BatchedNode *matrixColSum(Graph &graph, BatchedNode &input, const vector<int> &cols) {
+    BatchedMatrixColSumNode *node = new BatchedMatrixColSumNode;
+    node->init(graph, input, cols);
     return node;
 }
 
@@ -789,6 +852,33 @@ Node *matrixAndVectorMulti(Graph &graph, Node &matrix, Node &vec, int head_count
     }
     MatrixAndVectorMultiNode *node = MatrixAndVectorMultiNode::newNode(dim);
     node->forward(graph, matrix, vec, head_count);
+    return node;
+}
+
+BatchedNode *matrixAndVectorMulti(Graph &graph, BatchedNode &matrices, BatchedNode &vec,
+        int head_count) {
+    int i = 0;
+    for (Node *matrix : matrices.batch()) {
+        if (matrix->getDim() % head_count != 0) {
+            cerr << boost::format("matrix dim:%1% head_count:%2%") % matrix->getDim() %
+                head_count << endl;
+            abort();
+        }
+        if (vec.batch().at(i)->getDim() % head_count != 0) {
+            cerr << boost::format("vec dim:%1% head_count:%2%") % vec.batch().at(i)->getDim() %
+                head_count << endl;
+            abort();
+        }
+        if (matrix->getDim() % vec.batch().at(i)->getDim() != 0) {
+            cerr << boost::format("vec dim:%1% matrix dim:%2%") % vec.batch().at(i)->getDim() %
+                matrix->getDim() << endl;
+            abort();
+        }
+        ++i;
+    }
+
+    BatchedMatrixAndVectorMultiNode *node = new BatchedMatrixAndVectorMultiNode;
+    node->init(graph, matrices, vec, head_count);
     return node;
 }
 

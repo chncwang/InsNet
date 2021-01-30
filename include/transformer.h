@@ -432,6 +432,8 @@ BatchedNode *transformerEncoder(Graph &graph, TransformerEncoderParams &params,
         BatchedNode *q = linear(graph, *normed, attention_head_params.q());
         BatchedNode *attended = n3ldg_plus::dotAttention(graph, *key_matrix, *value_matrix, *q,
                 sentence_len, params.headCount()).first;
+        attended = n3ldg_plus::linear(graph, *attended, layer_params.headsFusionParams());
+        attended = n3ldg_plus::dropout(graph, *attended, dropout, is_training);
         BatchedNode *added = addInBatch(graph, {attended, last_layer});
         normed = layerNormalization(graph, layer_params.layerNormB(), *added);
         BatchedNode *t = linear(graph, *normed, layer_params.ffnInnerParams());
@@ -448,47 +450,35 @@ BatchedNode *transformerEncoder(Graph &graph, TransformerEncoderParams &params,
 class TransformerDecoderBuilderAbs {
 public:
     TransformerDecoderBuilderAbs(Graph &graph, TransformerDecoderParams &params,
-            const vector<Node *> &encoder_hiddens,
+            BatchedNode &encoder_hiddens,
             dtype dropout,
             bool is_training) :
-        graph_(&graph), params_(&params), encoder_hiddens_(encoder_hiddens), dropout_(dropout),
-    is_training_(is_training) {
-        int layer_count = params.layerCount();
-        hidden_layers_.resize(layer_count);
-    }
+        graph_(&graph), params_(&params), encoder_hiddens_(&encoder_hiddens), dropout_(dropout),
+    is_training_(is_training) {}
 
     virtual ~TransformerDecoderBuilderAbs() = default;
 
     void prepare() {
         int layer_count = params_->layerCount();
         for (int i = 0; i < layer_count; ++i) {
-            vector<Node *> encoder_keys, encoder_values;
             auto &layer_params = *params_->layerParams().ptrs().at(i);
             auto &attention_head_params = layer_params.encoderAttention();
-            for (Node *hidden : encoder_hiddens_) {
-                Node *k = linear(*graph_, *hidden, attention_head_params.k());
-                encoder_keys.push_back(k);
-                Node *v = linear(*graph_, *hidden, attention_head_params.v());
-                encoder_values.push_back(v);
-            }
-            Node *encoder_key_matrix = concat(*graph_, encoder_keys);
+            BatchedNode *k = linear(*graph_, *encoder_hiddens_, attention_head_params.k());
+            BatchedNode *v = linear(*graph_, *encoder_hiddens_, attention_head_params.v());
+            Node *encoder_key_matrix = concat(*graph_, k->batch());
             encoder_key_matrices_.push_back(encoder_key_matrix);
-            Node *encoder_value_matrix = concat(*graph_, encoder_values);
+            Node *encoder_value_matrix = concat(*graph_, v->batch());
             encoder_value_matrices_.push_back(encoder_value_matrix);
         }
 
         prepared_ = true;
     }
 
-    const vector<vector<Node *>> &hiddenLayers() {
-        return hidden_layers_;
-    }
-
 protected:
     Graph *graph_ = nullptr;
     TransformerDecoderParams *params_ = nullptr;
 
-    vector<Node *> encoder_hiddens_;
+    BatchedNode *encoder_hiddens_;
 
     vector<Node *> encoder_key_matrices_;
     vector<Node *> encoder_value_matrices_;
@@ -496,15 +486,13 @@ protected:
     dtype dropout_;
     bool is_training_;
 
-    vector<vector<Node *>> hidden_layers_;
-
     bool prepared_ = false;
 };
 
 class TransformerDecoderCellBuilder : public TransformerDecoderBuilderAbs {
 public:
     TransformerDecoderCellBuilder(Graph &graph, TransformerDecoderParams &params,
-            const vector<Node *> &encoder_hiddens,
+            BatchedNode &encoder_hiddens,
             dtype dropout,
             bool is_training) : TransformerDecoderBuilderAbs(graph, params, encoder_hiddens,
             dropout, is_training) {
@@ -512,6 +500,10 @@ public:
             key_matrix_layers_.push_back(nullptr);
             value_matrix_layers_.push_back(nullptr);
         }
+    }
+
+    const vector<vector<Node *>> &hiddenLayers() {
+        return hidden_layers_;
     }
 
     void forward(Node &decoder_input) {
@@ -554,7 +546,7 @@ public:
             auto &attention_head_params_for_encoder = layer_params.encoderAttention();
             q = linear(*graph_, *normed, attention_head_params_for_encoder.q());
             attended = dotAttention(*graph_, *encoder_key_matrices_.at(i),
-                    *encoder_value_matrices_.at(i), *q, encoder_hiddens_.size(),
+                    *encoder_value_matrices_.at(i), *q, encoder_hiddens_->batch().size(),
                     params_->headCount()).first;
             attended = n3ldg_plus::linear(*graph_, *attended, layer_params.encoderFusion());
             attended = n3ldg_plus::dropout(*graph_, *attended, dropout_, is_training_);
@@ -574,8 +566,9 @@ public:
 
 private:
     vector<Node *> key_matrix_layers_, value_matrix_layers_;
-
+    vector<vector<Node *>> hidden_layers_;
     int decoded_len_ = 0;
+
 };
 
 //class TransformerDecoderBuilder : public TransformerDecoderBuilderAbs {
@@ -708,6 +701,90 @@ private:
 //        }
 //    }
 //};
+
+class TransformerDecoderBuilder : public TransformerDecoderBuilderAbs {
+public:
+    TransformerDecoderBuilder(Graph &graph, TransformerDecoderParams &params,
+            BatchedNode &encoder_hiddens,
+            dtype dropout,
+            bool is_training) :
+        TransformerDecoderBuilderAbs(graph, params, encoder_hiddens, dropout, is_training) {}
+
+    void forward(BatchedNode &inputs) {
+        if (!prepared_) {
+            cerr << "TransformerDecoderBuilder forward - not prepared" << endl;
+            abort();
+        }
+        using namespace n3ldg_plus;
+
+        int sentence_len = inputs.batch().size();
+        vector<int> pos_ids;
+        vector<int> cols;
+        for (int i = 0; i < sentence_len; ++i) {
+            pos_ids.push_back(i);
+            cols.push_back(i + 1);
+        }
+
+        BatchedNode *pos_emb = embedding(*graph_, params_->positionalEncodingParam(), pos_ids,
+                false);
+        BatchedNode *scaled_input = scaled(*graph_, inputs, ::sqrt(inputs.getDim()));
+        BatchedNode *pos_encoded = addInBatch(*graph_, {&pos_emb, &scaled_input});
+        pos_encoded = n3ldg_plus::dropout(*graph_, *pos_encoded, dropout_, is_training_);
+
+        int layer_count = params_->layerCount();
+        BatchedNode *last_layer = pos_encoded;
+        for (int i = 0; i < layer_count; ++i) {
+            auto &layer_params = *params_->layerParams().ptrs().at(i);
+            auto &attention_head_params = layer_params.selfAttention();
+            BatchedNode *normed = layerNormalization(*graph_, layer_params.layerNormA(),
+                    *last_layer);
+            BatchedNode *k = linear(*graph_, *normed, attention_head_params.k());
+            BatchedNode *v = linear(*graph_, *normed, attention_head_params.v());
+            vector<Node *> key_cols, value_cols;
+            vector<vector<Node *>> key_cols_vec, value_cols_vec;
+            for (int j = 0; j < sentence_len; ++j) {
+                key_cols.push_back(k->batch().at(j));
+                key_cols_vec.push_back(key_cols);
+                value_cols.push_back(v->batch().at(j));
+                value_cols_vec.push_back(value_cols);
+            }
+            BatchedNode *key_matrices = concatToMatrix(*graph_, *normed, key_cols_vec);
+            BatchedNode *value_matrices = concatToMatrix(*graph_, *normed, value_cols_vec);
+            BatchedNode *q = linear(*graph_, *normed, attention_head_params.q());
+            BatchedNode *attended = n3ldg_plus::dotAttention(*graph_, *key_matrices,
+                    *value_matrices, *q, cols, params_->headCount()).first;
+            attended = n3ldg_plus::linear(*graph_, *attended, layer_params.selfFusion());
+            attended = n3ldg_plus::dropout(*graph_, *attended, dropout_, is_training_);
+            BatchedNode *added = addInBatch(*graph_, {attended, last_layer});
+            normed = layerNormalization(*graph_, layer_params.layerNormB(), *added);
+
+            auto &attention_head_params_for_encoder = layer_params.encoderAttention();
+            q = linear(*graph_, *normed, attention_head_params_for_encoder.q());
+            attended = dotAttention(*graph_, *encoder_key_matrices_.at(i),
+                    *encoder_value_matrices_.at(i), *q, encoder_hiddens_->batch().size(),
+                    params_->headCount()).first;
+            attended = n3ldg_plus::linear(*graph_, *attended, layer_params.encoderFusion());
+            attended = n3ldg_plus::dropout(*graph_, *attended, dropout_, is_training_);
+            added = addInBatch(*graph_, {added, attended});
+            normed = layerNormalization(*graph_, layer_params.layerNormC(), *added);
+
+            BatchedNode *t = linear(*graph_, *normed, layer_params.ffnInnerParams());
+            t = relu(*graph_, *t);
+            t = linear(*graph_, *t, layer_params.ffnOutterParams());
+            t = n3ldg_plus::dropout(*graph_, *t, dropout_, is_training_);
+            added = addInBatch(*graph_, {added, t});
+            last_layer = added;
+            hidden_layers_.push_back(last_layer);
+        }
+    }
+
+    vector<BatchedNode *> &hiddenLayers() {
+        return hidden_layers_;
+    }
+
+private:
+    vector<BatchedNode *> hidden_layers_;
+};
 
 }
 

@@ -186,7 +186,7 @@ public:
         for (BatchedNode *node : ins) {
             dim += node->getDim();
         }
-        allocateBatch(dim, ins.size());
+        allocateBatch(dim, ins.front()->batch().size());
         setInputsPerNode(ins);
         afterInit(graph, ins);
     }

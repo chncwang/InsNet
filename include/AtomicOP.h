@@ -591,7 +591,17 @@ private:
 class BatchedScalarToVectorNode : public BatchedNodeImpl<ScalarToVectorNode> {
 public:
     void init(Graph &graph, BatchedNode &input, int row) {
-        allocateBatch(row * input.getDim(), input.batch().size());
+        allocateBatch(input.getDim() * row, input.batch().size());
+        setInputsPerNode({&input});
+        afterInit(graph, {&input});
+    }
+
+    void init(Graph &graph, BatchedNode &input, const vector<int> &rows) {
+        vector<int> dims;
+        for (int row : rows) {
+            dims.push_back(row * input.getDim());
+        }
+        allocateBatch(dims);
         setInputsPerNode({&input});
         afterInit(graph, {&input});
     }
@@ -992,6 +1002,12 @@ Node *scalarToVector(Graph &graph, Node &input, int row) {
 BatchedNode *scalarToVector(Graph &graph, BatchedNode &input, int row) {
     BatchedScalarToVectorNode *node = new BatchedScalarToVectorNode;
     node->init(graph, input, row);
+    return node;
+}
+
+BatchedNode *scalarToVector(Graph &graph, BatchedNode &input, const vector<int> &rows) {
+    BatchedScalarToVectorNode *node = new BatchedScalarToVectorNode;
+    node->init(graph, input, rows);
     return node;
 }
 

@@ -62,6 +62,31 @@ pair<BatchedNode *, BatchedNode *> dotAttention(Graph &graph, Node& key_matrix,
     return make_pair(hidden, scaled_weight);
 }
 
+pair<BatchedNode *, BatchedNode *> dotAttention(Graph &graph, BatchedNode& key_matrix,
+        BatchedNode& value_matrix,
+        BatchedNode& guide,
+        const vector<int> &cols,
+        int head_count) {
+    if (guide.getDim() % head_count != 0) {
+        cerr << boost::format("head count is %1%, guide dim is %2%") % head_count % guide.getDim()
+            << endl;
+        abort();
+    }
+    BatchedNode *matrix = n3ldg_plus::matrixPointwiseMultiply(graph, key_matrix, guide);
+    vector<int> heads;
+    for (int col : cols) {
+        heads.push_back(head_count * col);
+    }
+    BatchedNode *sum = n3ldg_plus::matrixColSum(graph, *matrix, heads);
+    BatchedNode *transposed_sum = n3ldg_plus::transposeMatrix(graph, *sum, head_count);
+    BatchedNode *scaled_weight = n3ldg_plus::scaled(graph, *transposed_sum,
+            1.0 / ::sqrt((dtype)guide.getDim() / head_count));
+    scaled_weight = n3ldg_plus::softmax(graph, *scaled_weight, head_count);
+    BatchedNode *hidden = n3ldg_plus::matrixAndVectorMulti(graph, value_matrix, *scaled_weight,
+            head_count);
+    return make_pair(hidden, scaled_weight);
+}
+
 Node * dotAttentionWeights(Graph &cg, Node& key_matrix, Node& guide) {
     Node *matrix = n3ldg_plus::matrixPointwiseMultiply(cg, key_matrix, guide);
     Node *sum = n3ldg_plus::matrixColSum(cg, *matrix, 1);
