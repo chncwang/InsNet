@@ -135,9 +135,17 @@ public:
         return node_type_;
     }
 
+    string cachedTypeSig() const {
+        if (type_sig_.empty()) {
+            type_sig_ = typeSignature();
+        }
+        return type_sig_;
+    }
+
     virtual void clear() {
         degree_ = 0;
         depth_ = 0;
+        type_sig_.clear();
         parents_.clear();
     }
 
@@ -196,6 +204,7 @@ private:
     int degree_ = 0;
     int depth_ = 0;
     std::vector<NodeAbs *> parents_;
+    mutable std::string type_sig_;
 };
 
 class Node : public NodeAbs {
@@ -457,6 +466,10 @@ template <typename T>
 class Poolable {
 public:
     static vector<T *> newNodeVector(int key, int size) {
+        if (key <= 0) {
+            cerr << "newNode key:" << key << endl;
+            abort();
+        }
         vector<T *> results;
         if (!globalPoolEnabled()) {
             for (int i = 0; i < size; ++i) {
@@ -508,6 +521,10 @@ public:
     }
 
     static T *newNode(int key) {
+        if (key <= 0) {
+            cerr << "newNode key:" << key << endl;
+            abort();
+        }
         if (!globalPoolEnabled()) {
             T *node = new T;
             node->initNode(key);

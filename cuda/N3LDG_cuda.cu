@@ -1572,6 +1572,7 @@ __global__ void KernelBatchMemset(dtype **p, int count, int *dims, int max_dim,
 void BatchMemset(vector<dtype*> &vec, int count, vector<int> &dims, dtype value) {
     int max_dim = *max_element(dims.begin(), dims.end());
     int block_count = (count * max_dim -1 + TPB) / TPB;
+    //cout << "block_count:" << block_count << endl;
     block_count = min(block_count, BLOCK_COUNT);
     NumberPointerArray vec_arr;
     vec_arr.init((dtype**)vec.data(), vec.size());

@@ -35,7 +35,7 @@ void DecreaseDegree(std::map<void*, int> &degree_map, NodeAbs *p) {
 typedef std::unordered_map<string, vector<NodeAbs *>> NodeMap;
 
 void Insert(NodeAbs *node, NodeMap& node_map) {
-    string x_hash = node->typeSignature();
+    string x_hash = node->cachedTypeSig();
     auto it = node_map.find(x_hash);
     if (it == node_map.end()) {
         std::vector<NodeAbs *> v = {node};
@@ -69,7 +69,7 @@ public:
         }
 
         if (globalPoolEnabled()) {
-            for (NodeAbs *node : all_nodes) {
+            for (NodeAbs *node : finish_nodes) {
                 if (node->isBatched()) {
                     delete node;
                 }
@@ -79,7 +79,7 @@ public:
                 e->second = 0;
             }
         } else {
-            for (NodeAbs *node : all_nodes) {
+            for (NodeAbs *node : finish_nodes) {
                 delete node;
             }
         }
@@ -103,12 +103,12 @@ public:
         if (x->getDegree() == 0) {
             Insert(x, free_nodes);
         }
-        all_nodes.push_back(x);
+        ++all_nodes_count;
 
-        string x_type_hash = x->typeSignature();
+        string x_type_hash = x->cachedTypeSig();
         auto it = node_type_depth.find(x_type_hash);
         if (it == node_type_depth.end()) {
-//            cout << "addNode insert " << x->getNodeType() << " " << x->typeSignature() << " " <<
+//            cout << "addNode insert " << x->getNodeType() << " " << x->cachedTypeSig() << " " <<
 //                x->getDepth() << endl;
             node_type_depth.insert(std::pair<string, std::pair<int, int>>(
                         x_type_hash, std::pair<int, int>(x->getDepth(), 1)));
@@ -224,7 +224,7 @@ public:
                 }
             }
 
-            auto &it = node_type_depth.at(cur_exec->topo_nodes.front()->typeSignature());
+            auto &it = node_type_depth.at(cur_exec->topo_nodes.front()->cachedTypeSig());
             it.first -= depth_sum;
             it.second -= cur_exec->topo_nodes.size();
             if (it.first < 0 || it.second < 0) {
@@ -236,44 +236,9 @@ public:
             profiler.EndEvent();
         }
 
-        if (finish_nodes.size() != all_nodes.size()) {
+        if (finish_nodes.size() != all_nodes_count) {
             std::cerr << "error: several nodes are not executed, finished: " <<
-                finish_nodes.size() << ", all: " << all_nodes.size() << std::endl;
-            int total_node_num = all_nodes.size();
-            int unprocessed = 0;
-            for (int idx = 0; idx < total_node_num; idx++) {
-                NodeAbs *curNode = all_nodes.at(idx);
-                if (curNode->getDegree() > 0) {
-                    std::cerr << "unprocessed node:" << curNode->getNodeType() <<
-                        " degree:" << curNode->getDegree() <<
-                        std::endl;
-                    unprocessed++;
-                }
-            }
-            std::cerr << "unprocessed: " << unprocessed << std::endl;
-
-            set<void *> node_addr_table;
-            for (NodeAbs *node : finish_nodes) {
-                node_addr_table.insert(node);
-            }
-
-            for (NodeAbs *node : all_nodes) {
-                if (node_addr_table.find(node) == node_addr_table.end()) {
-                    cerr << "node: " << node->typeSignature() << endl;
-                }
-            }
-
-            set<void *> all_node_table;
-            for (NodeAbs *node : all_nodes) {
-                auto it = all_node_table.find(node);
-                if (it == all_node_table.end()) {
-                    all_node_table.insert(node);
-                } else {
-                    cerr << "duplicated node:" << node->typeSignature() << endl;
-                    abort();
-                }
-            }
-
+                finish_nodes.size() << ", all: " << all_nodes_count << std::endl;
             abort();
         }
     }
@@ -302,7 +267,6 @@ protected:
     NodeMap free_nodes;
     std::map<string, std::pair<int, int>> node_type_depth;
     vector<NodeAbs *> finish_nodes;
-    vector<NodeAbs *> all_nodes;
 
 private:
     bool eager_ = false;
@@ -311,6 +275,7 @@ private:
 
     bool calculate_activations_ = false;
     int64_t activations_ = 0;
+    int all_nodes_count = 0;
 };
 
 #endif

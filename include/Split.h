@@ -9,9 +9,9 @@
 #endif
 #include <boost/format.hpp>
 
-class SplitNode : public Node, public Poolable<SplitNode> {
+class SplitNode : public UniInputNode, public Poolable<SplitNode> {
 public:
-    SplitNode() : Node("split") {}
+    SplitNode() : UniInputNode("split") {}
 
     void setNodeDim(int dim) override {
         setDim(dim);
@@ -33,38 +33,60 @@ public:
         }
 
         offset_ = offset;
-        input_ = &input;
-        input.addParent(this);
-
-        graph.addNode(this);
+        UniInputNode::forward(graph, input);
     }
 
     Executor *generate() override;
 
     void compute () override {
         for (int i = 0; i < getDim(); ++i) {
-            val()[i] = input_->val()[i + offset_];
+            val()[i] = getInput()->val()[i + offset_];
         }
     }
 
     void backward() override {
         for (int i = 0; i < getDim(); ++i) {
-            input_->loss()[i + offset_] += getLoss()[i];
+            getInput()->loss()[i + offset_] += getLoss()[i];
         }
+    }
+protected:
+    virtual bool isDimLegal(const Node &input) const override {
+        return offset_ + getDim() <= input.getDim();
     }
 
 private:
-    Node *input_ = nullptr;
     int offset_ = 0;
     friend class SplitExecutor;
+    friend class BatchedSplitNode;
+};
+
+class BatchedSplitNode : public BatchedNodeImpl<SplitNode> {
+public:
+    void init(Graph &graph, BatchedNode &input, int dim, int offset) {
+        allocateBatch(dim, input.batch().size());
+        for (Node *node : batch()) {
+            SplitNode *s = dynamic_cast<SplitNode *>(node);
+            s->offset_ = offset;
+        }
+        setInputsPerNode({&input});
+        afterInit(graph, {&input});
+    }
 };
 
 namespace n3ldg_plus {
-Node* split(Graph &graph, int dim, Node &input, int offset) {
+
+Node* split(Graph &graph, Node &input, int dim, int offset) {
     SplitNode *split = SplitNode::newNode(dim);
     split->forward(graph, input, offset);
     return split;
 }
+
+BatchedNode* split(Graph &graph, BatchedNode &input, int dim, int offset) {
+    BatchedSplitNode *node = new BatchedSplitNode;
+    node->init(graph, input, dim, offset);
+    return node;
+}
+
 }
 
 #if USE_GPU
@@ -75,7 +97,7 @@ public:
         vector<dtype*> results;
         for (Node *node : batch) {
             SplitNode *split = static_cast<SplitNode*>(node);
-            inputs.push_back(split->input_->getVal().value);
+            inputs.push_back(split->getInput()->getVal().value);
             offsets.push_back(split->offset_);
             results.push_back(split->getVal().value);
             dims.push_back(split->getDim());
@@ -94,7 +116,7 @@ public:
         for (Node *node : batch) {
             SplitNode *split = static_cast<SplitNode*>(node);
             losses.push_back(split->getLoss().value);
-            input_losses.push_back(split->input_->getLoss().value);
+            input_losses.push_back(split->getInput()->getLoss().value);
         }
 
         n3ldg_cuda::SplitBackward(losses, offsets, batch.size(), dims, input_losses);

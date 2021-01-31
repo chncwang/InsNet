@@ -441,24 +441,56 @@ private:
     int offset_ = 0;
 };
 
+class BatchedLinearWordVectorNode : public BatchedNodeImpl<LinearWordVectorNode> {
+public:
+    void init(Graph &graph, BatchedNode &input, Param &param, int dim, int offset) {
+        allocateBatch(dim, input.batch().size());
+
+        for (Node *node : batch()) {
+            LinearWordVectorNode *l = dynamic_cast<LinearWordVectorNode *>(node);
+            l->setParam(param, offset);
+        }
+        setInputsPerNode({&input});
+        afterInit(graph, {&input});
+    }
+};
+
 namespace n3ldg_plus {
-    Node *linearWordVector(Graph &graph, int dim, Param &word_vectors, Node &input,
+    Node *linearWordVector(Graph &graph, Node &input, Param &param, int dim,
             int offset = 0) {
-        if (dim + offset > word_vectors.inDim()) {
+        if (dim + offset > param.inDim()) {
             cerr << boost::format("linearWordVector - dim:%1% offset%2% vocabulary_size:%3%") %
-                dim % offset % word_vectors.inDim() << endl;
+                dim % offset % param.inDim() << endl;
             abort();
         }
 
-        if (input.getDim() != word_vectors.outDim()) {
+        if (input.getDim() != param.outDim()) {
             cerr << boost::format("LinearWordVectorNode - input dim:%1% word vector dim:%2%") %
-                input.getDim() % word_vectors.outDim() << endl;
+                input.getDim() % param.outDim() << endl;
             abort();
         }
 
         LinearWordVectorNode *node =  LinearWordVectorNode::newNode(dim);
-        node->setParam(word_vectors, offset);
+        node->setParam(param, offset);
         node->forward(graph, input);
+        return node;
+    }
+
+    BatchedNode *linearWordVector(Graph &graph, BatchedNode &input, Param &param, int dim,
+            int offset = 0) {
+        if (dim + offset > param.inDim()) {
+            cerr << boost::format("linearWordVector - dim:%1% offset%2% vocabulary_size:%3%") %
+                dim % offset % param.inDim() << endl;
+            abort();
+        }
+
+        if (input.getDim() != param.outDim()) {
+            cerr << boost::format("LinearWordVectorNode - input dim:%1% word vector dim:%2%") %
+                input.getDim() % param.outDim() << endl;
+            abort();
+        }
+        BatchedLinearWordVectorNode *node = new BatchedLinearWordVectorNode;
+        node->init(graph, input, param, dim, offset);
         return node;
     }
 }
