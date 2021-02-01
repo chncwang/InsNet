@@ -84,7 +84,7 @@ Node *bucket(Graph &graph, int dim, float v) {
     return bucket;
 }
 
-Node *bucket(Graph &graph, const vector<float> &v) {
+Node *bucket(Graph &graph, const vector<dtype> &v) {
     BucketNode *bucket = BucketNode::newNode(v.size());
     bucket->forward(graph, v);
     return bucket;

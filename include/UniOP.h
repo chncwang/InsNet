@@ -317,68 +317,81 @@ public:
 class LinearExecutor :public Executor {
 public:
     Tensor2D x, y, b;
-    int inDim, outDim, count;
-    UniParams* param;
+
+    UniParams &params() {
+        LinearNode *l = dynamic_cast<LinearNode *>(batch.front());
+        return l->getParams();
+    }
+
+    int inDim() {
+        return params().W.inDim();
+    }
+
+    int outDim() {
+        return params().W.outDim();
+    }
+
 
     int calculateFLOPs() override {
-        int flops = param->W.inDim() * param->W.outDim() * batch.size() * 2;
-        if (param->bUseB) {
-            flops += param->W.outDim() * batch.size();
+        int flops = params().W.inDim() * params().W.outDim() * batch.size() * 2;
+        if (params().bUseB) {
+            flops += params().W.outDim() * batch.size();
         }
         return flops;
     }
 
     void  forward() override {
-        count = batch.size();
-        x.init(inDim, count);
-        y.init(outDim, count);
-        b.init(outDim, count);
+        int count = batch.size();
+        x.init(inDim(), count);
+        y.init(outDim(), count);
+        b.init(outDim(), count);
 
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
-            memcpy(x.v + idx * inDim, ptr->in->val().v, inDim * sizeof(dtype));
-            if (param->bUseB) {
-                memcpy(b.v + idx * outDim, param->b.val.v, outDim * sizeof(dtype));
+            memcpy(x.v + idx * inDim(), ptr->getInput()->val().v, inDim() * sizeof(dtype));
+            if (params().bUseB) {
+                memcpy(b.v + idx * outDim(), params().b.val.v, outDim() * sizeof(dtype));
             }
         }
 
-        y.mat() = param->W.val.mat() * x.mat();
-        if (param->bUseB) {
+        y.mat() = params().W.val.mat() * x.mat();
+        if (params().bUseB) {
             y.vec() = y.vec() + b.vec();
         }
 
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
-            memcpy(ptr->val().v, y.v + idx * outDim, outDim * sizeof(dtype));
+            memcpy(ptr->val().v, y.v + idx * outDim(), outDim() * sizeof(dtype));
         }
     }
 
     void backward() override {
         Tensor2D lx, ly;
-        lx.init(inDim, count);
-        ly.init(outDim, count);
+        int count = batch.size();
+        lx.init(inDim(), count);
+        ly.init(outDim(), count);
 
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
-            memcpy(ly.v + idx * outDim, ptr->loss().v, outDim * sizeof(dtype));
+            memcpy(ly.v + idx * outDim(), ptr->loss().v, outDim() * sizeof(dtype));
         }
 
-        param->W.grad.mat() += ly.mat() * x.mat().transpose();
+        params().W.grad.mat() += ly.mat() * x.mat().transpose();
 
-        if (param->bUseB) {
-            for (int idy = 0; idy < outDim; idy++) {
+        if (params().bUseB) {
+            for (int idy = 0; idy < outDim(); idy++) {
                 for (int idx = 0; idx < count; idx++) {
-                    param->b.grad.v[idy] += ly[idx][idy];
+                    params().b.grad.v[idy] += ly[idx][idy];
                 }
             }
         }
 
-        lx.mat() = param->W.val.mat().transpose() * ly.mat();
+        lx.mat() = params().W.val.mat().transpose() * ly.mat();
 
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
-            for (int idy = 0; idy < inDim; idy++) {
-                ptr->in->loss()[idy] += lx[idx][idy];
+            for (int idy = 0; idy < inDim(); idy++) {
+                ptr->getInput()->loss()[idy] += lx[idx][idy];
             }
         }
     }

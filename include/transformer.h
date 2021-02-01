@@ -424,15 +424,24 @@ BatchedNode *transformerEncoder(Graph &graph, TransformerEncoderParams &params,
         auto &layer_params = *params.layerParams().ptrs().at(i);
 
         BatchedNode *normed = layerNormalization(graph, layer_params.layerNormA(), *last_layer);
-        auto &attention_head_params = layer_params.multiHeadAttentionParams();
-        BatchedNode *key = linear(graph, *normed, attention_head_params.k());
-        BatchedNode *value = linear(graph, *normed, attention_head_params.v());
-        Node *key_matrix = concatToMatrix(graph, key->batch());
-        Node *value_matrix = concatToMatrix(graph, value->batch());
-        BatchedNode *q = linear(graph, *normed, attention_head_params.q());
-        BatchedNode *attended = n3ldg_plus::dotAttention(graph, *key_matrix, *value_matrix, *q,
-                sentence_len, params.headCount()).first;
-        attended = n3ldg_plus::linear(graph, *attended, layer_params.headsFusionParams());
+//        auto &attention_head_params = layer_params.multiHeadAttentionParams();
+//        BatchedNode *key = linear(graph, *normed, attention_head_params.k());
+//        BatchedNode *value = linear(graph, *normed, attention_head_params.v());
+//        BatchedNode *q = linear(graph, *normed, attention_head_params.q());
+//        int head_dim = q->getDim() / params.headCount();
+//        vector<BatchedNode *> split_attended_vec;
+//        for (int j = 0; j < params.headCount(); ++j) {
+//            BatchedNode *split_q = split(graph, *q, head_dim, j * head_dim);
+//            BatchedNode *split_k = split(graph, *key, head_dim, j * head_dim);
+//            Node *key_matrix = concatToMatrix(graph, split_k->batch());
+//            BatchedNode *split_v = split(graph, *value, head_dim, j * head_dim);
+//            Node *value_matrix = concatToMatrix(graph, split_v->batch());
+//            BatchedNode *split_attended = n3ldg_plus::dotAttention(graph, *key_matrix, *value_matrix,
+//                    *split_q).first;
+//            split_attended_vec.push_back(split_attended);
+//        }
+//        BatchedNode *attended = n3ldg_plus::concatInBatch(graph, split_attended_vec);
+        BatchedNode *attended = n3ldg_plus::linear(graph, *normed, layer_params.headsFusionParams());
         attended = n3ldg_plus::dropout(graph, *attended, dropout, is_training);
         BatchedNode *added = addInBatch(graph, {attended, last_layer});
         normed = layerNormalization(graph, layer_params.layerNormB(), *added);

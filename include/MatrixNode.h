@@ -852,6 +852,22 @@ public:
     }
 };
 
+#if USE_GPU
+class TranMatrixMulVectorExecutor : public Executor {
+
+};
+#else
+class TranMatrixMulVectorExecutor : public Executor {
+    int calculateFLOPs() override {
+        abort();
+    }
+};
+#endif
+
+Executor *TranMatrixMulVectorNode::generate() {
+    return new TranMatrixMulVectorExecutor;
+}
+
 namespace n3ldg_plus {
 
 Node *concatToMatrix(Graph &graph, const vector<Node *> &inputs) {
