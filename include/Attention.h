@@ -87,6 +87,17 @@ pair<BatchedNode *, BatchedNode *> dotAttention(Graph &graph, BatchedNode& key_m
     return make_pair(hidden, scaled_weight);
 }
 
+pair<BatchedNode *, BatchedNode *> dotAttention(Graph &graph, Node& key_matrix,
+        Node& value_matrix,
+        BatchedNode& guide) {
+    BatchedNode *raw_weights = n3ldg_plus::tranMatrixMulVector(graph, key_matrix, guide);
+    BatchedNode *scaled_weight = n3ldg_plus::scaled(graph, *raw_weights,
+            1.0 / ::sqrt((dtype)guide.getDim()));
+    scaled_weight = n3ldg_plus::softmax(graph, *scaled_weight, 1);
+    BatchedNode *hidden = n3ldg_plus::matrixAndVectorMulti(graph, value_matrix, *scaled_weight, 1);
+    return make_pair(hidden, scaled_weight);
+}
+
 Node * dotAttentionWeights(Graph &cg, Node& key_matrix, Node& guide) {
     Node *matrix = n3ldg_plus::matrixPointwiseMultiply(cg, key_matrix, guide);
     Node *sum = n3ldg_plus::matrixColSum(cg, *matrix, 1);

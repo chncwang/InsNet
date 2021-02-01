@@ -777,6 +777,81 @@ Executor *MatrixTransposeNode::generate() {
     return new MatrixTransposeExecutor;
 }
 
+class TranMatrixMulVectorNode : public Node, public Poolable<TranMatrixMulVectorNode> {
+public:
+    TranMatrixMulVectorNode() : Node("TranMatrixMulVectorNode") {}
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    void setInputs(const vector<Node *> &ins) override {
+        matrix_ = ins.at(0);
+        vector_ = ins.at(1);
+        int max_col = matrix_->getDim() / vector_->getDim();
+        if (getDim() > max_col) {
+            cerr << boost::format("TranMatrixMulVectorNode setInputs dim:%1% max_col:%2%")
+                % getDim() % max_col << endl;
+            abort();
+        }
+    }
+
+    void forward(Graph &graph, Node &matrix, Node &vec) {
+        setInputs({&matrix, &vec});
+        afterForward(graph, {&matrix, &vec});
+    }
+
+    void compute() override {
+        val().mat() = Mat(matrix_->getVal().v, vector_->getDim(), getDim()).transpose() *
+            vector_->getVal().mat();
+    }
+
+    void backward() override {
+        Mat(matrix_->loss().v, vector_->getDim(), getDim()) += vector_->getVal().mat() *
+            getLoss().mat().transpose();
+        vector_->loss().mat() += Mat(matrix_->val().v, vector_->getDim(), getDim()) *
+            getLoss().mat();
+    }
+
+    Executor * generate() override;
+
+    string typeSignature() const override {
+        return Node::getNodeType() + to_string(vector_->getDim());
+    }
+
+private:
+    Node *matrix_ = nullptr;
+    Node *vector_ = nullptr;
+    friend class BatchedTranMatrixMulVectorNode;
+};
+
+class BatchedTranMatrixMulVectorNode : public BatchedNodeImpl<TranMatrixMulVectorNode> {
+public:
+    void init(Graph &graph, Node &matrix, BatchedNode &vec, bool use_increased_dims = false) {
+        if (use_increased_dims) {
+            vector<int> dims;
+            for (int i = 1; i <= vec.batch().size(); ++i) {
+                dims.push_back(i);
+            }
+            allocateBatch(dims);
+        } else {
+            int dim = matrix.getDim() / vec.getDim();
+            allocateBatch(dim, vec.batch().size());
+        }
+        int i = 0;
+        for (Node *node : batch()) {
+            node->setInputs({&matrix, vec.batch().at(i++)});
+        }
+        matrix.addParent(this);
+        vec.addParent(this);
+        graph.addNode(this);
+    }
+};
+
 namespace n3ldg_plus {
 
 Node *concatToMatrix(Graph &graph, const vector<Node *> &inputs) {
@@ -928,6 +1003,24 @@ BatchedNode *transposeMatrix(Graph &graph, BatchedNode &input, int input_row) {
     }
     BatchedMatrixTransposeNode *node = new BatchedMatrixTransposeNode;
     node->init(graph, input, input_row);
+    return node;
+}
+
+Node *tranMatrixMulVector(Graph &graph, Node &matrix, Node &vec, int dim) {
+    TranMatrixMulVectorNode *node = TranMatrixMulVectorNode::newNode(dim);
+    node->forward(graph, matrix, vec);
+    return node;
+}
+
+Node *tranMatrixMulVector(Graph &graph, Node &matrix, Node &vec) {
+    int dim = matrix.getDim() / vec.getDim();
+    return tranMatrixMulVector(graph, matrix, vec, dim);
+}
+
+BatchedNode *tranMatrixMulVector(Graph &graph, Node &matrix, BatchedNode &vec,
+        bool use_increased_dims = false) {
+    BatchedTranMatrixMulVectorNode *node = new BatchedTranMatrixMulVectorNode;
+    node->init(graph, matrix, vec, use_increased_dims);
     return node;
 }
 
