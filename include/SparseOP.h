@@ -1,10 +1,3 @@
-/*
- * SparseOP.h
- *
- *  Created on: Jul 20, 2016
- *      Author: mason
- */
-
 #ifndef SPARSEOP_H_
 #define SPARSEOP_H_
 

@@ -168,11 +168,14 @@ public:
 
     virtual void addParent(NodeAbs* parent) {
         NodeAbs &topo = topologicalNode();
-        if (topo.degree_ >= 0) {
-            topo.parents_.push_back(parent);
-            parent->degree_++;
-            parent->depth_ = std::max(topo.depth_ + 1, parent->depth_);
+        if (topo.degree_ < 0) {
+            cerr << "NodeAbs addParent degree:" << topo.degree_ << endl;
+            abort();
         }
+
+        topo.parents_.push_back(parent);
+        parent->degree_++;
+        parent->depth_ = std::max(topo.depth_ + 1, parent->depth_);
     }
 
     const vector<NodeAbs *> getParents() const {
@@ -413,15 +416,27 @@ public:
     BatchedNodeImpl() = default;
 
 protected:
+//    void allocateBatch(int dim, int size) {
+//        if (!batch().empty()) {
+//            cerr << "batch not empty" << endl;
+//            abort();
+//        }
+//        auto v = NodeType::newNodeVector(dim, size);
+//        for (auto *x : v) {
+//            x->setBatchedNode(this);
+//            batch().push_back(x);
+//        }
+//    }
+
     void allocateBatch(int dim, int size) {
         if (!batch().empty()) {
             cerr << "batch not empty" << endl;
             abort();
         }
-        auto v = NodeType::newNodeVector(dim, size);
-        for (auto *x : v) {
-            x->setBatchedNode(this);
-            batch().push_back(x);
+        for (int i = 0; i < size; ++i) {
+            auto node = NodeType::newNode(dim);
+            node->setBatchedNode(this);
+            batch().push_back(node);
         }
     }
 
@@ -528,6 +543,8 @@ public:
         if (!globalPoolEnabled()) {
             T *node = new T;
             node->initNode(key);
+            node->setNodeDim(key);
+            node->setBatchedNode(node);
             return node;
         }
         int original_key = key;
@@ -536,18 +553,18 @@ public:
         }
 
         map<int, pair<vector<Node *>, int>>::iterator it;
-        if (last_key_ == key) {
-            it = last_it_;
-        } else {
+//        if (last_key_ == key) {
+//            it = last_it_;
+//        } else {
             it = pool_.find(key);
             if (it == pool_.end()) {
                 pool_.insert(make_pair(key, make_pair(vector<Node *>(), 0)));
                 it = pool_.find(key);
                 globalPoolReferences().insert(&it->second);
             }
-            last_it_ = it;
-            last_key_ = key;
-        }
+//            last_it_ = it;
+//            last_key_ = key;
+//        }
         auto &p = it->second;
         vector<Node *> &v = p.first;
         T *node;
@@ -563,9 +580,9 @@ public:
         } else {
             node = dynamic_cast<T*>(v.at(p.second));
             node->setNodeDim(original_key);
+            node->clear();
+            node->setBatchedNode(node);
             ++p.second;
-            Node *n = static_cast<Node *>(node);
-            n->clear();
         }
         return node;
     }
@@ -575,16 +592,16 @@ public:
 
 private:
     static map<int, pair<vector<Node *>, int>> pool_;
-    static map<int, pair<vector<Node *>, int>>::iterator last_it_;
-    static int last_key_;
+//    static map<int, pair<vector<Node *>, int>>::iterator last_it_;
+//    static int last_key_;
 };
 
 template<typename T>
 map<int, pair<vector<Node *>, int>> Poolable<T>::pool_;
-template<typename T>
-map<int, pair<vector<Node *>, int>>::iterator Poolable<T>::last_it_;
-template<typename T>
-int Poolable<T>::last_key_;
+//template<typename T>
+//map<int, pair<vector<Node *>, int>>::iterator Poolable<T>::last_it_;
+//template<typename T>
+//int Poolable<T>::last_key_;
 
 void validateEqualNodeDims(const vector<Node *> &nodes) {
     for (int i = 1; i < nodes.size(); ++i) {

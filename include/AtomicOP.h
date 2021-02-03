@@ -342,7 +342,7 @@ public:
         for (Node *n : batch) {
             DropoutNode *dropout_node = static_cast<DropoutNode*>(n);
 #if TEST_CUDA
-            dropout_node->in()->val().copyFromHostToDevice();
+            dropout_node->getInput()->val().copyFromHostToDevice();
 #endif
             xs.push_back(dropout_node->getInput()->getVal().value);
             ys.push_back(dropout_node->getVal().value);
@@ -352,12 +352,12 @@ public:
         n3ldg_cuda::DropoutForward(xs, count, getDim(), isTraining(), drop_mask.value,
                 dropoutValue(), ys);
 #if TEST_CUDA
-        if (is_training) {
+        if (isTraining()) {
             drop_mask.copyFromDeviceToHost();
             for (int i = 0; i < count; ++i) {
-                for (int j = 0; j < dim; ++j) {
+                for (int j = 0; j < getDim(); ++j) {
                     dtype v = drop_mask[i][j];
-                    static_cast<DropoutNode*>(batch.at(i))->dropMask()[j] = v <= drop_value ?
+                    static_cast<DropoutNode*>(batch.at(i))->dropMask()[j] = v <= dropoutValue() ?
                         0 : 1;
                 }
             }
@@ -379,7 +379,7 @@ public:
             DropoutNode *dropout_node = static_cast<DropoutNode*>(n);
 #if TEST_CUDA
             dropout_node->loss().copyFromHostToDevice();
-            dropout_node->in()->loss().copyFromHostToDevice();
+            dropout_node->getInput()->loss().copyFromHostToDevice();
 #endif
             vals.push_back(dropout_node->val().value);
             losses.push_back(dropout_node->loss().value);
@@ -393,7 +393,7 @@ public:
         }
         for (Node *n : batch) {
             DropoutNode *dropout_node = static_cast<DropoutNode*>(n);
-            n3ldg_cuda::Assert(dropout_node->in()->loss().verify("DropoutExecutor backward"));
+            n3ldg_cuda::Assert(dropout_node->getInput()->loss().verify("DropoutExecutor backward"));
         }
 #endif
     }
@@ -703,9 +703,6 @@ protected:
     bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
     }
-
-private:
-    friend class ExpExecutor;
 };
 
 class BatchedExpNode : public BatchedNodeImpl<ExpNode> {

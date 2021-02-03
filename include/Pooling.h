@@ -1,14 +1,6 @@
 #ifndef POOLING
 #define POOLING
 
-/*
-*  Pooling.h:
-*  pool operation, max, min, average and sum pooling
-*
-*  Created on: Apr 22, 2017
-*      Author: mszhang
-*/
-
 #include "MyLib.h"
 #include "Node.h"
 #include "Graph.h"

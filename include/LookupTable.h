@@ -1,14 +1,6 @@
 #ifndef _LOOKUPTABLE_H_
 #define _LOOKUPTABLE_H_
 
-/*
- *  LookupTable.h:
- *  Lookup operation, for embeddings
- *
- *  Created on: Apr 22, 2017
- *      Author: mszhang
- */
-
 #include "SparseParam.h"
 #include "MyLib.h"
 #include "Alphabet.h"

@@ -1,14 +1,6 @@
 #ifndef ATTENTION_HELP
 #define ATTENTION_HELP
 
-/*
-*  AttentionHelp.h:
-*  attention softmax help nodes
-*
-*  Created on: Apr 22, 2017
-*      Author: mszhang
-*/
-
 #include "MyLib.h"
 #include "Node.h"
 #include "Graph.h"

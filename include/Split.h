@@ -123,7 +123,7 @@ public:
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {
             SplitNode &split = static_cast<SplitNode&>(node);
-            vector<pair<Node *, string>> inputs = {make_pair(split.input_, "input")};
+            vector<pair<Node *, string>> inputs = {make_pair(split.getInput(), "input")};
             return inputs;
         };
         Executor::testBackward(get_inputs);

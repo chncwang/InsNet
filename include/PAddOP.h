@@ -1,14 +1,6 @@
 #ifndef PAddOP
 #define PAddOP
 
-/*
-*  PAddOP.h:
-*  (pointwise) add
-*
-*  Created on: June 13, 2017
-*      Author: mszhang
-*/
-
 #include "Eigen/Dense"
 #include "MyLib.h"
 #include "Node.h"

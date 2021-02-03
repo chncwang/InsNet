@@ -1,14 +1,6 @@
 #ifndef BucketOP
 #define BucketOP
 
-/*
-*  BucketOP.h:
-*  a bucket operation, for padding mainly
-*  usually an inputleaf node, degree = 0
-*
-*  Created on: Apr 21, 2017
-*      Author: mszhang
-*/
 #include <vector>
 #include "Eigen/Dense"
 #include "MyLib.h"

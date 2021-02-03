@@ -1,15 +1,6 @@
 #ifndef CONCAT
 #define CONCAT
 
-/*
-*  Concat.h:
-*  concatenatation operation.
-*
-*  Created on: Apr 22, 2017
-*      Author: mszhang
-*/
-
-
 #include "MyLib.h"
 #include "Node.h"
 #include "Graph.h"

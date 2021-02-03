@@ -1,14 +1,6 @@
 #ifndef PMultiOP
 #define PMultiOP
 
-/*
-*  PMultiOP.h:
-*  pointwise multiplication
-*
-*  Created on: Apr 21, 2017
-*      Author: mszhang
-*/
-
 #include "Eigen/Dense"
 #include "MyLib.h"
 #include "Node.h"

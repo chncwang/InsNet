@@ -1,10 +1,3 @@
-/*
- * BaseParam.h
- *
- *  Created on: Jul 25, 2016
- *      Author: mason
- */
-
 #ifndef BasePARAM_H_
 #define BasePARAM_H_
 

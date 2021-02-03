@@ -1,14 +1,6 @@
 #ifndef ATTENTION_BUILDER
 #define ATTENTION_BUILDER
 
-/*
-*  Attention.h:
-*  a set of attention builders
-*
-*  Created on: Apr 22, 2017
-*      Author: mszhang
-*/
-
 #include "MyLib.h"
 #include "Node.h"
 #include "UniOP.h"
@@ -78,13 +70,13 @@ pair<BatchedNode *, BatchedNode *> dotAttention(Graph &graph, BatchedNode& key_m
         heads.push_back(head_count * col);
     }
     BatchedNode *sum = n3ldg_plus::matrixColSum(graph, *matrix, heads);
-    BatchedNode *transposed_sum = n3ldg_plus::transposeMatrix(graph, *sum, head_count);
-    BatchedNode *scaled_weight = n3ldg_plus::scaled(graph, *transposed_sum,
+    BatchedNode *weight = n3ldg_plus::transposeMatrix(graph, *sum, head_count);
+    weight = n3ldg_plus::scaled(graph, *weight,
             1.0 / ::sqrt((dtype)guide.getDim() / head_count));
-    scaled_weight = n3ldg_plus::softmax(graph, *scaled_weight, head_count);
-    BatchedNode *hidden = n3ldg_plus::matrixAndVectorMulti(graph, value_matrix, *scaled_weight,
+    weight = n3ldg_plus::softmax(graph, *weight, head_count);
+    BatchedNode *hidden = n3ldg_plus::matrixAndVectorMulti(graph, value_matrix, *weight,
             head_count);
-    return make_pair(hidden, scaled_weight);
+    return make_pair(hidden, weight);
 }
 
 pair<BatchedNode *, BatchedNode *> dotAttention(Graph &graph, Node& key_matrix,

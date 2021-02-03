@@ -55,6 +55,21 @@ public:
         graph.addNode(this);
     }
 
+    void forward(Graph &graph, NodeAbs &topo_input, const vector<Node *> &inputs) {
+        int input_dim = inputs.front()->getDim();
+        for (auto it = inputs.begin() + 1; it != inputs.end(); ++it) {
+            if (input_dim != (*it)->getDim()) {
+                cerr << "MatrixConcatNode - forward inconsistent input dims" << endl;
+                abort();
+            }
+        }
+
+        in_nodes = inputs;
+        topo_input.addParent(this);
+        setColumn(inputs.size());
+        graph.addNode(this);
+    }
+
     void compute() override {
         for (int i = 0; i < in_nodes.size(); ++i) {
             int offset = i * getRow();
@@ -112,6 +127,14 @@ public:
 class MatrixConcatExecutor : public MatrixExecutor {
 public:
     void forward() override {
+#if TEST_CUDA
+        auto get_inputs = [](Node &node) -> vector<Node *> {
+            MatrixConcatNode *m = dynamic_cast<MatrixConcatNode*>(&node);
+            return m->getInputs();
+        };
+        testForwardInpputs(get_inputs);
+        cout << "MatrixConcat forward tested" << endl;
+#endif
         for (Node *node : batch) {
             MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(node);
             in_counts.push_back(concat->getColumn());
@@ -874,6 +897,13 @@ Node *concatToMatrix(Graph &graph, const vector<Node *> &inputs) {
     int input_dim = inputs.front()->getDim();
     MatrixConcatNode *node = MatrixConcatNode::newNode(inputs.size() * input_dim);
     node->forward(graph, inputs);
+    return node;
+}
+
+Node *concatToMatrix(Graph &graph, NodeAbs &topo_input, const vector<Node *> &inputs) {
+    int input_dim = inputs.front()->getDim();
+    MatrixConcatNode *node = MatrixConcatNode::newNode(inputs.size() * input_dim);
+    node->forward(graph, topo_input, inputs);
     return node;
 }
 

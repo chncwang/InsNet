@@ -1,10 +1,3 @@
-/*
- * Param.h
- *
- *  Created on: Jul 25, 2016
- *      Author: mason
- */
-
 #ifndef PARAM_H_
 #define PARAM_H_
 

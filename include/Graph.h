@@ -80,7 +80,14 @@ public:
             }
         } else {
             for (NodeAbs *node : finish_nodes) {
-                delete node;
+                if (node->isBatched()) {
+                    for (Node *x : node->batch()) {
+                        delete x;
+                    }
+                    delete node;
+                } else {
+                    delete node;
+                }
             }
         }
     }
@@ -164,6 +171,10 @@ public:
                     auto &v = node->batch();
                     for (Node *atom : v) {
                         cur_exec->batch.push_back(atom);
+//                        if (cur_exec->batch.front()->typeSignature() != atom->typeSignature()) {
+//                            cerr << "type sig not equal" << endl;
+//                            abort();
+//                        }
                     }
                 }
             } else {

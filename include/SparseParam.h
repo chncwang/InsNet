@@ -1,10 +1,3 @@
-/*
- * SparseParam.h
- *
- *  Created on: Jul 25, 2016
- *      Author: mason
- */
-
 #ifndef SPARSEPARAM_H_
 #define SPARSEPARAM_H_
 

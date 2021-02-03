@@ -1,10 +1,3 @@
-/*
- * ModelUpdate.h
- *
- *  Created on: Jul 20, 2016
- *      Author: mason
- */
-
 #ifndef ModelUpdate_H_
 #define ModelUpdate_H_
 

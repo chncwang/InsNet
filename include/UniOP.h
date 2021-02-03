@@ -1,15 +1,6 @@
 #ifndef UNIOP_H_
 #define UNIOP_H_
 
-/*
-*  UniOP.h:
-*  a simple feed forward neural operation, unary input.
-*
-*  Created on: Apr 22, 2017
-*      Author: mszhang
-*/
-
-
 #include "Param.h"
 #include "MyLib.h"
 #include "SparseParam.h"
@@ -158,16 +149,16 @@ public:
     void  forward() {
         int count = batch.size();
 #if TEST_CUDA
-        param->W.val.copyFromDeviceToHost();
-        if (param->bUseB) {
-            param->b.val.copyFromDeviceToHost();
+        params().W.val.copyFromDeviceToHost();
+        if (params().bUseB) {
+            params().b.val.copyFromDeviceToHost();
         }
 #endif
 
         x.init(inDim(), count);
         y.init(outDim(), count);
 #if TEST_CUDA
-        b.init(outDim, count);
+        b.init(outDim(), count);
 #endif
         std::vector<dtype*> xs, ys;
         xs.reserve(batch.size());
@@ -179,7 +170,7 @@ public:
             xs.push_back(n->getInput()->val().value);
             ys.push_back(n->val().value);
 #if TEST_CUDA
-            n->in->val().copyFromDeviceToHost();
+            n->getInput()->val().copyFromDeviceToHost();
 #endif
         }
 
@@ -199,18 +190,18 @@ public:
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
-            for (int idy = 0; idy < inDim; idy++) {
-                x[idx][idy] = ptr->in->getVal()[idy];
+            for (int idy = 0; idy < inDim(); idy++) {
+                x[idx][idy] = ptr->getInput()->getVal()[idy];
             }
-            if (param->bUseB) {
-                for (int i = 0; i < outDim; ++i) {
-                    b[idx][i] = param->b.val.v[i];
+            if (params().bUseB) {
+                for (int i = 0; i < outDim(); ++i) {
+                    b[idx][i] = params().b.val.v[i];
                 }
             }
         }
 
-        y.mat() = param->W.val.mat() * x.mat();
-        if (param->bUseB) {
+        y.mat() = params().W.val.mat() * x.mat();
+        if (params().bUseB) {
             y.vec() += b.vec();
         }
 
@@ -219,7 +210,7 @@ public:
 
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
-            for (int idy = 0; idy < outDim; idy++) {
+            for (int idy = 0; idy < outDim(); idy++) {
                 ptr->val()[idy] = y[idx][idy];
             }
             n3ldg_cuda::Assert(ptr->val().verify("linear forward val"));
@@ -231,22 +222,22 @@ public:
     void backward() {
         int count = batch.size();
 #if TEST_CUDA
-        if (param->bUseB) {
-            n3ldg_cuda::Assert(param->b.grad.verify("before linear backward b grad"));
-            param->b.grad.copyFromDeviceToHost();
+        if (params().bUseB) {
+            n3ldg_cuda::Assert(params().b.grad.verify("before linear backward b grad"));
+            params().b.grad.copyFromDeviceToHost();
         }
-        n3ldg_cuda::Assert(param->W.val.verify("before linear backward W val"));
-        param->W.val.copyFromDeviceToHost();
-        n3ldg_cuda::Assert(param->W.grad.verify("before linear backward W grad"));
-        param->W.grad.copyFromDeviceToHost();
+        n3ldg_cuda::Assert(params().W.val.verify("before linear backward W val"));
+        params().W.val.copyFromDeviceToHost();
+        n3ldg_cuda::Assert(params().W.grad.verify("before linear backward W grad"));
+        params().W.grad.copyFromDeviceToHost();
         for (int i = 0; i < count; ++i) {
             LinearNode* ptr = (LinearNode*)batch[i];
             n3ldg_cuda::Assert(ptr->loss().verify("before linear backward grad"));
             ptr->loss().copyFromDeviceToHost();
             n3ldg_cuda::Assert(ptr->val().verify("before linear val"));
             ptr->val().copyFromDeviceToHost();
-            n3ldg_cuda::Assert(ptr->in->loss().verify("before linear backward in grad"));
-            ptr->in->loss().copyFromDeviceToHost();
+            n3ldg_cuda::Assert(ptr->getInput()->loss().verify("before linear backward in grad"));
+            ptr->getInput()->loss().copyFromDeviceToHost();
         }
 #endif
         Tensor2D lx, ly;
@@ -277,38 +268,38 @@ public:
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
-            for (int idy = 0; idy < outDim; idy++) {
+            for (int idy = 0; idy < outDim(); idy++) {
                 ly[idx][idy] = ptr->getLoss()[idy];
             }
         }
 
         n3ldg_cuda::Assert(x.verify("backward x"));
 
-        param->W.grad.mat() += ly.mat() * x.mat().transpose();
-        n3ldg_cuda::Assert(param->W.grad.verify("LinearExecutor backward W grad"));
+        params().W.grad.mat() += ly.mat() * x.mat().transpose();
+        n3ldg_cuda::Assert(params().W.grad.verify("LinearExecutor backward W grad"));
 
-        if (param->bUseB) {
+        if (params().bUseB) {
             for (int idx = 0; idx < count; idx++) {
-                for (int idy = 0; idy < outDim; idy++) {
-                    param->b.grad.v[idy] += ly[idx][idy];
+                for (int idy = 0; idy < outDim(); idy++) {
+                    params().b.grad.v[idy] += ly[idx][idy];
                 }
             }
-            n3ldg_cuda::Assert(param->b.grad.verify("backward b grad"));
+            n3ldg_cuda::Assert(params().b.grad.verify("backward b grad"));
         }
 
-        lx.mat() += param->W.val.mat().transpose() * ly.mat();
+        lx.mat() += params().W.val.mat().transpose() * ly.mat();
         n3ldg_cuda::Assert(lx.verify("linear execute backward lx"));
 
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
-            for (int idy = 0; idy < inDim; idy++) {
-                ptr->in->loss()[idy] += lx[idx][idy];
+            for (int idy = 0; idy < inDim(); idy++) {
+                ptr->getInput()->loss()[idy] += lx[idx][idy];
             }
         }
 
         for (Node * n : batch) {
             LinearNode *ptr = static_cast<LinearNode *>(n);
-            n3ldg_cuda::Assert(ptr->in->loss().verify("backward loss"));
+            n3ldg_cuda::Assert(ptr->getInput()->loss().verify("backward loss"));
         }
 #endif
     }
@@ -450,8 +441,9 @@ public:
 
 private:
     Param *param_ = nullptr;
-    friend class LinearWordVectorExecutor;
     int offset_ = 0;
+
+    friend class LinearWordVectorExecutor;
 };
 
 class BatchedLinearWordVectorNode : public BatchedNodeImpl<LinearWordVectorNode> {
@@ -513,8 +505,6 @@ namespace n3ldg_plus {
 class LinearWordVectorExecutor : public UniInputExecutor {
 public:
     Tensor2D x, y;
-    int inDim, outDim;
-    Param *param;
 
     void forward() {
         int count = batch.size();
@@ -656,8 +646,18 @@ public:
 class LinearWordVectorExecutor : public Executor {
 public:
     Tensor2D x, y;
-    int inDim, outDim;
-    Param *param;
+
+    int inDim() {
+        return param().outDim();
+    }
+
+    int outDim() {
+        return param().inDim();
+    }
+
+    Param &param() {
+        return *dynamic_cast<LinearWordVectorNode *>(batch.front())->param_;
+    }
 
     int calculateFLOPs() override {
         LinearWordVectorNode *node = static_cast<LinearWordVectorNode*>(batch.front());
@@ -666,49 +666,49 @@ public:
 
     void forward() override {
         int count = batch.size();
-        x.init(inDim, count);
-        y.init(outDim, count);
+        x.init(inDim(), count);
+        y.init(outDim(), count);
 
         for (int i = 0; i < count; i++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
-            memcpy(x.v + i * inDim, ptr->getInput()->val().v, inDim * sizeof(dtype));
+            memcpy(x.v + i * inDim(), ptr->getInput()->val().v, inDim() * sizeof(dtype));
         }
         int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
-        Mat scoped_matrix(param->val.mat().data() + offset * inDim, inDim, outDim);
+        Mat scoped_matrix(param().val.mat().data() + offset * inDim(), inDim(), outDim());
         y.mat() = scoped_matrix.transpose() * x.mat();
 
         for (int i = 0; i < count; i++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
-            memcpy(ptr->val().v, y.v + i * outDim, outDim * sizeof(dtype));
+            memcpy(ptr->val().v, y.v + i * outDim(), outDim() * sizeof(dtype));
         }
     }
 
     void backward() override {
         Tensor2D lx, ly;
         int count = batch.size();
-        lx.init(inDim, count);
-        ly.init(outDim, count);
+        lx.init(inDim(), count);
+        ly.init(outDim(), count);
 
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
-            memcpy(ly.v + idx * outDim, ptr->loss().v, outDim * sizeof(dtype));
+            memcpy(ly.v + idx * outDim(), ptr->loss().v, outDim() * sizeof(dtype));
         }
 
         int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
         auto scoped_grad = x.mat() * ly.mat().transpose();
-        MatrixXdtype full_grad(inDim, param->inDim()), left(inDim, offset),
-                     right(inDim, param->inDim() - offset - outDim);
+        MatrixXdtype full_grad(inDim(), param().inDim()), left(inDim(), offset),
+                     right(inDim(), param().inDim() - offset - outDim());
         left.setZero();
         right.setZero();
         full_grad << left, scoped_grad, right;
-        param->grad.mat() += full_grad;
+        param().grad.mat() += full_grad;
 
-        Mat scoped_matrix(param->val.mat().data() + offset * inDim, inDim, outDim);
+        Mat scoped_matrix(param().val.mat().data() + offset * inDim(), inDim(), outDim());
         lx.mat() = scoped_matrix * ly.mat();
 
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
-            for (int idy = 0; idy < inDim; idy++) {
+            for (int idy = 0; idy < inDim(); idy++) {
                 ptr->getInput()->loss()[idy] += lx[idx][idy];
             }
         }
@@ -718,12 +718,7 @@ public:
 #endif
 
 Executor* LinearWordVectorNode::generate() {
-    LinearWordVectorExecutor* exec = new LinearWordVectorExecutor();
-    exec->batch.push_back(this);
-    exec->inDim = param_->outDim();
-    exec->outDim = getDim();
-    exec->param = param_;
-    return exec;
+    return new LinearWordVectorExecutor();
 }
 
 class BiasParam : public Param {
