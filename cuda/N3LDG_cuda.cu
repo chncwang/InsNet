@@ -2238,19 +2238,16 @@ void MatrixColSumBackward(vector<dtype *> &grads, int count, vector<int> &cols, 
 }
 
 __global__ void KernelMatrixAndVectorMultiForward(dtype **matrices, dtype **vectors, int count,
-        int head_count,
         int matrix_row,
         int *cols,
         int max_col,
         dtype **vals) {
     __shared__ volatile extern dtype shared_arr[];
-    int count_i = blockIdx.y / head_count;
-    int head_count_i = blockIdx.y % head_count;
+    int count_i = blockIdx.y;
     int col = cols[count_i];
     int matrix_row_i = blockIdx.x;
-    int matrix_offset = matrix_row  * head_count * threadIdx.x + matrix_row * head_count_i +
-        matrix_row_i;
-    int vector_offset = col * head_count_i + threadIdx.x;
+    int matrix_offset = matrix_row  * threadIdx.x + matrix_row_i;
+    int vector_offset = threadIdx.x;
     if (threadIdx.x < col) {
         shared_arr[threadIdx.x] = matrices[count_i][matrix_offset] *
             vectors[count_i][vector_offset];
@@ -2268,12 +2265,11 @@ __global__ void KernelMatrixAndVectorMultiForward(dtype **matrices, dtype **vect
     }
 
     if (threadIdx.x == 0) {
-        vals[count_i][matrix_row_i + head_count_i * matrix_row] = shared_arr[0];
+        vals[count_i][matrix_row_i] = shared_arr[0];
     }
 }
 
 void MatrixAndVectorMultiForward(vector<dtype *> &matrices, vector<dtype *> &vectors, int count,
-        int head_count,
         int row,
         vector<int> &cols,
         vector<dtype *> &vals) {
@@ -2285,35 +2281,31 @@ void MatrixAndVectorMultiForward(vector<dtype *> &matrices, vector<dtype *> &vec
     col_arr.init(cols.data(), count);
     int max_col = *max_element(cols.begin(), cols.end());
     int thread_count = NextTwoIntegerPowerNumber(max_col);
-    dim3 block_dim(row, count * head_count, 1);
+    dim3 block_dim(row, count, 1);
     KernelMatrixAndVectorMultiForward<<<block_dim, thread_count,
-        thread_count * sizeof(dtype)>>>(matrix_arr.value, vector_arr.value, count, head_count, row,
+        thread_count * sizeof(dtype)>>>(matrix_arr.value, vector_arr.value, count, row,
                 col_arr.value, max_col, val_arr.value);
     CheckCudaError();
 }
 
 __global__ void KernelMatrixAndVectorMultiBackwardForMatrix(dtype **grads, dtype **vectors,
         int count,
-        int head_count,
-        int head_dim,
+        int row,
         int *cols,
         int max_col,
         dtype **matrix_grads) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
-    for (int i = index; i < count * max_col * head_dim * head_count; i += step) {
-        int n = max_col * head_dim * head_count;
+    for (int i = index; i < count * max_col * row; i += step) {
+        int n = max_col * row;
         int count_i = i / n;
-        int head_i = i % n / (max_col * head_dim);
-        int head_offset = i % n % (max_col * head_dim);
-        int col_i = head_offset / head_dim;
-        int row_i = head_offset % head_dim;
-        int offset = col_i * head_dim * head_count + head_i * head_dim + row_i;
+        int offset = i % n;
+        int col_i = offset / row;
+        int row_i = offset % row;
         int col = cols[count_i];
         if (col_i < col) {
             DeviceAtomicAdd(matrix_grads[count_i] + offset,
-                    grads[count_i][head_i * head_dim + row_i] *
-                    vectors[count_i][col_i + head_i * col]);
+                    grads[count_i][row_i] * vectors[count_i][col_i]);
         }
     }
 }
@@ -2322,14 +2314,13 @@ __global__ void KernelMatrixAndVectorMultiBackwardForVector(dtype **grads, dtype
         volatile dtype *block_sums,
         int *block_counters,
         int count,
-        int head_count,
-        int head_dim,
+        int row
         int *cols,
         int max_col,
         dtype **vector_grads) {
     __shared__ volatile dtype shared_arr[TPB];
     __shared__ volatile bool is_last_block;
-    int count_i = blockIdx.x / head_count;
+    int count_i = blockIdx.x;
     if (blockIdx.z >= cols[count_i]) {
         return;
     }
@@ -2340,11 +2331,9 @@ __global__ void KernelMatrixAndVectorMultiBackwardForVector(dtype **grads, dtype
     if (threadIdx.x == 0) {
         is_last_block = false;
     }
-    int head_i = blockIdx.x % head_count;
-    int head_dim_i = blockIdx.y * blockDim.x + threadIdx.x;
-    int matrix_row_i = head_dim_i + head_i * head_dim;
-    int matrix_offset = blockIdx.z * head_dim * head_count + matrix_row_i;
-    shared_arr[threadIdx.x] = head_dim_i < head_dim ?
+    int matrix_row_i = blockIdx.y * blockDim.x + threadIdx.x;
+    int matrix_offset = blockIdx.z * row + matrix_row_i;
+    shared_arr[threadIdx.x] = matrix_row_i < row ?
         matrices[count_i][matrix_offset] * grads[count_i][matrix_row_i] : 0;
     __syncthreads();
 
@@ -2382,8 +2371,7 @@ __global__ void KernelMatrixAndVectorMultiBackwardForVector(dtype **grads, dtype
         }
 
         if (threadIdx.x == 0) {
-            DeviceAtomicAdd(vector_grads[count_i] + head_i * cols[count_i] + blockIdx.z,
-                    shared_arr[0]);
+            DeviceAtomicAdd(vector_grads[count_i] + blockIdx.z, shared_arr[0]);
         }
     }
 }
@@ -2391,7 +2379,6 @@ __global__ void KernelMatrixAndVectorMultiBackwardForVector(dtype **grads, dtype
 void MatrixAndVectorMultiBackward(vector<dtype *> &grads, vector<dtype *> &matrices,
         vector<dtype *> &vectors,
         int count,
-        int head_count,
         int row,
         vector<int> &cols,
         vector<dtype *> &matrix_grads,
@@ -2406,21 +2393,20 @@ void MatrixAndVectorMultiBackward(vector<dtype *> &grads, vector<dtype *> &matri
     IntArray col_arr;
     col_arr.init(cols.data(), count);
 
-    int block_count = DefaultBlockCount(count * max_col * row * head_count);
+    int block_count = DefaultBlockCount(count * max_col * row);
     KernelMatrixAndVectorMultiBackwardForMatrix<<<block_count, TPB>>>(grad_arr.value,
-            vector_arr.value, count, head_count, row, col_arr.value, max_col,
-            matrix_grad_arr.value);
+            vector_arr.value, count, row, col_arr.value, max_col, matrix_grad_arr.value);
     CheckCudaError();
 
     int y = (row - 1) / TPB + 1;
-    dim3 block_dim(count * head_count, y, max_col);
+    dim3 block_dim(count, y, max_col);
     NumberArray block_sums;
-    block_sums.init(y * max_col * count * head_count);
+    block_sums.init(y * max_col * count);
     IntArray block_counters;
-    block_counters.init(max_col * count * head_count);
+    block_counters.init(max_col * count);
 
     KernelMatrixAndVectorMultiBackwardForVector<<<block_dim, TPB>>>(grad_arr.value,
-            matrix_arr.value, block_sums.value, block_counters.value, count, head_count, row,
+            matrix_arr.value, block_sums.value, block_counters.value, count, row,
             col_arr.value, max_col, vector_grad_arr.value);
     CheckCudaError();
 }

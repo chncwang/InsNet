@@ -512,106 +512,56 @@ public:
         vector_ = ins.at(1);
     }
 
-    void forward(Graph &graph, Node &matrix, Node &vec, int head_count) {
-        head_count_ = head_count;
+    void forward(Graph &graph, Node &matrix, Node &vec) {
         setInputs({&matrix, &vec});
         afterForward(graph, {&matrix, &vec});
     }
 
     void compute() override {
-        int col = vector_->getDim() / head_count_;
+        int col = vector_->getDim();
         int row = getDim();
-        int head_dim = getDim() / head_count_;
-        dtype *matrix_head = new dtype[head_dim * col];
-        for (int i = 0; i < head_count_; ++i) {
-            for (int j = 0; j < col; ++j) {
-                for (int k = 0; k < head_dim; ++k) {
-                    matrix_head[head_dim * j + k] =
-                        matrix_->getVal()[row * j + k + i * head_dim];
-                }
-            }
-            Mat(val().v + head_dim * i, head_dim, 1) = Mat(matrix_head, head_dim, col) *
-                Mat(vector_->getVal().v + col * i, col, 1);
-        }
-        delete [] matrix_head;
+        val().mat() = Mat(matrix_->getVal().v, row, col) * vector_->getVal().mat();
     }
 
     void backward() override {
-        int col = vector_->getDim() / head_count_;
+        int col = vector_->getDim();
         int row = getDim();
-        int head_dim = getDim() / head_count_;
-        dtype *matrix_head = new dtype[head_dim * col];
-        for (int i = 0; i < head_count_; ++i) {
-            for (int j = 0; j < col; ++j) {
-                for (int k = 0; k < head_dim; ++k) {
-                    matrix_head[head_dim * j + k] =
-                        matrix_->getLoss()[row * j + k + i * head_dim];
-                }
-            }
-
-            Mat(matrix_head, head_dim, col) = Mat(getLoss().v + head_dim * i, head_dim, 1) *
-                Mat(vector_->getVal().v + col * i, col, 1).transpose();
-
-            for (int j = 0; j < col; ++j) {
-                for (int k = 0; k < head_dim; ++k) {
-                    matrix_->loss()[row * j + k + i * head_dim] += matrix_head[head_dim * j + k];
-                }
-            }
-
-            for (int j = 0; j < col; ++j) {
-                for (int k = 0; k < head_dim; ++k) {
-                    matrix_head[head_dim * j + k] =
-                        matrix_->getVal()[row * j + k + i * head_dim];
-                }
-            }
-
-            Mat(vector_->loss().v + i * col, col, 1) +=
-                Mat(matrix_head, head_dim, col).transpose() *
-                Mat(getLoss().v + i * head_dim, head_dim, 1);
-        }
-        delete [] matrix_head;
+        Mat(matrix_->loss().v, row, col) += getLoss().mat() *
+            vector_->getVal().mat().transpose();
+        vector_->loss().mat() += Mat(matrix_->getVal().v, row, col).transpose() * getLoss().mat();
     }
 
     Executor * generate() override;
 
     string typeSignature() const override {
-        return Node::typeSignature() + to_string(head_count_);
+        return Node::typeSignature();
     }
 
 private:
     Node *vector_ = nullptr;
     Node *matrix_ = nullptr;
-    int head_count_ = 1;
     friend class MatrixAndVectorMultiExecutor;
     friend class BatchedMatrixAndVectorMultiNode;
 };
 
 class BatchedMatrixAndVectorMultiNode: public BatchedNodeImpl<MatrixAndVectorMultiNode> {
 public:
-    void init(Graph &graph, Node &matrix, BatchedNode &vec, int head_count) {
-        int dim = matrix.getDim() * head_count / vec.getDim();
-        allocateBatch(dim, vec.batch().size());
+    void init(Graph &graph, Node &matrix, BatchedNode &vec, int *dim = nullptr) {
+        if (dim == nullptr) {
+            int dim = matrix.getDim() / vec.getDim();
+            allocateBatch(dim, vec.batch().size());
+        } else {
+            allocateBatch(*dim, vec.batch().size());
+        }
         int i = 0;
         for (Node *node : batch()) {
             MatrixAndVectorMultiNode *m = dynamic_cast<MatrixAndVectorMultiNode *>(node);
-            m->head_count_ = head_count;
             m->setInputs({&matrix, vec.batch().at(+i++)});
         }
 
         matrix.addParent(this);
         vec.addParent(this);
         graph.addNode(this);
-    }
-
-    void init(Graph &graph, BatchedNode &matrices, BatchedNode &vec, int head_count) {
-        int dim = matrices.getDim() * head_count / vec.getDim();
-        allocateBatch(dim, vec.batch().size());
-        for (Node *node : batch()) {
-            MatrixAndVectorMultiNode *m = dynamic_cast<MatrixAndVectorMultiNode *>(node);
-            m->head_count_ = head_count;
-        }
-        setInputsPerNode({&matrices, &vec});
-        afterInit(graph, {&matrices, &vec});
     }
 };
 
@@ -633,17 +583,16 @@ public:
         }
 #endif
         auto vals = getVals();
-        int head_count = dynamic_cast<MatrixAndVectorMultiNode*>(batch.front())->head_count_;
         for (Node *node : batch) {
             MatrixAndVectorMultiNode *multi = static_cast<MatrixAndVectorMultiNode *>(node);
             matrix_vals_.push_back(multi->matrix_->getVal().value);
             vector_vals_.push_back(multi->vector_->getVal().value);
-            cols_.push_back(multi->vector_->getDim() / head_count);
+            cols_.push_back(multi->vector_->getDim());
         }
         MatrixAndVectorMultiNode *x = static_cast<MatrixAndVectorMultiNode *>(batch.front());
-        row_ = x->getDim() / head_count;
-        n3ldg_cuda::MatrixAndVectorMultiForward(matrix_vals_, vector_vals_, batch.size(),
-                head_count, row_, cols_, vals);
+        row_ = x->getDim();
+        n3ldg_cuda::MatrixAndVectorMultiForward(matrix_vals_, vector_vals_, batch.size(), row_,
+                cols_, vals);
 #if TEST_CUDA
         testForward();
         cout << "MatrixAndVectorMultiExecutor forward tested" << endl;
@@ -659,9 +608,8 @@ public:
             matrix_grads.push_back(multi->matrix_->getLoss().value);
             vector_grads.push_back(multi->vector_->getLoss().value);
         }
-        int head_count = dynamic_cast<MatrixAndVectorMultiNode*>(batch.front())->head_count_;
         n3ldg_cuda::MatrixAndVectorMultiBackward(grads, matrix_vals_, vector_vals_, batch.size(),
-                head_count, row_, cols_, matrix_grads, vector_grads);
+                row_, cols_, matrix_grads, vector_grads);
 #if TEST_CUDA
         auto get_inputs = [&](Node &node) {
             MatrixAndVectorMultiNode &multi = static_cast<MatrixAndVectorMultiNode&>(node);
@@ -854,16 +802,12 @@ private:
 
 class BatchedTranMatrixMulVectorNode : public BatchedNodeImpl<TranMatrixMulVectorNode> {
 public:
-    void init(Graph &graph, Node &matrix, BatchedNode &vec, bool use_increased_dims = false) {
-        if (use_increased_dims) {
-            vector<int> dims;
-            for (int i = 1; i <= vec.batch().size(); ++i) {
-                dims.push_back(i);
-            }
-            allocateBatch(dims);
-        } else {
+    void init(Graph &graph, Node &matrix, BatchedNode &vec, const vector<int> *dims = nullptr) {
+        if (dims == nullptr) {
             int dim = matrix.getDim() / vec.getDim();
             allocateBatch(dim, vec.batch().size());
+        } else {
+            allocateBatch(*dims);
         }
         int i = 0;
         for (Node *node : batch()) {
@@ -954,67 +898,47 @@ BatchedNode *matrixColSum(Graph &graph, BatchedNode &input, const vector<int> &c
     return node;
 }
 
-Node *matrixAndVectorMulti(Graph &graph, Node &matrix, Node &vec, int head_count) {
-    int dim = matrix.getDim() * head_count / vec.getDim();
-    if (matrix.getDim() % head_count != 0) {
-        cerr << boost::format("matrix dim:%1% head_count:%2%") % matrix.getDim() % head_count <<
-            endl;
-        abort();
-    }
-    if (vec.getDim() % head_count != 0) {
-        cerr << boost::format("vec dim:%1% head_count:%2%") % vec.getDim() % head_count <<
-            endl;
-        abort();
-    }
+Node *matrixAndVectorMulti(Graph &graph, Node &matrix, Node &vec) {
+    int dim = matrix.getDim() / vec.getDim();
     if (matrix.getDim() % vec.getDim() != 0) {
         cerr << boost::format("vec dim:%1% matrix dim:%2%") % vec.getDim() % matrix.getDim() <<
             endl;
         abort();
     }
     MatrixAndVectorMultiNode *node = MatrixAndVectorMultiNode::newNode(dim);
-    node->forward(graph, matrix, vec, head_count);
+    node->forward(graph, matrix, vec);
     return node;
 }
 
-BatchedNode *matrixAndVectorMulti(Graph &graph, BatchedNode &matrices, BatchedNode &vec,
-        int head_count) {
-    int i = 0;
-    for (Node *matrix : matrices.batch()) {
-        if (matrix->getDim() % head_count != 0) {
-            cerr << boost::format("matrix dim:%1% head_count:%2%") % matrix->getDim() %
-                head_count << endl;
-            abort();
-        }
-        if (vec.batch().at(i)->getDim() % head_count != 0) {
-            cerr << boost::format("vec dim:%1% head_count:%2%") % vec.batch().at(i)->getDim() %
-                head_count << endl;
-            abort();
-        }
-        if (matrix->getDim() % vec.batch().at(i)->getDim() != 0) {
-            cerr << boost::format("vec dim:%1% matrix dim:%2%") % vec.batch().at(i)->getDim() %
-                matrix->getDim() << endl;
-            abort();
-        }
-        ++i;
-    }
+//BatchedNode *matrixAndVectorMulti(Graph &graph, BatchedNode &matrices, BatchedNode &vec,
+//        int head_count) {
+//    int i = 0;
+//    for (Node *matrix : matrices.batch()) {
+//        if (matrix->getDim() % head_count != 0) {
+//            cerr << boost::format("matrix dim:%1% head_count:%2%") % matrix->getDim() %
+//                head_count << endl;
+//            abort();
+//        }
+//        if (vec.batch().at(i)->getDim() % head_count != 0) {
+//            cerr << boost::format("vec dim:%1% head_count:%2%") % vec.batch().at(i)->getDim() %
+//                head_count << endl;
+//            abort();
+//        }
+//        if (matrix->getDim() % vec.batch().at(i)->getDim() != 0) {
+//            cerr << boost::format("vec dim:%1% matrix dim:%2%") % vec.batch().at(i)->getDim() %
+//                matrix->getDim() << endl;
+//            abort();
+//        }
+//        ++i;
+//    }
 
-    BatchedMatrixAndVectorMultiNode *node = new BatchedMatrixAndVectorMultiNode;
-    node->init(graph, matrices, vec, head_count);
-    return node;
-}
+//    BatchedMatrixAndVectorMultiNode *node = new BatchedMatrixAndVectorMultiNode;
+//    node->init(graph, matrices, vec);
+//    return node;
+//}
 
 BatchedNode *matrixAndVectorMulti(Graph &graph, Node &matrix, BatchedNode &vec,
-        int head_count) {
-    if (matrix.getDim() % head_count != 0) {
-        cerr << boost::format("matrix dim:%1% head_count:%2%") % matrix.getDim() % head_count <<
-            endl;
-        abort();
-    }
-    if (vec.getDim() % head_count != 0) {
-        cerr << boost::format("vec dim:%1% head_count:%2%") % vec.getDim() % head_count <<
-            endl;
-        abort();
-    }
+        int *dim = nullptr) {
     if (matrix.getDim() % vec.getDim() != 0) {
         cerr << boost::format("vec dim:%1% matrix dim:%2%") % vec.getDim() % matrix.getDim() <<
             endl;
@@ -1022,7 +946,7 @@ BatchedNode *matrixAndVectorMulti(Graph &graph, Node &matrix, BatchedNode &vec,
     }
 
     BatchedMatrixAndVectorMultiNode *node = new BatchedMatrixAndVectorMultiNode;
-    node->init(graph, matrix, vec, head_count);
+    node->init(graph, matrix, vec, dim);
     return node;
 }
 
@@ -1064,9 +988,9 @@ Node *tranMatrixMulVector(Graph &graph, Node &matrix, Node &vec) {
 }
 
 BatchedNode *tranMatrixMulVector(Graph &graph, Node &matrix, BatchedNode &vec,
-        bool use_increased_dims = false) {
+        const vector<int> *dims = nullptr) {
     BatchedTranMatrixMulVectorNode *node = new BatchedTranMatrixMulVectorNode;
-    node->init(graph, matrix, vec, use_increased_dims);
+    node->init(graph, matrix, vec, dims);
     return node;
 }
 

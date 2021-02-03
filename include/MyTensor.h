@@ -71,14 +71,17 @@ Vec n3ldg_cpu::Tensor1D::vec() {
 
 dtype& n3ldg_cpu::Tensor1D::operator[](const int i) {
     if (i >= dim) {
-        std::cerr << "i >= dim" << std::endl;
+        std::cerr << boost::format("i >= dim i:%1% dim:%2%") % i % dim << std::endl;
         abort();
     }
     return v[i];  // no boundary check?
 }
 
 const dtype& n3ldg_cpu::Tensor1D::operator[](const int i) const {
-    assert(i < dim);
+    if (i >= dim) {
+        std::cerr << boost::format("i >= dim i:%1% dim:%2%") % i % dim << std::endl;
+        abort();
+    }
     return v[i];  // no boundary check?
 }
 

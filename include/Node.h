@@ -168,14 +168,11 @@ public:
 
     virtual void addParent(NodeAbs* parent) {
         NodeAbs &topo = topologicalNode();
-        if (topo.degree_ < 0) {
-            cerr << "NodeAbs addParent degree:" << topo.degree_ << endl;
-            abort();
+        if (topo.degree_ >= 0) {
+            topo.parents_.push_back(parent);
+            parent->degree_++;
+            parent->depth_ = std::max(topo.depth_ + 1, parent->depth_);
         }
-
-        topo.parents_.push_back(parent);
-        parent->degree_++;
-        parent->depth_ = std::max(topo.depth_ + 1, parent->depth_);
     }
 
     const vector<NodeAbs *> getParents() const {
