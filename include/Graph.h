@@ -161,7 +161,7 @@ public:
                     min_hash = type_hash;
                 }
             }
-//            cout << "type:" <<min_hash << " " << shallow_nodes.size() << endl;
+            cout << "type:" <<min_hash << " " << shallow_nodes.size() << endl;
             NodeAbs *first_node = shallow_nodes.front();
             Executor *cur_exec = first_node->generate();
             cur_exec->batch.clear();

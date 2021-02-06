@@ -506,16 +506,28 @@ class LinearWordVectorExecutor : public UniInputExecutor {
 public:
     Tensor2D x, y;
 
+    int inDim() {
+        return param().outDim();
+    }
+
+    int outDim() {
+        return param().inDim();
+    }
+
+    Param &param() {
+        return *dynamic_cast<LinearWordVectorNode *>(batch.front())->param_;
+    }
+
     void forward() {
         int count = batch.size();
 
-        x.init(inDim, count);
-        y.init(outDim, count);
+        x.init(inDim(), count);
+        y.init(outDim(), count);
         std::vector<dtype*> xs, ys;
         xs.reserve(batch.size());
         ys.reserve(batch.size());
 #if TEST_CUDA
-        param->val.copyFromDeviceToHost();
+        param().val.copyFromDeviceToHost();
 #endif
 
         for (int i = 0; i < batch.size(); ++i) {
@@ -527,11 +539,11 @@ public:
             ys.push_back(n->val().value);
         }
 
-        n3ldg_cuda::CopyForUniNodeForward(xs, nullptr, x.value, y.value, count, inDim, outDim,
+        n3ldg_cuda::CopyForUniNodeForward(xs, nullptr, x.value, y.value, count, inDim(), outDim(),
                 false);
         int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
-        n3ldg_cuda::MatrixMultiplyMatrix(param->val.value + offset * inDim, x.value, y.value,
-                outDim, inDim, count, false, false, true);
+        n3ldg_cuda::MatrixMultiplyMatrix(param().val.value + offset * inDim(), x.value, y.value,
+                outDim(), inDim(), count, false, false, true);
 
         std::vector<dtype*> vals;
         vals.reserve(count);
@@ -539,20 +551,20 @@ public:
             vals.push_back(node->val().value);
         }
 
-        n3ldg_cuda::CopyFromOneVectorToMultiVals(y.value, vals, count, outDim);
+        n3ldg_cuda::CopyFromOneVectorToMultiVals(y.value, vals, count, outDim());
 #if TEST_CUDA
         for (int i = 0; i < count; i++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
-            memcpy(x.v + i * inDim, ptr->getInput()->val().v, inDim * sizeof(dtype));
+            memcpy(x.v + i * inDim(), ptr->getInput()->val().v, inDim() * sizeof(dtype));
         }
-        Mat scoped_matrix(param->val.mat().data() + offset * inDim, inDim, outDim);
+        Mat scoped_matrix(param().val.mat().data() + offset * inDim(), inDim(), outDim());
         y.mat() = scoped_matrix.transpose() * x.mat();
         n3ldg_cuda::Assert(x.verify("forward x"));
         n3ldg_cuda::Assert(y.verify("linear word forward y"));
 
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
-            for (int idy = 0; idy < outDim; idy++) {
+            for (int idy = 0; idy < outDim(); idy++) {
                 ptr->val()[idy] = y[idx][idy];
             }
             n3ldg_cuda::Assert(ptr->val().verify("linear forward val"));
@@ -564,10 +576,10 @@ public:
     void backward() {
         int count = batch.size();
         Tensor2D lx, ly;
-        lx.init(inDim, count);
-        ly.init(outDim, count);
+        lx.init(inDim(), count);
+        ly.init(outDim(), count);
 #if TEST_CUDA
-        param->grad.copyFromDeviceToHost();
+        param().grad.copyFromDeviceToHost();
 #endif
 
         std::vector<dtype*> ly_vec;
@@ -580,12 +592,12 @@ public:
 #endif
             ly_vec.push_back(ptr->loss().value);
         }
-        n3ldg_cuda::CopyFromMultiVectorsToOneVector(ly_vec, ly.value, count, outDim);
+        n3ldg_cuda::CopyFromMultiVectorsToOneVector(ly_vec, ly.value, count, outDim());
         int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
-        n3ldg_cuda::MatrixMultiplyMatrix(x.value, ly.value, param->grad.value + inDim * offset,
-                inDim, count, outDim, true, true, false);
-        n3ldg_cuda::MatrixMultiplyMatrix(param->val.value + offset * inDim, ly.value, lx.value,
-                inDim, outDim, count, false, false, false);
+        n3ldg_cuda::MatrixMultiplyMatrix(x.value, ly.value, param().grad.value + inDim() * offset,
+                inDim(), count, outDim(), true, true, false);
+        n3ldg_cuda::MatrixMultiplyMatrix(param().val.value + offset * inDim(), ly.value, lx.value,
+                inDim(), outDim(), count, false, false, false);
         std::vector<dtype*> losses;
         losses.reserve(count);
         for (int idx = 0; idx < count; idx++) {
@@ -594,11 +606,11 @@ public:
         }
 
         n3ldg_cuda::AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(ly.value, lx.value,
-                nullptr, losses, count, outDim, inDim, false);
+                nullptr, losses, count, outDim(), inDim(), false);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
-            memcpy(ly.v + idx * outDim, ptr->loss().v, outDim * sizeof(dtype));
+            memcpy(ly.v + idx * outDim(), ptr->loss().v, outDim() * sizeof(dtype));
             ptr->loss().copyFromDeviceToHost();
         }
 
@@ -606,28 +618,28 @@ public:
         n3ldg_cuda::Assert(ly.verify("backward ly"));
 
         auto scoped_grad = x.mat() * ly.mat().transpose();
-        MatrixXdtype full_grad(inDim, param->inDim()), left(inDim, offset),
-                     right(inDim, param->inDim() - offset - outDim);
+        MatrixXdtype full_grad(inDim(), param().inDim()), left(inDim(), offset),
+                     right(inDim(), param().inDim() - offset - outDim());
         left.setZero();
         right.setZero();
         full_grad << left, scoped_grad, right;
-        param->grad.mat() += full_grad;
+        param().grad.mat() += full_grad;
         function<void(void)> print = [&]()->void {
-            cerr << "outdim:" << outDim << " param indim:" << param->inDim() << " offset:" <<
-                offset << " indim:" << inDim << endl;
+            cerr << "outdim:" << outDim() << " param indim:" << param().inDim() << " offset:" <<
+                offset << " indim:" << inDim() << endl;
 //            cerr << "cpu:" << endl << param->grad.toString() << endl << "gpu:" << endl;
 //            param->grad.print();
         };
-        n3ldg_cuda::Assert(param->grad.verify("LinearWordVectorExecutor backward W grad"), "",
+        n3ldg_cuda::Assert(param().grad.verify("LinearWordVectorExecutor backward W grad"), "",
                 print);
 
-        Mat scoped_matrix(param->val.mat().data() + offset * inDim, inDim, outDim);
+        Mat scoped_matrix(param().val.mat().data() + offset * inDim(), inDim(), outDim());
         lx.mat() = scoped_matrix * ly.mat();
         n3ldg_cuda::Assert(lx.verify("linear word vector execute backward lx"));
 
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
-            for (int idy = 0; idy < inDim; idy++) {
+            for (int idy = 0; idy < inDim(); idy++) {
                 ptr->getInput()->loss()[idy] += lx[idx][idy];
             }
         }

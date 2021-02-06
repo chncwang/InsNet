@@ -55,6 +55,7 @@ private:
     Node *subtrahend_;
 
     friend class SubExecutor;
+    friend vector<pair<Node *, string>> getInput(Node &node);
 };
 
 class BatchedSubNode : public BatchedNodeImpl<SubNode> {
@@ -82,11 +83,26 @@ BatchedNode *sub(Graph &graph, BatchedNode &minuend, BatchedNode &subtrahend) {
 
 }
 
+vector<pair<Node *, string>> getInput(Node &node) {
+    SubNode &sub = static_cast<SubNode&>(node);
+    vector<pair<Node*, string>> inputs = {make_pair(sub.minuend_, "minuend"),
+        make_pair(sub.subtrahend_, "subtrahend")};
+    return inputs;
+}
+
 #if USE_GPU
 class SubExecutor : public Executor {
     void forward() override {
         vector<dtype*> minuend, subtrahend;
         vector<dtype*> results;
+#if TEST_CUDA
+        testForwardInpputs(getInput);
+        for (Node *node : batch) {
+            SubNode *sub = static_cast<SubNode*>(node);
+            sub->minuend_->val().copyFromHostToDevice();
+            sub->subtrahend_->val().copyFromHostToDevice();
+        }
+#endif
 
         for (Node *node : batch) {
             SubNode *sub = static_cast<SubNode*>(node);
@@ -113,20 +129,14 @@ class SubExecutor : public Executor {
             subtrahend_losses.push_back(sub->subtrahend_->loss().value);
         }
 #if TEST_CUDA
-        auto get_inputs = [](Node &node) {
-            SubNode &sub = static_cast<SubNode&>(node);
-            vector<pair<Node*, string>> inputs = {make_pair(sub.minuend_, "minuend"),
-                make_pair(sub.subtrahend_, "subtrahend")};
-            return inputs;
-        };
         cout << "test before sub backward..." << endl;
-        testBeforeBackward(get_inputs);
+        testBeforeBackward(getInput);
 #endif
         int count = batch.size();
         n3ldg_cuda::SubBackward(losses, count, dims_, minuend_losses, subtrahend_losses);
 #if TEST_CUDA
         cout << "test sub backward..." << endl;
-        Executor::testBackward(get_inputs);
+        Executor::testBackward(getInput);
         cout << "sub tested" << endl;
 #endif
     }

@@ -798,6 +798,7 @@ private:
     Node *matrix_ = nullptr;
     Node *vector_ = nullptr;
     friend class BatchedTranMatrixMulVectorNode;
+    friend class TranMatrixMulVectorExecutor;
 };
 
 class BatchedTranMatrixMulVectorNode : public BatchedNodeImpl<TranMatrixMulVectorNode> {
@@ -821,7 +822,39 @@ public:
 
 #if USE_GPU
 class TranMatrixMulVectorExecutor : public Executor {
+public:
+    void forward() override {
+        vector<int> cols;
+        vector<dtype *> matrices, vectors, vals;
+        for (Node *node : batch) {
+            TranMatrixMulVectorNode *t = dynamic_cast<TranMatrixMulVectorNode *>(node);
+            cols.push_back(t->getDim());
+            matrices.push_back(t->matrix_->getVal().value);
+            vectors.push_back(t->vector_->getVal().value);
+            vals.push_back(t->getVal().value);
+        }
+        TranMatrixMulVectorNode *t = dynamic_cast<TranMatrixMulVectorNode *>(batch.front());
+        int row = t->vector_->getDim();
 
+        n3ldg_cuda::TranMatrixMulVectorForward(matrices, vectors, batch.size(), cols, row, vals);
+#if TEST_CUDA
+        testForward();
+#endif
+    }
+
+    void backward() override {
+#if TEST_CUDA
+        auto get_inputs = [&](Node &node) {
+            TranMatrixMulVectorNode &t = dynamic_cast<TranMatrixMulVectorNode&>(node);
+            vector<pair<Node*, string>> pairs = {
+                make_pair(t.matrix_, "matrix"),
+                make_pair(t.vector_, "vector")
+            };
+            return pairs;
+        };
+        testBackward(get_inputs);
+#endif
+    }
 };
 #else
 class TranMatrixMulVectorExecutor : public Executor {

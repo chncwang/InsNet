@@ -413,29 +413,29 @@ public:
     BatchedNodeImpl() = default;
 
 protected:
-//    void allocateBatch(int dim, int size) {
-//        if (!batch().empty()) {
-//            cerr << "batch not empty" << endl;
-//            abort();
-//        }
-//        auto v = NodeType::newNodeVector(dim, size);
-//        for (auto *x : v) {
-//            x->setBatchedNode(this);
-//            batch().push_back(x);
-//        }
-//    }
-
     void allocateBatch(int dim, int size) {
         if (!batch().empty()) {
             cerr << "batch not empty" << endl;
             abort();
         }
-        for (int i = 0; i < size; ++i) {
-            auto node = NodeType::newNode(dim);
-            node->setBatchedNode(this);
-            batch().push_back(node);
+        auto v = NodeType::newNodeVector(dim, size);
+        for (auto *x : v) {
+            x->setBatchedNode(this);
+            batch().push_back(x);
         }
     }
+
+//    void allocateBatch(int dim, int size) {
+//        if (!batch().empty()) {
+//            cerr << "batch not empty" << endl;
+//            abort();
+//        }
+//        for (int i = 0; i < size; ++i) {
+//            auto node = NodeType::newNode(dim);
+//            node->setBatchedNode(this);
+//            batch().push_back(node);
+//        }
+//    }
 
     void allocateBatch(const vector<int> &dims) {
         if (!batch().empty()) {
@@ -550,18 +550,18 @@ public:
         }
 
         map<int, pair<vector<Node *>, int>>::iterator it;
-//        if (last_key_ == key) {
-//            it = last_it_;
-//        } else {
+        if (last_key_ == key) {
+            it = last_it_;
+        } else {
             it = pool_.find(key);
             if (it == pool_.end()) {
                 pool_.insert(make_pair(key, make_pair(vector<Node *>(), 0)));
                 it = pool_.find(key);
                 globalPoolReferences().insert(&it->second);
             }
-//            last_it_ = it;
-//            last_key_ = key;
-//        }
+            last_it_ = it;
+            last_key_ = key;
+        }
         auto &p = it->second;
         vector<Node *> &v = p.first;
         T *node;
@@ -589,16 +589,16 @@ public:
 
 private:
     static map<int, pair<vector<Node *>, int>> pool_;
-//    static map<int, pair<vector<Node *>, int>>::iterator last_it_;
-//    static int last_key_;
+    static map<int, pair<vector<Node *>, int>>::iterator last_it_;
+    static int last_key_;
 };
 
 template<typename T>
 map<int, pair<vector<Node *>, int>> Poolable<T>::pool_;
-//template<typename T>
-//map<int, pair<vector<Node *>, int>>::iterator Poolable<T>::last_it_;
-//template<typename T>
-//int Poolable<T>::last_key_;
+template<typename T>
+map<int, pair<vector<Node *>, int>>::iterator Poolable<T>::last_it_;
+template<typename T>
+int Poolable<T>::last_key_;
 
 void validateEqualNodeDims(const vector<Node *> &nodes) {
     for (int i = 1; i < nodes.size(); ++i) {
@@ -818,6 +818,17 @@ protected:
             vector<Node*> inputs = get_inputs(*x);
             for (Node *input : inputs) {
                 n3ldg_cuda::Assert(input->getVal().verify((getNodeType() +
+                                " forward input").c_str()));
+            }
+        }
+    }
+
+    void testForwardInpputs(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
+        for (NodeAbs *node : batch) {
+            Node *x = dynamic_cast<Node *>(node);
+            auto inputs = get_inputs(*x);
+            for (auto &input : inputs) {
+                n3ldg_cuda::Assert(input.first->getVal().verify((getNodeType() +
                                 " forward input").c_str()));
             }
         }

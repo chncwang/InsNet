@@ -405,7 +405,7 @@ __device__ int DeviceDefaultStep() {
 }
 
 __device__ dtype DeviceAbs(dtype d) {
-    return d > 0 ? d : -d;
+    return d >= 0 ? d : -d;
 }
 
 int DefaultBlockCount(int len) {
@@ -847,18 +847,90 @@ void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y, int row, int col,
 #endif
 }
 
-__global__ void KernelVerify(dtype *host, dtype *device, int len,
+__device__ dtype max(dtype a, dtype b) {
+    return a > b ? a : b;
+}
+
+__global__ void KernelAbsMax(dtype *v, int len, volatile dtype *global_sum,
+        int *block_counter, dtype *result) {
+    __shared__ volatile dtype shared_sum[TPB];
+    __shared__ volatile bool is_last_block;
+    int index = DeviceDefaultIndex();
+    if (index == 0) {
+        *block_counter = 0;
+    }
+    if (threadIdx.x == 0) {
+        is_last_block = false;
+    }
+    shared_sum[threadIdx.x] = 0;
+    for (int i = index; i < len; i += blockDim.x * gridDim.x) {
+        dtype abs_v = DeviceAbs(v[i]);
+        shared_sum[threadIdx.x] = max(shared_sum[threadIdx.x], abs_v);
+    }
+
+    __syncthreads();
+    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+        if (threadIdx.x < i) {
+            shared_sum[threadIdx.x] = max(shared_sum[threadIdx.x], shared_sum[threadIdx.x + i]);
+        }
+        __syncthreads();
+    }
+
+    if (threadIdx.x == 0) {
+        global_sum[blockIdx.x] = shared_sum[0];
+        if (atomicAdd(block_counter, 1) == gridDim.x - 1) {
+            is_last_block = true;
+        }
+    }
+    __syncthreads();
+
+    if (is_last_block) {
+        dtype sum = 0.0f;
+        for (int i = threadIdx.x; i < gridDim.x; i += blockDim.x) {
+            sum = max(sum, global_sum[i]);
+        }
+
+        shared_sum[threadIdx.x] = sum;
+        __syncthreads();
+
+        for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+            if (threadIdx.x < i) {
+                shared_sum[threadIdx.x] = max(shared_sum[threadIdx.x], shared_sum[threadIdx.x + i]);
+            }
+            __syncthreads();
+        }
+
+        if (threadIdx.x == 0) {
+            *result = shared_sum[0];
+        }
+    }
+}
+
+dtype AbsMax(dtype *v, int len) {
+    int block_count = DefaultBlockCount(len);
+    NumberArray global_sum;
+    global_sum.init(block_count);
+    DeviceInt block_counter;
+    block_counter.init();
+    DeviceNumber result;
+    result.init();
+    KernelAbsMax<<<block_count, TPB>>>(v, len, global_sum.value, block_counter.value, result.value);
+    CheckCudaError();
+    result.copyFromDeviceToHost();
+    return result.v;
+}
+
+__global__ void KernelVerify(dtype *host, dtype *device, int len, dtype abs_avg,
         char *message, bool *success) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
     for (int i = index; i < len; i += step) {
-        dtype loss = host[index] - device[index];
-        if (DeviceAbs(loss) > 0.001 && DeviceAbs(loss) > 0.001 * DeviceAbs(host[index])) {
+        dtype loss = host[i] - device[i];
+        if (DeviceAbs(loss) > 1e-3 * abs_avg && DeviceAbs(loss) > 1e-3 * DeviceAbs(host[i]) &&
+                (len > 1 || DeviceAbs(host[i]) > 1e-6)) {
             *success = false;
-            KernelPrintLine("KernelVerify: host:%f device:%f loss:%f",
-                    host[index],
-                    device[index],
-                    loss);
+            KernelPrintLine("KernelVerify: host:%f device:%f abs(loss):%f", host[i], device[i],
+                    DeviceAbs(loss));
         }
     }
 }
@@ -877,7 +949,9 @@ bool Verify(dtype *host, dtype *device, int len, const char* message) {
     CallCuda(MemoryPool::Ins().Malloc((void**)&dev_success, 8 * sizeof(bool)));
     CallCuda(MyCudaMemcpy(dev_success, &success, sizeof(bool),
                 cudaMemcpyHostToDevice));
-    KernelVerify<<<block_count, TPB>>>(arr.value, device, len, m, dev_success);
+    dtype abs_max = AbsMax(arr.value, len);
+    cudaDeviceSynchronize();
+    KernelVerify<<<block_count, TPB>>>(arr.value, device, len, abs_max, m, dev_success);
     CheckCudaError();
     CallCuda(MyCudaMemcpy(&success, dev_success, sizeof(bool),
                 cudaMemcpyDeviceToHost));
@@ -886,6 +960,7 @@ bool Verify(dtype *host, dtype *device, int len, const char* message) {
     cudaDeviceSynchronize();
     cudaPrintfDisplay(stdout, true);
     if (!success) {
+        cerr << "abs max:" << abs_max << endl;
         cerr << message << endl;
     }
     return success;
@@ -2237,6 +2312,99 @@ void MatrixColSumBackward(vector<dtype *> &grads, int count, vector<int> &cols, 
     CheckCudaError();
 }
 
+__global__ void KernelTranMatrixMulVectorForward(dtype **matrices, dtype **vectors, int count,
+        int *cols,
+        int max_col,
+        int row,
+        volatile dtype *block_sums,
+        int *block_counters,
+        dtype **vals) {
+    __shared__ volatile extern dtype shared_sum[];
+    __shared__ volatile bool is_last_block;
+    if (threadIdx.x == 0 && blockIdx.y == 0) {
+        block_counters[blockIdx.x] = 0;
+    }
+    if (threadIdx.x == 0) {
+        is_last_block = false;
+    }
+
+    int count_i = blockIdx.x / max_col;
+    int row_i = blockIdx.y * blockDim.x + threadIdx.x;
+    int col_i = blockIdx.x % max_col;
+    if (col_i >= cols[count_i]) {
+        return;
+    }
+    int offset = row * col_i + row_i;
+    shared_sum[threadIdx.x] = row_i < row ? matrices[count_i][offset] * vectors[count_i][row_i] :
+        0.0f;
+    __syncthreads();
+
+    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+        if (threadIdx.x < i) {
+            shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+        }
+        __syncthreads();
+    }
+
+    int block_sums_offset = blockIdx.x * gridDim.y + blockIdx.y;
+    if (threadIdx.x == 0) {
+        block_sums[block_sums_offset] = shared_sum[0];
+        if (atomicAdd(block_counters + blockIdx.x, 1) == gridDim.y - 1) {
+            is_last_block = true;
+        }
+    }
+    __syncthreads();
+
+    if (is_last_block) {
+        dtype sum = 0.0f;
+        for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
+            int offset = blockIdx.x * gridDim.y + i;
+            sum += block_sums[offset];
+        }
+
+        shared_sum[threadIdx.x] = sum;
+        __syncthreads();
+
+        for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+            if (threadIdx.x < i) {
+                shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+            }
+            __syncthreads();
+        }
+
+        if (threadIdx.x == 0) {
+            vals[count_i][col_i] = shared_sum[0];
+        }
+    }
+}
+
+void TranMatrixMulVectorForward(vector<dtype *> &matrices, vector<dtype *> &vectors, int count,
+        vector<int> &cols,
+        int row,
+        vector<dtype *> &vals) {
+    int thread_count = min(NextTwoIntegerPowerNumber(row), TPB);
+    int block_y_count = (row - 1 + thread_count) / thread_count;
+    int max_col = *max_element(cols.begin(), cols.end());
+    dim3 block_dim(count * max_col, block_y_count, 1);
+
+    NumberArray block_sums;
+    block_sums.init(block_y_count * count * max_col);
+    IntArray block_counters;
+    block_counters.init(count * max_col);
+
+    NumberPointerArray matrix_val_arr, vector_val_arr, val_arr;
+    matrix_val_arr.init((dtype**)matrices.data(), matrices.size());
+    vector_val_arr.init((dtype**)vectors.data(), vectors.size());
+    val_arr.init((dtype **)vals.data(), vals.size());
+
+    IntArray col_arr;
+    col_arr.init(cols.data(), cols.size());
+
+    KernelTranMatrixMulVectorForward<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(
+            matrix_val_arr.value, vector_val_arr.value, count, col_arr.value, max_col, row,
+            block_sums.value, block_counters.value, val_arr.value);
+}
+
 __global__ void KernelMatrixAndVectorMultiForward(dtype **matrices, dtype **vectors, int count,
         int matrix_row,
         int *cols,
@@ -2314,7 +2482,7 @@ __global__ void KernelMatrixAndVectorMultiBackwardForVector(dtype **grads, dtype
         volatile dtype *block_sums,
         int *block_counters,
         int count,
-        int row
+        int row,
         int *cols,
         int max_col,
         dtype **vector_grads) {
