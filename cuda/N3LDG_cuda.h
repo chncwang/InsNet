@@ -265,23 +265,6 @@ void MatrixConcatForward(vector<dtype*> &in_vals, int count, int in_dim, vector<
         vector<dtype*> &vals);
 void MatrixConcatBackward(vector<dtype *> &grads, int count, int in_dim, vector<int> &in_counts,
         vector<dtype *> &in_grads);
-void MatrixAndVectorPointwiseMultiForward(vector<dtype *> &matrix_vals,
-        vector<dtype *> &vector_vals,
-        int count,
-        int row,
-        vector<int> &cols,
-        vector<dtype *> &vals);
-void MatrixAndVectorPointwiseMultiBackward(vector<dtype *> &grads, vector<dtype *> &matrix_vals,
-        vector<dtype *> &vector_vals,
-        int count,
-        int row,
-        vector<int> &cols,
-        vector<dtype *> &matrix_grads,
-        vector<dtype *> &vector_grads);
-void MatrixColSumForward(vector<dtype *> &in_vals, int count, vector<int> &cols, int row,
-        vector<dtype *> &vals);
-void MatrixColSumBackward(vector<dtype *> &grads, int count, vector<int> &cols, int row,
-        vector<dtype *> &in_grads);
 void TranMatrixMulVectorForward(vector<dtype *> &matrices, vector<dtype *> &vectors, int count,
         vector<int> &cols,
         int row,

@@ -71,6 +71,21 @@ public:
         setInputsPerNode({&input});
         afterInit(graph, {&input});
     }
+
+    void init(Graph &graph, BatchedNode &input, int dim, const vector<int> &offsets) {
+        allocateBatch(dim, input.batch().size() * offsets.size());
+        int i = 0;
+        for (int offset : offsets) {
+            for (Node *input_node : input.batch()) {
+                SplitNode *s = dynamic_cast<SplitNode *>(batch().at(i++));
+                s->offset_ = offset;
+                s->setInputs({input_node});
+            }
+        }
+
+        input.addParent(this);
+        graph.addNode(this);
+    }
 };
 
 namespace n3ldg_plus {
@@ -84,6 +99,12 @@ Node* split(Graph &graph, Node &input, int dim, int offset) {
 BatchedNode* split(Graph &graph, BatchedNode &input, int dim, int offset) {
     BatchedSplitNode *node = new BatchedSplitNode;
     node->init(graph, input, dim, offset);
+    return node;
+}
+
+BatchedNode *split(Graph &graph, BatchedNode &input, int dim, const vector<int> &offsets) {
+    BatchedSplitNode *node = new BatchedSplitNode;
+    node->init(graph, input, dim, offsets);
     return node;
 }
 
