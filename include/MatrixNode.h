@@ -824,19 +824,15 @@ public:
 class TranMatrixMulVectorExecutor : public Executor {
 public:
     void forward() override {
-        vector<int> cols;
-        vector<dtype *> matrices, vectors, vals;
         for (Node *node : batch) {
             TranMatrixMulVectorNode *t = dynamic_cast<TranMatrixMulVectorNode *>(node);
-            cols.push_back(t->getDim());
-            matrices.push_back(t->matrix_->getVal().value);
-            vectors.push_back(t->vector_->getVal().value);
-            vals.push_back(t->getVal().value);
+            cols_.push_back(t->getDim());
+            matrices_.push_back(t->matrix_->getVal().value);
+            vectors_.push_back(t->vector_->getVal().value);
+            vals_.push_back(t->getVal().value);
         }
-        TranMatrixMulVectorNode *t = dynamic_cast<TranMatrixMulVectorNode *>(batch.front());
-        int row = t->vector_->getDim();
-
-        n3ldg_cuda::TranMatrixMulVectorForward(matrices, vectors, batch.size(), cols, row, vals);
+        n3ldg_cuda::TranMatrixMulVectorForward(matrices_, vectors_, batch.size(), cols_, row(),
+                vals_);
 #if TEST_CUDA
         testForward();
 #endif
@@ -852,9 +848,29 @@ public:
             };
             return pairs;
         };
+#endif
+        vector<dtype *> matrix_grads, vector_grads, grads;
+        for (Node *node : batch) {
+            TranMatrixMulVectorNode *t = dynamic_cast<TranMatrixMulVectorNode *>(node);
+            grads.push_back(t->getLoss().value);
+            matrix_grads.push_back(t->matrix_->getLoss().value);
+            vector_grads.push_back(t->vector_->getLoss().value);
+        }
+        n3ldg_cuda::TranMatrixMulVectorBackward(grads, matrices_, vectors_, batch.size(),
+                cols_, row(), matrix_grads, vector_grads);
+#if TEST_CUDA
         testBackward(get_inputs);
 #endif
     }
+
+private:
+    int row() const {
+        TranMatrixMulVectorNode *t = dynamic_cast<TranMatrixMulVectorNode *>(batch.front());
+        return t->vector_->getDim();
+    }
+
+    vector<int> cols_;
+    vector<dtype *> matrices_, vectors_, vals_;
 };
 #else
 class TranMatrixMulVectorExecutor : public Executor {

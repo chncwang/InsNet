@@ -32,6 +32,14 @@ public:
         vector<dtype*> losses;
         vector<dtype*> vals;
         vector<dtype*> input_losses;
+#if TEST_CUDA
+        UniInputExecutor::testBeforeBackward();
+        for (Node *node : batch) {
+            node->loss().copyFromHostToDevice();
+            UniInputNode *i = dynamic_cast<UniInputNode *>(node);
+            i->getInput()->loss().copyFromHostToDevice();
+        }
+#endif
 
         for (Node *node : batch) {
             UniInputNode *exp = static_cast<UniInputNode*>(node);
@@ -477,6 +485,13 @@ public:
 class MaxScalarExecutor : public UniInputExecutor {
 public:
     void forward() override {
+#if TEST_CUDA
+        testForwardInpputs();
+        for (Node *node : batch) {
+            MaxScalarNode *m = dynamic_cast<MaxScalarNode *>(node);
+            m->getInput()->val().copyFromHostToDevice();
+        }
+#endif
         vector<dtype*> inputs;
         vector<dtype*> results;
         max_indexes.resize(batch.size() * batch.front()->getDim());
@@ -498,13 +513,7 @@ public:
         n3ldg_cuda::MaxScalarForward(inputs, batch.size(), dim, head_dims, results, max_indexes);
 
 #if TEST_CUDA
-        Executor::forward();
-        for (Node *node : batch) {
-            MaxScalarNode *max_scalar = static_cast<MaxScalarNode*>(node);
-            n3ldg_cuda::Assert(max_scalar->getInput()->getVal().verify(
-                        "max scalar forward input"));
-            n3ldg_cuda::Assert(max_scalar->getVal().verify("max scalar forward"));
-        }
+        testForward();
         cout << "max scalar forward tested:" << endl;
 #endif
     }
@@ -637,6 +646,7 @@ public:
         for (Node *node : batch) {
             ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(node);
             n->loss().copyFromHostToDevice();
+            n->getInput()->loss().copyFromHostToDevice();
         }
 #endif
         vector<dtype*> losses;

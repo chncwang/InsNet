@@ -926,11 +926,11 @@ __global__ void KernelVerify(dtype *host, dtype *device, int len, dtype abs_avg,
     int step = DeviceDefaultStep();
     for (int i = index; i < len; i += step) {
         dtype loss = host[i] - device[i];
-        if (DeviceAbs(loss) > 1e-3 * abs_avg && DeviceAbs(loss) > 1e-3 * DeviceAbs(host[i]) &&
-                (len > 1 || DeviceAbs(host[i]) > 1e-6)) {
+        if (DeviceAbs(loss) > 1e-3 * abs_avg && DeviceAbs(loss) > 1e-2 * DeviceAbs(host[i]) &&
+                (DeviceAbs(host[i]) > 1e-6)) {
             *success = false;
-            KernelPrintLine("KernelVerify: host:%f device:%f abs(loss):%f", host[i], device[i],
-                    DeviceAbs(loss));
+            KernelPrintLine("KernelVerify: host:%.9f device:%.9f abs(loss):%.9f", host[i],
+                    device[i], DeviceAbs(loss));
         }
     }
 }
@@ -960,8 +960,7 @@ bool Verify(dtype *host, dtype *device, int len, const char* message) {
     cudaDeviceSynchronize();
     cudaPrintfDisplay(stdout, true);
     if (!success) {
-        cerr << "abs max:" << abs_max << endl;
-        cerr << message << endl;
+        fprintf(stderr, "abs max:%.9f\n%s", abs_max, message);
     }
     return success;
 }
@@ -2316,7 +2315,7 @@ __global__ void KernelTranMatrixMulVectorForward(dtype **matrices, dtype **vecto
         int *cols,
         int max_col,
         int row,
-        volatile dtype *block_sums,
+        dtype *block_sums,
         int *block_counters,
         dtype **vals) {
     __shared__ volatile extern dtype shared_sum[];
@@ -2405,6 +2404,88 @@ void TranMatrixMulVectorForward(vector<dtype *> &matrices, vector<dtype *> &vect
             block_sums.value, block_counters.value, val_arr.value);
 }
 
+__global__ void KernelTranMatrixMulVectorBackwardForMatrix(dtype **grads, dtype **vector_vals,
+        int count,
+        int *cols,
+        int max_col,
+        int row,
+        dtype **matrix_grads) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    int n = max_col * row;
+    for (int i = index; i < count * n; i += step) {
+        int count_i = i / n;
+        int offset = i % n;
+        int col_i = offset / row;
+        if (col_i < cols[count_i]) {
+            int row_i = offset % row;
+            DeviceAtomicAdd(matrix_grads[count_i] + offset, vector_vals[count_i][row_i] *
+                    grads[count_i][col_i]);
+        }
+    }
+}
+
+__global__ void KernelTranMatrixMulVectorBackwardForVector(dtype **grads, dtype **matrix_vals,
+        int count,
+        int *cols,
+        int max_col,
+        int row,
+        dtype **vector_grads) {
+    __shared__ volatile extern dtype shared_arr[];
+    int count_i = blockIdx.y;
+    int col = cols[count_i];
+    int col_i = threadIdx.x;
+    int row_i = blockIdx.x;
+    if (col_i < col) {
+        int index_i = row * col_i + row_i;
+        shared_arr[threadIdx.x] = grads[count_i][col_i] * matrix_vals[count_i][index_i];
+    } else {
+        shared_arr[threadIdx.x] = 0.0f;
+    }
+    __syncthreads();
+
+    for (int i = (blockDim.x >> 1); i > 0;i >>=1) {
+        if (threadIdx.x < i) {
+            int plus_i = threadIdx.x + i;
+            shared_arr[threadIdx.x] += shared_arr[plus_i];
+        }
+        __syncthreads();
+    }
+
+    if (threadIdx.x == 0) {
+        DeviceAtomicAdd(vector_grads[count_i] + row_i, shared_arr[0]);
+    }
+}
+
+void TranMatrixMulVectorBackward(vector<dtype *> &grads, vector<dtype *> &matrix_vals,
+        vector<dtype *> &vector_vals,
+        int count,
+        vector<int> &cols,
+        int row,
+        vector<dtype *> &matrix_grads,
+        vector<dtype *> &vector_grads) {
+    NumberPointerArray grad_arr, matrix_val_arr, vector_val_arr, matrix_grad_arr, vector_grad_arr;
+    grad_arr.init(grads.data(), count);
+    matrix_val_arr.init(matrix_vals.data(), count);
+    vector_val_arr.init(vector_vals.data(), count);
+    matrix_grad_arr.init(matrix_grads.data(), count);
+    vector_grad_arr.init(vector_grads.data(), count);
+    IntArray col_arr;
+    col_arr.init((int *)cols.data(), count);
+    int max_col = *max_element(cols.begin(), cols.end());
+    int block_count = DefaultBlockCount(count * max_col * row);
+    KernelTranMatrixMulVectorBackwardForMatrix<<<block_count, TPB>>>(grad_arr.value,
+            vector_val_arr.value, count, col_arr.value, max_col, row, matrix_grad_arr.value);
+    CheckCudaError();
+
+    int thread_count = NextTwoIntegerPowerNumber(max_col);
+    dim3 block_dim(row, count, 1);
+    KernelTranMatrixMulVectorBackwardForVector<<<block_dim, thread_count,
+        thread_count * sizeof(dtype)>>>((dtype **)grad_arr.value, (dtype **)matrix_val_arr.value,
+                count, (int *)col_arr.value, max_col, row, (dtype **)vector_grad_arr.value);
+    CheckCudaError();
+}
+
 __global__ void KernelMatrixAndVectorMultiForward(dtype **matrices, dtype **vectors, int count,
         int matrix_row,
         int *cols,
@@ -2464,8 +2545,8 @@ __global__ void KernelMatrixAndVectorMultiBackwardForMatrix(dtype **grads, dtype
         dtype **matrix_grads) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
+    int n = max_col * row;
     for (int i = index; i < count * max_col * row; i += step) {
-        int n = max_col * row;
         int count_i = i / n;
         int offset = i % n;
         int col_i = offset / row;
@@ -4040,8 +4121,8 @@ __global__ void KernelVectorSumBackward(dtype **grads, int count, int col, int *
         dtype **input_grads) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
+    int n = col * max_row;
     for (int i = index; i < count * max_row * col; i += step) {
-        int n = col * max_row;
         int count_i = i / n;
         int row = rows[count_i];
         int x = i % n;
@@ -4139,8 +4220,8 @@ __global__ void KernelScalarToVectorForward(dtype **inputs, int count, int input
         dtype **results) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
+    int n = max_row * input_col;
     for (int i = index; i < count * max_row * input_col; i += step) {
-        int n = max_row * input_col;
         int count_i = i / n;
         int dim_i = i % n;
         int col_i = dim_i / max_row;
