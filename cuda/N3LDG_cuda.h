@@ -287,12 +287,6 @@ void MatrixAndVectorMultiBackward(vector<dtype *> &grads, vector<dtype *> &matri
         vector<int> &cols,
         vector<dtype *> &matrix_grads,
         vector<dtype *> &vector_grads);
-void MatrixTransposeForward(vector<dtype *> &matrices, int count, int input_row,
-        vector<int> &input_cols,
-        vector<dtype *> &vals);
-void MatrixTransposeBackward(vector<dtype *> &grads, int count, int input_row,
-        vector<int> &input_cols,
-        vector<dtype *> &matrix_grads);
 void PMultiForward(vector<dtype*> &ins1,
         vector<dtype*> &ins2,
         int count,
