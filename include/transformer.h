@@ -411,9 +411,9 @@ BatchedNode *dotAttention(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedN
     for (int j = 0; j < head_count; ++j) {
         BatchedNode *split_q = split(graph, q, head_dim, j * head_dim);
         BatchedNode *split_k = split(graph, k, head_dim, j * head_dim);
-        Node *key_matrix = concatToMatrix(graph, *split_k, split_k->batch());
+        Node *key_matrix = concatToMatrix(graph, *split_k);
         BatchedNode *split_v = split(graph, v, head_dim, j * head_dim);
-        Node *value_matrix = concatToMatrix(graph, *split_v, split_v->batch());
+        Node *value_matrix = concatToMatrix(graph, *split_v);
         BatchedNode *split_attended = n3ldg_plus::dotAttention(graph, *key_matrix,
                 *value_matrix, *split_q, is_decoder_self_att ? &dims : nullptr).first;
         split_attended_vec.push_back(split_attended);

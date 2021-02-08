@@ -103,25 +103,10 @@ private:
     friend class BatchedMatrixConcatNode;
 };
 
-class BatchedMatrixConcatNode : public BatchedNodeImpl<MatrixConcatNode> {
-public:
-    void init(Graph &graph, BatchedNode &input, const vector<vector<Node *>> &cols) {
-        vector<int> dims;
-        for (const auto &v : cols) {
-            dims.push_back(v.front()->getDim() * v.size());
-        }
-        allocateBatch(dims);
-
-        for (int i = 0; i < batch().size(); ++i) {
-            MatrixConcatNode *node = dynamic_cast<MatrixConcatNode *>(batch().at(i));
-            node->in_nodes = cols.at(i);
-            node->setColumn(cols.at(i).size());
-        }
-
-        input.addParent(this);
-        graph.addNode(this);
-    }
-};
+//class BatchedMatrixConcatNode : public BatchedNodeImpl<MatrixConcatNode> {
+//public:
+//    void init(Graph &graph, BatchedNode &input, 
+//};
 
 #if USE_GPU
 class MatrixConcatExecutor : public MatrixExecutor {
@@ -497,7 +482,8 @@ Node *concatToMatrix(Graph &graph, const vector<Node *> &inputs) {
     return node;
 }
 
-Node *concatToMatrix(Graph &graph, NodeAbs &topo_input, const vector<Node *> &inputs) {
+Node *concatToMatrix(Graph &graph, NodeAbs &topo_input) {
+    const auto &inputs = topo_input.batch();
     int input_dim = inputs.front()->getDim();
     MatrixConcatNode *node = MatrixConcatNode::newNode(inputs.size() * input_dim);
     node->forward(graph, topo_input, inputs);
