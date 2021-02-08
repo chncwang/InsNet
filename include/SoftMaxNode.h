@@ -45,7 +45,7 @@ Node* softmax(Graph &graph, Node &input, int input_col) {
     return div;
 }
 
-BatchedNode* softmax(Graph &graph, BatchedNode &input, int input_col) {
+BatchedNode* softmax(Graph &graph, BatchedNode &input, int input_col = 1) {
     using namespace n3ldg_plus;
     BatchedNode *subtracted = minusMaxScalar(graph, input, input_col);
     BatchedNode *exp = n3ldg_plus::exp(graph, *subtracted);
