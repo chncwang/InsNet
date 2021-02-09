@@ -75,6 +75,10 @@ public:
 
     void forward() override {
         vector<dtype*> results;
+        results.reserve(batch.size());
+        numerators.reserve(batch.size());
+        denominators.reserve(batch.size());
+        dims.reserve(batch.size());
         for (Node *node : batch) {
             FullDivNode *div = static_cast<FullDivNode*>(node);
             numerators.push_back(div->numerator_->getVal().value);
@@ -93,6 +97,9 @@ public:
     void backward() override {
         vector<dtype*> losses;
         vector<dtype*> numerator_losses, denominator_losses;
+        losses.reserve(batch.size());
+        numerator_losses.reserve(batch.size());
+        denominator_losses.reserve(batch.size());
         for (Node *node : batch) {
             FullDivNode *div = static_cast<FullDivNode*>(node);
             losses.push_back(node->getLoss().value);

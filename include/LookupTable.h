@@ -363,6 +363,7 @@ template <typename ParamType>
 BatchedNode *embedding(Graph &graph, LookupTable<ParamType> &param, const vector<string> &words,
         bool should_backward = true) {
     vector<int> ids;
+    ids.reserve(words.size());
     for (const string &w : words) {
         int id;
         if (!param.findElemId(w)) {
@@ -395,6 +396,7 @@ public:
         xids.reserve(count);
         std::vector<dtype*> vals;
         vals.reserve(count);
+        backward_switches.reserve(count);
         for (int idx = 0; idx < count; idx++) {
             LookupNode<ParamType> *n = static_cast<LookupNode<ParamType>*>(batch[idx]);
             xids.push_back(n->xid);

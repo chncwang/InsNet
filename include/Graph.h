@@ -97,7 +97,7 @@ public:
         profiler.BeginEvent("computation backward");
         int count = execs.size();
         for (int idx = count - 1; idx >= 0; idx--) {
-//            execs.at(idx)->backwardFully();
+            execs.at(idx)->backwardFully();
         }
         profiler.EndCudaEvent();
     }
@@ -189,7 +189,7 @@ public:
 //            cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl << endl;
 
             profiler.BeginEvent("computation forward");
-//            cur_exec->forwardFully();
+            cur_exec->forwardFully();
             if (eager_) {
                 for (Node *node : cur_exec->batch) {
                     node->getVal().checkIsNumber();

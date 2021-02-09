@@ -113,6 +113,7 @@ public:
         for (Node *node : batch()) {
             MatrixConcatNode *m = dynamic_cast<MatrixConcatNode *>(node);
             vector<Node *> in_nodes;
+            in_nodes.reserve(input_count);
             for (int i = 0; i < input_count; ++i) {
                 in_nodes.push_back(input.batch().at(group_i * input_count + i));
             }
@@ -138,12 +139,15 @@ public:
         testForwardInpputs(get_inputs);
         cout << "MatrixConcat forward tested" << endl;
 #endif
+        in_counts.reserve(batch.size());
         for (Node *node : batch) {
             MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(node);
             in_counts.push_back(concat->getColumn());
         }
         max_in_count = *max_element(in_counts.begin(), in_counts.end());
         vector<dtype *> vals, in_vals;
+        vals.reserve(batch.size());
+        in_vals.reserve(batch.size());
         int node_i = -1;
         for (Node *node : batch) {
             ++node_i;
@@ -163,6 +167,8 @@ public:
 
     void backward() override {
         vector<dtype *> grads, in_grads;
+        grads.reserve(batch.size());
+        in_grads.reserve(batch.size());
         int node_i = -1;
         for (Node *node : batch) {
             ++node_i;
@@ -326,6 +332,9 @@ public:
         }
 #endif
         auto vals = getVals();
+        matrix_vals_.reserve(batch.size());
+        vector_vals_.reserve(batch.size());
+        cols_.reserve(batch.size());
         for (Node *node : batch) {
             MatrixAndVectorMultiNode *multi = static_cast<MatrixAndVectorMultiNode *>(node);
             matrix_vals_.push_back(multi->matrix_->getVal().value);
@@ -346,6 +355,8 @@ public:
         auto grads = getGrads();
 
         vector<dtype *> matrix_grads, vector_grads;
+        matrix_grads.reserve(batch.size());
+        vector_grads.reserve(batch.size());
         for (Node *node : batch) {
             MatrixAndVectorMultiNode *multi = static_cast<MatrixAndVectorMultiNode *>(node);
             matrix_grads.push_back(multi->matrix_->getLoss().value);
@@ -468,6 +479,7 @@ public:
             allocateBatch(dim, vec.batch().size());
         } else {
             vector<int> overall_dims;
+            overall_dims.reserve(group * dims->size());
             for (int i = 0; i < group; ++i) {
                 for (int dim : *dims) {
                     overall_dims.push_back(dim);
@@ -495,6 +507,10 @@ public:
 class TranMatrixMulVectorExecutor : public Executor {
 public:
     void forward() override {
+        cols_.reserve(batch.size());
+        matrices_.reserve(batch.size());
+        vectors_.reserve(batch.size());
+        vals_.reserve(batch.size());
         for (Node *node : batch) {
             TranMatrixMulVectorNode *t = dynamic_cast<TranMatrixMulVectorNode *>(node);
             cols_.push_back(t->getDim());
@@ -521,6 +537,9 @@ public:
         };
 #endif
         vector<dtype *> matrix_grads, vector_grads, grads;
+        matrix_grads.reserve(batch.size());
+        vector_grads.reserve(batch.size());
+        grads.reserve(batch.size());
         for (Node *node : batch) {
             TranMatrixMulVectorNode *t = dynamic_cast<TranMatrixMulVectorNode *>(node);
             grads.push_back(t->getLoss().value);

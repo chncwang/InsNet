@@ -168,7 +168,6 @@ void DropoutForward(vector<dtype*> &xs, int count, int dim,
         dtype drop_factor,
         vector<dtype*> &ys);
 void DropoutBackward(vector<dtype*> &losses,
-        vector<dtype*> &vals,
         int count,
         int dim,
         bool is_training,

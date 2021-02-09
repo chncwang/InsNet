@@ -722,10 +722,7 @@ void DropoutForward(vector<dtype*> &xs, int count, int dim,
     CheckCudaError();
 }
 
-__global__ void KernelDropoutBackward(dtype **grads, dtype **vals,
-        int count,
-        int dim,
-        bool is_training,
+__global__ void KernelDropoutBackward(dtype **grads, int count, int dim, bool is_training,
         dtype* drop_mask,
         dtype drop_factor,
         dtype **in_grads) {
@@ -746,7 +743,6 @@ __global__ void KernelDropoutBackward(dtype **grads, dtype **vals,
 }
 
 void DropoutBackward(vector<dtype*> &grads,
-        vector<dtype*> &vals,
         int count,
         int dim,
         bool is_training,
@@ -757,13 +753,12 @@ void DropoutBackward(vector<dtype*> &grads,
         cerr << "drop value is " << drop_factor << endl;
         abort();
     }
-    NumberPointerArray loss_arr, val_arr, in_loss_arr;
+    NumberPointerArray loss_arr, in_loss_arr;
     loss_arr.init((dtype**)grads.data(), grads.size());
-    val_arr.init((dtype**)vals.data(), vals.size());
     in_loss_arr.init((dtype**)in_grads.data(), in_grads.size());
     int block_count = DefaultBlockCount(count * dim);
-    KernelDropoutBackward<<<block_count, TPB>>>(loss_arr.value, val_arr.value, count, dim,
-            is_training, drop_mask, drop_factor, (dtype **)in_loss_arr.value);
+    KernelDropoutBackward<<<block_count, TPB>>>(loss_arr.value, count, dim, is_training, drop_mask,
+            drop_factor, (dtype **)in_loss_arr.value);
     CheckCudaError();
 }
 

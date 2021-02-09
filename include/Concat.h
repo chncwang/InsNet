@@ -33,6 +33,7 @@ public:
     void setInputs(const vector<Node *> &ins) override {
         int nSize = ins.size();
         int curDim = 0;
+        inDims.reserve(nSize);
         for (int i = 0; i < nSize; ++i) {
             inDims.push_back(ins.at(i)->getDim());
             curDim += inDims[i];

@@ -66,10 +66,9 @@ public:
 namespace n3ldg_plus {
 
 Node *bucket(Graph &graph, int dim, float v) {
-    vector<dtype> vals;
-    vals.reserve(dim);
+    vector<dtype> vals(dim);
     for (int i = 0; i < dim; ++i) {
-        vals.push_back(v);
+        vals.at(i) = v;
     }
     BucketNode *bucket = BucketNode::newNode(dim);
     bucket->forward(graph, vals);
@@ -89,10 +88,9 @@ BatchedBucketNode *bucket(Graph &graph, int batch_size, const vector<dtype> &v) 
 }
 
 BatchedBucketNode *bucket(Graph &graph, int dim, int batch_size, dtype v) {
-    vector<dtype> vals;
-    vals.reserve(dim);
+    vector<dtype> vals(dim);
     for (int i = 0; i < dim; ++i) {
-        vals.push_back(v);
+        vals.at(i) = v;
     }
     BatchedBucketNode *node = new BatchedBucketNode;
     node->init(graph, vals, batch_size);
@@ -112,14 +110,15 @@ public:
     void forward() override {
 #if USE_GPU
         int count = batch.size();
-        vector<dtype*> ys;
-        vector<dtype> cpu_x;
-        cpu_x.reserve(getDim() * count);
+        vector<dtype*> ys(batch.size());
+        vector<dtype> cpu_x(batch.size() * getDim());
+        int batch_i = 0;
+        int j = 0;
         for (Node *node : batch) {
             BucketNode *bucket = static_cast<BucketNode*>(node);
-            ys.push_back(bucket->val().value);
+            ys.at(batch_i++) = bucket->val().value;
             for (int i = 0; i < getDim(); ++i) {
-                cpu_x.push_back(bucket->input_.at(i));
+                cpu_x.at(j++) = bucket->input_.at(i);
             }
         }
         n3ldg_cuda::BucketForward(cpu_x, count, getDim(), ys);
