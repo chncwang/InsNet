@@ -367,9 +367,10 @@ public:
 
     const vector<int> &getDims() const {
         if (dims_ == nullptr) {
-            dims_ = new vector<int>;
+            dims_ = new vector<int>(batch_.size());
+            int i = 0;
             for (Node *node : batch_) {
-                dims_->push_back(node->getDim());
+                dims_->at(i++) = node->getDim();
             }
         }
         return *dims_;
@@ -385,9 +386,10 @@ protected:
 
     void setInputsPerNode(const vector<BatchedNode *> &batched_inputs) {
         for (int i = 0; i < batch_.size(); ++i) {
-            vector<Node *> ins;
+            vector<Node *> ins(batched_inputs.size());
+            int j = 0;
             for (BatchedNode *in : batched_inputs) {
-                ins.push_back(in->batch().at(i));
+                ins.at(j++) = in->batch().at(i);
             }
             batch().at(i)->setInputs(ins);
         }
@@ -419,23 +421,12 @@ protected:
             abort();
         }
         auto v = NodeType::newNodeVector(dim, size);
+        batch().reserve(v.size());
         for (auto *x : v) {
             x->setBatchedNode(this);
             batch().push_back(x);
         }
     }
-
-//    void allocateBatch(int dim, int size) {
-//        if (!batch().empty()) {
-//            cerr << "batch not empty" << endl;
-//            abort();
-//        }
-//        for (int i = 0; i < size; ++i) {
-//            auto node = NodeType::newNode(dim);
-//            node->setBatchedNode(this);
-//            batch().push_back(node);
-//        }
-//    }
 
     void allocateBatch(const vector<int> &dims) {
         if (!batch().empty()) {
@@ -443,6 +434,7 @@ protected:
             abort();
         }
 
+        batch().reserve(dims.size());
         for (int dim : dims) {
             auto node = NodeType::newNode(dim);
             node->setBatchedNode(this);
@@ -482,12 +474,12 @@ public:
             cerr << "newNode key:" << key << endl;
             abort();
         }
-        vector<T *> results;
+        vector<T *> results(size);
         if (!globalPoolEnabled()) {
             for (int i = 0; i < size; ++i) {
                 T *node = new T;
                 node->initNode(key);
-                results.push_back(node);
+                results.at(i) = node;
             }
             return results;
         }
@@ -516,7 +508,7 @@ public:
             }
         }
 
-        vector<T *> nodes;
+        vector<T *> nodes(size);
         nodes.reserve(size);
         for (int i = 0; i < size; ++i) {
 //            cout << boost::format("v.size:%1% p.second:%2% i:%3% size:%4%") % v.size() % p.second %
@@ -524,7 +516,7 @@ public:
             T *node = dynamic_cast<T*>(v.at(p.second + i));
             node->setNodeDim(original_key);
             static_cast<Node *>(node)->clear();
-            nodes.push_back(node);
+            nodes.at(i) = node;
         }
 
         p.second += size;
@@ -674,9 +666,10 @@ private:
 
 template<typename T>
 std::vector<Node*> toNodePointers(const std::vector<T *> &vec) {
-    std::vector<Node *> results;
+    std::vector<Node *> results(vec.size());
+    int i = 0;
     for (T *p : vec) {
-        results.push_back(p);
+        results.at(i++) = p;
     }
     return results;
 }
@@ -685,12 +678,12 @@ std::vector<Node*> toNodePointers(const std::vector<T *> &vec) {
 void clearNodes(std::vector<Node*> &nodes) {
     n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
     profiler.BeginEvent("clearNodes");
-    std::vector<dtype*> val_and_losses;
-    vector<int> dims;
-    val_and_losses.reserve(2 * nodes.size());
+    std::vector<dtype*> val_and_losses(nodes.size());
+    vector<int> dims(nodes.size());
+    int i = 0;
     for (Node *n : nodes) {
-        val_and_losses.push_back(n->getLoss().value);
-        dims.push_back(n->getDim());
+        val_and_losses.at(i) = n->getLoss().value;
+        dims.at(i++) = n->getDim();
     }
     n3ldg_cuda::BatchMemset(val_and_losses, val_and_losses.size(), dims, 0.0f);
 #if TEST_CUDA
@@ -710,19 +703,21 @@ public:
 
 #if USE_GPU
     vector<dtype *> getVals() {
-        vector<dtype *> vals;
+        vector<dtype *> vals(batch.size());
+        int i = 0;
         for (NodeAbs *node : batch) {
             Node *x = dynamic_cast<Node *>(node);
-            vals.push_back(x->getVal().value);
+            vals.at(i++) = x->getVal().value;
         }
         return vals;
     }
 
     vector<dtype *> getGrads() {
-        vector<dtype *> grads;
+        vector<dtype *> grads(batch.size());
+        int i = 0;
         for (NodeAbs *node : batch) {
             Node *x = dynamic_cast<Node *>(node);
-            grads.push_back(x->getLoss().value);
+            grads.at(i++) = x->getLoss().value;
         }
         return grads;
     }

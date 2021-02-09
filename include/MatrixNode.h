@@ -39,15 +39,7 @@ public:
     MatrixConcatNode(): MatrixNode("concat") {}
 
     void forward(Graph &graph, const vector<Node *> &inputs) {
-        int input_dim = inputs.front()->getDim();
-        for (auto it = inputs.begin() + 1; it != inputs.end(); ++it) {
-            if (input_dim != (*it)->getDim()) {
-                cerr << "MatrixConcatNode - forward inconsistent input dims" << endl;
-                abort();
-            }
-        }
-
-        in_nodes = inputs;
+        setInputs(inputs);
         for (Node *in : inputs) {
             in->addParent(this);
         }
@@ -56,6 +48,13 @@ public:
     }
 
     void forward(Graph &graph, NodeAbs &topo_input, const vector<Node *> &inputs) {
+        setInputs(inputs);
+        topo_input.addParent(this);
+        setColumn(inputs.size());
+        graph.addNode(this);
+    }
+
+    void setInputs(const vector<Node *> &inputs) override {
         int input_dim = inputs.front()->getDim();
         for (auto it = inputs.begin() + 1; it != inputs.end(); ++it) {
             if (input_dim != (*it)->getDim()) {
@@ -65,9 +64,6 @@ public:
         }
 
         in_nodes = inputs;
-        topo_input.addParent(this);
-        setColumn(inputs.size());
-        graph.addNode(this);
     }
 
     void compute() override {
@@ -118,8 +114,9 @@ public:
             MatrixConcatNode *m = dynamic_cast<MatrixConcatNode *>(node);
             vector<Node *> in_nodes;
             for (int i = 0; i < input_count; ++i) {
-                in_nodes.push_back(input.batch().at(group_i++ * input_count + i));
+                in_nodes.push_back(input.batch().at(group_i * input_count + i));
             }
+            ++group_i;
             m->in_nodes = move(in_nodes);
             m->setColumn(input_count);
         }

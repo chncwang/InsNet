@@ -90,6 +90,7 @@ Node *layerNormalization(Graph &graph, LayerNormalizationParams &params,
 BatchedNode *layerNormalization(Graph &graph, LayerNormalizationParams &params,
         BatchedNode &input_layer) {
     using namespace n3ldg_plus;
+    return bias(graph, input_layer, params.b());
     BatchedNode *sum = vectorSum(graph, input_layer, 1);
     BatchedNode *avg = scaled(graph, *sum, 1.0 / input_layer.getDim());
     BatchedNode *avg_vector = scalarToVector(graph, *avg, input_layer.getDim());

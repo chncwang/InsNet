@@ -393,6 +393,35 @@ private:
 
 typedef TransformerParams<TransformerDecoderLayerParams> TransformerDecoderParams;
 
+class BatchedConcatNodeForDotAtt : public BatchedConcatNode {
+public:
+    void init(Graph &graph, BatchedNode &input, int head) {
+        if (input.batch().size() % head != 0) {
+            cerr << boost::format("BatchedConcatNode init input batch size:%1% head:%2%") %
+                input.batch().size() % head << endl;
+            abort();
+        }
+        int sentence_len = input.batch().size() / head;
+        int dim = head * input.getDim();
+        allocateBatch(dim, sentence_len);
+        for (int i = 0; i < sentence_len; ++i) {
+            Node *node = batch().at(i);
+            vector<Node *> inputs(head);
+            for (int j = 0; j < head; ++j) {
+                inputs.at(j) = input.batch().at(j * sentence_len + i);
+            }
+            node->setInputs(inputs);
+        }
+        afterInit(graph, {&input});
+    }
+};
+
+BatchedNode *concat(Graph &graph, BatchedNode &input, int head) {
+    BatchedConcatNodeForDotAtt *node = new BatchedConcatNodeForDotAtt;
+    node->init(graph, input, head);
+    return node;
+}
+
 namespace n3ldg_plus {
 
 BatchedNode *dotAttention(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedNode& q,
@@ -401,24 +430,26 @@ BatchedNode *dotAttention(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedN
         UniParams &fusion_param,
         dtype dropout,
         bool is_training) {
-    vector<int> dims;
+    vector<int> dims(k.batch().size());
     for (int i = 1; i <= k.batch().size(); ++i) {
-        dims.push_back(i);
+        dims.at(i - 1) = i;
     }
 
     int head_dim = q.getDim() / head_count;
-    vector<BatchedNode *> split_attended_vec;
-    for (int j = 0; j < head_count; ++j) {
-        BatchedNode *split_q = split(graph, q, head_dim, j * head_dim);
-        BatchedNode *split_k = split(graph, k, head_dim, j * head_dim);
-        Node *key_matrix = concatToMatrix(graph, *split_k);
-        BatchedNode *split_v = split(graph, v, head_dim, j * head_dim);
-        Node *value_matrix = concatToMatrix(graph, *split_v);
-        BatchedNode *split_attended = n3ldg_plus::dotAttention(graph, *key_matrix,
-                *value_matrix, *split_q, is_decoder_self_att ? &dims : nullptr).first;
-        split_attended_vec.push_back(split_attended);
+    vector<int> offsets(head_count);
+    for (int i = 0; i < head_count; ++i) {
+        offsets.at(i) = i * head_dim;
     }
-    BatchedNode *attended = n3ldg_plus::concatInBatch(graph, split_attended_vec);
+
+    BatchedNode *split_q = split(graph, q, head_dim, offsets);
+    BatchedNode *split_k = split(graph, k, head_dim, offsets);
+    BatchedNode *key_matrix = concatToMatrix(graph, *split_k, head_count);
+    BatchedNode *split_v = split(graph, v, head_dim, offsets);
+    BatchedNode *value_matrix = concatToMatrix(graph, *split_v, head_count);
+    BatchedNode *split_attended = n3ldg_plus::dotAttention(graph, *key_matrix,
+            *value_matrix, *split_q, is_decoder_self_att ? &dims : nullptr).first;
+
+    BatchedNode *attended = concat(graph, *split_attended, head_count);
     attended = n3ldg_plus::linear(graph, *attended, fusion_param);
     attended = n3ldg_plus::dropout(graph, *attended, dropout, is_training);
     return attended;
