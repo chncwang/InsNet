@@ -508,7 +508,7 @@ public:
             }
             head_dims.at(i) = head_dim;
         }
-        n3ldg_cuda::MaxScalarForward(inputs, batch.size(), dim, head_dims, results, max_indexes);
+        n3ldg_cuda::MaxScalarForward(inputs, batch.size(), dim, head_dims, results, &max_indexes);
 
 #if TEST_CUDA
         testForward();

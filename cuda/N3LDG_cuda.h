@@ -340,7 +340,7 @@ dtype KLCrossEntropyLoss(vector<dtype*> &vals, vector<shared_ptr<vector<dtype>>>
         vector<dtype*> &losses);
 void MaxScalarForward(vector<dtype*> &inputs, int count, int head_count, vector<int> &head_dims,
         vector<dtype*> &results,
-        vector<int> &max_indexes);
+        vector<int> *max_indexes = nullptr);
 void MaxScalarBackward(vector<dtype *> &losses, vector<int> &indexes,
         int count,
         vector<dtype*> &input_losses);
@@ -348,6 +348,9 @@ void VectorSumForward(vector<dtype *> &inputs, int count, int col, vector<int> &
         vector<dtype*> &results);
 void VectorSumBackward(vector<dtype*> &losses, int count, int col, vector<int> &dims,
         vector<dtype*> &input_losses);
+void SoftmaxForward(vector<dtype *> &in_vals, int count, vector<int> &dims, vector<dtype *> &vals);
+void SoftmaxBackward(vector<dtype *> &grads, vector<dtype *> &vals, int count, vector<int> &dims,
+        vector<dtype *> &in_grads);
 void ScaledForward(vector<dtype *> &in_vals, int count, vector<int> &dims, vector<dtype> &factors,
         vector<dtype *> &vals);
 void ScaledBackward(vector<dtype *> &grads, int count, vector<int> &dims, vector<dtype> &factors,
