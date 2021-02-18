@@ -832,9 +832,7 @@ protected:
         }
     }
 
-    void testBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
-        Executor::backward();
-
+    void verifyBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
         for (NodeAbs *node : batch) {
             Node *x = dynamic_cast<Node *>(node);
             auto inputs = get_inputs(*x);
@@ -849,6 +847,11 @@ protected:
                 }
             }
         }
+    }
+
+    void testBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
+        Executor::backward();
+        verifyBackward(get_inputs);
     }
 
     void testBeforeBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
@@ -891,6 +894,15 @@ protected:
             return inputs;
         };
         Executor::testBeforeBackward(get_inputs);
+    }
+
+    void verifyBackward() {
+        auto get_inputs = [](Node &node) {
+            UniInputNode &uni_input = static_cast<UniInputNode&>(node);
+            vector<pair<Node*, string>> inputs = {make_pair(uni_input.input_, "input")};
+            return inputs;
+        };
+        Executor::verifyBackward(get_inputs);
     }
 
     void testBackward() {

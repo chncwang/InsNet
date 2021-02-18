@@ -114,7 +114,8 @@ class LayerNormExecutor : public UniInputExecutor {
 public:
     void forward() override {
         int count = batch.size();
-        means_.init(count);
+        Tensor1D means;
+        means.init(count);
         sds_.init(count);
         vector<dtype *> in_vals(count), vals(count);
         int i = 0;
@@ -123,17 +124,15 @@ public:
             in_vals.at(i) = s.getInput()->getVal().value;
             vals.at(i++) = s.getVal().value;
         }
-        n3ldg_cuda::StandardLayerNormForward(in_vals, count, getDim(), vals, means_.value,
-                sds_.value);
+        n3ldg_cuda::StandardLayerNormForward(in_vals, count, getDim(), vals, sds_.value);
+        vals_ = move(vals);
 #if TEST_CUDA
-        cpu_means_.init(batch.size());
         cpu_sds_.init(batch.size());
         i = 0;
         for (Node *node : batch) {
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
             auto &input = s.getInput()->getVal();
             dtype mean = input.mat().sum() / s.getDim();
-            means_[i] = mean;
             Tensor1D x;
             x.init(s.getDim());
             x.vec() = (input.vec() - mean).square();
@@ -146,29 +145,37 @@ public:
     }
 
     void backward() override {
+        int count = batch.size();
+        vector<dtype *> in_grads(count), grads(count);
+        int i = 0;
+        for (Node *node : batch) {
+            StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
+            in_grads.at(i) = s.getInput()->getLoss().value;
+            grads.at(i++) = s.getLoss().value;
+        }
+        n3ldg_cuda::StandardLayerNormBackward(grads, count, getDim(), vals_, sds_.value, in_grads);
 #if TEST_CUDA
-        testBackward();
+        verifyBackward();
 #endif
     }
 
 private:
-    Tensor1D means_, sds_;
+    Tensor1D sds_;
+    vector<dtype *> vals_;
 #if TEST_CUDA
-    n3ldg_cpu::Tensor1D cpu_means_, cpu_sds_;
+    n3ldg_cpu::Tensor1D cpu_sds_;
 #endif
 };
 #else
 class LayerNormExecutor : public UniInputExecutor {
 public:
     void forward() override {
-        means_.init(batch.size());
         sds_.init(batch.size());
         int i = 0;
         for (Node *node : batch) {
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
             auto &input = s.getInput()->getVal();
             dtype mean = input.mat().sum() / s.getDim();
-            means_[i] = mean;
             Tensor1D x;
             x.init(s.getDim());
             x.vec() = (input.vec() - mean).square();
@@ -200,7 +207,7 @@ public:
     }
 
 private:
-    Tensor1D means_, sds_;
+    Tensor1D sds_;
 };
 #endif
 
