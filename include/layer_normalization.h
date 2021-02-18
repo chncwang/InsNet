@@ -121,7 +121,7 @@ public:
         int i = 0;
         for (Node *node : batch) {
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
-            in_vals.at(i) = s.getInput()->getVal().value;
+            in_vals.at(i) = s.getInput().getVal().value;
             vals.at(i++) = s.getVal().value;
         }
         n3ldg_cuda::StandardLayerNormForward(in_vals, count, getDim(), vals, sds_.value);
@@ -131,7 +131,7 @@ public:
         i = 0;
         for (Node *node : batch) {
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
-            auto &input = s.getInput()->getVal();
+            auto &input = s.getInput().getVal();
             dtype mean = input.mat().sum() / s.getDim();
             Tensor1D x;
             x.init(s.getDim());
@@ -150,7 +150,7 @@ public:
         int i = 0;
         for (Node *node : batch) {
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
-            in_grads.at(i) = s.getInput()->getLoss().value;
+            in_grads.at(i) = s.getInput().getLoss().value;
             grads.at(i++) = s.getLoss().value;
         }
         n3ldg_cuda::StandardLayerNormBackward(grads, count, getDim(), vals_, sds_.value, in_grads);
@@ -174,7 +174,7 @@ public:
         int i = 0;
         for (Node *node : batch) {
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
-            auto &input = s.getInput()->getVal();
+            auto &input = s.getInput().getVal();
             dtype mean = input.mat().sum() / s.getDim();
             Tensor1D x;
             x.init(s.getDim());
@@ -195,7 +195,7 @@ public:
             Tensor1D m;
             m.init(n);
             m.vec() = s.getLoss().vec() * s.getVal().vec();
-            s.getInput()->loss().vec() += c * ((n - 1 - y2) * s.getLoss().vec() -
+            s.getInput().loss().vec() += c * ((n - 1 - y2) * s.getLoss().vec() -
                     ((m.mat().sum() - m.vec()) * s.getVal().vec() + s.getLoss().mat().sum() -
                      s.getLoss().vec()));
             ++i;
@@ -215,6 +215,24 @@ Executor *StandardLayerNormNode::generate() {
     return new LayerNormExecutor;
 }
 
+//class PointwiseLinearNode : public UniInputNode, public Poolable<PointwiseLinearNode> {
+//public:
+//    PointwiseLinearNode() : UniInputNode("pointise-linear") {}
+
+//    void initNode(int dim) override {
+//        init(dim);
+//    }
+
+//    void setNodeDim(int dim) override {
+//        Node::setDim(dim);
+//    }
+
+//    void compute() override {
+//    }
+
+//    void backward() override {
+//    }
+//};
 
 Node *layerNormalization(Graph &graph, LayerNormalizationParams &params,
         Node &input_layer) {

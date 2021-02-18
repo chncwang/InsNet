@@ -40,13 +40,13 @@ public:
 
     void compute () override {
         for (int i = 0; i < getDim(); ++i) {
-            val()[i] = getInput()->val()[i + offset_];
+            val()[i] = getInput().val()[i + offset_];
         }
     }
 
     void backward() override {
         for (int i = 0; i < getDim(); ++i) {
-            getInput()->loss()[i + offset_] += getLoss()[i];
+            getInput().loss()[i + offset_] += getLoss()[i];
         }
     }
 protected:
@@ -118,7 +118,7 @@ public:
         vector<dtype*> results;
         for (Node *node : batch) {
             SplitNode *split = static_cast<SplitNode*>(node);
-            inputs.push_back(split->getInput()->getVal().value);
+            inputs.push_back(split->getInput().getVal().value);
             offsets.push_back(split->offset_);
             results.push_back(split->getVal().value);
             dims.push_back(split->getDim());
@@ -137,14 +137,14 @@ public:
         for (Node *node : batch) {
             SplitNode *split = static_cast<SplitNode*>(node);
             losses.push_back(split->getLoss().value);
-            input_losses.push_back(split->getInput()->getLoss().value);
+            input_losses.push_back(split->getInput().getLoss().value);
         }
 
         n3ldg_cuda::SplitBackward(losses, offsets, batch.size(), dims, input_losses);
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {
             SplitNode &split = static_cast<SplitNode&>(node);
-            vector<pair<Node *, string>> inputs = {make_pair(split.getInput(), "input")};
+            vector<pair<Node *, string>> inputs = {make_pair(&split.getInput(), "input")};
             return inputs;
         };
         Executor::testBackward(get_inputs);

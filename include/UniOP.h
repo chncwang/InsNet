@@ -167,10 +167,10 @@ public:
         for (int i = 0; i < batch.size(); ++i) {
             LinearNode *n = static_cast<LinearNode*>(batch.at(i));
 
-            xs.push_back(n->getInput()->val().value);
+            xs.push_back(n->getInput().val().value);
             ys.push_back(n->val().value);
 #if TEST_CUDA
-            n->getInput()->val().copyFromDeviceToHost();
+            n->getInput().val().copyFromDeviceToHost();
 #endif
         }
 
@@ -191,7 +191,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
             for (int idy = 0; idy < inDim(); idy++) {
-                x[idx][idy] = ptr->getInput()->getVal()[idy];
+                x[idx][idy] = ptr->getInput().getVal()[idy];
             }
             if (params().bUseB) {
                 for (int i = 0; i < outDim(); ++i) {
@@ -236,8 +236,8 @@ public:
             ptr->loss().copyFromDeviceToHost();
             n3ldg_cuda::Assert(ptr->val().verify("before linear val"));
             ptr->val().copyFromDeviceToHost();
-            n3ldg_cuda::Assert(ptr->getInput()->loss().verify("before linear backward in grad"));
-            ptr->getInput()->loss().copyFromDeviceToHost();
+            n3ldg_cuda::Assert(ptr->getInput().loss().verify("before linear backward in grad"));
+            ptr->getInput().loss().copyFromDeviceToHost();
         }
 #endif
         Tensor2D lx, ly;
@@ -259,7 +259,7 @@ public:
         losses.reserve(count);
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
-            losses.push_back(ptr->getInput()->loss().value);
+            losses.push_back(ptr->getInput().loss().value);
         }
 
         n3ldg_cuda::AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(ly.value, lx.value,
@@ -293,13 +293,13 @@ public:
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
             for (int idy = 0; idy < inDim(); idy++) {
-                ptr->getInput()->loss()[idy] += lx[idx][idy];
+                ptr->getInput().loss()[idy] += lx[idx][idy];
             }
         }
 
         for (Node * n : batch) {
             LinearNode *ptr = static_cast<LinearNode *>(n);
-            n3ldg_cuda::Assert(ptr->getInput()->loss().verify("backward loss"));
+            n3ldg_cuda::Assert(ptr->getInput().loss().verify("backward loss"));
         }
 #endif
     }
@@ -339,7 +339,7 @@ public:
 
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
-            memcpy(x.v + idx * inDim(), ptr->getInput()->val().v, inDim() * sizeof(dtype));
+            memcpy(x.v + idx * inDim(), ptr->getInput().val().v, inDim() * sizeof(dtype));
             if (params().bUseB) {
                 memcpy(b.v + idx * outDim(), params().b.val.v, outDim() * sizeof(dtype));
             }
@@ -382,7 +382,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
             for (int idy = 0; idy < inDim(); idy++) {
-                ptr->getInput()->loss()[idy] += lx[idx][idy];
+                ptr->getInput().loss()[idy] += lx[idx][idy];
             }
         }
     }
@@ -533,9 +533,9 @@ public:
         for (int i = 0; i < batch.size(); ++i) {
             LinearWordVectorNode *n = static_cast<LinearWordVectorNode*>(batch.at(i));
 #if TEST_CUDA
-            n->getInput()->val().copyFromDeviceToHost();
+            n->getInput().val().copyFromDeviceToHost();
 #endif
-            xs.push_back(n->getInput()->val().value);
+            xs.push_back(n->getInput().val().value);
             ys.push_back(n->val().value);
         }
 
@@ -555,7 +555,7 @@ public:
 #if TEST_CUDA
         for (int i = 0; i < count; i++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
-            memcpy(x.v + i * inDim(), ptr->getInput()->val().v, inDim() * sizeof(dtype));
+            memcpy(x.v + i * inDim(), ptr->getInput().val().v, inDim() * sizeof(dtype));
         }
         Mat scoped_matrix(param().val.mat().data() + offset * inDim(), inDim(), outDim());
         y.mat() = scoped_matrix.transpose() * x.mat();
@@ -602,7 +602,7 @@ public:
         losses.reserve(count);
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
-            losses.push_back(ptr->getInput()->loss().value);
+            losses.push_back(ptr->getInput().loss().value);
         }
 
         n3ldg_cuda::AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(ly.value, lx.value,
@@ -640,13 +640,13 @@ public:
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
             for (int idy = 0; idy < inDim(); idy++) {
-                ptr->getInput()->loss()[idy] += lx[idx][idy];
+                ptr->getInput().loss()[idy] += lx[idx][idy];
             }
         }
 
         for (Node * n : batch) {
             LinearWordVectorNode *ptr = static_cast<LinearWordVectorNode *>(n);
-            n3ldg_cuda::Assert(ptr->getInput()->loss().verify("backward loss"));
+            n3ldg_cuda::Assert(ptr->getInput().loss().verify("backward loss"));
         }
         cout << "LinearWordVectorNode backward tested" << endl;
 #endif
@@ -673,7 +673,7 @@ public:
 
     int calculateFLOPs() override {
         LinearWordVectorNode *node = static_cast<LinearWordVectorNode*>(batch.front());
-        return node->getDim() * node->getInput()->getDim() * batch.size() * 2;
+        return node->getDim() * node->getInput().getDim() * batch.size() * 2;
     }
 
     void forward() override {
@@ -683,7 +683,7 @@ public:
 
         for (int i = 0; i < count; i++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
-            memcpy(x.v + i * inDim(), ptr->getInput()->val().v, inDim() * sizeof(dtype));
+            memcpy(x.v + i * inDim(), ptr->getInput().val().v, inDim() * sizeof(dtype));
         }
         int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
         Mat scoped_matrix(param().val.mat().data() + offset * inDim(), inDim(), outDim());
@@ -721,7 +721,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
             for (int idy = 0; idy < inDim(); idy++) {
-                ptr->getInput()->loss()[idy] += lx[idx][idy];
+                ptr->getInput().loss()[idy] += lx[idx][idy];
             }
         }
     }
@@ -769,12 +769,12 @@ public:
 
     void compute() override {
         for (int i = 0; i < getDim(); ++i) {
-            val()[i] = getInput()->getVal()[i] + bias_param_->val[0][i];
+            val()[i] = getInput().getVal()[i] + bias_param_->val[0][i];
         }
     }
 
     void backward() override {
-        getInput()->loss().vec() += loss().vec();
+        getInput().loss().vec() += loss().vec();
         for (int i = 0; i < getDim(); ++i) {
             bias_param_->grad[0][i] += getLoss()[i];
         }
@@ -822,7 +822,7 @@ public:
         vector<dtype*> inputs, vals;
         for (Node *node : batch) {
             BiasNode *bias_node = static_cast<BiasNode *>(node);
-            inputs.push_back(bias_node->getInput()->getVal().value);
+            inputs.push_back(bias_node->getInput().getVal().value);
             vals.push_back(bias_node->getVal().value);
         }
         n3ldg_cuda::BiasForward(inputs, bias, batch.size(), getDim(), vals);
@@ -838,7 +838,7 @@ public:
         for (Node *node : batch) {
             BiasNode *bias_node = static_cast<BiasNode *>(node);
             losses.push_back(bias_node->getLoss().value);
-            in_losses.push_back(bias_node->getInput()->getLoss().value);
+            in_losses.push_back(bias_node->getInput().getLoss().value);
         }
         n3ldg_cuda::BiasBackward(losses, batch.size(), getDim(), bias, in_losses);
 #if TEST_CUDA

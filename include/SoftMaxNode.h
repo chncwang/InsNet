@@ -24,11 +24,11 @@ public:
     Executor *generate() override;
 
     void compute() override {
-        dtype max = getInput()->getVal().mat().maxCoeff();
+        dtype max = getInput().getVal().mat().maxCoeff();
         Tensor1D x_exp, x;
         x.init(getDim());
         x_exp.init(getDim());
-        x.vec() = getInput()->getVal().vec() - max;
+        x.vec() = getInput().getVal().vec() - max;
         x_exp.vec() = x.vec().exp();
         dtype sum = x_exp.mat().sum();
         val().vec() = x_exp.vec() / sum;
@@ -42,7 +42,7 @@ public:
         Tensor1D b;
         b.init(getDim());
         b.vec() = z - a.vec();
-        getInput()->loss().vec() += getVal().vec() *
+        getInput().loss().vec() += getVal().vec() *
             ((1 - getVal().vec()) * getLoss().vec() - b.vec());
     }
 
@@ -77,7 +77,7 @@ public:
             SoftmaxNode &s = dynamic_cast<SoftmaxNode &>(*node);
             vals_.push_back(s.getVal().value);
             dims_.push_back(s.getDim());
-            in_vals.at(i++) = s.getInput()->getVal().value;
+            in_vals.at(i++) = s.getInput().getVal().value;
         }
         n3ldg_cuda::SoftmaxForward(in_vals, batch.size(), dims_, vals_);
 #if TEST_CUDA
@@ -91,7 +91,7 @@ public:
         for (Node *node : batch) {
             SoftmaxNode &s = dynamic_cast<SoftmaxNode &>(*node);
             grads.at(i) = s.getLoss().value;
-            in_grads.at(i++) = s.getInput()->getLoss().value;
+            in_grads.at(i++) = s.getInput().getLoss().value;
         }
         n3ldg_cuda::SoftmaxBackward(grads, vals_, batch.size(), dims_, in_grads);
 #if TEST_CUDA

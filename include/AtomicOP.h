@@ -20,7 +20,7 @@ public:
         int i = 0;
         for (Node *node : batch) {
             UniInputNode *expnode = static_cast<UniInputNode*>(node);
-            inputs.at(i++) = expnode->getInput()->getVal().value;
+            inputs.at(i++) = expnode->getInput().getVal().value;
             vals.push_back(expnode->getVal().value);
             dims_.push_back(node->getDim());
         }
@@ -39,7 +39,7 @@ public:
         for (Node *node : batch) {
             node->loss().copyFromHostToDevice();
             UniInputNode *i = dynamic_cast<UniInputNode *>(node);
-            i->getInput()->loss().copyFromHostToDevice();
+            i->getInput().loss().copyFromHostToDevice();
         }
 #endif
 
@@ -47,7 +47,7 @@ public:
         for (Node *node : batch) {
             UniInputNode *exp = static_cast<UniInputNode*>(node);
             losses.at(i) = exp->getLoss().value;
-            input_losses.at(i++) = exp->getInput()->getLoss().value;
+            input_losses.at(i++) = exp->getInput().getLoss().value;
         }
 
         n3ldg_cuda::ActivationBackward(activation, losses, vals, batch.size(), dims_,
@@ -85,11 +85,11 @@ public:
     }
 
     void compute() override {
-        val().vec() = getInput()->val().vec().unaryExpr(ptr_fun(ftanh));
+        val().vec() = getInput().val().vec().unaryExpr(ptr_fun(ftanh));
     }
 
     void backward() override {
-        getInput()->loss().vec() += loss().vec() * getInput()->val().vec().binaryExpr(val().vec(),
+        getInput().loss().vec() += loss().vec() * getInput().val().vec().binaryExpr(val().vec(),
                 ptr_fun(dtanh));
     }
 
@@ -119,11 +119,11 @@ public:
     }
 
     void compute() override {
-        val().vec() = getInput()->val().vec().unaryExpr(ptr_fun(fsigmoid));
+        val().vec() = getInput().val().vec().unaryExpr(ptr_fun(fsigmoid));
     }
 
     void backward() override {
-        getInput()->loss().vec() += loss().vec() * getInput()->val().vec().binaryExpr(val().vec(),
+        getInput().loss().vec() += loss().vec() * getInput().val().vec().binaryExpr(val().vec(),
                 ptr_fun(dsigmoid));
     }
 
@@ -150,11 +150,11 @@ public:
     }
 
     void compute() override {
-        val().vec() = getInput()->val().vec().unaryExpr(ptr_fun(frelu));
+        val().vec() = getInput().val().vec().unaryExpr(ptr_fun(frelu));
     }
 
     void backward() override {
-        getInput()->loss().vec() += loss().vec() * getInput()->val().vec().binaryExpr(val().vec(),
+        getInput().loss().vec() += loss().vec() * getInput().val().vec().binaryExpr(val().vec(),
                 ptr_fun(drelu));
     }
 
@@ -194,11 +194,11 @@ public:
     }
 
     void compute() override {
-        val().vec() = getInput()->val().vec().unaryExpr(ptr_fun(fsqrt));
+        val().vec() = getInput().val().vec().unaryExpr(ptr_fun(fsqrt));
     }
 
     void backward() override {
-        getInput()->loss().vec() += loss().vec() * val().vec().unaryExpr(ptr_fun(dsqrt));
+        getInput().loss().vec() += loss().vec() * val().vec().unaryExpr(ptr_fun(dsqrt));
     }
 
     PExecutor generate() override {
@@ -257,11 +257,11 @@ public:
         } else {
             drop_mask_ = 1 - drop_value_;
         }
-        val().vec() = getInput()->val().vec() * drop_mask_.vec();
+        val().vec() = getInput().val().vec() * drop_mask_.vec();
     }
 
     void backward() override {
-        getInput()->loss().vec() += loss().vec() * drop_mask_.vec();
+        getInput().loss().vec() += loss().vec() * drop_mask_.vec();
     }
 
     string typeSignature() const override {
@@ -351,9 +351,9 @@ public:
         for (Node *n : batch) {
             DropoutNode *dropout_node = static_cast<DropoutNode*>(n);
 #if TEST_CUDA
-            dropout_node->getInput()->val().copyFromHostToDevice();
+            dropout_node->getInput().val().copyFromHostToDevice();
 #endif
-            xs.at(i) = dropout_node->getInput()->getVal().value;
+            xs.at(i) = dropout_node->getInput().getVal().value;
             ys.at(i++) = dropout_node->getVal().value;
         }
 
@@ -386,10 +386,10 @@ public:
             DropoutNode *dropout_node = static_cast<DropoutNode*>(n);
 #if TEST_CUDA
             dropout_node->loss().copyFromHostToDevice();
-            dropout_node->getInput()->loss().copyFromHostToDevice();
+            dropout_node->getInput().loss().copyFromHostToDevice();
 #endif
             losses.at(i) = dropout_node->loss().value;
-            in_losses.at(i++) = dropout_node->getInput()->loss().value;
+            in_losses.at(i++) = dropout_node->getInput().loss().value;
         }
         n3ldg_cuda::DropoutBackward(losses, count, getDim(), isTraining(), drop_mask.value,
                 dropoutValue(), in_losses);
@@ -399,7 +399,7 @@ public:
         }
         for (Node *n : batch) {
             DropoutNode *dropout_node = static_cast<DropoutNode*>(n);
-            n3ldg_cuda::Assert(dropout_node->getInput()->loss().verify("DropoutExecutor backward"));
+            n3ldg_cuda::Assert(dropout_node->getInput().loss().verify("DropoutExecutor backward"));
         }
 #endif
     }
@@ -436,13 +436,13 @@ public:
     }
 
     void compute() override {
-        int input_row = getInput()->getDim() / getDim();
+        int input_row = getInput().getDim() / getDim();
         for (int i = 0; i < getDim(); ++i) {
-            float max = getInput()->getVal()[input_row * i];
+            float max = getInput().getVal()[input_row * i];
             int max_i = 0;
             for (int j = 1; j < input_row; ++j) {
-                if (getInput()->getVal()[input_row * i + j] > max) {
-                    max = getInput()->getVal()[input_row * i + j];
+                if (getInput().getVal()[input_row * i + j] > max) {
+                    max = getInput().getVal()[input_row * i + j];
                     max_i = j;
                 }
             }
@@ -452,9 +452,9 @@ public:
     }
 
     void backward() override {
-        int input_row = getInput()->getDim() / getDim();
+        int input_row = getInput().getDim() / getDim();
         for (int i = 0; i < getDim(); ++i) {
-            getInput()->loss()[i * input_row + max_indexes_.at(i)] += getLoss()[i];
+            getInput().loss()[i * input_row + max_indexes_.at(i)] += getLoss()[i];
         }
     }
 
@@ -487,7 +487,7 @@ public:
         testForwardInpputs();
         for (Node *node : batch) {
             MaxScalarNode *m = dynamic_cast<MaxScalarNode *>(node);
-            m->getInput()->val().copyFromHostToDevice();
+            m->getInput().val().copyFromHostToDevice();
         }
 #endif
         vector<dtype*> inputs(batch.size());
@@ -497,13 +497,13 @@ public:
         int dim = Executor::getDim();
         for (int i = 0; i < batch.size(); ++i) {
             MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));
-            inputs.at(i) = node->getInput()->getVal().value;
+            inputs.at(i) = node->getInput().getVal().value;
             results.at(i) = node->getVal().value;
-            int head_dim = node->getInput()->getDim() / dim;
-            if (head_dim * dim != node->getInput()->getDim()) {
+            int head_dim = node->getInput().getDim() / dim;
+            if (head_dim * dim != node->getInput().getDim()) {
                 cerr << boost::format(
                         "MaxScalarExecutor forward head_dim:%1% dim:%2% input dim:%3%") % head_dim
-                    % dim % node->getInput()->getDim() << endl;
+                    % dim % node->getInput().getDim() << endl;
                 abort();
             }
             head_dims.at(i) = head_dim;
@@ -524,7 +524,7 @@ public:
         for (Node *node : batch) {
             MaxScalarNode *max_scalar = static_cast<MaxScalarNode*>(node);
             losses.at(i) = max_scalar->getLoss().value;
-            input_losses.at(i++) = max_scalar->getInput()->getLoss().value;
+            input_losses.at(i++) = max_scalar->getInput().getLoss().value;
         }
 
         n3ldg_cuda::MaxScalarBackward(losses, max_indexes, batch.size(), input_losses);
@@ -563,13 +563,13 @@ public:
     }
 
     string typeSignature() const override {
-        return getNodeType() + to_string(getInput()->getDim());
+        return getNodeType() + to_string(getInput().getDim());
     }
 
     void compute() override {
         for (int i = 0; i < getColumn(); ++i) {
             for (int j = 0; j < getRow(); ++j) {
-                val()[i * getRow() + j] = getInput()->getVal()[i];
+                val()[i * getRow() + j] = getInput().getVal()[i];
             }
         }
     }
@@ -581,7 +581,7 @@ public:
             for (int j = 0; j < row; ++j) {
                 sum += getLoss()[i * row + j];
             }
-            getInput()->loss()[i] += sum;
+            getInput().loss()[i] += sum;
         }
     }
 
@@ -629,11 +629,11 @@ public:
         int i = 0;
         for (Node *node : batch) {
             ScalarToVectorNode *n = static_cast<ScalarToVectorNode*>(node);
-            inputs.at(i) = n->getInput()->getVal().value;
+            inputs.at(i) = n->getInput().getVal().value;
             results.at(i++) = n->getVal().value;
-            dims_.push_back(n->getDim() / n->getInput()->getDim());
+            dims_.push_back(n->getDim() / n->getInput().getDim());
         }
-        int dim = dynamic_cast<ScalarToVectorNode *>(batch.front())->getInput()->getDim();
+        int dim = dynamic_cast<ScalarToVectorNode *>(batch.front())->getInput().getDim();
         n3ldg_cuda::ScalarToVectorForward(inputs, batch.size(), dim, dims_, results);
 #if TEST_CUDA
         Executor::testForward();
@@ -648,7 +648,7 @@ public:
         for (Node *node : batch) {
             ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(node);
             n->loss().copyFromHostToDevice();
-            n->getInput()->loss().copyFromHostToDevice();
+            n->getInput().loss().copyFromHostToDevice();
         }
 #endif
         vector<dtype*> losses(batch.size());
@@ -657,9 +657,9 @@ public:
         for (Node *node : batch) {
             ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(node);
             losses.at(i) = n->getLoss().value;
-            input_losses.at(i++) = n->getInput()->getLoss().value;
+            input_losses.at(i++) = n->getInput().getLoss().value;
         }
-        int dim = dynamic_cast<ScalarToVectorNode *>(batch.front())->getInput()->getDim();
+        int dim = dynamic_cast<ScalarToVectorNode *>(batch.front())->getInput().getDim();
         n3ldg_cuda::ScalarToVectorBackward(losses, batch.size(), dim, dims_, input_losses);
 #if TEST_CUDA
         cout << "scalarToVector test backward..." << endl;
@@ -705,11 +705,11 @@ public:
     }
 
     void compute() override {
-        val().vec() = getInput()->getVal().vec().exp();
+        val().vec() = getInput().getVal().vec().exp();
     }
 
     void backward() override {
-        getInput()->loss().vec() += getLoss().vec() * getVal().vec();
+        getInput().loss().vec() += getLoss().vec() * getVal().vec();
     }
 
 protected:
@@ -748,9 +748,9 @@ public:
     void compute() override {
         for (int i = 0; i < getDim(); ++i) {
             dtype sum = 0;
-            int input_row = getInput()->getDim() / getDim();
+            int input_row = getInput().getDim() / getDim();
             for (int j = 0; j < input_row; ++j) {
-                sum += getInput()->getVal()[i * input_row + j];
+                sum += getInput().getVal()[i * input_row + j];
             }
             val()[i] = sum;
         }
@@ -758,9 +758,9 @@ public:
 
     void backward() override {
         for (int i = 0; i < getDim(); ++i) {
-            int input_row = getInput()->getDim() / getDim();
+            int input_row = getInput().getDim() / getDim();
             for (int j = 0; j < input_row; ++j) {
-                getInput()->loss()[i * input_row + j] += getLoss()[i];
+                getInput().loss()[i * input_row + j] += getLoss()[i];
             }
         }
     }
@@ -792,12 +792,12 @@ class SumExecutor : public UniInputExecutor {
         int i = 0;
         for (Node *node : batch) {
             SumNode *sum = static_cast<SumNode*>(node);
-            inputs.at(i) = sum->getInput()->getVal().value;
+            inputs.at(i) = sum->getInput().getVal().value;
             results.at(i++) = sum->getVal().value;
-            int row = sum->getInput()->getDim()/ getDim();
-            if (row * getDim() != sum->getInput()->getDim()) {
+            int row = sum->getInput().getDim()/ getDim();
+            if (row * getDim() != sum->getInput().getDim()) {
                 cerr << boost::format("SumExecutor forward row:%1% dim:%2% input dim:%3%") %
-                    row % getDim() % sum->getInput()->getDim() << endl;
+                    row % getDim() % sum->getInput().getDim() << endl;
                 abort();
             }
             dims_.push_back(row);
@@ -820,7 +820,7 @@ class SumExecutor : public UniInputExecutor {
 #endif
             losses.at(i) = node->getLoss().value;
             SumNode *sum = static_cast<SumNode*>(node);
-            input_losses.at(i++) = sum->getInput()->getLoss().value;
+            input_losses.at(i++) = sum->getInput().getLoss().value;
         }
 
         n3ldg_cuda::VectorSumBackward(losses, batch.size(), getDim(), dims_, input_losses);
@@ -865,11 +865,11 @@ public:
     }
 
     void compute() override {
-        val().vec() = factor_ * getInput()->getVal().vec();
+        val().vec() = factor_ * getInput().getVal().vec();
     }
 
     void backward() override {
-        getInput()->loss().vec() += factor_ * getLoss().vec();
+        getInput().loss().vec() += factor_ * getLoss().vec();
     }
 
     Executor* generate() override;
@@ -915,7 +915,7 @@ public:
         int i = 0;
         for (Node *node : batch) {
             ScaledNode *scaled = static_cast<ScaledNode *>(node);
-            in_vals.at(i++) = scaled->getInput()->getVal().value;
+            in_vals.at(i++) = scaled->getInput().getVal().value;
             dims.push_back(scaled->getDim());
             factors.push_back(scaled->factor_);
         }
@@ -932,7 +932,7 @@ public:
         int i = 0;
         for (Node *node : batch) {
             ScaledNode *scaled = static_cast<ScaledNode *>(node);
-            in_grads.at(i++) = scaled->getInput()->getLoss().value;
+            in_grads.at(i++) = scaled->getInput().getLoss().value;
         }
         auto grads = getGrads();
         n3ldg_cuda::ScaledBackward(grads, batch.size(), dims, factors, in_grads);

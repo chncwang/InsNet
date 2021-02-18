@@ -646,8 +646,8 @@ public:
         Node::afterForward(container, ins);
     }
 
-    Node *getInput() const {
-        return input_;
+    Node &getInput() const {
+        return *input_;
     }
 
     Json::Value toJson() const override {
@@ -869,7 +869,7 @@ protected:
 
 auto get_inputs = [](Node &node) {
     UniInputNode &uni_input = static_cast<UniInputNode&>(node);
-    vector<Node*> inputs = {uni_input.getInput()};
+    vector<Node*> inputs = {&uni_input.getInput()};
     return inputs;
 };
 
