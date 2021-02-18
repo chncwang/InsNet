@@ -794,7 +794,10 @@ protected:
 #if TEST_CUDA
     void testForward() {
         Executor::forward();
+        verifyForward();
+    }
 
+    void verifyForward() {
         for (NodeAbs *node : batch) {
             Node *x = dynamic_cast<Node *>(node);
             if(!x->getVal().verify((getNodeType() + " forward").c_str())) {

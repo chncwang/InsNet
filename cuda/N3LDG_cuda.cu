@@ -3457,6 +3457,8 @@ vector<int> Predict(vector<dtype*> &vals, int count, int dim) {
 
 __global__ void KernelSum(dtype **v, int count, int dim, volatile dtype *block_sums,
         int *block_counters,
+        bool cal_mean,
+        bool cal_sqrt,
         dtype *sum_vals) {
     __shared__ volatile extern dtype shared_sum[];
     __shared__ volatile bool is_last_block;
@@ -3506,12 +3508,15 @@ __global__ void KernelSum(dtype **v, int count, int dim, volatile dtype *block_s
         }
 
         if (threadIdx.x == 0) {
-            sum_vals[count_i] = shared_sum[0];
+            dtype x = cal_mean ? shared_sum[0] / dim :  shared_sum[0];
+            x = cal_sqrt ? cuda_sqrt(x) : x;
+            sum_vals[count_i] = x;
         }
     }
 }
 
-void Sum(dtype **v, int count, int dim, dtype *sum_vals) {
+void Sum(dtype **v, int count, int dim, dtype *sum_vals, bool cal_mean = false,
+        bool cal_sqrt = false) {
     int thread_count = min(NextTwoIntegerPowerNumber(dim), TPB);
     int block_y_count = (dim - 1 + thread_count) / thread_count;
     dim3 block_dim(count, block_y_count, 1);
@@ -3522,7 +3527,7 @@ void Sum(dtype **v, int count, int dim, dtype *sum_vals) {
     block_counters.init(count);
 
     KernelSum<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(v,
-            count, dim, block_sums.value, block_counters.value, sum_vals);
+            count, dim, block_sums.value, block_counters.value, cal_mean, cal_sqrt, sum_vals);
     CheckCudaError();
 }
 
@@ -4372,6 +4377,45 @@ void BiasBackward(vector<dtype *> &grads, int count, int dim, dtype *bias_grad,
     input_grad_arr.init(input_grads.data(), input_grads.size());
     KernelBiasBackward<<<block_count, TPB>>>(grad_arr.value, count, dim, bias_grad,
             (dtype **)input_grad_arr.value);
+}
+
+__global__ void KernelSquare(dtype **in_vals, dtype *subtrahends, int count, int dim,
+        dtype **vals) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * dim; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        dtype x = in_vals[count_i][dim_i] - subtrahends[count_i];
+        vals[count_i][dim_i] = x * x;
+    }
+}
+
+__global__ void KernelDiv(dtype **in_vals, dtype *subtrahends, dtype *denominators, int count,
+        int dim,
+        dtype **vals) {
+    int index = DeviceDefaultIndex();
+    int step = DeviceDefaultStep();
+    for (int i = index; i < count * dim; i += step) {
+        int count_i = i / dim;
+        int dim_i = i % dim;
+        vals[count_i][dim_i] = (in_vals[count_i][dim_i] - subtrahends[count_i]) /
+            denominators[count_i];
+    }
+}
+
+void StandardLayerNormForward(vector<dtype *> &in_vals, int count, int dim, vector<dtype *> &vals,
+        dtype *means, dtype *sds) {
+    NumberPointerArray in_val_arr, val_arr;
+    in_val_arr.init(in_vals.data(), count);
+    val_arr.init(vals.data(), count);
+    Sum(in_val_arr.value, count, dim, means, true);
+    int block_count = DefaultBlockCount(count * dim);
+    KernelSquare<<<block_count, TPB>>>(in_val_arr.value, means, count, dim, val_arr.value);
+    CheckCudaError();
+    Sum(val_arr.value, count, dim, sds, true, true);
+    KernelDiv<<<block_count, TPB>>>(in_val_arr.value, means, sds, count, dim, val_arr.value);
+    CheckCudaError();
 }
 
 __global__ void KernelSquareSum(dtype *v, int len, volatile dtype *global_sum,

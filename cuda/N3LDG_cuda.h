@@ -363,6 +363,8 @@ void BiasForward(vector<dtype*> &in_vals, dtype *bias, int count, int dim,
         vector<dtype *> &vals);
 void BiasBackward(vector<dtype *> &losses, int count, int dim, dtype *bias_loss,
         vector<dtype *> input_losses);
+void StandardLayerNormForward(vector<dtype *> &in_vals, int count, int dim, vector<dtype *> &vals,
+        dtype *means, dtype *sds);
 vector<int> Predict(vector<dtype*> &vals, int count, int dim);
 int Predict(dtype* val, int dim);
 void Max(dtype **v, int count, int dim, int *max_indexes, dtype *max_vals);

@@ -299,7 +299,7 @@ public:
 
 protected:
     virtual bool isDimLegal(const Node &input) const override {
-        return true;
+        return input.getDim() == getDim();;
     }
 
 private:
