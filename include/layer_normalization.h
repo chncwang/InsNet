@@ -85,7 +85,7 @@ public:
         abort();
     }
 
-    PExecutor generate() override;
+    Executor *generate() override;
 
     string typeSignature() const override {
         return Node::typeSignature();
@@ -102,7 +102,7 @@ private:
 
 class BatchedStandardLayerNormNode : public BatchedNodeImpl<StandardLayerNormNode> {
 public:
-    void init(Graph &graph, BatchedNode &input, LayerNormalizationParams &params) {
+    void init(Graph &graph, BatchedNode &input) {
         allocateBatch(input.getDim(), input.batch().size());
         setInputsPerNode({&input});
         afterInit(graph, {&input});
@@ -215,24 +215,74 @@ Executor *StandardLayerNormNode::generate() {
     return new LayerNormExecutor;
 }
 
-//class PointwiseLinearNode : public UniInputNode, public Poolable<PointwiseLinearNode> {
-//public:
-//    PointwiseLinearNode() : UniInputNode("pointise-linear") {}
+class PointwiseLinearNode : public UniInputNode, public Poolable<PointwiseLinearNode> {
+public:
+    PointwiseLinearNode() : UniInputNode("pointise-linear") {}
 
-//    void initNode(int dim) override {
-//        init(dim);
-//    }
+    void initNode(int dim) override {
+        init(dim);
+    }
 
-//    void setNodeDim(int dim) override {
-//        Node::setDim(dim);
-//    }
+    void setNodeDim(int dim) override {
+        Node::setDim(dim);
+    }
 
-//    void compute() override {
-//    }
+    void compute() override {
+        val().vec() = getInput().getVal().vec() * params_->g().val.vec() + params_->b().val.vec();
+    }
 
-//    void backward() override {
-//    }
-//};
+    void backward() override {
+        getInput().loss().vec() += getLoss().vec() * params_->g().val.vec();
+        params_->g().grad.vec() += getLoss().vec() * getInput().getVal().vec();
+        params_->b().grad.vec() += getLoss().vec();
+    }
+
+    Executor *generate() override;
+
+    string typeSignature() const override {
+        return Node::typeSignature() + "-" + addressToString(params_);
+    }
+
+protected:
+    virtual bool isDimLegal(const Node &input) const override {
+        return input.getDim() == getDim();;
+    }
+
+private:
+    LayerNormalizationParams *params_;
+
+    friend class BatchedPointwiseLinearNode;
+};
+
+class BatchedPointwiseLinearNode : public BatchedNodeImpl<PointwiseLinearNode> {
+public:
+    void init(Graph &graph, BatchedNode &input, LayerNormalizationParams &params) {
+        allocateBatch(input.getDim(), input.batch().size());
+        setInputsPerNode({&input});
+        for (Node *node : batch()) {
+            PointwiseLinearNode &p = dynamic_cast<PointwiseLinearNode &>(*node);
+            p.params_ = &params;
+        }
+        afterInit(graph, {&input});
+    }
+};
+
+#if USE_GPU
+class PointwiseLinearExecutor {
+
+};
+#else
+class PointwiseLinearExecutor : public UniInputExecutor {
+public:
+    int calculateFLOPs() override {
+        return 0; // TODO
+    }
+};
+#endif
+
+Executor *PointwiseLinearNode::generate() {
+    return new PointwiseLinearExecutor;
+}
 
 Node *layerNormalization(Graph &graph, LayerNormalizationParams &params,
         Node &input_layer) {
@@ -259,27 +309,11 @@ Node *layerNormalization(Graph &graph, LayerNormalizationParams &params,
 BatchedNode *layerNormalization(Graph &graph, LayerNormalizationParams &params,
         BatchedNode &input_layer) {
     using namespace n3ldg_plus;
-//    return bias(graph, input_layer, params.b());
-//    BatchedNode *sum = vectorSum(graph, input_layer, 1);
-//    BatchedNode *avg = scaled(graph, *sum, 1.0 / input_layer.getDim());
-//    BatchedNode *avg_vector = scalarToVector(graph, *avg, input_layer.getDim());
-//    BatchedNode *zeros_around = sub(graph, input_layer, *avg_vector);
-//    BatchedNode *square = pointwiseMultiply(graph, *zeros_around, *zeros_around);
-//    BatchedNode *square_sum = vectorSum(graph, *square, 1);
-//    BatchedNode *eps = bucket(graph, 1, input_layer.batch().size(), 1e-6);
-//    square_sum = addInBatch(graph, {square_sum, eps});
-//    BatchedNode *var = scaled(graph, *square_sum, 1.0 / input_layer.getDim());
-//    BatchedNode *standard_deviation = sqrt(graph, *var);
-//    standard_deviation = scalarToVector(graph, *standard_deviation, input_layer.getDim());
-//    BatchedNode *g = embedding(graph, params.g(), 0, input_layer.batch().size(), true);
-//    BatchedNode *factor = fullDiv(graph, *g, *standard_deviation);
-
-//    BatchedNode *scaled = pointwiseMultiply(graph, *factor, *zeros_around);
-//    BatchedNode *biased = bias(graph, *scaled, params.b());
-//    return biased;
-    BatchedStandardLayerNormNode *node = new BatchedStandardLayerNormNode;
-    node->init(graph, input_layer, params);
-    return node;
+    BatchedStandardLayerNormNode *a = new BatchedStandardLayerNormNode;
+    a->init(graph, input_layer);
+    BatchedPointwiseLinearNode *b = new BatchedPointwiseLinearNode;
+    b->init(graph, *a, params);
+    return b;
 }
 
 vector<Node *> layerNormalization(Graph &graph, LayerNormalizationParams &params,
