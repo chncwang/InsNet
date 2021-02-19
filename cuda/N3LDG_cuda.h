@@ -291,15 +291,6 @@ void PMultiForward(vector<dtype*> &ins1,
         int count,
         int dim,
         vector<dtype*> &vals);
-void DivForward(vector<dtype*> numerators, vector<dtype*> denominators, int count,
-        vector<int> &dims,
-        vector<dtype*> &results);
-void DivBackward(vector<dtype*> &losses, vector<dtype*> &denominator_vals,
-        vector<dtype*> &numerator_vals,
-        int count,
-        vector<int> &dims,
-        vector<dtype*> &numerator_losses,
-        vector<dtype*> &denominator_losses);
 void FullDivForward(vector<dtype*> &numerators, vector<dtype*> &denominators, int count,
         vector<int> &dims,
         vector<dtype*> &results);
