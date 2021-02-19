@@ -252,6 +252,7 @@ private:
     LayerNormalizationParams *params_;
 
     friend class BatchedPointwiseLinearNode;
+    friend class PointwiseLinearExecutor;
 };
 
 class BatchedPointwiseLinearNode : public BatchedNodeImpl<PointwiseLinearNode> {
@@ -268,8 +269,53 @@ public:
 };
 
 #if USE_GPU
-class PointwiseLinearExecutor {
+class PointwiseLinearExecutor : public UniInputExecutor {
+public:
+    void forward() override {
+        int count = batch.size();
+        in_vals_.reserve(count);
+        vector<dtype *> vals(count);
+        int i = 0;
+        for (Node *node : batch)  {
+            PointwiseLinearNode &p = dynamic_cast<PointwiseLinearNode &>(*node);
+            in_vals_.push_back(p.getInput().getVal().value);
+            vals.at(i++) = p.getVal().value;
+        }
 
+        n3ldg_cuda::PointwiseLinearForward(in_vals_, count, getDim(), params().g().val.value,
+                params().b().val.value, vals);
+
+#if TEST_CUDA
+        testForward();
+#endif
+    }
+
+    void backward() override {
+        int count = batch.size();
+        vector<dtype *> grads(count), in_grads(count);
+        int i = 0;
+        for (Node *node : batch)  {
+            PointwiseLinearNode &p = dynamic_cast<PointwiseLinearNode &>(*node);
+            grads.at(i) = p.getLoss().value;
+            in_grads.at(i++) = p.getInput().getLoss().value;
+        }
+
+        n3ldg_cuda::PointwiseLinearBackward(grads, in_vals_, params().g().val.value, count,
+                getDim(), in_grads, params().g().grad.value, params().b().grad.value);
+
+#if TEST_CUDA
+        testBackward();
+        params().g().grad.verify("PointwiseLinearExecutor backward g");
+        params().b().grad.verify("PointwiseLinearExecutor backward bias");
+#endif
+    }
+
+private:
+    vector<dtype *> in_vals_;
+
+    LayerNormalizationParams &params() {
+        return *dynamic_cast<PointwiseLinearNode *>(batch.front())->params_;
+    }
 };
 #else
 class PointwiseLinearExecutor : public UniInputExecutor {

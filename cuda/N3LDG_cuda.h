@@ -368,6 +368,14 @@ void StandardLayerNormForward(vector<dtype *> &in_vals, int count, int dim, vect
 void StandardLayerNormBackward(vector<dtype *> &grads, int count, int dim, vector<dtype *> &vals,
         dtype *sds,
         vector<dtype *> &in_grads);
+void PointwiseLinearForward(vector<dtype *> &in_vals, int count, int dim, dtype *g, dtype *b,
+        vector<dtype *> &vals);
+void PointwiseLinearBackward(vector<dtype *> &grads, vector<dtype *> &in_vals, dtype *g_vals,
+        int count,
+        int dim,
+        vector<dtype *> &in_grads,
+        dtype *g_grads,
+        dtype *bias_grads);
 vector<int> Predict(vector<dtype*> &vals, int count, int dim);
 int Predict(dtype* val, int dim);
 void Max(dtype **v, int count, int dim, int *max_indexes, dtype *max_vals);
