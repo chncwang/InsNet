@@ -38,7 +38,7 @@ public:
 
     MatrixConcatNode(): MatrixNode("concat") {}
 
-    void forward(Graph &graph, const vector<Node *> &inputs) {
+    void connect(Graph &graph, const vector<Node *> &inputs) {
         setInputs(inputs);
         for (Node *in : inputs) {
             in->addParent(this);
@@ -47,7 +47,7 @@ public:
         graph.addNode(this);
     }
 
-    void forward(Graph &graph, NodeAbs &topo_input, const vector<Node *> &inputs) {
+    void connect(Graph &graph, NodeAbs &topo_input, const vector<Node *> &inputs) {
         setInputs(inputs);
         topo_input.addParent(this);
         setColumn(inputs.size());
@@ -233,7 +233,7 @@ public:
         vector_ = ins.at(1);
     }
 
-    void forward(Graph &graph, Node &matrix, Node &vec) {
+    void connect(Graph &graph, Node &matrix, Node &vec) {
         setInputs({&matrix, &vec});
         afterForward(graph, {&matrix, &vec});
     }
@@ -417,7 +417,7 @@ public:
         }
     }
 
-    void forward(Graph &graph, Node &matrix, Node &vec) {
+    void connect(Graph &graph, Node &matrix, Node &vec) {
         setInputs({&matrix, &vec});
         afterForward(graph, {&matrix, &vec});
     }
@@ -574,12 +574,61 @@ Executor *TranMatrixMulVectorNode::generate() {
     return new TranMatrixMulVectorExecutor;
 }
 
+class TranMatrixMulMatrixNode : public Node, public Poolable<TranMatrixMulMatrixNode> {
+public:
+    TranMatrixMulMatrixNode() : Node("TranMatrixMulMatrixNode") {}
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    void setInputs(const vector<Node *> &ins) override {
+        if (ins.at(0)->getDim() != ins.at(1)->getDim()) {
+            cerr << boost::format("input dims are not equal: %1% and %2%\n") % ins.at(0)->getDim()
+                % ins.at(1)->getDim();
+            abort();
+        }
+        input_col_ = sqrt(getDim());
+        if (ins.at(0)->getDim() % input_col_ != 0) {
+            cerr << boost::format("invalid input dim:%1% node dim:%2%\n") % ins.at(0)->getDim() %
+                getDim();
+            abort();
+        }
+        ins_ = {ins.at(0), ins.at(1)};
+    }
+
+    void connect(Graph &graph, Node &a, Node &b) {
+        vector<Node *> inputs = {&a, &b};
+        setInputs(inputs);
+        afterForward(graph, inputs);
+    }
+
+    void compute() override {
+        input_row_ = ins_.at(0)->getDim() / input_col_;
+        Mat(val().v, input_col_, input_col_) =
+            Mat(ins_.at(0)->getVal().v, input_row_, input_col_).transpose() *
+            Mat(ins_.at(1)->getVal().v, input_row_, input_col_);
+    }
+
+    void backward() override {
+
+    }
+
+private:
+    std::array<Node *, 2> ins_;
+    int input_col_, input_row_;
+};
+
 namespace n3ldg_plus {
 
 Node *concatToMatrix(Graph &graph, const vector<Node *> &inputs) {
     int input_dim = inputs.front()->getDim();
     MatrixConcatNode *node = MatrixConcatNode::newNode(inputs.size() * input_dim);
-    node->forward(graph, inputs);
+    node->connect(graph, inputs);
     return node;
 }
 
@@ -587,7 +636,7 @@ Node *concatToMatrix(Graph &graph, NodeAbs &topo_input) {
     const auto &inputs = topo_input.batch();
     int input_dim = inputs.front()->getDim();
     MatrixConcatNode *node = MatrixConcatNode::newNode(inputs.size() * input_dim);
-    node->forward(graph, topo_input, inputs);
+    node->connect(graph, topo_input, inputs);
     return node;
 }
 
@@ -605,7 +654,7 @@ Node *matrixAndVectorMulti(Graph &graph, Node &matrix, Node &vec) {
         abort();
     }
     MatrixAndVectorMultiNode *node = MatrixAndVectorMultiNode::newNode(dim);
-    node->forward(graph, matrix, vec);
+    node->connect(graph, matrix, vec);
     return node;
 }
 
@@ -631,7 +680,7 @@ BatchedNode *matrixAndVectorMulti(Graph &graph, BatchedNode &matrix, BatchedNode
 
 Node *tranMatrixMulVector(Graph &graph, Node &matrix, Node &vec, int dim) {
     TranMatrixMulVectorNode *node = TranMatrixMulVectorNode::newNode(dim);
-    node->forward(graph, matrix, vec);
+    node->connect(graph, matrix, vec);
     return node;
 }
 
