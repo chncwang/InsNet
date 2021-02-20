@@ -2239,6 +2239,52 @@ void TranMatrixMulVectorBackward(vector<dtype *> &grads, vector<dtype *> &matrix
     CheckCudaError();
 }
 
+__global__ void KernelTranMatrixMulMatrixForward(dtype **a, dtype **b, int *cols, int row,
+        dtype **vals) {
+    __shared__ volatile extern dtype shared_sum[];
+
+    int col = cols[blockIdx.x];
+    if (blockIdx.y >= col || blockIdx.z >= col) {
+        return;
+    }
+
+    shared_sum[threadIdx.x] = 0;
+    __syncthreads();
+
+    for (int i = threadIdx.x; i < row; i += blockDim.x) {
+        shared_sum[i] += a[blockIdx.y][i] * b[blockIdx.z][i];
+    }
+    __syncthreads();
+
+    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+        if (threadIdx.x < i) {
+            shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+        }
+        __syncthreads();
+    }
+
+    vals[blockIdx.x][col * blockDim.z + blockIdx.y] = shared_sum[0];
+}
+
+void TranMatrixMulMatrixForward(vector<dtype *> &input_a_vals, vector <dtype *> &input_b_vals,
+        int count,
+        vector<int> &cols,
+        int row,
+        vector<dtype *> &vals) {
+    NumberPointerArray a_val_arr, b_val_arr, val_arr;
+    a_val_arr.init(input_a_vals.data(), count);
+    b_val_arr.init(input_b_vals.data(), count);
+    val_arr.init(vals.data(), count);
+    IntArray col_arr;
+    col_arr.init(cols.data(), count);
+    int thread_count = min(NextTwoIntegerPowerNumber(row), TPB);
+    int max_col = *max_element(cols.begin(), cols.end());
+    dim3 block_dim(count, max_col, max_col);
+    KernelTranMatrixMulMatrixForward<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(
+            a_val_arr.value, b_val_arr.value, col_arr.value, row, val_arr.value);
+    CheckCudaError();
+}
+
 __global__ void KernelMatrixAndVectorMultiForward(dtype **matrices, dtype **vectors, int count,
         int matrix_row,
         int *cols,

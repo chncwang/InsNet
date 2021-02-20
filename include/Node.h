@@ -353,11 +353,34 @@ public:
 
     BatchedNode() : NodeAbs("") {}
 
+    string shape() const {
+        bool dims_same = true;
+        for (int i = 1; i < batch().size(); ++i) {
+            if (batch().front()->getDim() != batch().at(i)->getDim()) {
+                dims_same = false;
+                break;
+            }
+        }
+        if (dims_same) {
+            return (boost::format("batch size:%1% dim:%2%") % batch().size() % getDim()).str();
+        } else {
+            string str = (boost::format("batch size:%1% dims:") % batch().size()).str();
+            for (int dim : getDims()) {
+                str += to_string(dim) + ",";
+            }
+            return str;
+        }
+    }
+
     virtual string getNodeType() const override {
         return "Batched-" + batch_.front()->getNodeType();
     }
 
     vector<Node *> &batch() override {
+        return batch_;
+    }
+
+    const vector<Node *> &batch() const {
         return batch_;
     }
 
@@ -631,7 +654,7 @@ public:
         return Node::typeSignature() + "-" + to_string(input_->getDim()) + "-";
     }
 
-    void setInputs(const vector<Node *> &ins) override {
+    virtual void setInputs(const vector<Node *> &ins) override {
         input_ = ins.front();
     }
 

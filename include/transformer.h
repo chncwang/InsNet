@@ -455,6 +455,35 @@ BatchedNode *dotAttention(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedN
     return attended;
 }
 
+BatchedNode *dotAttentionEncoder(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedNode& q,
+        bool is_decoder_self_att,
+        int head_count,
+        UniParams &fusion_param,
+        dtype dropout,
+        bool is_training) {
+    int dim = k.batch().size();
+
+    int head_dim = q.getDim() / head_count;
+    vector<int> offsets(head_count);
+    for (int i = 0; i < head_count; ++i) {
+        offsets.at(i) = i * head_dim;
+    }
+
+    BatchedNode *split_q = split(graph, q, head_dim, offsets);
+    BatchedNode *query_matrix = concatToMatrix(graph, *split_q, head_count);
+    BatchedNode *split_k = split(graph, k, head_dim, offsets);
+    BatchedNode *key_matrix = concatToMatrix(graph, *split_k, head_count);
+    BatchedNode *split_v = split(graph, v, head_dim, offsets);
+    BatchedNode *value_matrix = concatToMatrix(graph, *split_v, head_count);
+    BatchedNode *split_attended = n3ldg_plus::dotAttention(graph, *key_matrix,
+            *value_matrix, *query_matrix, dim).first;
+
+    BatchedNode *attended = concat(graph, *split_attended, head_count);
+    attended = n3ldg_plus::linear(graph, *attended, fusion_param);
+    attended = n3ldg_plus::dropout(graph, *attended, dropout, is_training);
+    return attended;
+}
+
 BatchedNode *transformerEncoder(Graph &graph, TransformerEncoderParams &params,
         BatchedNode &inputs,
         dtype dropout,
@@ -488,8 +517,8 @@ BatchedNode *transformerEncoder(Graph &graph, TransformerEncoderParams &params,
         BatchedNode *key = linear(graph, *normed, attention_head_params.k());
         BatchedNode *value = linear(graph, *normed, attention_head_params.v());
         BatchedNode *q = linear(graph, *normed, attention_head_params.q());
-        BatchedNode *attended = dotAttention(graph, *key, *value, *q, false, params.headCount(),
-                layer_params.headsFusionParams(), dropout, is_training);
+        BatchedNode *attended = dotAttentionEncoder(graph, *key, *value, *q, false,
+                params.headCount(), layer_params.headsFusionParams(), dropout, is_training);
         BatchedNode *added = addInBatch(graph, {attended, last_layer});
         normed = layerNormalization(graph, layer_params.layerNormB(), *added);
         BatchedNode *t = linear(graph, *normed, layer_params.ffnInnerParams());

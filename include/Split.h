@@ -77,6 +77,11 @@ public:
         int i = 0;
         for (int offset : offsets) {
             for (Node *input_node : input.batch()) {
+                if (offset + dim > input_node->getDim()) {
+                    cerr << boost::format("offset:%1% dim:%2% input dim:%3%\n") % offset % dim %
+                        input_node->getDim();
+                    abort();
+                }
                 SplitNode *s = dynamic_cast<SplitNode *>(batch().at(i++));
                 s->offset_ = offset;
                 s->setInputs({input_node});

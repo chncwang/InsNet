@@ -195,9 +195,10 @@ public:
             Tensor1D m;
             m.init(n);
             m.vec() = s.getLoss().vec() * s.getVal().vec();
-            s.getInput().loss().vec() += c * ((n - 1 - y2) * s.getLoss().vec() -
+            auto x = c * ((n - 1 - y2) * s.getLoss().vec() -
                     ((m.mat().sum() - m.vec()) * s.getVal().vec() + s.getLoss().mat().sum() -
                      s.getLoss().vec()));
+            s.getInput().loss().vec() += x;
             ++i;
         }
     }

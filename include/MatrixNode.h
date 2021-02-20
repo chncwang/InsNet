@@ -615,13 +615,90 @@ public:
     }
 
     void backward() override {
+        Mat(ins_.at(0)->loss().v, input_row_, input_col_) +=
+            Mat(ins_.at(1)->getVal().v, input_row_, input_col_) *
+            Mat(getLoss().v, input_col_, input_col_).transpose();
+        Mat(ins_.at(1)->loss().v, input_row_, input_col_) +=
+            Mat(ins_.at(0)->getVal().v, input_row_, input_col_) *
+            Mat(getLoss().v, input_col_, input_col_);
+    }
 
+    Executor * generate() override;
+
+    string typeSignature() const override {
+        return Node::getNodeType() + to_string(ins_.at(0)->getDim());
     }
 
 private:
     std::array<Node *, 2> ins_;
     int input_col_, input_row_;
+    friend class TranMatrixMulMatrixExecutor;
 };
+
+class BatchedTranMatrixMulMatrixNode : public BatchedNodeImpl<TranMatrixMulMatrixNode> {
+public:
+    void init(Graph &graph, BatchedNode &a, BatchedNode &b, int dim) {
+        allocateBatch(dim, a.batch().size());
+        setInputsPerNode({&a, &b});
+        afterInit(graph, {&a, &b});
+    }
+};
+
+#if USE_GPU
+class TranMatrixMulMatrixExecutor : public Executor {
+public:
+    void forward() override {
+        int count = batch.size();
+        vector<dtype *> vals;
+        vals.reserve(count);
+        cols_.reserve(count);
+        a_vals_.reserve(count);
+        b_vals_.reserve(count);
+        for (Node *node : batch) {
+            TranMatrixMulMatrixNode &t = dynamic_cast<TranMatrixMulMatrixNode &>(*node);
+            a_vals_.push_back(t.ins_.at(0)->getVal().value);
+            b_vals_.push_back(t.ins_.at(1)->getVal().value);
+            vals.push_back(t.getVal().value);
+            cols_.push_back(sqrt(t.getDim()));
+        }
+
+        n3ldg_cuda::TranMatrixMulMatrixForward(a_vals_, b_vals_, count, cols_, row_, vals);
+
+#if TEST_CUDA
+        testForward();
+#endif
+    }
+
+    void backward() override {
+#if TEST_CUDA
+        auto get_inputs = [&](Node &node) {
+            vector<pair<Node*, string>> pairs;
+            TranMatrixMulMatrixNode &t = static_cast<TranMatrixMulMatrixNode &>(node);
+            pairs.push_back(make_pair(t.ins_.at(0), "a"));
+            pairs.push_back(make_pair(t.ins_.at(1), "b"));
+            return pairs;
+        };
+        testBackward(get_inputs);
+#endif
+    }
+
+private:
+    vector<dtype *> a_vals_, b_vals_;
+    vector<int> cols_;
+    int row_;
+};
+#else
+class TranMatrixMulMatrixExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        abort();
+    }
+};
+#endif
+
+Executor* TranMatrixMulMatrixNode::generate() {
+    return new TranMatrixMulMatrixExecutor;
+}
 
 namespace n3ldg_plus {
 
@@ -700,6 +777,12 @@ BatchedNode *tranMatrixMulVector(Graph &graph, BatchedNode &matrix, BatchedNode 
         const vector<int> *dims = nullptr) {
     BatchedTranMatrixMulVectorNode *node = new BatchedTranMatrixMulVectorNode;
     node->init(graph, matrix, vec, dims);
+    return node;
+}
+
+BatchedNode *tranMatrixMulMatrix(Graph &graph, BatchedNode &a, BatchedNode &b, int col) {
+    BatchedTranMatrixMulMatrixNode *node = new BatchedTranMatrixMulMatrixNode;
+    node->init(graph, a, b, col * col);
     return node;
 }
 

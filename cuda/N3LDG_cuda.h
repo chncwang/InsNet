@@ -275,6 +275,11 @@ void TranMatrixMulVectorBackward(vector<dtype *> &grads, vector<dtype *> &matrix
         int row,
         vector<dtype *> &matrix_grads,
         vector<dtype *> &vector_grads);
+void TranMatrixMulMatrixForward(vector<dtype *> &input_a_vals, vector <dtype *> &input_b_vals,
+        int count,
+        vector<int> &cols,
+        int row,
+        vector<dtype *> &vals);
 void MatrixAndVectorMultiForward(vector<dtype *> &matrices, vector<dtype *> &vectors, int count,
         int row,
         vector<int> &cols,
