@@ -2252,7 +2252,7 @@ __global__ void KernelTranMatrixMulMatrixForward(dtype **a, dtype **b, int *cols
     __syncthreads();
 
     for (int i = threadIdx.x; i < row; i += blockDim.x) {
-        shared_sum[i] += a[blockIdx.y][i] * b[blockIdx.z][i];
+        shared_sum[i] += a[blockIdx.x][blockIdx.y * row + i] * b[blockIdx.x][blockIdx.z * row + i];
     }
     __syncthreads();
 
@@ -2263,7 +2263,7 @@ __global__ void KernelTranMatrixMulMatrixForward(dtype **a, dtype **b, int *cols
         __syncthreads();
     }
 
-    vals[blockIdx.x][col * blockDim.z + blockIdx.y] = shared_sum[0];
+    vals[blockIdx.x][col * blockIdx.z + blockIdx.y] = shared_sum[0];
 }
 
 void TranMatrixMulMatrixForward(vector<dtype *> &input_a_vals, vector <dtype *> &input_b_vals,

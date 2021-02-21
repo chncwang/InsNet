@@ -896,6 +896,27 @@ auto get_inputs = [](Node &node) {
     return inputs;
 };
 
+void printZeroGrads(Node &node, int level = 0) {
+    bool all_zero = true;
+    for (int i = 0; i < node.getDim(); ++i) {
+        if (abs(node.getLoss()[i]) > 1e-6) {
+            all_zero = false;
+            break;
+        }
+    }
+    if (all_zero) {
+        cout << "type sig:" << node.cachedTypeSig() << " level:" << level << endl;
+        cout << "t parents count:" << node.topologicalNode().getParents().size() << endl;
+        for (NodeAbs *t_p : node.topologicalNode().getParents()) {
+            cout << "parent sig:" << t_p->cachedTypeSig() << endl;
+            for (Node *b : t_p->batch()) {
+                printZeroGrads(*b, level + 1);
+                break;
+            }
+        }
+    }
+};
+
 class UniInputExecutor : public Executor {
 protected:
 #if TEST_CUDA

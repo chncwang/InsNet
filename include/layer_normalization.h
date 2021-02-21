@@ -155,6 +155,21 @@ public:
         }
         n3ldg_cuda::StandardLayerNormBackward(grads, count, getDim(), vals_, sds_.value, in_grads);
 #if TEST_CUDA
+        i = 0;
+        for (Node *node : batch) {
+            StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
+            int n = s.getDim();
+            dtype c = 1.0 / (n * sds_[i]);
+            auto y2 = s.getVal().vec().square();
+            Tensor1D m;
+            m.init(n);
+            m.vec() = s.getLoss().vec() * s.getVal().vec();
+            auto x = c * ((n - 1 - y2) * s.getLoss().vec() -
+                    ((m.mat().sum() - m.vec()) * s.getVal().vec() + s.getLoss().mat().sum() -
+                     s.getLoss().vec()));
+            s.getInput().loss().vec() += x;
+            ++i;
+        }
         verifyBackward();
 #endif
     }

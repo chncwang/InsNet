@@ -626,7 +626,7 @@ public:
     Executor * generate() override;
 
     string typeSignature() const override {
-        return Node::getNodeType() + to_string(ins_.at(0)->getDim());
+        return Node::getNodeType() + to_string(ins_.at(0)->getDim() / sqrt(getDim()));
     }
 
 private:
@@ -661,6 +661,8 @@ public:
             vals.push_back(t.getVal().value);
             cols_.push_back(sqrt(t.getDim()));
         }
+        row_ = dynamic_cast<TranMatrixMulMatrixNode &>(*batch.front()).ins_.at(0)->getDim() /
+            cols_.front();
 
         n3ldg_cuda::TranMatrixMulMatrixForward(a_vals_, b_vals_, count, cols_, row_, vals);
 
