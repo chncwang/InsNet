@@ -672,6 +672,19 @@ public:
     }
 
     void backward() override {
+        int count = batch.size();
+        vector<dtype *> a_grads, b_grads, grads;
+        a_grads.reserve(count);
+        b_grads.reserve(count);
+        for (Node *node : batch) {
+            TranMatrixMulMatrixNode &t = dynamic_cast<TranMatrixMulMatrixNode &>(*node);
+            a_grads.push_back(t.ins_.at(0)->getLoss().value);
+            b_grads.push_back(t.ins_.at(1)->getLoss().value);
+            grads.push_back(t.getLoss().value);
+        }
+        n3ldg_cuda::TranMatrixMulMatrixBackward(grads, a_vals_, b_vals_, count, cols_, row_,
+                a_grads, b_grads);
+
 #if TEST_CUDA
         auto get_inputs = [&](Node &node) {
             vector<pair<Node*, string>> pairs;

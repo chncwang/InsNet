@@ -195,6 +195,7 @@ public:
                 n3ldg_cuda::Assert(in->loss().verify("PAddExecutor backward"));
             }
         }
+        cout << "PAddExecutor backward tested" << endl;
 #endif
     }
 #else

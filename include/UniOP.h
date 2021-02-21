@@ -301,6 +301,7 @@ public:
             LinearNode *ptr = static_cast<LinearNode *>(n);
             n3ldg_cuda::Assert(ptr->getInput().loss().verify("backward loss"));
         }
+        cout << "linear backward tested" << endl;
 #endif
     }
 };

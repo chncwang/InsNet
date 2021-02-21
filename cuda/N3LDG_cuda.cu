@@ -2263,7 +2263,9 @@ __global__ void KernelTranMatrixMulMatrixForward(dtype **a, dtype **b, int *cols
         __syncthreads();
     }
 
-    vals[blockIdx.x][col * blockIdx.z + blockIdx.y] = shared_sum[0];
+    if (threadIdx.x == 0) {
+        vals[blockIdx.x][col * blockIdx.z + blockIdx.y] = shared_sum[0];
+    }
 }
 
 void TranMatrixMulMatrixForward(vector<dtype *> &input_a_vals, vector <dtype *> &input_b_vals,
@@ -2282,6 +2284,72 @@ void TranMatrixMulMatrixForward(vector<dtype *> &input_a_vals, vector <dtype *> 
     dim3 block_dim(count, max_col, max_col);
     KernelTranMatrixMulMatrixForward<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(
             a_val_arr.value, b_val_arr.value, col_arr.value, row, val_arr.value);
+    CheckCudaError();
+}
+
+__device__ dtype GetWithoutTrans(dtype *v, int col, int bi, int ti) {
+    return v[bi * col + ti];
+}
+
+__device__ dtype GetWithTrans(dtype *v, int col, int bi, int ti) {
+    return v[ti * col + bi];
+}
+
+__global__ void KernelTranMatrixMulMatrixBackward(dtype **grads, dtype **in_vals, int count,
+        int *cols,
+        int row,
+        dtype **in_grads,
+        bool trans) {
+    __shared__ volatile extern dtype shared_sum[];
+    int col = cols[blockIdx.x];
+    if (blockIdx.z >= col) {
+        return;
+    }
+    shared_sum[threadIdx.x] = threadIdx.x < col ?
+        in_vals[blockIdx.x][row * threadIdx.x + blockIdx.y] *
+        (trans ? grads[blockIdx.x][threadIdx.x * col + blockIdx.z] :
+         grads[blockIdx.x][blockIdx.z * col + threadIdx.x]) : 0;
+    __syncthreads();
+
+    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+        if (threadIdx.x < i) {
+            shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+        }
+        __syncthreads();
+    }
+
+    if (threadIdx.x == 0) {
+        DeviceAtomicAdd(in_grads[blockIdx.x] + row * blockIdx.z + blockIdx.y, shared_sum[0]);
+    }
+}
+
+void TranMatrixMulMatrixBackward(vector<dtype *> &grads, vector<dtype *> &a_vals,
+        vector<dtype *> &b_vals,
+        int count,
+        vector<int> &cols,
+        int row,
+        vector<dtype *> &a_grads,
+        vector<dtype *> &b_grads) {
+    NumberPointerArray grad_arr, a_val_arr, b_val_arr, a_grad_arr, b_grad_arr;
+    grad_arr.init(grads.data(), count);
+    a_val_arr.init(a_vals.data(), count);
+    b_val_arr.init(b_vals.data(), count);
+    a_grad_arr.init(a_grads.data(), count);
+    b_grad_arr.init(b_grads.data(), count);
+    IntArray col_arr;;
+    col_arr.init(cols.data(), count);
+
+    int max_col = *max_element(cols.begin(), cols.end());
+
+    dim3 block_dim(count, row, max_col);
+    int thread_count = NextTwoIntegerPowerNumber(max_col);
+
+    KernelTranMatrixMulMatrixBackward<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(
+            grad_arr.value, b_val_arr.value, count, col_arr.value, row, a_grad_arr.value, true);
+    CheckCudaError();
+
+    KernelTranMatrixMulMatrixBackward<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(
+            grad_arr.value, a_val_arr.value, count, col_arr.value, row, b_grad_arr.value, false);
     CheckCudaError();
 }
 
