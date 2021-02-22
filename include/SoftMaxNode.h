@@ -24,30 +24,36 @@ public:
     Executor *generate() override;
 
     void compute() override {
-        dtype max = getInput().getVal().mat().maxCoeff();
-        Tensor1D x_exp, x;
-        x.init(getDim());
-        x_exp.init(getDim());
-        x.vec() = getInput().getVal().vec() - max;
-        x_exp.vec() = x.vec().exp();
-        dtype sum = x_exp.mat().sum();
-        val().vec() = x_exp.vec() / sum;
+        int row = getDim() / getColumn();
+        for (int i = 0; i < getColumn(); ++i) {
+            dtype max = Mat(getInput().getVal().v + row * i, row, 1).maxCoeff();
+            Tensor1D x_exp, x;
+            x.init(row);
+            x_exp.init(row);
+            x.vec() = Vec(getInput().getVal().v + row * i, row) - max;
+            x_exp.vec() = x.vec().exp();
+            dtype sum = x_exp.mat().sum();
+            Vec(val().v + row * i, row) = x_exp.vec() / sum;
+        }
     }
 
     void backward() override {
-        Tensor1D a;
-        a.init(getDim());
-        a.vec() = getLoss().vec() * getVal().vec();
-        dtype z = a.mat().sum();
-        Tensor1D b;
-        b.init(getDim());
-        b.vec() = z - a.vec();
-        getInput().loss().vec() += getVal().vec() *
-            ((1 - getVal().vec()) * getLoss().vec() - b.vec());
+        int row = getDim() / getColumn();
+        for (int i = 0; i < getColumn(); ++i) {
+            Tensor1D a;
+            a.init(row);
+            a.vec() = Vec(getLoss().v + i * row, row) * Vec(getVal().v + i * row, row);
+            dtype z = a.mat().sum();
+            Tensor1D b;
+            b.init(row);
+            b.vec() = z - a.vec();
+            Vec(getInput().loss().v + i * row, row) += Vec(getVal().v + i * row, row) *
+                ((1 - Vec(getVal().v + i * row, row)) * Vec(getLoss().v + i * row, row) - b.vec());
+        }
     }
 
     string typeSignature() const override {
-        return Node::getNodeType();
+        return Node::getNodeType() + isVectorSig();
     }
 
 protected:
@@ -58,9 +64,12 @@ protected:
 
 class BatchedSoftmaxNode : public BatchedNodeImpl<SoftmaxNode> {
 public:
-    void init(Graph &graph, BatchedNode &input) {
+    void init(Graph &graph, BatchedNode &input, int col) {
         allocateBatch(input.getDims());
         setInputsPerNode({&input});
+        for (Node *node : batch()) {
+            node->setColumn(col);
+        }
         afterInit(graph, {&input});
     }
 };
@@ -152,22 +161,11 @@ Node* softmax(Graph &graph, Node &input, int input_col) {
     return div;
 }
 
-BatchedNode* softmax(Graph &graph, BatchedNode &input, int input_col = 1) {
+BatchedNode* softmax(Graph &graph, BatchedNode &input, int col = 1) {
     using namespace n3ldg_plus;
     BatchedSoftmaxNode *node = new BatchedSoftmaxNode;
-    node->init(graph, input);
+    node->init(graph, input, col);
     return node;
-
-//    BatchedNode *subtracted = minusMaxScalar(graph, input, input_col);
-//    BatchedNode *exp = n3ldg_plus::exp(graph, *subtracted);
-//    BatchedNode *sum = vectorSum(graph, *exp, input_col);
-//    vector<int> input_rows;
-//    for (int dim : input.getDims()) {
-//        input_rows.push_back(dim / input_col);
-//    }
-//    sum = scalarToVector(graph, *sum, input_rows);
-//    BatchedNode *div = n3ldg_plus::fullDiv(graph, *exp, *sum);
-//    return div;
 }
 
 };

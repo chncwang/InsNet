@@ -303,6 +303,10 @@ protected:
         container.addNode(this);
     }
 
+    string isVectorSig() const {
+        return column_ == 1 ? "-vector-" : "-matrix-";
+    }
+
     Node(const string &node_type, int dim = 0) : NodeAbs(node_type), dim_(dim) {}
 
     virtual void setDim(int dim) {
