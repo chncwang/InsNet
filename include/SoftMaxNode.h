@@ -104,7 +104,7 @@ public:
             grads.at(i) = s.getLoss().value;
             in_grads.at(i++) = s.getInput().getLoss().value;
         }
-        n3ldg_cuda::SoftmaxBackward(grads, vals_, batch.size(), rows_, in_grads);
+        n3ldg_cuda::SoftmaxBackward(grads, vals_, batch.size(), rows_, cols_, in_grads);
 #if TEST_CUDA
         UniInputExecutor::testBackward();
 #endif

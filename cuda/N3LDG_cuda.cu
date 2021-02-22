@@ -4018,37 +4018,53 @@ void SoftmaxForward(vector<dtype *> &in_vals, int count, vector<int> &rows, vect
     CheckCudaError();
 }
 
-__global__ void KernelPointwiseMul(dtype **a, dtype **b, int count, int *dims, int max_dim,
+__global__ void KernelPointwiseMul(dtype **a, dtype **b, int count, int *rows, int max_row,
+        int *cols,
+        int max_col,
         dtype *vals) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
-
-    for (int i = index; i < count * max_dim; i += step) {
-        int count_i = i / max_dim;
-        int dim_i = i % max_dim;
-        if (dim_i < dims[count_i]) {
-            vals[count_i * max_dim + dim_i] = a[count_i][dim_i] * b[count_i][dim_i];
+    int n = max_row * max_col;
+    for (int i = index; i < count * max_row * max_col; i += step) {
+        int count_i = i / n;
+        int offset = i % n;
+        int col = cols[count_i];
+        int row = rows[count_i];
+        int col_i = offset / row;
+        if (col_i < col) {
+            int row_i = offset % row;
+            if (row_i < row) {
+                vals[count_i * n + offset] = a[count_i][offset] * b[count_i][offset];
+            }
         }
     }
 }
 
-__global__ void KernelVectorSum(dtype *v, int count, int *dims, int max_dim, dtype *block_sums,
+__global__ void KernelVectorSum(dtype *v, int count, int *rows, int max_row, int *cols,
+        dtype *block_sums,
         int *block_counters,
         dtype *results) {
     __shared__ volatile extern dtype shared_sum[];
     __shared__ bool is_last_block;
+
+    int count_i = blockIdx.x;
+    int col = cols[count_i];
+    int col_i = blockIdx.z;
+    if (col_i >= col) {
+        return;
+    }
+
     if (threadIdx.x == 0 && blockIdx.y == 0) {
-        block_counters[blockIdx.x] = 0;
+        block_counters[blockIdx.x * gridDim.z + blockIdx.z] = 0;
     }
     if (threadIdx.x == 0) {
         is_last_block = false;
     }
 
-    int count_i = blockIdx.x;
-    int dim_i = blockIdx.y * blockDim.x + threadIdx.x;
-    int dim = dims[count_i];
-
-    shared_sum[threadIdx.x] = dim_i < dim ? v[count_i * max_dim + dim_i] : 0.0f;
+    int row = rows[count_i];
+    int row_i = blockIdx.y * blockDim.x + threadIdx.x;
+    int offset = col_i * row + row_i;
+    shared_sum[threadIdx.x] = row_i < row ? v[count_i * gridDim.z * max_row + offset] : 0.0f;
     __syncthreads();
 
     for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
@@ -4059,9 +4075,10 @@ __global__ void KernelVectorSum(dtype *v, int count, int *dims, int max_dim, dty
     }
 
     if (threadIdx.x == 0) {
-        int block_sums_offset = blockIdx.x * gridDim.y + blockIdx.y;
+        int block_sums_offset = blockIdx.x * gridDim.y * gridDim.z + blockIdx.z * gridDim.y +
+            blockIdx.y;
         block_sums[block_sums_offset] = shared_sum[0];
-        if (atomicAdd(block_counters + blockIdx.x, 1) == gridDim.y - 1) {
+        if (atomicAdd(block_counters + blockIdx.x * gridDim.z + blockIdx.z, 1) == gridDim.y - 1) {
             is_last_block = true;
         }
     }
@@ -4070,7 +4087,7 @@ __global__ void KernelVectorSum(dtype *v, int count, int *dims, int max_dim, dty
     if (is_last_block) {
         dtype sum = 0.0f;
         for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
-            int offset = blockIdx.x * gridDim.y + i;
+            int offset = blockIdx.x * gridDim.y * gridDim.z + blockIdx.z * gridDim.y + i;
             sum += block_sums[offset];
         }
 
@@ -4085,62 +4102,75 @@ __global__ void KernelVectorSum(dtype *v, int count, int *dims, int max_dim, dty
         }
 
         if (threadIdx.x == 0) {
-            results[count_i] = shared_sum[0];
+            results[count_i * gridDim.z + blockIdx.z] = shared_sum[0];
         }
     }
 }
 
-__global__ void KernelSoftmaxBackward(dtype **vals, dtype **grads, int count, int *dims,
-        int max_dim,
+__global__ void KernelSoftmaxBackward(dtype **vals, dtype **grads, int count, int *rows,
+        int max_row,
+        int *cols,
+        int max_col,
         dtype *z,
         dtype *a,
         dtype **input_grads) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
-    for (int i = index; i < count * max_dim; i += step) {
-        int count_i = i / max_dim;
-        int dim_i = i % max_dim;
-        if (dim_i < dims[count_i]) {
-            dtype b = z[count_i] - a[count_i * max_dim + dim_i];
-            dtype x = vals[count_i][dim_i] *
-                ((1 - vals[count_i][dim_i]) * grads[count_i][dim_i] - b);
-            DeviceAtomicAdd(input_grads[count_i] + dim_i, x);
+    int n = max_row * max_col;
+    for (int i = index; i < count * max_row * max_col; i += step) {
+        int count_i = i / n;
+        int offset = i % n;
+        int col = cols[count_i];
+        int row = rows[count_i];
+        int col_i = offset / row;
+        if (col_i < col) {
+            int row_i = offset % row;
+            if (row_i < row) {
+                dtype b = z[count_i * max_col + col_i] - a[count_i * n + offset];
+                dtype x = vals[count_i][offset] *
+                    ((1 - vals[count_i][offset]) * grads[count_i][offset] - b);
+                DeviceAtomicAdd(input_grads[count_i] + offset, x);
+            }
         }
     }
 }
 
-void SoftmaxBackward(vector<dtype *> &grads, vector<dtype *> &vals, int count, vector<int> &dims,
+void SoftmaxBackward(vector<dtype *> &grads, vector<dtype *> &vals, int count, vector<int> &rows,
+        vector<int> &cols,
         vector<dtype *> &in_grads) {
-    int max_dim = *max_element(dims.begin(), dims.end());
+    int max_row = *max_element(rows.begin(), rows.end());
+    int max_col = *max_element(cols.begin(), cols.end());
     NumberArray a;
-    a.init(max_dim * count);
+    a.init(max_row * max_col * count);
     NumberPointerArray grad_arr, val_arr;
     grad_arr.init(grads.data(), count);
     val_arr.init(vals.data(), count);
-    IntArray dim_arr;
-    dim_arr.init(dims.data(), count);
-    int block_count = DefaultBlockCount(max_dim * count);
-    KernelPointwiseMul<<<block_count, TPB>>>(grad_arr.value, val_arr.value, count, dim_arr.value,
-            max_dim, a.value);
+    IntArray row_arr, col_arr;
+    row_arr.init(rows.data(), count);
+    col_arr.init(cols.data(), count);
+    int block_count = DefaultBlockCount(max_col * max_row * count);
+    KernelPointwiseMul<<<block_count, TPB>>>(grad_arr.value, val_arr.value, count, row_arr.value,
+            max_row, col_arr.value, max_col, a.value);
     CheckCudaError();
 
-    int thread_count = min(NextTwoIntegerPowerNumber(max_dim), TPB);
-    int block_y_count = (max_dim - 1 + thread_count) / thread_count;
-    dim3 block_dim(count, block_y_count, 1);
+    int thread_count = min(NextTwoIntegerPowerNumber(max_row), TPB);
+    int block_y_count = (max_row - 1 + thread_count) / thread_count;
+    dim3 block_dim(count, block_y_count, max_col);
     NumberArray block_vals;
-    block_vals.init(block_y_count * count);
+    block_vals.init(block_y_count * count * max_col);
     IntArray block_counters;
-    block_counters.init(count);
+    block_counters.init(count * max_col);
     NumberArray z;
-    z.init(count);
+    z.init(count * max_col);
     KernelVectorSum<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(a.value, count,
-            dim_arr.value, max_dim, block_vals.value, block_counters.value, z.value);
+            row_arr.value, max_row, col_arr.value, block_vals.value, block_counters.value,
+            z.value);
     CheckCudaError();
 
     NumberPointerArray in_grad_arr;
     in_grad_arr.init(in_grads.data(), count);
     KernelSoftmaxBackward<<<block_count, TPB>>>(val_arr.value, grad_arr.value, count,
-            dim_arr.value, max_dim, z.value, a.value, in_grad_arr.value);
+            row_arr.value, max_row, col_arr.value, max_col, z.value, a.value, in_grad_arr.value);
 }
 
 __global__ void KernelScaledForward(dtype **in_vals, int count, int *dims, int max_dim,
