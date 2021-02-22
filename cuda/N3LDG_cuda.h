@@ -351,7 +351,8 @@ void VectorSumForward(vector<dtype *> &inputs, int count, int col, vector<int> &
         vector<dtype*> &results);
 void VectorSumBackward(vector<dtype*> &losses, int count, int col, vector<int> &dims,
         vector<dtype*> &input_losses);
-void SoftmaxForward(vector<dtype *> &in_vals, int count, vector<int> &dims, vector<dtype *> &vals);
+void SoftmaxForward(vector<dtype *> &in_vals, int count, vector<int> &rows, vector<int> &cols,
+        vector<dtype *> &vals);
 void SoftmaxBackward(vector<dtype *> &grads, vector<dtype *> &vals, int count, vector<int> &dims,
         vector<dtype *> &in_grads);
 void ScaledForward(vector<dtype *> &in_vals, int count, vector<int> &dims, vector<dtype> &factors,

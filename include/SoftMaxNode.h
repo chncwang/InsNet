@@ -80,15 +80,17 @@ public:
     void forward() override {
         vector<dtype *> in_vals(batch.size());
         vals_.reserve(batch.size());
-        dims_.reserve(batch.size());
+        rows_.reserve(batch.size());
+        cols_.reserve(batch.size());
         int i = 0;
         for (Node *node : batch) {
             SoftmaxNode &s = dynamic_cast<SoftmaxNode &>(*node);
             vals_.push_back(s.getVal().value);
-            dims_.push_back(s.getDim());
+            rows_.push_back(s.getDim() / s.getColumn());
+            cols_.push_back(s.getColumn());
             in_vals.at(i++) = s.getInput().getVal().value;
         }
-        n3ldg_cuda::SoftmaxForward(in_vals, batch.size(), dims_, vals_);
+        n3ldg_cuda::SoftmaxForward(in_vals, batch.size(), rows_, cols_, vals_);
 #if TEST_CUDA
         UniInputExecutor::testForward();
 #endif
@@ -102,7 +104,7 @@ public:
             grads.at(i) = s.getLoss().value;
             in_grads.at(i++) = s.getInput().getLoss().value;
         }
-        n3ldg_cuda::SoftmaxBackward(grads, vals_, batch.size(), dims_, in_grads);
+        n3ldg_cuda::SoftmaxBackward(grads, vals_, batch.size(), rows_, in_grads);
 #if TEST_CUDA
         UniInputExecutor::testBackward();
 #endif
@@ -110,7 +112,7 @@ public:
 
 private:
     vector<dtype *> vals_;
-    vector<int> dims_;
+    vector<int> rows_, cols_;
 };
 #else
 class SoftmaxExecutor : public UniInputExecutor {
