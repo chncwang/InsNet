@@ -449,7 +449,7 @@ public:
     Executor * generate() override;
 
     string typeSignature() const override {
-        return Node::typeSignature();
+        return Node::getNodeType() + to_string(getDim() / k_);
     }
 private:
     std::array<Node *, 2> ins_;
@@ -457,12 +457,12 @@ private:
     int a_row_;
     
     friend class BatchedMatrixMulMatrixNode;
+    friend class MatrixMulMatrixExecutor;
 };
 
 class BatchedMatrixMulMatrixNode : public BatchedNodeImpl<MatrixMulMatrixNode> {
 public:
     void init(Graph &graph, BatchedNode &a, BatchedNode &b, int k) {
-//        cout << boost::format("a shape:%1% b shape:%2%") % a.shape() % b.shape() << endl;
         allocateBatch(a.getDim(), a.batch().size());
         for (Node *node : batch()) {
             MatrixMulMatrixNode &m = dynamic_cast<MatrixMulMatrixNode &>(*node);
@@ -474,6 +474,57 @@ public:
 };
 
 #if USE_GPU
+class MatrixMulMatrixExecutor : public Executor {
+public:
+    void forward() override {
+        int count = batch.size();
+        vector<dtype *> a, b, vals;
+        a.reserve(count);
+        b.reserve(count);
+        vals.reserve(count);
+        vector<int> ks;
+        ks.reserve(count);
+        for (Node *node : batch) {
+            MatrixMulMatrixNode &m = dynamic_cast<MatrixMulMatrixNode &>(*node);
+            a.push_back(m.ins_.at(0)->getVal().value);
+            b.push_back(m.ins_.at(1)->getVal().value);
+            vals.push_back(m.getVal().value);
+            ks.push_back(m.k_);
+        }
+        MatrixMulMatrixNode &first = dynamic_cast<MatrixMulMatrixNode &>(*batch.front());
+        int row = first.getDim() / first.k_;
+#if TEST_CUDA
+        auto get_inputs = [&](Node &node) {
+            MatrixMulMatrixNode &t = dynamic_cast<MatrixMulMatrixNode&>(node);
+            vector<pair<Node*, string>> pairs = {
+                make_pair(t.ins_.at(0), "a"),
+                make_pair(t.ins_.at(1), "b")
+            };
+            return pairs;
+        };
+        testForwardInpputs(get_inputs);
+#endif
+
+        n3ldg_cuda::MatrixMulMatrixForward(a, b, count, ks, row, vals);
+#if TEST_CUDA
+        testForward();
+#endif
+    }
+
+    void backward() override {
+#if TEST_CUDA
+        auto get_inputs = [&](Node &node) {
+            MatrixMulMatrixNode &t = dynamic_cast<MatrixMulMatrixNode&>(node);
+            vector<pair<Node*, string>> pairs = {
+                make_pair(t.ins_.at(0), "a"),
+                make_pair(t.ins_.at(1), "b")
+            };
+            return pairs;
+        };
+        testBackward(get_inputs);
+#endif
+    }
+};
 #else
 class MatrixMulMatrixExecutor : public Executor {
 public:

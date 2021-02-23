@@ -2287,14 +2287,6 @@ void TranMatrixMulMatrixForward(vector<dtype *> &input_a_vals, vector <dtype *> 
     CheckCudaError();
 }
 
-__device__ dtype GetWithoutTrans(dtype *v, int col, int bi, int ti) {
-    return v[bi * col + ti];
-}
-
-__device__ dtype GetWithTrans(dtype *v, int col, int bi, int ti) {
-    return v[ti * col + bi];
-}
-
 __global__ void KernelTranMatrixMulMatrixBackward(dtype **grads, dtype **in_vals, int count,
         int *cols,
         int row,
@@ -2351,6 +2343,46 @@ void TranMatrixMulMatrixBackward(vector<dtype *> &grads, vector<dtype *> &a_vals
     KernelTranMatrixMulMatrixBackward<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(
             grad_arr.value, a_val_arr.value, count, col_arr.value, row, b_grad_arr.value, false);
     CheckCudaError();
+}
+
+__global__ void KernelMatrixMulMatrixForward(dtype **a, dtype **b, int count, int *ks, int row,
+        dtype **vals) {
+    __shared__ volatile extern dtype shared_sum[];
+    int k = ks[blockIdx.x];
+    if (blockIdx.z >= k) {
+        return;
+    }
+    shared_sum[threadIdx.x] = threadIdx.x < k ?  a[blockIdx.x][row * threadIdx.x + blockIdx.y] *
+        b[blockIdx.x][blockIdx.z * k + threadIdx.x] : 0;
+    __syncthreads();
+
+    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+        if (threadIdx.x < i) {
+            shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+        }
+        __syncthreads();
+    }
+
+    if (threadIdx.x == 0) {
+        vals[blockIdx.x][row * blockIdx.z + blockIdx.y] = shared_sum[0];
+    }
+}
+
+void MatrixMulMatrixForward(vector<dtype *> &a, vector<dtype *> &b, int count, vector<int> &ks,
+        int row,
+        vector<dtype *> &vals) {
+    NumberPointerArray a_arr, b_arr, val_arr;
+    a_arr.init(a.data(), count);
+    b_arr.init(b.data(), count);
+    val_arr.init(vals.data(), count);
+    IntArray k_arr;
+    k_arr.init(ks.data(), count);
+    int max_k = *max_element(ks.begin(), ks.end());
+    dim3 block_dim(count, row, max_k);
+    int thread_count = NextTwoIntegerPowerNumber(max_k);
+    cout << boost::format("max_k:%1% count:%2% row:%3%") % max_k % count % row << endl;
+    KernelMatrixMulMatrixForward<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(
+            a_arr.value, b_arr.value, count, k_arr.value, row, val_arr.value);
 }
 
 __global__ void KernelMatrixAndVectorMultiForward(dtype **matrices, dtype **vectors, int count,
