@@ -478,21 +478,20 @@ class MatrixMulMatrixExecutor : public Executor {
 public:
     void forward() override {
         int count = batch.size();
-        vector<dtype *> a, b, vals;
-        a.reserve(count);
-        b.reserve(count);
+        vector<dtype *> vals;
+        a_vals_.reserve(count);
+        b_vals_.reserve(count);
         vals.reserve(count);
-        vector<int> ks;
-        ks.reserve(count);
+        ks_.reserve(count);
         for (Node *node : batch) {
             MatrixMulMatrixNode &m = dynamic_cast<MatrixMulMatrixNode &>(*node);
-            a.push_back(m.ins_.at(0)->getVal().value);
-            b.push_back(m.ins_.at(1)->getVal().value);
+            a_vals_.push_back(m.ins_.at(0)->getVal().value);
+            b_vals_.push_back(m.ins_.at(1)->getVal().value);
             vals.push_back(m.getVal().value);
-            ks.push_back(m.k_);
+            ks_.push_back(m.k_);
         }
         MatrixMulMatrixNode &first = dynamic_cast<MatrixMulMatrixNode &>(*batch.front());
-        int row = first.getDim() / first.k_;
+        row_ = first.getDim() / first.k_;
 #if TEST_CUDA
         auto get_inputs = [&](Node &node) {
             MatrixMulMatrixNode &t = dynamic_cast<MatrixMulMatrixNode&>(node);
@@ -505,13 +504,29 @@ public:
         testForwardInpputs(get_inputs);
 #endif
 
-        n3ldg_cuda::MatrixMulMatrixForward(a, b, count, ks, row, vals);
+        n3ldg_cuda::MatrixMulMatrixForward(a_vals_, b_vals_, count, ks_, row_, vals);
 #if TEST_CUDA
         testForward();
 #endif
     }
 
     void backward() override {
+        int count = batch.size();
+        vector<dtype *> grads, a_grads, b_grads;
+        grads.reserve(count);
+        a_grads.reserve(count);
+        b_grads.reserve(count);
+
+        for (Node *node : batch) {
+            MatrixMulMatrixNode &m = dynamic_cast<MatrixMulMatrixNode &>(*node);
+            grads.push_back(m.getLoss().value);
+            a_grads.push_back(m.ins_.at(0)->getLoss().value);
+            b_grads.push_back(m.ins_.at(1)->getLoss().value);
+        }
+
+        n3ldg_cuda::MatrixMulMatrixBackward(grads, a_vals_, b_vals_, count, ks_, row_, a_grads,
+                b_grads);
+
 #if TEST_CUDA
         auto get_inputs = [&](Node &node) {
             MatrixMulMatrixNode &t = dynamic_cast<MatrixMulMatrixNode&>(node);
@@ -524,6 +539,11 @@ public:
         testBackward(get_inputs);
 #endif
     }
+
+private:
+    vector<dtype *> a_vals_, b_vals_;
+    vector<int> ks_;
+    int row_;
 };
 #else
 class MatrixMulMatrixExecutor : public Executor {
