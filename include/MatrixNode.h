@@ -394,6 +394,99 @@ Executor * MatrixAndVectorMultiNode::generate() {
     return new MatrixAndVectorMultiExecutor;
 }
 
+class MatrixMulMatrixNode : public Node, public Poolable<MatrixMulMatrixNode> {
+public:
+    MatrixMulMatrixNode() : Node("MatrixMulMatrixNode") {}
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
+    }
+
+    void initNode(int dim) override {
+        init(dim);
+    }
+
+    void setInputs(const vector<Node *> &ins) override {
+        int a_size = ins.at(0)->getDim();
+        if (a_size != getDim()) {
+            cerr << boost::format("MatrixMulMatrixNode setInputs a_size:%1% size:%2%\n") % a_size %
+                getDim();
+            abort();
+        }
+        if (a_size % k_ != 0) {
+            cerr << boost::format("MatrixMulMatrixNode setInputs a_size:%1% k:%2%\n") % a_size %
+                k_;
+            abort();
+        }
+        if (k_ * k_ != ins.at(1)->getDim()) {
+            cerr << boost::format("MatrixMulMatrixNode setInputs b_size:%1% k:%2%\n") %
+                ins_.at(1)->getDim() % k_;
+            abort();
+        }
+
+        ins_.at(0) = ins.at(0);
+        ins_.at(1) = ins.at(1);
+    }
+
+    void connect(Graph &graph, Node &a, Node &b) {
+        setInputs({&a, &b});
+        afterForward(graph, {&a, &b});
+    }
+
+    void compute() override {
+        a_row_ = ins_.at(0)->getDim() / k_;
+        Mat(getVal().v, a_row_, k_) = Mat(ins_.at(0)->getVal().v, a_row_, k_) *
+            Mat(ins_.at(1)->getVal().v, k_, k_);
+    }
+
+    void backward() override {
+        Mat(ins_.at(0)->loss().v, a_row_, k_) += Mat(getLoss().v, a_row_, k_) *
+            Mat(ins_.at(1)->getVal().v, k_, k_).transpose();
+        Mat(ins_.at(1)->loss().v, k_, k_) += Mat(ins_.at(0)->getVal().v, a_row_, k_).transpose() *
+            Mat(getLoss().v, a_row_, k_);
+    }
+
+    Executor * generate() override;
+
+    string typeSignature() const override {
+        return Node::typeSignature();
+    }
+private:
+    std::array<Node *, 2> ins_;
+    int k_ = 0;
+    int a_row_;
+    
+    friend class BatchedMatrixMulMatrixNode;
+};
+
+class BatchedMatrixMulMatrixNode : public BatchedNodeImpl<MatrixMulMatrixNode> {
+public:
+    void init(Graph &graph, BatchedNode &a, BatchedNode &b, int k) {
+//        cout << boost::format("a shape:%1% b shape:%2%") % a.shape() % b.shape() << endl;
+        allocateBatch(a.getDim(), a.batch().size());
+        for (Node *node : batch()) {
+            MatrixMulMatrixNode &m = dynamic_cast<MatrixMulMatrixNode &>(*node);
+            m.k_ = k;
+        }
+        setInputsPerNode({&a, &b});
+        afterInit(graph, {&a, &b});
+    }
+};
+
+#if USE_GPU
+#else
+class MatrixMulMatrixExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        return 0; // TODO
+    }
+};
+#endif
+
+Executor *MatrixMulMatrixNode::generate() {
+    return new MatrixMulMatrixExecutor;
+}
+
 class TranMatrixMulVectorNode : public Node, public Poolable<TranMatrixMulVectorNode> {
 public:
     TranMatrixMulVectorNode() : Node("TranMatrixMulVectorNode") {}
@@ -798,6 +891,12 @@ BatchedNode *tranMatrixMulVector(Graph &graph, BatchedNode &matrix, BatchedNode 
 BatchedNode *tranMatrixMulMatrix(Graph &graph, BatchedNode &a, BatchedNode &b, int col) {
     BatchedTranMatrixMulMatrixNode *node = new BatchedTranMatrixMulMatrixNode;
     node->init(graph, a, b, col * col);
+    return node;
+}
+
+BatchedNode *matrixMulMatrix(Graph &graph, BatchedNode &a, BatchedNode &b, int k) {
+    BatchedMatrixMulMatrixNode *node = new BatchedMatrixMulMatrixNode;
+    node->init(graph, a, b, k);
     return node;
 }
 

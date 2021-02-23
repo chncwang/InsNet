@@ -871,6 +871,11 @@ Executor *BiasNode::generate() {
 namespace n3ldg_plus {
 
 Node *linear(Graph &graph, Node &input, UniParams &params) {
+    if (input.getDim() != params.W.inDim()) {
+        cerr << boost::format("linear input dim:%1% W col:%2%\n") % input.getDim() %
+            params.W.inDim() << endl;
+        abort();
+    }
     int dim = params.W.outDim();
     LinearNode *uni = LinearNode::newNode(dim);
     uni->setParam(params);
@@ -879,6 +884,11 @@ Node *linear(Graph &graph, Node &input, UniParams &params) {
 }
 
 BatchedNode *linear(Graph &graph, BatchedNode &input, UniParams &params) {
+    if (input.getDim() != params.W.inDim()) {
+        cerr << boost::format("linear input dim:%1% W col:%2%\n") % input.getDim() %
+            params.W.inDim() << endl;
+        abort();
+    }
     BatchedLinearNode *node = new BatchedLinearNode;
     node->init(graph, input, params);
     return node;

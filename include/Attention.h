@@ -51,13 +51,13 @@ pair<BatchedNode *, BatchedNode *> dotAttention(Graph &graph, BatchedNode &key_m
     BatchedNode *scaled_weight = n3ldg_plus::scaled(graph, *raw_weights,
             1.0 / ::sqrt((dtype)dim));
     scaled_weight = n3ldg_plus::softmax(graph, *scaled_weight, matrix_col);
+    BatchedNode *hidden = n3ldg_plus::matrixMulMatrix(graph, value_matrix, *scaled_weight,
+            matrix_col);
     vector<int> offsets(matrix_col);
     for (int i = 0; i < matrix_col; ++i) {
-        offsets.at(i) = i * matrix_col;
+        offsets.at(i) = i * dim;
     }
-    scaled_weight = n3ldg_plus::split(graph, *scaled_weight, matrix_col, offsets);
-    BatchedNode *hidden = n3ldg_plus::matrixAndVectorMulti(graph, value_matrix, *scaled_weight,
-            &dim);
+    hidden = n3ldg_plus::split(graph, *hidden, dim, offsets);
     return make_pair(hidden, scaled_weight);
 }
 
