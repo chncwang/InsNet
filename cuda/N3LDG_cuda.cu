@@ -1438,50 +1438,59 @@ void CalculateDropoutMask(dtype drop_factor, int count, int dim, dtype* mask) {
     CallCurand(curandGenerateUniform(gen, mask, count * dim));
 }
 
-__global__ void KernelConcatForward(dtype **ins, int *in_dims,
-        dtype **outs,
-        int count,
+__global__ void KernelConcatForward(dtype **ins, int *in_rows, dtype **outs, int count,
         int in_count,
-        int out_dim) {
+        int out_row,
+        int *cols,
+        int max_col) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
+    int n = max_col * out_row;
 
-    for (int i = index; i < out_dim * count; i += step) {
-        int out_dim_i = i % out_dim;
-        int count_i = i / out_dim;
-        int in_dim_sum = 0;
-        int last_in_dim_sum;
-        int offset_j = 0;
-        for (int j = 0; j < in_count; ++j) {
-            last_in_dim_sum = in_dim_sum;
-            in_dim_sum += in_dims[j];
-            offset_j = j;
-            if (out_dim_i < in_dim_sum) {
-                break;
+    for (int i = index; i < out_row * count * max_col; i += step) {
+        int offset = i % n;
+        int count_i = i / n;
+        int col = cols[count_i];
+        int col_i = offset / out_row;
+        if (col_i < col) {
+            int out_row_i = offset % out_row;
+            int in_row_sum = 0;
+            int last_in_row_sum;
+            int offset_j = 0;
+            for (int j = 0; j < in_count; ++j) {
+                last_in_row_sum = in_row_sum;
+                in_row_sum += in_rows[j];
+                offset_j = j;
+                if (out_row_i < in_row_sum) {
+                    break;
+                }
             }
+            int in_row_i = out_row_i - last_in_row_sum;
+            dtype v = ins[count_i * in_count + offset_j][col_i * in_rows[offset_j] + in_row_i];
+            outs[count_i][col_i * out_row + out_row_i] = v;
         }
-        int in_dim_i = out_dim_i - last_in_dim_sum;
-        dtype v = ins[count_i * in_count + offset_j][in_dim_i];
-        outs[count_i][out_dim_i] = v;
     }
 }
 
-void ConcatForward(vector<dtype*> &in_vals,
-        vector<int> &in_dims,
-        vector<dtype*> &vals,
-        int count,
+void ConcatForward(vector<dtype*> &in_vals, vector<int> &in_rows, vector<dtype*> &vals, int count,
         int in_count,
-        int out_dim) {
-    int len = count * out_dim;
+        int out_row,
+        vector<int> &cols) {
+    int max_col = *max_element(cols.begin(), cols.end());
+    int len = count * out_row * max_col;
     int block_count = min(BLOCK_COUNT, (len - 1 + TPB) / TPB);
+
     NumberPointerArray in_val_arr, val_arr;
     in_val_arr.init((dtype**)in_vals.data(), in_vals.size());
     val_arr.init((dtype**)vals.data(), vals.size());
-    IntArray in_dim_arr;
-    in_dim_arr.init((int*)in_dims.data(), in_dims.size());
+    IntArray in_row_arr, col_arr;
+    in_row_arr.init(in_rows.data(), in_rows.size());
+    col_arr.init(cols.data(), count);
 
-    KernelConcatForward<<<block_count, TPB>>>(in_val_arr.value,
-            in_dim_arr.value, (dtype **)val_arr.value, count, in_count, out_dim);
+//    cout << boost::format("max_col:%1% count:%2% out_row:%3% in_count:%4%") % max_col % count %
+//        out_row % in_count << endl;
+    KernelConcatForward<<<block_count, TPB>>>(in_val_arr.value, in_row_arr.value, val_arr.value,
+            count, in_count, out_row, col_arr.value, max_col);
     CheckCudaError();
 }
 

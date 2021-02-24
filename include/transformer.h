@@ -416,7 +416,7 @@ public:
     }
 };
 
-BatchedNode *concat(Graph &graph, BatchedNode &input, int head) {
+BatchedNode *concatHeads(Graph &graph, BatchedNode &input, int head) {
     BatchedConcatNodeForDotAtt *node = new BatchedConcatNodeForDotAtt;
     node->init(graph, input, head);
     return node;
@@ -448,8 +448,7 @@ BatchedNode *dotAttention(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedN
     BatchedNode *value_matrix = concatToMatrix(graph, *split_v, head_count);
     BatchedNode *split_attended = n3ldg_plus::dotAttention(graph, *key_matrix,
             *value_matrix, *split_q, is_decoder_self_att ? &dims : nullptr).first;
-
-    BatchedNode *attended = concat(graph, *split_attended, head_count);
+    BatchedNode *attended = concatHeads(graph, *split_attended, head_count);
     attended = n3ldg_plus::linear(graph, *attended, fusion_param);
     attended = n3ldg_plus::dropout(graph, *attended, dropout, is_training);
     return attended;
@@ -477,8 +476,14 @@ BatchedNode *dotAttentionEncoder(Graph &graph, BatchedNode& k, BatchedNode& v, B
     BatchedNode *value_matrix = concatToMatrix(graph, *split_v, head_count);
     BatchedNode *split_attended = n3ldg_plus::dotAttention(graph, *key_matrix,
             *value_matrix, *query_matrix, dim).first;
-
-    BatchedNode *attended = concat(graph, *split_attended, head_count);
+    Node *attended_matrix = concat(graph, *split_attended, k.batch().size());
+    offsets.clear();
+    offsets.reserve(k.batch().size());
+    int row = k.getDim();
+    for (int i = 0; i < k.batch().size(); ++i) {
+        offsets.push_back(i * row);
+    }
+    BatchedNode *attended = split(graph, *attended_matrix, row, offsets);
     attended = n3ldg_plus::linear(graph, *attended, fusion_param);
     attended = n3ldg_plus::dropout(graph, *attended, dropout, is_training);
     return attended;

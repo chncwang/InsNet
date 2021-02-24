@@ -202,12 +202,10 @@ void AddLtyToParamBiasAndAddLxToInputLossesForBiBackward(dtype *lty,
         int in_dim2,
         bool use_b);
 void CalculateDropoutMask(dtype dropout_ratio, int count, int dim, dtype *mask);
-void ConcatForward(vector<dtype*> &in_vals,
-        vector<int> &in_dims,
-        vector<dtype*> &vals,
-        int count,
+void ConcatForward(vector<dtype*> &in_vals, vector<int> &in_dims, vector<dtype*> &vals, int count,
         int in_count,
-        int out_dim);
+        int out_dim,
+        vector<int> &cols);
 void ConcatBackward(vector<dtype*> &in_losses,
         vector<int> &in_dims,
         vector<dtype*> &losses,

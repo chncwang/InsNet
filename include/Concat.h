@@ -11,9 +11,6 @@
 
 class ConcatNode : public Node, public Poolable<ConcatNode> {
 public:
-    vector<int> inDims;
-    vector<Node *> ins;
-
     ConcatNode() : Node("concat") {}
 
     void initNode(int dim) override {
@@ -25,27 +22,27 @@ public:
     }
 
     void clear() override {
-        inDims.clear();
-        ins.clear();
+        in_rows_.clear();
+        ins_.clear();
         Node::clear();
     }
 
     void setInputs(const vector<Node *> &ins) override {
-        int nSize = ins.size();
-        int curDim = 0;
-        inDims.reserve(nSize);
-        for (int i = 0; i < nSize; ++i) {
-            inDims.push_back(ins.at(i)->getDim());
-            curDim += inDims[i];
+        int in_size = ins.size();
+        int cur_dim = 0;
+        in_rows_.reserve(in_size);
+        for (int i = 0; i < in_size; ++i) {
+            in_rows_.push_back(ins.at(i)->getDim() / getColumn());
+            cur_dim += in_rows_.at(i);
         }
-        if (curDim != getDim()) {
-            std::cerr << "input dim size not match" << curDim << "\t" << getDim() << std::endl;
+        if (cur_dim * getColumn() != getDim()) {
+            std::cerr << "input dim size not match" << cur_dim << "\t" << getDim() << std::endl;
             abort();
         }
-        this->ins = ins;
+        ins_ = ins;
     }
 
-    void forward(Graph &cg, const vector<Node *>& x) {
+    void connect(Graph &cg, const vector<Node *> &x) {
         if (x.empty()) {
             std::cerr << "empty inputs for concat" << std::endl;
             abort();
@@ -58,57 +55,70 @@ public:
     PExecutor generate() override;
 
     string typeSignature() const override {
-        string hash_code = Node::typeSignature() + "-" + to_string(inDims.size());
-        for (int dim : inDims) {
+        string hash_code = Node::typeSignature() + "-" + to_string(in_rows_.size());
+        for (int dim : in_rows_) {
             hash_code += "-" + to_string(dim);
         }
+        hash_code += isVectorSig();
         return hash_code;
     }
 
     void compute() override {
-        int nSize = ins.size();
-        int offset = 0;
-        for (int i = 0; i < nSize; ++i) {
-            memcpy(val().v + offset, ins.at(i)->val().v,
-                    inDims.at(i) * sizeof(dtype));
-            offset += inDims[i];
+        int in_size = ins_.size();
+        int row = getDim() / getColumn();
+        for (int i = 0; i < getColumn(); ++i) {
+            int offset = 0;
+            for (int j = 0; j < in_size; ++j) {
+                Vec(val().v + i * row + offset, in_rows_.at(j)) =
+                    Vec(ins_.at(j)->val().v + i * in_rows_.at(j), in_rows_.at(j));
+                offset += in_rows_[j];
+            }
         }
     }
 
     void backward() override {
-        int nSize = ins.size();
-        int offset = 0;
-        for (int i = 0; i < nSize; ++i) {
-            for (int idx = 0; idx < inDims[i]; idx++) {
-                ins[i]->loss()[idx] += loss()[offset + idx];
+        int in_size = ins_.size();
+        int row = getDim() / getColumn();
+        for (int i = 0; i < getColumn(); ++i) {
+            int offset = 0;
+            for (int j = 0; j < in_size; ++j) {
+                Vec(ins_[j]->loss().v + i * in_rows_.at(j), in_rows_.at(j)) +=
+                    Vec(getLoss().v + i * row + offset, in_rows_.at(j));
+                offset += in_rows_[j];
             }
-            offset += inDims[i];
         }
     }
+
+private:
+    vector<int> in_rows_;
+    vector<Node *> ins_;
+
+    friend class ConcatExecutor;
 };
 
 #if USE_GPU
 class ConcatExecutor : public Executor {
 public:
-    int outDim;
-    int inCount;
-
     void forward() override {
         int count = batch.size();
 
         std::vector<dtype*> in_vals, vals;
-        in_vals.reserve(inCount * count);
+        in_vals.reserve(inCount() * count);
         vals.reserve(count);
+        cols_.reserve(count);
         for (Node *node : batch) {
             ConcatNode *concat = static_cast<ConcatNode*>(node);
-            for (Node *in : concat->ins) {
+            for (Node *in : concat->ins_) {
                 in_vals.push_back(in->val().value);
             }
             vals.push_back(node->getVal().value);
+            cols_.push_back(concat->getColumn());
         }
 
-        n3ldg_cuda::ConcatForward(in_vals, static_cast<ConcatNode*>(batch.at(0))->inDims, vals,
-                count, inCount, outDim);
+        ConcatNode &first = dynamic_cast<ConcatNode &>(*batch.front());
+        row_ = first.getDim() / first.getColumn();
+        n3ldg_cuda::ConcatForward(in_vals, static_cast<ConcatNode*>(batch.at(0))->in_rows_, vals,
+                count, inCount(), row_, cols_);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -121,30 +131,38 @@ public:
     void backward() override {
         int count = batch.size();
         std::vector<dtype*> in_losses, losses;
-        in_losses.reserve(inCount * count);
+        in_losses.reserve(inCount() * count);
         losses.reserve(count);
         for (Node *node : batch) {
             ConcatNode *concat = static_cast<ConcatNode*>(node);
-            for (Node *in : concat->ins) {
+            for (Node *in : concat->ins_) {
                 in_losses.push_back(in->loss().value);
             }
             losses.push_back(node->loss().value);
         }
 
-        n3ldg_cuda::ConcatBackward(in_losses, static_cast<ConcatNode*>(batch.at(0))->inDims,
-                losses, count, inCount, outDim);
+        n3ldg_cuda::ConcatBackward(in_losses, static_cast<ConcatNode*>(batch.at(0))->in_rows_,
+                losses, count, inCount(), getDim());
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward();
         }
         for (int idx = 0; idx < count; idx++) {
-            for (int j = 0; j < inCount; ++j) {
+            for (int j = 0; j < inCount(); ++j) {
                 n3ldg_cuda::Assert(static_cast<ConcatNode *>(batch[idx])->
-                        ins[j]->loss().verify("concat backward"));
+                        ins_.at(j)->loss().verify("concat backward"));
             }
         }
 #endif
     }
+
+private:
+    int inCount() {
+        return dynamic_cast<ConcatNode *>(batch.front())->ins_.size();
+    }
+
+    vector<int> cols_;
+    int row_;
 };
 #else
 class ConcatExecutor : public Executor {
@@ -160,15 +178,7 @@ public:
 #endif
 
 PExecutor ConcatNode::generate() {
-    ConcatExecutor* exec = new ConcatExecutor();
-#if USE_GPU
-    exec->inCount = this->ins.size();
-    exec->outDim = 0;
-    for (int d : inDims) {
-        exec->outDim += d;
-    }
-#endif
-    return exec;
+    return new ConcatExecutor();
 }
 
 class BatchedConcatNode : public BatchedNodeImpl<ConcatNode> {
@@ -324,13 +334,27 @@ Executor *ScalarConcatNode::generate() {
 
 namespace n3ldg_plus {
 
-Node *concat(Graph &graph, const vector<Node*> &inputs) {
+Node *concat(Graph &graph, const vector<Node*> &inputs, int col = 1) {
     int dim = 0;
     for (Node *in : inputs) {
         dim += in->getDim();
     }
     ConcatNode *concat = ConcatNode::newNode(dim);
-    concat->forward(graph, inputs);
+    concat->setColumn(col);
+    concat->connect(graph, inputs);
+    return concat;
+}
+
+Node *concat(Graph &graph, BatchedNode &inputs, int col = 1) {
+    int dim = 0;
+    for (Node *in : inputs.batch()) {
+        dim += in->getDim();
+    }
+    ConcatNode *concat = ConcatNode::newNode(dim);
+    concat->setColumn(col);
+    concat->setInputs(inputs.batch());
+    inputs.addParent(concat);
+    graph.addNode(concat);
     return concat;
 }
 
@@ -340,7 +364,7 @@ BatchedNode *concatInBatch(Graph &graph, const vector<BatchedNode *> &inputs) {
     return node;
 }
 
-Node *scalarConcat(Graph &graph, const vector<Node *> &inputs) {
+Node *scalarConcat(Graph &graph, vector<Node *> &inputs) {
     ScalarConcatNode *concat = ScalarConcatNode::newNode(inputs.size());
     concat->forward(graph, inputs);
     return concat;

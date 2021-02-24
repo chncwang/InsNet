@@ -91,6 +91,19 @@ public:
         input.addParent(this);
         graph.addNode(this);
     }
+
+    void init(Graph &graph, Node &input, int dim, const vector<int> &offsets) {
+        allocateBatch(dim, offsets.size());
+        int i = 0;
+        for (int offset : offsets) {
+            SplitNode *s = dynamic_cast<SplitNode *>(batch().at(i++));
+            s->offset_ = offset;
+            s->setInputs({&input});
+        }
+
+        input.addParent(this);
+        graph.addNode(this);
+    }
 };
 
 namespace n3ldg_plus {
@@ -108,6 +121,12 @@ BatchedNode* split(Graph &graph, BatchedNode &input, int dim, int offset) {
 }
 
 BatchedNode *split(Graph &graph, BatchedNode &input, int dim, const vector<int> &offsets) {
+    BatchedSplitNode *node = new BatchedSplitNode;
+    node->init(graph, input, dim, offsets);
+    return node;
+}
+
+BatchedNode *split(Graph &graph, Node &input, int dim, const vector<int> &offsets) {
     BatchedSplitNode *node = new BatchedSplitNode;
     node->init(graph, input, dim, offsets);
     return node;
