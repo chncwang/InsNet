@@ -142,7 +142,7 @@ public:
         }
 
         n3ldg_cuda::ConcatBackward(in_losses, static_cast<ConcatNode*>(batch.at(0))->in_rows_,
-                losses, count, inCount(), getDim());
+                losses, count, inCount(), row_, cols_);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward();

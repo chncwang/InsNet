@@ -206,12 +206,11 @@ void ConcatForward(vector<dtype*> &in_vals, vector<int> &in_dims, vector<dtype*>
         int in_count,
         int out_dim,
         vector<int> &cols);
-void ConcatBackward(vector<dtype*> &in_losses,
-        vector<int> &in_dims,
-        vector<dtype*> &losses,
+void ConcatBackward(vector<dtype*> &in_grads, vector<int> &in_rows, vector<dtype*> &grads,
         int count,
         int in_count,
-        int out_dim);
+        int out_row,
+        vector<int> &cols);
 void ScalarConcatForward(vector<dtype *> &ins, int count, vector<int> &dims,
         int max_dim,
         vector<dtype *> &results);
