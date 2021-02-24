@@ -888,11 +888,11 @@ Node *concatToMatrix(Graph &graph, const vector<Node *> &inputs) {
     return node;
 }
 
-Node *concatToMatrix(Graph &graph, NodeAbs &topo_input) {
-    const auto &inputs = topo_input.batch();
+Node *concatToMatrix(Graph &graph, BatchedNode &input) {
+    const auto &inputs = input.batch();
     int input_dim = inputs.front()->getDim();
     MatrixConcatNode *node = MatrixConcatNode::newNode(inputs.size() * input_dim);
-    node->connect(graph, topo_input, inputs);
+    node->connect(graph, input, inputs);
     return node;
 }
 

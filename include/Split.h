@@ -39,14 +39,19 @@ public:
     Executor *generate() override;
 
     void compute () override {
-        for (int i = 0; i < getDim(); ++i) {
-            val()[i] = getInput().val()[i + offset_];
+        int row = getDim() / getColumn();
+        int in_row = getInput().getDim() / getColumn();
+        for (int i = 0; i < getColumn(); ++i) {
+            Vec(val().v + i * row, row) = Vec(getInput().getVal().v + i * in_row + offset_, row);
         }
     }
 
     void backward() override {
-        for (int i = 0; i < getDim(); ++i) {
-            getInput().loss()[i + offset_] += getLoss()[i];
+        int row = getDim() / getColumn();
+        int in_row = getInput().getDim() / getColumn();
+        for (int i = 0; i < getColumn(); ++i) {
+            Vec(getInput().loss().v + i * in_row + offset_, row) +=
+                Vec(getLoss().v + i * row, row);
         }
     }
 protected:
@@ -92,11 +97,12 @@ public:
         graph.addNode(this);
     }
 
-    void init(Graph &graph, Node &input, int dim, const vector<int> &offsets) {
-        allocateBatch(dim, offsets.size());
+    void init(Graph &graph, Node &input, int row, const vector<int> &offsets, int col = 1) {
+        allocateBatch(row * col, offsets.size());
         int i = 0;
         for (int offset : offsets) {
             SplitNode *s = dynamic_cast<SplitNode *>(batch().at(i++));
+            s->setColumn(col);
             s->offset_ = offset;
             s->setInputs({&input});
         }
@@ -126,9 +132,9 @@ BatchedNode *split(Graph &graph, BatchedNode &input, int dim, const vector<int> 
     return node;
 }
 
-BatchedNode *split(Graph &graph, Node &input, int dim, const vector<int> &offsets) {
+BatchedNode *split(Graph &graph, Node &input, int row, const vector<int> &offsets, int col = 1) {
     BatchedSplitNode *node = new BatchedSplitNode;
-    node->init(graph, input, dim, offsets);
+    node->init(graph, input, row, offsets, col);
     return node;
 }
 

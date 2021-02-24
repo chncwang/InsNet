@@ -460,7 +460,7 @@ BatchedNode *dotAttentionEncoder(Graph &graph, BatchedNode& k, BatchedNode& v, B
         UniParams &fusion_param,
         dtype dropout,
         bool is_training) {
-    int dim = k.batch().size();
+    int col = k.batch().size();
 
     int head_dim = q.getDim() / head_count;
     vector<int> offsets(head_count);
@@ -468,15 +468,15 @@ BatchedNode *dotAttentionEncoder(Graph &graph, BatchedNode& k, BatchedNode& v, B
         offsets.at(i) = i * head_dim;
     }
 
-    BatchedNode *split_q = split(graph, q, head_dim, offsets);
-    BatchedNode *query_matrix = concatToMatrix(graph, *split_q, head_count);
-    BatchedNode *split_k = split(graph, k, head_dim, offsets);
-    BatchedNode *key_matrix = concatToMatrix(graph, *split_k, head_count);
-    BatchedNode *split_v = split(graph, v, head_dim, offsets);
-    BatchedNode *value_matrix = concatToMatrix(graph, *split_v, head_count);
-    BatchedNode *split_attended = n3ldg_plus::dotAttention(graph, *key_matrix,
-            *value_matrix, *query_matrix, dim).first;
-    Node *attended_matrix = concat(graph, *split_attended, k.batch().size());
+    Node *query_matrix = concatToMatrix(graph, q);
+    Node *key_matrix = concatToMatrix(graph, k);
+    Node *value_matrix = concatToMatrix(graph, v);
+    BatchedNode *split_q = split(graph, *query_matrix, head_dim, offsets, col);
+    BatchedNode *split_k = split(graph, *key_matrix, head_dim, offsets, col);
+    BatchedNode *split_v = split(graph, *value_matrix, head_dim, offsets, col);
+    BatchedNode *split_attended = n3ldg_plus::dotAttention(graph, *split_k, *split_v, *split_q,
+            col).first;
+    Node *attended_matrix = concat(graph, *split_attended, col);
     offsets.clear();
     offsets.reserve(k.batch().size());
     int row = k.getDim();

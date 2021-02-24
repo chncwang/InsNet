@@ -1543,8 +1543,6 @@ void ConcatBackward(vector<dtype*> &in_grads, vector<int> &in_rows, vector<dtype
     in_row_arr.init(in_rows.data(), in_rows.size());
     col_arr.init(cols.data(), cols.size());
 
-    cout << boost::format("max_col:%1% count:%2% outrow:%3% in_count:%4%") % max_col % count %
-        out_row % in_count << endl;
     KernelConcatBackward<<<block_count, TPB>>>((dtype **)in_loss_arr.value, in_row_arr.value,
             loss_arr.value, count, in_count, out_row, col_arr.value, max_col);
     CheckCudaError();

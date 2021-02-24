@@ -53,7 +53,7 @@ public:
     }
 
     string typeSignature() const override {
-        return Node::getNodeType() + isVectorSig();
+        return Node::getNodeType();
     }
 
 protected:
