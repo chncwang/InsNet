@@ -182,7 +182,8 @@ public:
             input_grads.push_back(split->getInput().getLoss().value);
         }
 
-        n3ldg_cuda::SplitBackward(grads, offsets_, batch.size(), rows_, input_grads);
+        n3ldg_cuda::SplitBackward(grads, offsets_, batch.size(), rows_, in_rows_, cols_,
+                input_grads);
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {
             SplitNode &split = static_cast<SplitNode&>(node);

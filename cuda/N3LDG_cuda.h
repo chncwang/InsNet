@@ -324,8 +324,10 @@ void SplitForward(vector<dtype*> &inputs, vector<int> &offsets, int count, vecto
         vector<int> &in_rows,
         vector<int> &cols,
         vector<dtype*> &results);
-void SplitBackward(vector<dtype*> &losses, vector<int> offsets, int count, vector<int> &dims,
-        vector<dtype*> &input_losses);
+void SplitBackward(vector<dtype*> &grads, vector<int> offsets, int count, vector<int> &rows,
+        vector<int> &in_rows,
+        vector<int> &cols,
+        vector<dtype*> &input_grads);
 void SubForward(vector<dtype*> &minuend, vector<dtype*> &subtrahend, int count, vector<int> &dims,
         vector<dtype*> &results);
 void SubBackward(vector<dtype*> &losses, int count, vector<int> &dims,
