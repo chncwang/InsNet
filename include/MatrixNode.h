@@ -776,9 +776,23 @@ public:
         Mat(val().v, input_col_, input_col_) =
             Mat(ins_.at(0)->getVal().v, input_row_, input_col_).transpose() *
             Mat(ins_.at(1)->getVal().v, input_row_, input_col_);
+        if (use_lower_mask_) {
+            for (int i = 0; i < input_col_; ++i) {
+                for (int j = i + 1; j < input_col_; ++j) {
+                    val()[i * input_col_ + j] = -INF;
+                }
+            }
+        }
     }
 
     void backward() override {
+        if (use_lower_mask_) {
+            for (int i = 0; i < input_col_; ++i) {
+                for (int j = i + 1; j < input_col_; ++j) {
+                    loss()[i * input_col_ + j] = 0;
+                }
+            }
+        }
         Mat(ins_.at(0)->loss().v, input_row_, input_col_) +=
             Mat(ins_.at(1)->getVal().v, input_row_, input_col_) *
             Mat(getLoss().v, input_col_, input_col_).transpose();
@@ -796,14 +810,20 @@ public:
 private:
     std::array<Node *, 2> ins_;
     int input_col_, input_row_;
+    bool use_lower_mask_ = false;
     friend class TranMatrixMulMatrixExecutor;
+    friend class BatchedTranMatrixMulMatrixNode;
 };
 
 class BatchedTranMatrixMulMatrixNode : public BatchedNodeImpl<TranMatrixMulMatrixNode> {
 public:
-    void init(Graph &graph, BatchedNode &a, BatchedNode &b, int dim) {
+    void init(Graph &graph, BatchedNode &a, BatchedNode &b, int dim, bool use_lower_mask = false) {
         allocateBatch(dim, a.batch().size());
         setInputsPerNode({&a, &b});
+        for (Node *node : batch()) {
+            TranMatrixMulMatrixNode &t = dynamic_cast<TranMatrixMulMatrixNode &>(*node);
+            t.use_lower_mask_ = use_lower_mask;
+        }
         afterInit(graph, {&a, &b});
     }
 };
@@ -959,9 +979,10 @@ BatchedNode *tranMatrixMulVector(Graph &graph, BatchedNode &matrix, BatchedNode 
     return node;
 }
 
-BatchedNode *tranMatrixMulMatrix(Graph &graph, BatchedNode &a, BatchedNode &b, int col) {
+BatchedNode *tranMatrixMulMatrix(Graph &graph, BatchedNode &a, BatchedNode &b, int col,
+        bool use_lower_mask = false) {
     BatchedTranMatrixMulMatrixNode *node = new BatchedTranMatrixMulMatrixNode;
-    node->init(graph, a, b, col * col);
+    node->init(graph, a, b, col * col, use_lower_mask);
     return node;
 }
 

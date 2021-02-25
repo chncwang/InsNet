@@ -44,9 +44,10 @@ pair<BatchedNode *, BatchedNode *> dotAttention(Graph &graph, BatchedNode &key_m
 pair<BatchedNode *, BatchedNode *> dotAttention(Graph &graph, BatchedNode &key_matrix,
         BatchedNode &value_matrix,
         BatchedNode &query_matrix,
-        int matrix_col) {
+        int matrix_col,
+        bool is_decoder) {
     BatchedNode *raw_weights = n3ldg_plus::tranMatrixMulMatrix(graph, key_matrix, query_matrix,
-            matrix_col);
+            matrix_col, is_decoder);
     int dim = key_matrix.getDim() / matrix_col;
     BatchedNode *scaled_weight = n3ldg_plus::scaled(graph, *raw_weights,
             1.0 / ::sqrt((dtype)dim));

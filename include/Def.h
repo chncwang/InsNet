@@ -25,6 +25,7 @@ typedef Eigen::Map<Matrix<double, Dynamic, Dynamic, ColMajor> > Mat;
 typedef Matrix<double, Dynamic, Dynamic> MatrixXdtype;
 #endif
 
+constexpr dtype INF = 1e30;
 enum ActivatedEnum {
     EXP = 0,
     TANH = 1,
