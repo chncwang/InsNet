@@ -408,22 +408,11 @@ public:
 
     void setInputs(const vector<Node *> &ins) override {
         int a_size = ins.at(0)->getDim();
-        if (a_size != getDim()) {
-            cerr << boost::format("MatrixMulMatrixNode setInputs a_size:%1% size:%2%\n") % a_size %
-                getDim();
-            abort();
-        }
         if (a_size % k_ != 0) {
             cerr << boost::format("MatrixMulMatrixNode setInputs a_size:%1% k:%2%\n") % a_size %
                 k_;
             abort();
         }
-        if (k_ * k_ != ins.at(1)->getDim()) {
-            cerr << boost::format("MatrixMulMatrixNode setInputs b_size:%1% k:%2%\n") %
-                ins_.at(1)->getDim() % k_;
-            abort();
-        }
-
         ins_.at(0) = ins.at(0);
         ins_.at(1) = ins.at(1);
     }
@@ -435,26 +424,29 @@ public:
 
     void compute() override {
         a_row_ = ins_.at(0)->getDim() / k_;
-        Mat(getVal().v, a_row_, k_) = Mat(ins_.at(0)->getVal().v, a_row_, k_) *
-            Mat(ins_.at(1)->getVal().v, k_, k_);
+        b_col_ = ins_.at(1)->getDim() / k_;
+        Mat(getVal().v, a_row_, b_col_) = Mat(ins_.at(0)->getVal().v, a_row_, k_) *
+            Mat(ins_.at(1)->getVal().v, k_, b_col_);
     }
 
     void backward() override {
-        Mat(ins_.at(0)->loss().v, a_row_, k_) += Mat(getLoss().v, a_row_, k_) *
-            Mat(ins_.at(1)->getVal().v, k_, k_).transpose();
-        Mat(ins_.at(1)->loss().v, k_, k_) += Mat(ins_.at(0)->getVal().v, a_row_, k_).transpose() *
-            Mat(getLoss().v, a_row_, k_);
+        Mat(ins_.at(0)->loss().v, a_row_, k_) += Mat(getLoss().v, a_row_, b_col_) *
+            Mat(ins_.at(1)->getVal().v, k_, b_col_).transpose();
+        Mat(ins_.at(1)->loss().v, k_, b_col_) +=
+            Mat(ins_.at(0)->getVal().v, a_row_, k_).transpose() * Mat(getLoss().v, a_row_, b_col_);
     }
 
     Executor * generate() override;
 
     string typeSignature() const override {
-        return Node::getNodeType() + to_string(getDim() / k_);
+        return Node::getNodeType() + to_string(ins_.at(0)->getDim() / k_);
     }
+
 private:
     std::array<Node *, 2> ins_;
     int k_ = 0;
     int a_row_;
+    int b_col_;
     
     friend class BatchedMatrixMulMatrixNode;
     friend class MatrixMulMatrixExecutor;
@@ -463,7 +455,9 @@ private:
 class BatchedMatrixMulMatrixNode : public BatchedNodeImpl<MatrixMulMatrixNode> {
 public:
     void init(Graph &graph, BatchedNode &a, BatchedNode &b, int k) {
-        allocateBatch(a.getDim(), a.batch().size());
+        int a_row = a.getDim() / k;
+        int b_col = b.getDim() / k;
+        allocateBatch(a_row * b_col, a.batch().size());
         for (Node *node : batch()) {
             MatrixMulMatrixNode &m = dynamic_cast<MatrixMulMatrixNode &>(*node);
             m.k_ = k;
@@ -751,17 +745,6 @@ public:
     }
 
     void setInputs(const vector<Node *> &ins) override {
-        if (ins.at(0)->getDim() != ins.at(1)->getDim()) {
-            cerr << boost::format("input dims are not equal: %1% and %2%\n") % ins.at(0)->getDim()
-                % ins.at(1)->getDim();
-            abort();
-        }
-        input_col_ = sqrt(getDim());
-        if (ins.at(0)->getDim() % input_col_ != 0) {
-            cerr << boost::format("invalid input dim:%1% node dim:%2%\n") % ins.at(0)->getDim() %
-                getDim();
-            abort();
-        }
         ins_ = {ins.at(0), ins.at(1)};
     }
 
@@ -772,14 +755,18 @@ public:
     }
 
     void compute() override {
-        input_row_ = ins_.at(0)->getDim() / input_col_;
-        Mat(val().v, input_col_, input_col_) =
-            Mat(ins_.at(0)->getVal().v, input_row_, input_col_).transpose() *
-            Mat(ins_.at(1)->getVal().v, input_row_, input_col_);
+        a_col_ = ins_.at(0)->getDim() / input_row_;
+        b_col_ = ins_.at(1)->getDim() / input_row_;
+        Mat(val().v, a_col_, b_col_) = Mat(ins_.at(0)->getVal().v, input_row_, a_col_).transpose()
+            * Mat(ins_.at(1)->getVal().v, input_row_, b_col_);
         if (use_lower_mask_) {
-            for (int i = 0; i < input_col_; ++i) {
-                for (int j = i + 1; j < input_col_; ++j) {
-                    val()[i * input_col_ + j] = -INF;
+            if (a_col_ != b_col_) {
+                cerr << boost::format("a_col_:%1% b_col_:%2%") % a_col_ % b_col_ << endl;
+                abort();
+            }
+            for (int i = 0; i < a_col_; ++i) {
+                for (int j = i + 1; j < a_col_; ++j) {
+                    val()[i * a_col_ + j] = -INF;
                 }
             }
         }
@@ -787,29 +774,33 @@ public:
 
     void backward() override {
         if (use_lower_mask_) {
-            for (int i = 0; i < input_col_; ++i) {
-                for (int j = i + 1; j < input_col_; ++j) {
-                    loss()[i * input_col_ + j] = 0;
+            if (a_col_ != b_col_) {
+                cerr << boost::format("a_col_:%1% b_col_:%2%") % a_col_ % b_col_ << endl;
+                abort();
+            }
+            for (int i = 0; i < a_col_; ++i) {
+                for (int j = i + 1; j < a_col_; ++j) {
+                    loss()[i * a_col_ + j] = 0;
                 }
             }
         }
-        Mat(ins_.at(0)->loss().v, input_row_, input_col_) +=
-            Mat(ins_.at(1)->getVal().v, input_row_, input_col_) *
-            Mat(getLoss().v, input_col_, input_col_).transpose();
-        Mat(ins_.at(1)->loss().v, input_row_, input_col_) +=
-            Mat(ins_.at(0)->getVal().v, input_row_, input_col_) *
-            Mat(getLoss().v, input_col_, input_col_);
+        Mat(ins_.at(0)->loss().v, input_row_, a_col_) +=
+            Mat(ins_.at(1)->getVal().v, input_row_, b_col_) *
+            Mat(getLoss().v, a_col_, b_col_).transpose();
+        Mat(ins_.at(1)->loss().v, input_row_, b_col_) +=
+            Mat(ins_.at(0)->getVal().v, input_row_, a_col_) *
+            Mat(getLoss().v, a_col_, b_col_);
     }
 
     Executor * generate() override;
 
     string typeSignature() const override {
-        return Node::getNodeType() + to_string(ins_.at(0)->getDim() / sqrt(getDim()));
+        return Node::getNodeType() + to_string(input_row_);
     }
 
 private:
     std::array<Node *, 2> ins_;
-    int input_col_, input_row_;
+    int a_col_, b_col_, input_row_;
     bool use_lower_mask_ = false;
     friend class TranMatrixMulMatrixExecutor;
     friend class BatchedTranMatrixMulMatrixNode;
@@ -817,12 +808,16 @@ private:
 
 class BatchedTranMatrixMulMatrixNode : public BatchedNodeImpl<TranMatrixMulMatrixNode> {
 public:
-    void init(Graph &graph, BatchedNode &a, BatchedNode &b, int dim, bool use_lower_mask = false) {
-        allocateBatch(dim, a.batch().size());
+    void init(Graph &graph, BatchedNode &a, BatchedNode &b, int input_row,
+            bool use_lower_mask = false) {
+        int a_col = a.getDim() / input_row;
+        int b_col = b.getDim() / input_row;
+        allocateBatch(a_col * b_col, a.batch().size());
         setInputsPerNode({&a, &b});
         for (Node *node : batch()) {
             TranMatrixMulMatrixNode &t = dynamic_cast<TranMatrixMulMatrixNode &>(*node);
             t.use_lower_mask_ = use_lower_mask;
+            t.input_row_ = input_row;
         }
         afterInit(graph, {&a, &b});
     }
@@ -979,10 +974,10 @@ BatchedNode *tranMatrixMulVector(Graph &graph, BatchedNode &matrix, BatchedNode 
     return node;
 }
 
-BatchedNode *tranMatrixMulMatrix(Graph &graph, BatchedNode &a, BatchedNode &b, int col,
+BatchedNode *tranMatrixMulMatrix(Graph &graph, BatchedNode &a, BatchedNode &b, int input_row,
         bool use_lower_mask = false) {
     BatchedTranMatrixMulMatrixNode *node = new BatchedTranMatrixMulMatrixNode;
-    node->init(graph, a, b, col * col, use_lower_mask);
+    node->init(graph, a, b, input_row, use_lower_mask);
     return node;
 }
 

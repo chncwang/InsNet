@@ -461,7 +461,8 @@ BatchedNode *dotAttention(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedN
         dtype dropout,
         bool use_mask,
         bool is_training) {
-    int col = k.batch().size();
+    int q_col = q.batch().size();
+    int v_col = v.batch().size();
 
     int head_dim = q.getDim() / head_count;
     vector<int> offsets(head_count);
@@ -472,16 +473,16 @@ BatchedNode *dotAttention(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedN
     Node *query_matrix = concatToMatrix(graph, q);
     Node *key_matrix = concatToMatrix(graph, k);
     Node *value_matrix = concatToMatrix(graph, v);
-    BatchedNode *split_q = split(graph, *query_matrix, head_dim, offsets, col);
-    BatchedNode *split_k = split(graph, *key_matrix, head_dim, offsets, col);
-    BatchedNode *split_v = split(graph, *value_matrix, head_dim, offsets, col);
+    BatchedNode *split_q = split(graph, *query_matrix, head_dim, offsets, q_col);
+    BatchedNode *split_k = split(graph, *key_matrix, head_dim, offsets, v_col);
+    BatchedNode *split_v = split(graph, *value_matrix, head_dim, offsets, v_col);
     BatchedNode *split_attended = n3ldg_plus::dotAttention(graph, *split_k, *split_v, *split_q,
-            col, use_mask).first;
-    Node *attended_matrix = concat(graph, *split_attended, col);
+            q_col, use_mask).first;
+    Node *attended_matrix = concat(graph, *split_attended, q_col);
     offsets.clear();
-    offsets.reserve(k.batch().size());
-    int row = k.getDim();
-    for (int i = 0; i < k.batch().size(); ++i) {
+    offsets.reserve(q.batch().size());
+    int row = q.getDim();
+    for (int i = 0; i < q.batch().size(); ++i) {
         offsets.push_back(i * row);
     }
     BatchedNode *attended = split(graph, *attended_matrix, row, offsets);
@@ -708,8 +709,6 @@ public:
             attended = dotAttention(*graph_, *encoder_key_matrices_.at(i),
                     *encoder_value_matrices_.at(i), *q, false, params_->headCount(),
                     layer_params.encoderFusion(), dropout_, false, is_training_);
-            cout << "attended shape:" << attended->shape() << endl;
-            cout << "added shape:" << added->shape() << endl;
             added = addInBatch(*graph_, {added, attended});
             normed = layerNormalization(*graph_, layer_params.layerNormC(), *added);
 
