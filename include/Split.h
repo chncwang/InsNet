@@ -144,16 +144,28 @@ BatchedNode *split(Graph &graph, Node &input, int row, const vector<int> &offset
 class SplitExecutor : public Executor {
 public:
     void forward() override {
+        int count = batch.size();
         vector<dtype*> inputs;
         vector<dtype*> results;
+
+        inputs.reserve(count);
+        results.reserve(count);
+        offsets_.reserve(count);
+        rows_.reserve(count);
+        in_rows_.reserve(count);
+        cols_.reserve(count);
+
         for (Node *node : batch) {
-            SplitNode *split = static_cast<SplitNode*>(node);
-            inputs.push_back(split->getInput().getVal().value);
-            offsets.push_back(split->offset_);
-            results.push_back(split->getVal().value);
-            dims.push_back(split->getDim());
+            SplitNode &split = dynamic_cast<SplitNode &>(*node);
+            inputs.push_back(split.getInput().getVal().value);
+            offsets_.push_back(split.offset_);
+            results.push_back(split.getVal().value);
+            int col = split.getColumn();
+            cols_.push_back(col);
+            rows_.push_back(split.getDim() / col);
+            in_rows_.push_back(split.getInput().getDim() / col);
         }
-        n3ldg_cuda::SplitForward(inputs, offsets, batch.size(), dims, results);
+        n3ldg_cuda::SplitForward(inputs, offsets_, count, rows_, in_rows_, cols_, results);
 #if TEST_CUDA
         testForward();
         cout << "split tested" << endl;
@@ -161,16 +173,16 @@ public:
     }
 
     void backward() override {
-        vector<dtype*> losses;
-        vector<dtype *> input_losses;
+        vector<dtype*> grads;
+        vector<dtype *> input_grads;
 
         for (Node *node : batch) {
             SplitNode *split = static_cast<SplitNode*>(node);
-            losses.push_back(split->getLoss().value);
-            input_losses.push_back(split->getInput().getLoss().value);
+            grads.push_back(split->getLoss().value);
+            input_grads.push_back(split->getInput().getLoss().value);
         }
 
-        n3ldg_cuda::SplitBackward(losses, offsets, batch.size(), dims, input_losses);
+        n3ldg_cuda::SplitBackward(grads, offsets_, batch.size(), rows_, input_grads);
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {
             SplitNode &split = static_cast<SplitNode&>(node);
@@ -183,8 +195,10 @@ public:
     }
 
 private:
-        vector<int> offsets;
-        vector<int> dims;
+        vector<int> offsets_;
+        vector<int> rows_;
+        vector<int> in_rows_;
+        vector<int> cols_;
 };
 #else
 class SplitExecutor : public Executor {

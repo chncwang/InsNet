@@ -2747,34 +2747,49 @@ void FullDivBackward(vector<dtype*> &grads,
     CheckCudaError();
 }
 
-__global__ void KernelSplitForward(dtype **inputs, int *offsets, int count, int *dims, int max_dim,
+__global__ void KernelSplitForward(dtype **inputs, int *offsets, int count, int *rows, int max_row,
+        int *in_rows,
+        int *cols,
+        int max_col,
         dtype **results) {
     int index = DeviceDefaultIndex();
     int step = DeviceDefaultStep();
+    int n = max_col * max_row;
 
-    for (int i = index; i < count * max_dim; i += step) {
-        int count_i = i / max_dim;
-        int dim_i = i % max_dim;
-        if (dim_i < dims[count_i]) {
+    for (int i = index; i < count * max_row * max_col; i += step) {
+        int count_i = i / n;
+        int row = rows[count_i];
+        int col = cols[count_i];
+        int result_offset = i % n;
+        int col_i = result_offset / row;
+        if (col_i < col) {
+            int row_i = result_offset % row;
+            int in_row = in_rows[count_i];
             int offset = offsets[count_i];
-            results[count_i][dim_i] = inputs[count_i][offset + dim_i];
+            results[count_i][col_i * row + row_i] =
+                inputs[count_i][in_row * col_i + offset + row_i];
         }
     }
 }
 
-void SplitForward(vector<dtype*> &inputs, vector<int> &offsets, int count, vector<int> &dims,
+void SplitForward(vector<dtype*> &inputs, vector<int> &offsets, int count, vector<int> &rows,
+        vector<int> &in_rows,
+        vector<int> &cols,
         vector<dtype*> &results) {
     NumberPointerArray input_arr, result_arr;
     input_arr.init(inputs.data(), inputs.size());
     result_arr.init(results.data(), results.size());
-    IntArray offset_arr, dim_arr;
+    IntArray offset_arr, row_arr, in_row_arr, col_arr;
     offset_arr.init((int*)offsets.data(), offsets.size());
-    dim_arr.init(dims.data(), dims.size());
-    int max_dim = *max_element(dims.begin(), dims.end());
+    row_arr.init(rows.data(), rows.size());
+    in_row_arr.init(in_rows.data(), in_rows.size());
+    col_arr.init(cols.data(), cols.size());
+    int max_row = *max_element(rows.begin(), rows.end());
+    int max_col = *max_element(cols.begin(), cols.end());
 
-    int block_count = DefaultBlockCount(count * max_dim);
+    int block_count = DefaultBlockCount(count * max_row * max_col);
     KernelSplitForward<<<block_count, TPB>>>(input_arr.value, offset_arr.value, count,
-            dim_arr.value, max_dim, result_arr.value);
+            row_arr.value, max_row, in_row_arr.value, col_arr.value, max_col, result_arr.value);
     CheckCudaError();
 }
 

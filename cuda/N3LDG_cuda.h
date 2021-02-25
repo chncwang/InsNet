@@ -320,7 +320,9 @@ void FullDivBackward(vector<dtype*> &grads,
         vector<int> &dims,
         vector<dtype*> &numerator_grads,
         vector<dtype*> &denominator_grads);
-void SplitForward(vector<dtype*> &inputs, vector<int> &offsets, int count, vector<int> &dims,
+void SplitForward(vector<dtype*> &inputs, vector<int> &offsets, int count, vector<int> &rows,
+        vector<int> &in_rows,
+        vector<int> &cols,
         vector<dtype*> &results);
 void SplitBackward(vector<dtype*> &losses, vector<int> offsets, int count, vector<int> &dims,
         vector<dtype*> &input_losses);
