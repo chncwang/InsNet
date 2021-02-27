@@ -11,8 +11,21 @@
 #include <helper_cuda.h>
 #include <vector>
 #include <cmath>
+#include <exception>
 
 namespace n3ldg_cuda {
+
+class CudaVerificationException: public std::exception {
+public:
+    CudaVerificationException(int index) : index_(index) {}
+
+    int getIndex() const {
+        return index_;
+    }
+
+private:
+    int index_;
+};
 
 template<typename T>
 struct GPUArray {
@@ -274,23 +287,28 @@ void TranMatrixMulVectorBackward(vector<dtype *> &grads, vector<dtype *> &matrix
         vector<dtype *> &vector_grads);
 void TranMatrixMulMatrixForward(vector<dtype *> &input_a_vals, vector <dtype *> &input_b_vals,
         int count,
-        vector<int> &cols,
+        vector<int> &a_cols,
+        vector<int> &b_cols,
         int row,
+        bool use_lower_triangle_mask,
         vector<dtype *> &vals);
 void TranMatrixMulMatrixBackward(vector<dtype *> &grads, vector<dtype *> &a_vals,
         vector<dtype *> &b_vals,
         int count,
-        vector<int> &cols,
+        vector<int> &a_cols,
+        vector<int> &b_cols,
         int row,
         vector<dtype *> &a_grads,
         vector<dtype *> &b_grads);
 void MatrixMulMatrixForward(vector<dtype *> &a, vector<dtype *> &b, int count, vector<int> &ks,
+        vector<int> &b_cols,
         int row,
         vector<dtype *> &vals);
 void MatrixMulMatrixBackward(vector<dtype *> &grads, vector<dtype *> &a_vals,
         vector<dtype *> &b_vals,
         int count,
         vector<int> &ks,
+        vector<int> &b_cols,
         int row,
         vector<dtype *> &a_grads,
         vector<dtype *> &b_grads);

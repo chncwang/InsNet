@@ -40,6 +40,7 @@ public:
             node->loss().copyFromHostToDevice();
             UniInputNode *i = dynamic_cast<UniInputNode *>(node);
             i->getInput().loss().copyFromHostToDevice();
+            i->val().copyFromHostToDevice();
         }
 #endif
 

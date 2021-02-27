@@ -55,7 +55,7 @@ public:
     PExecutor generate() override;
 
     string typeSignature() const override {
-        string hash_code = Node::typeSignature() + "-" + to_string(in_rows_.size());
+        string hash_code = Node::getNodeType() + "-" + to_string(in_rows_.size());
         for (int dim : in_rows_) {
             hash_code += "-" + to_string(dim);
         }

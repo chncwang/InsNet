@@ -55,7 +55,7 @@ dtype dsigmoid(const dtype& x, const dtype& y) {
 }
 
 dtype drelu(const dtype& x, const dtype& y) {
-    if (x <= 0) return 0;
+    if (y <= 0) return 0;
     return 1;
 }
 
@@ -705,14 +705,14 @@ std::vector<Node*> toNodePointers(const std::vector<T *> &vec) {
 void clearNodes(std::vector<Node*> &nodes) {
     n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
     profiler.BeginEvent("clearNodes");
-    std::vector<dtype*> val_and_losses(nodes.size());
+    std::vector<dtype*> grads(nodes.size());
     vector<int> dims(nodes.size());
     int i = 0;
     for (Node *n : nodes) {
-        val_and_losses.at(i) = n->getLoss().value;
+        grads.at(i) = n->getLoss().value;
         dims.at(i++) = n->getDim();
     }
-    n3ldg_cuda::BatchMemset(val_and_losses, val_and_losses.size(), dims, 0.0f);
+    n3ldg_cuda::BatchMemset(grads, grads.size(), dims, 0.0f);
 #if TEST_CUDA
     for (Node *node : nodes) {
         node->loss().verify("clearNodes");
@@ -825,6 +825,7 @@ protected:
     }
 
     void verifyForward() {
+        int i = 0;
         for (NodeAbs *node : batch) {
             Node *x = dynamic_cast<Node *>(node);
             if(!x->getVal().verify((getNodeType() + " forward").c_str())) {
@@ -832,8 +833,9 @@ protected:
                 cout << x->getVal().toJson();
                 cout << "gpu:" << endl;
                 x->getVal().print();
-                abort();
+                throw n3ldg_cuda::CudaVerificationException(i);
             }
+            ++i;
         }
     }
 

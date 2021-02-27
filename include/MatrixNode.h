@@ -477,15 +477,17 @@ public:
         b_vals_.reserve(count);
         vals.reserve(count);
         ks_.reserve(count);
+        b_cols_.reserve(count);
         for (Node *node : batch) {
             MatrixMulMatrixNode &m = dynamic_cast<MatrixMulMatrixNode &>(*node);
             a_vals_.push_back(m.ins_.at(0)->getVal().value);
             b_vals_.push_back(m.ins_.at(1)->getVal().value);
             vals.push_back(m.getVal().value);
             ks_.push_back(m.k_);
+            b_cols_.push_back(m.ins_.at(1)->getDim() / m.k_);
         }
         MatrixMulMatrixNode &first = dynamic_cast<MatrixMulMatrixNode &>(*batch.front());
-        row_ = first.getDim() / first.k_;
+        row_ = first.ins_.at(0)->getDim() / first.k_;
 #if TEST_CUDA
         auto get_inputs = [&](Node &node) {
             MatrixMulMatrixNode &t = dynamic_cast<MatrixMulMatrixNode&>(node);
@@ -498,7 +500,7 @@ public:
         testForwardInpputs(get_inputs);
 #endif
 
-        n3ldg_cuda::MatrixMulMatrixForward(a_vals_, b_vals_, count, ks_, row_, vals);
+        n3ldg_cuda::MatrixMulMatrixForward(a_vals_, b_vals_, count, ks_, b_cols_, row_, vals);
 #if TEST_CUDA
         testForward();
 #endif
@@ -518,8 +520,8 @@ public:
             b_grads.push_back(m.ins_.at(1)->getLoss().value);
         }
 
-        n3ldg_cuda::MatrixMulMatrixBackward(grads, a_vals_, b_vals_, count, ks_, row_, a_grads,
-                b_grads);
+        n3ldg_cuda::MatrixMulMatrixBackward(grads, a_vals_, b_vals_, count, ks_, b_cols_, row_,
+                a_grads, b_grads);
 
 #if TEST_CUDA
         auto get_inputs = [&](Node &node) {
@@ -536,7 +538,7 @@ public:
 
 private:
     vector<dtype *> a_vals_, b_vals_;
-    vector<int> ks_;
+    vector<int> ks_, b_cols_;
     int row_;
 };
 #else
@@ -759,7 +761,7 @@ public:
         b_col_ = ins_.at(1)->getDim() / input_row_;
         Mat(val().v, a_col_, b_col_) = Mat(ins_.at(0)->getVal().v, input_row_, a_col_).transpose()
             * Mat(ins_.at(1)->getVal().v, input_row_, b_col_);
-        if (use_lower_mask_) {
+        if (use_lower_triangle_mask_) {
             if (a_col_ != b_col_) {
                 cerr << boost::format("a_col_:%1% b_col_:%2%") % a_col_ % b_col_ << endl;
                 abort();
@@ -773,17 +775,6 @@ public:
     }
 
     void backward() override {
-        if (use_lower_mask_) {
-            if (a_col_ != b_col_) {
-                cerr << boost::format("a_col_:%1% b_col_:%2%") % a_col_ % b_col_ << endl;
-                abort();
-            }
-            for (int i = 0; i < a_col_; ++i) {
-                for (int j = i + 1; j < a_col_; ++j) {
-                    loss()[i * a_col_ + j] = 0;
-                }
-            }
-        }
         Mat(ins_.at(0)->loss().v, input_row_, a_col_) +=
             Mat(ins_.at(1)->getVal().v, input_row_, b_col_) *
             Mat(getLoss().v, a_col_, b_col_).transpose();
@@ -795,13 +786,14 @@ public:
     Executor * generate() override;
 
     string typeSignature() const override {
-        return Node::getNodeType() + to_string(input_row_);
+        return Node::getNodeType() + to_string(input_row_) +
+            (use_lower_triangle_mask_ ? "-mask" : "-no-mask");
     }
 
 private:
     std::array<Node *, 2> ins_;
     int a_col_, b_col_, input_row_;
-    bool use_lower_mask_ = false;
+    bool use_lower_triangle_mask_ = false;
     friend class TranMatrixMulMatrixExecutor;
     friend class BatchedTranMatrixMulMatrixNode;
 };
@@ -809,14 +801,14 @@ private:
 class BatchedTranMatrixMulMatrixNode : public BatchedNodeImpl<TranMatrixMulMatrixNode> {
 public:
     void init(Graph &graph, BatchedNode &a, BatchedNode &b, int input_row,
-            bool use_lower_mask = false) {
+            bool use_lower_triangle_mask = false) {
         int a_col = a.getDim() / input_row;
         int b_col = b.getDim() / input_row;
         allocateBatch(a_col * b_col, a.batch().size());
         setInputsPerNode({&a, &b});
         for (Node *node : batch()) {
             TranMatrixMulMatrixNode &t = dynamic_cast<TranMatrixMulMatrixNode &>(*node);
-            t.use_lower_mask_ = use_lower_mask;
+            t.use_lower_triangle_mask_ = use_lower_triangle_mask;
             t.input_row_ = input_row;
         }
         afterInit(graph, {&a, &b});
@@ -830,20 +822,25 @@ public:
         int count = batch.size();
         vector<dtype *> vals;
         vals.reserve(count);
-        cols_.reserve(count);
+        a_cols_.reserve(count);
+        b_cols_.reserve(count);
+        b_cols_.reserve(count);
         a_vals_.reserve(count);
         b_vals_.reserve(count);
+        input_row_ = dynamic_cast<TranMatrixMulMatrixNode &>(*batch.front()).input_row_;
+        use_lower_triangle_mask_ =
+            dynamic_cast<TranMatrixMulMatrixNode &>(*batch.front()).use_lower_triangle_mask_;
         for (Node *node : batch) {
             TranMatrixMulMatrixNode &t = dynamic_cast<TranMatrixMulMatrixNode &>(*node);
             a_vals_.push_back(t.ins_.at(0)->getVal().value);
             b_vals_.push_back(t.ins_.at(1)->getVal().value);
             vals.push_back(t.getVal().value);
-            cols_.push_back(sqrt(t.getDim()));
+            a_cols_.push_back(t.ins_.at(0)->getDim() / input_row_);
+            b_cols_.push_back(t.ins_.at(1)->getDim() / input_row_);
         }
-        row_ = dynamic_cast<TranMatrixMulMatrixNode &>(*batch.front()).ins_.at(0)->getDim() /
-            cols_.front();
 
-        n3ldg_cuda::TranMatrixMulMatrixForward(a_vals_, b_vals_, count, cols_, row_, vals);
+        n3ldg_cuda::TranMatrixMulMatrixForward(a_vals_, b_vals_, count, a_cols_, b_cols_,
+                input_row_, use_lower_triangle_mask_, vals);
 
 #if TEST_CUDA
         testForward();
@@ -861,8 +858,8 @@ public:
             b_grads.push_back(t.ins_.at(1)->getLoss().value);
             grads.push_back(t.getLoss().value);
         }
-        n3ldg_cuda::TranMatrixMulMatrixBackward(grads, a_vals_, b_vals_, count, cols_, row_,
-                a_grads, b_grads);
+        n3ldg_cuda::TranMatrixMulMatrixBackward(grads, a_vals_, b_vals_, count, a_cols_, b_cols_,
+                input_row_, a_grads, b_grads);
 
 #if TEST_CUDA
         auto get_inputs = [&](Node &node) {
@@ -878,8 +875,9 @@ public:
 
 private:
     vector<dtype *> a_vals_, b_vals_;
-    vector<int> cols_;
-    int row_;
+    vector<int> a_cols_, b_cols_;
+    int input_row_;
+    bool use_lower_triangle_mask_;
 };
 #else
 class TranMatrixMulMatrixExecutor : public Executor {
@@ -975,9 +973,9 @@ BatchedNode *tranMatrixMulVector(Graph &graph, BatchedNode &matrix, BatchedNode 
 }
 
 BatchedNode *tranMatrixMulMatrix(Graph &graph, BatchedNode &a, BatchedNode &b, int input_row,
-        bool use_lower_mask = false) {
+        bool use_lower_triangle_mask = false) {
     BatchedTranMatrixMulMatrixNode *node = new BatchedTranMatrixMulMatrixNode;
-    node->init(graph, a, b, input_row, use_lower_mask);
+    node->init(graph, a, b, input_row, use_lower_triangle_mask);
     return node;
 }
 

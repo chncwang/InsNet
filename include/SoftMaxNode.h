@@ -78,6 +78,9 @@ public:
 class SoftmaxExecutor : public UniInputExecutor {
 public:
     void forward() override {
+#if TEST_CUDA
+        UniInputExecutor::testForwardInpputs();
+#endif
         vector<dtype *> in_vals(batch.size());
         vals_.reserve(batch.size());
         rows_.reserve(batch.size());
@@ -92,7 +95,18 @@ public:
         }
         n3ldg_cuda::SoftmaxForward(in_vals, batch.size(), rows_, cols_, vals_);
 #if TEST_CUDA
-        UniInputExecutor::testForward();
+        try {
+            UniInputExecutor::testForward();
+        } catch (n3ldg_cuda::CudaVerificationException &e) {
+            cerr << "softmax forward verification failed" << endl;
+            SoftmaxNode &s = dynamic_cast<SoftmaxNode &>(*batch.at(e.getIndex()));
+            cerr << "input val:" << s.getInput().getVal().toString() << endl;
+            cerr << "gpu:" << endl;
+            s.getInput().getVal().print();
+            cout << boost::format("count:%1% dim:%2% col:%3%") % batch.size() % s.getDim() %
+                s.getColumn() << endl;
+            abort();
+        }
 #endif
     }
 
