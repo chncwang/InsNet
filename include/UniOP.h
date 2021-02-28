@@ -103,12 +103,12 @@ public:
     Executor * generate() override;
 
     string typeSignature() const override {
-        return Node::typeSignature() + "-" + addressToString(param_);
+        return Node::getNodeType() + "-" + addressToString(param_);
     }
 
 protected:
     virtual bool isDimLegal(const Node &input) const override {
-        return input.getDim() == param_->W.inDim();
+        return true;
     }
 
 private:
@@ -334,59 +334,73 @@ public:
 
     void  forward() override {
         int count = batch.size();
-        x.init(inDim(), count);
-        y.init(outDim(), count);
-        b.init(outDim(), count);
+        for (Node *node : batch) {
+            col_sum_ += node->getColumn();
+        }
+        x.init(inDim(), col_sum_);
+        y.init(outDim(), col_sum_);
+        b.init(outDim(), col_sum_);
 
-        for (int idx = 0; idx < count; idx++) {
-            LinearNode* ptr = (LinearNode*)batch[idx];
-            memcpy(x.v + idx * inDim(), ptr->getInput().val().v, inDim() * sizeof(dtype));
-            if (params().bUseB) {
-                memcpy(b.v + idx * outDim(), params().b.val.v, outDim() * sizeof(dtype));
+        int col_offset = 0;
+        for (int i = 0; i < count; i++) {
+            LinearNode& l = dynamic_cast<LinearNode &>(*batch.at(i));
+            Vec(x.v + col_offset * inDim(), l.getInput().getDim()) = l.getInput().getVal().vec();
+
+            col_offset += l.getColumn();
+        }
+
+        if (params().bUseB) {
+            for (int i = 0; i < col_sum_; ++i) {
+                Vec(b.v + i * outDim(), outDim()) = params().b.val.vec();
             }
         }
 
         y.mat() = params().W.val.mat() * x.mat();
         if (params().bUseB) {
-            y.vec() = y.vec() + b.vec();
+            y.vec() += b.vec();
         }
 
-        for (int idx = 0; idx < count; idx++) {
-            LinearNode* ptr = (LinearNode*)batch[idx];
-            memcpy(ptr->val().v, y.v + idx * outDim(), outDim() * sizeof(dtype));
+        col_offset = 0;
+        for (int i = 0; i < count; i++) {
+            LinearNode &l = dynamic_cast<LinearNode &>(*batch.at(i));
+            l.val().vec() = Vec(y.v + col_offset * outDim(), l.getDim());
+            col_offset += l.getColumn();
         }
     }
 
     void backward() override {
         Tensor2D lx, ly;
         int count = batch.size();
-        lx.init(inDim(), count);
-        ly.init(outDim(), count);
+        lx.init(inDim(), col_sum_);
+        ly.init(outDim(), col_sum_);
 
-        for (int idx = 0; idx < count; idx++) {
-            LinearNode* ptr = (LinearNode*)batch[idx];
-            memcpy(ly.v + idx * outDim(), ptr->loss().v, outDim() * sizeof(dtype));
+        int col_offset = 0;
+        for (int i = 0; i < count; i++) {
+            LinearNode &l = dynamic_cast<LinearNode &>(*batch.at(i));
+            Vec(ly.v + col_offset * outDim(), l.getDim()) = l.getLoss().vec();
+            col_offset += l.getColumn();
         }
 
         params().W.grad.mat() += ly.mat() * x.mat().transpose();
 
         if (params().bUseB) {
-            for (int idy = 0; idy < outDim(); idy++) {
-                for (int idx = 0; idx < count; idx++) {
-                    params().b.grad.v[idy] += ly[idx][idy];
-                }
+            for (int i = 0; i < col_sum_; ++i) {
+                params().b.grad.vec() += Vec(ly.v + i * outDim(), outDim());
             }
         }
 
         lx.mat() = params().W.val.mat().transpose() * ly.mat();
 
-        for (int idx = 0; idx < count; idx++) {
-            LinearNode* ptr = (LinearNode*)batch[idx];
-            for (int idy = 0; idy < inDim(); idy++) {
-                ptr->getInput().loss()[idy] += lx[idx][idy];
-            }
+        col_offset = 0;
+        for (int i = 0; i < count; i++) {
+            LinearNode& l = (LinearNode &)(*batch.at(i));
+            l.getInput().loss().vec() += Vec(lx.v + col_offset * inDim(), inDim());
+            col_offset += l.getColumn();
         }
     }
+
+private:
+    int col_sum_ = 0;
 };
 #endif
 
@@ -870,14 +884,15 @@ Executor *BiasNode::generate() {
 
 namespace n3ldg_plus {
 
-Node *linear(Graph &graph, Node &input, UniParams &params) {
-    if (input.getDim() != params.W.inDim()) {
-        cerr << boost::format("linear input dim:%1% W col:%2%\n") % input.getDim() %
-            params.W.inDim() << endl;
+Node *linear(Graph &graph, Node &input, UniParams &params, int col = 1) {
+    if (input.getDim() / col != params.W.inDim()) {
+        cerr << boost::format("linear input dim:%1% W col:%2% W col:%3%\n") % input.getDim() %
+            input.getColumn() % params.W.inDim() << endl;
         abort();
     }
     int dim = params.W.outDim();
-    LinearNode *uni = LinearNode::newNode(dim);
+    LinearNode *uni = LinearNode::newNode(dim * col);
+    uni->setColumn(col);
     uni->setParam(params);
     uni->forward(graph, input);
     return uni;

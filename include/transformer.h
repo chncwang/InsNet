@@ -479,6 +479,7 @@ BatchedNode *dotAttention(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedN
     BatchedNode *split_attended = n3ldg_plus::dotAttention(graph, *split_k, *split_v, *split_q,
             q_col, use_mask).first;
     Node *attended_matrix = concat(graph, *split_attended, q_col);
+    attended_matrix = n3ldg_plus::linear(graph, *attended_matrix, fusion_param, q_col);
     offsets.clear();
     offsets.reserve(q.batch().size());
     int row = q.getDim();
@@ -486,7 +487,6 @@ BatchedNode *dotAttention(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedN
         offsets.push_back(i * row);
     }
     BatchedNode *attended = split(graph, *attended_matrix, row, offsets);
-    attended = n3ldg_plus::linear(graph, *attended, fusion_param);
     attended = n3ldg_plus::dropout(graph, *attended, dropout, is_training);
     return attended;
 }
