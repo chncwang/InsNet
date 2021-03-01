@@ -181,13 +181,12 @@ void DropoutForward(vector<dtype*> &xs, int count, vector<int> &dims, int max_di
         dtype *drop_mask,
         dtype drop_factor,
         vector<dtype*> &ys);
-void DropoutBackward(vector<dtype*> &losses,
-        int count,
-        int dim,
+void DropoutBackward(vector<dtype*> &grads, int count, vector<int> &dims, int max_dim,
+        vector<int> &offsets,
         bool is_training,
         dtype *drop_mask,
         dtype drop_factor,
-        vector<dtype*> &in_losses);
+        vector<dtype*> &in_grads);
 void BucketForward(vector<dtype> input, int count, int dim, vector<dtype*> &ys);
 void CopyForUniNodeForward(vector<dtype*> &xs, dtype* b,
         dtype* xs_dest,

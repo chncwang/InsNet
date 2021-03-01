@@ -736,29 +736,33 @@ void DropoutForward(vector<dtype*> &xs, int count, vector<int> &dims, int max_di
     CheckCudaError();
 }
 
-__global__ void KernelDropoutBackward(dtype **grads, int count, int dim, bool is_training,
+__global__ void KernelDropoutBackward(dtype **grads, int count, int *dims, int max_dim,
+        int *offsets,
+        bool is_training,
         dtype* drop_mask,
         dtype drop_factor,
         dtype **in_grads) {
-    int index = DeviceDefaultIndex();
-    int step = DeviceDefaultStep();
-    for (int i = index; i < dim * count; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        if (is_training) {
-            if (drop_mask[i] >= drop_factor) {
-                DeviceAtomicAdd(in_grads[count_i] + dim_i, grads[count_i][dim_i]);
+    int i = DeviceDefaultIndex();
+    if (i < count * max_dim) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+        int dim = dims[count_i];
+        if (dim_i < dim) {
+            if (is_training) {
+                int offset = offsets[count_i];
+                if (drop_mask[offset + dim_i] >= drop_factor) {
+                    DeviceAtomicAdd(in_grads[count_i] + dim_i, grads[count_i][dim_i]);
+                }
+            } else {
+                DeviceAtomicAdd(in_grads[count_i] + dim_i,
+                        (1 - drop_factor) * grads[count_i][dim_i]);
             }
-        } else {
-            DeviceAtomicAdd(in_grads[count_i] + dim_i,
-                    (1 - drop_factor) * grads[count_i][dim_i]);
         }
     }
 }
 
-void DropoutBackward(vector<dtype*> &grads,
-        int count,
-        int dim,
+void DropoutBackward(vector<dtype*> &grads, int count, vector<int> &dims, int max_dim,
+        vector<int> &offsets,
         bool is_training,
         dtype *drop_mask,
         dtype drop_factor,
@@ -767,12 +771,15 @@ void DropoutBackward(vector<dtype*> &grads,
         cerr << "drop value is " << drop_factor << endl;
         abort();
     }
-    NumberPointerArray loss_arr, in_loss_arr;
-    loss_arr.init((dtype**)grads.data(), grads.size());
-    in_loss_arr.init((dtype**)in_grads.data(), in_grads.size());
-    int block_count = DefaultBlockCount(count * dim);
-    KernelDropoutBackward<<<block_count, TPB>>>(loss_arr.value, count, dim, is_training, drop_mask,
-            drop_factor, (dtype **)in_loss_arr.value);
+    NumberPointerArray grad_arr, in_grad_arr;
+    grad_arr.init((dtype**)grads.data(), grads.size());
+    in_grad_arr.init((dtype**)in_grads.data(), in_grads.size());
+    IntArray dim_arr, offset_arr;
+    dim_arr.init(dims.data(), count);
+    offset_arr.init(offsets.data(), count);
+    int block_count = DefaultBlockCountWithoutLimit(count * max_dim);
+    KernelDropoutBackward<<<block_count, TPB>>>(grad_arr.value, count, dim_arr.value, max_dim,
+            offset_arr.value, is_training, drop_mask, drop_factor, (dtype **)in_grad_arr.value);
     CheckCudaError();
 }
 

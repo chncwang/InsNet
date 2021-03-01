@@ -421,8 +421,8 @@ public:
             losses.at(i) = dropout_node->loss().value;
             in_losses.at(i++) = dropout_node->getInput().loss().value;
         }
-        n3ldg_cuda::DropoutBackward(losses, count, getDim(), isTraining(), drop_mask.value,
-                dropoutValue(), in_losses);
+        n3ldg_cuda::DropoutBackward(losses, count, dims_, max_dim_, offsets_, isTraining(),
+                drop_mask.value, dropoutValue(), in_losses);
 #if TEST_CUDA
         for (Node *n : batch) {
             n->backward();
