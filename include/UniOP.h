@@ -131,8 +131,6 @@ public:
 #if USE_GPU
 class LinearExecutor :public Executor {
 public:
-    Tensor2D x, y, b;
-
     UniParams &params() {
         LinearNode *l = dynamic_cast<LinearNode *>(batch.front());
         return l->getParams();
@@ -154,49 +152,45 @@ public:
             params().b.val.copyFromDeviceToHost();
         }
 #endif
+        for (int i = 0; i < count; ++i) {
+            col_sum_ += batch.at(i)->getColumn();
+        }
 
-        x.init(inDim(), count);
-        y.init(outDim(), count);
+        x.init(inDim(), col_sum_);
+        y.init(outDim(), col_sum_);
 #if TEST_CUDA
-        b.init(outDim(), count);
+        b.init(outDim(), col_sum_);
 #endif
         std::vector<dtype*> xs, ys;
         xs.reserve(batch.size());
         ys.reserve(batch.size());
+        cols_.reserve(batch.size());
 
         for (int i = 0; i < batch.size(); ++i) {
             LinearNode *n = static_cast<LinearNode*>(batch.at(i));
 
             xs.push_back(n->getInput().val().value);
             ys.push_back(n->val().value);
+            cols_.push_back(n->getColumn());
 #if TEST_CUDA
             n->getInput().val().copyFromDeviceToHost();
 #endif
         }
+        n3ldg_cuda::LinearForward(xs, count, cols_, inDim(), outDim(), params().W.val.value, 
+                params().bUseB ? params().b.val.value : nullptr, ys);
 
-        n3ldg_cuda::CopyForUniNodeForward(xs, params().b.val.value,
-                x.value, y.value, count, inDim(), outDim(), params().bUseB);
+#if TEST_CUDA
+        int col_offset = 0;
+        for (int i = 0; i < count; i++) {
+            LinearNode& l = dynamic_cast<LinearNode &>(*batch.at(i));
+            Vec(x.v + col_offset * inDim(), l.getInput().getDim()) = l.getInput().getVal().vec();
 
-        n3ldg_cuda::MatrixMultiplyMatrix(params().W.val.value, x.value, y.value,
-                outDim(), inDim(), count, params().bUseB);
-
-        std::vector<dtype*> vals;
-        vals.reserve(count);
-        for (Node *node : batch) {
-            vals.push_back(node->val().value);
+            col_offset += l.getColumn();
         }
 
-        n3ldg_cuda::CopyFromOneVectorToMultiVals(y.value, vals, count, outDim());
-#if TEST_CUDA
-        for (int idx = 0; idx < count; idx++) {
-            LinearNode* ptr = (LinearNode*)batch[idx];
-            for (int idy = 0; idy < inDim(); idy++) {
-                x[idx][idy] = ptr->getInput().getVal()[idy];
-            }
-            if (params().bUseB) {
-                for (int i = 0; i < outDim(); ++i) {
-                    b[idx][i] = params().b.val.v[i];
-                }
+        if (params().bUseB) {
+            for (int i = 0; i < col_sum_; ++i) {
+                Vec(b.v + i * outDim(), outDim()) = params().b.val.vec();
             }
         }
 
@@ -205,14 +199,15 @@ public:
             y.vec() += b.vec();
         }
 
-        n3ldg_cuda::Assert(x.verify("forward x"));
-        n3ldg_cuda::Assert(y.verify("linear forward y"), batch.at(0)->typeSignature());
+        col_offset = 0;
+        for (int i = 0; i < count; i++) {
+            LinearNode &l = dynamic_cast<LinearNode &>(*batch.at(i));
+            l.val().vec() = Vec(y.v + col_offset * outDim(), l.getDim());
+            col_offset += l.getColumn();
+        }
 
         for (int idx = 0; idx < count; idx++) {
             LinearNode* ptr = (LinearNode*)batch[idx];
-            for (int idy = 0; idy < outDim(); idy++) {
-                ptr->val()[idy] = y[idx][idy];
-            }
             n3ldg_cuda::Assert(ptr->val().verify("linear forward val"));
         }
         cout << "linear forward tested" << endl;
@@ -304,6 +299,11 @@ public:
         cout << "linear backward tested" << endl;
 #endif
     }
+
+private:
+    Tensor2D x, y, b;
+    int col_sum_ = 0;
+    vector<int> cols_;
 };
 #else
 class LinearExecutor :public Executor {

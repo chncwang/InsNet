@@ -200,6 +200,11 @@ void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y, int row, int col,
         bool useb,
         bool should_x_transpose = false,
         bool should_W_transpose = false);
+void LinearForward(vector<dtype *> &in_vals, int count, vector<int> &in_cols, int in_row,
+        int out_row,
+        dtype *W,
+        dtype *bias,
+        vector<dtype *> &vals);
 void AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(dtype *lty,
         dtype *lx, dtype *b, vector<dtype*> &losses, int count,
         int out_dim, int in_dim, bool use_b);

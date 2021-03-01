@@ -830,8 +830,41 @@ void CopyForUniNodeForward(vector<dtype*> &xs, dtype* b,
     CheckCudaError();
 }
 
-void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y, int row, int col,
-        int count, bool useb, bool should_x_transpose,
+__global__ void KernelConcat(dtype **src, int count, int *dims, int max_dim, int *offsets,
+        dtype *dest) {
+    int i = DeviceDefaultIndex();
+    int count_i = i / max_dim;
+    if (count_i < count) {
+        int dim_i = i % max_dim;
+        int dim = dims[count_i];
+        if (dim_i < dim) {
+            int offset = offsets[count_i];
+            dest[offset + dim_i] = src[count_i][dim_i];
+        }
+    }
+}
+
+__global__ void KernelCopy(dtype *src, int count, int *dims, int max_dim, int *offsets,
+        int row,
+        dtype *y,
+        dtype **dest) {
+    int i = DeviceDefaultIndex();
+    int count_i = i / max_dim;
+    if (count_i < count) {
+        int dim_i = i % max_dim;
+        int dim = dims[count_i];
+        if (dim_i < dim) {
+            int offset = offsets[count_i];
+            int row_i = i % row;
+            dtype a = src == nullptr ? 0 : src[row_i];
+            dtype b = y[offset + dim_i];
+            dest[count_i][dim_i] = a + b;
+        }
+    }
+}
+
+void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y, int row, int col, int count, bool useb,
+        bool should_x_transpose,
         bool should_W_transpose) {
     cublasHandle_t &handle = GetCublasHandle();
     dtype alpha = 1;
@@ -847,6 +880,59 @@ void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y, int row, int col,
     CallCublas(cublasDgemm(handle, W_op, x_op, row, count, col,
                 &alpha, W, ldw, x, ldx, &beta, y, row));
 #endif
+}
+
+void LinearForward(vector<dtype *> &in_vals, int count, vector<int> &in_cols, int in_row,
+        int out_row,
+        dtype *W,
+        dtype *bias,
+        vector<dtype *> &vals) {
+    int in_col_sum = 0;
+    vector<int> in_offsets, out_offsets, in_dims, out_dims;
+    in_offsets.reserve(count);
+    out_offsets.reserve(count);
+    in_dims.reserve(count);
+    out_dims.reserve(count);
+    for (int in_col : in_cols) {
+        in_offsets.push_back(in_col_sum * in_row);
+        out_offsets.push_back(in_col_sum * out_row);
+        in_col_sum += in_col;
+        in_dims.push_back(in_row * in_col);
+        out_dims.push_back(out_row * in_col);
+    }
+
+    NumberArray concated_in_val, y;
+    concated_in_val.init(in_col_sum * in_row);
+    y.init(in_col_sum * out_row);
+
+    NumberPointerArray in_val_arr, val_arr;
+    in_val_arr.init(in_vals.data(), count);
+    val_arr.init(vals.data(), count);
+
+    IntArray in_dim_arr, in_offset_arr, out_dim_arr, out_offset_arr;
+    in_dim_arr.init(in_dims.data(), count);
+    in_offset_arr.init(in_offsets.data(), count);
+    out_dim_arr.init(out_dims.data(), count);
+    out_offset_arr.init(out_offsets.data(), count);
+
+    int max_in_col = *max_element(in_cols.begin(), in_cols.end());
+    int max_in_dim = max_in_col * in_row;
+    int block_count = DefaultBlockCountWithoutLimit(count * max_in_col * in_row);
+
+    KernelConcat<<<block_count, TPB>>>(in_val_arr.value, count, in_dim_arr.value, max_in_dim,
+            in_offset_arr.value, concated_in_val.value);
+    CheckCudaError();
+
+    MatrixMultiplyMatrix(W, concated_in_val.value, y.value, out_row, in_row, in_col_sum, false,
+            false, false);
+
+    int max_out_dim = max_in_col * out_row;
+    block_count = DefaultBlockCountWithoutLimit(count * max_out_dim);
+    cout << boost::format("max_in_col:%1% out_row:%2% count:%3% max_out_dim:%4%") % max_in_col %
+        out_row % count % max_out_dim << endl;
+    KernelCopy<<<block_count, TPB>>>(bias, count, out_dim_arr.value, max_out_dim,
+            out_offset_arr.value, out_row, y.value, val_arr.value);
+    CheckCudaError();
 }
 
 __device__ dtype maxIgnoringINF(dtype a, dtype b) {
