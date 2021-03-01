@@ -882,28 +882,28 @@ void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y, int row, int col, int co
 #endif
 }
 
-void LinearForward(vector<dtype *> &in_vals, int count, vector<int> &in_cols, int in_row,
+void LinearForward(vector<dtype *> &in_vals, int count, vector<int> &cols, int in_row,
         int out_row,
         dtype *W,
         dtype *bias,
         vector<dtype *> &vals) {
-    int in_col_sum = 0;
+    int col_sum = 0;
     vector<int> in_offsets, out_offsets, in_dims, out_dims;
     in_offsets.reserve(count);
     out_offsets.reserve(count);
     in_dims.reserve(count);
     out_dims.reserve(count);
-    for (int in_col : in_cols) {
-        in_offsets.push_back(in_col_sum * in_row);
-        out_offsets.push_back(in_col_sum * out_row);
-        in_col_sum += in_col;
-        in_dims.push_back(in_row * in_col);
-        out_dims.push_back(out_row * in_col);
+    for (int col : cols) {
+        in_offsets.push_back(col_sum * in_row);
+        out_offsets.push_back(col_sum * out_row);
+        col_sum += col;
+        in_dims.push_back(in_row * col);
+        out_dims.push_back(out_row * col);
     }
 
-    NumberArray concated_in_val, y;
-    concated_in_val.init(in_col_sum * in_row);
-    y.init(in_col_sum * out_row);
+    NumberArray y, concated_in_val;
+    concated_in_val.init(col_sum * in_row);
+    y.init(col_sum * out_row);
 
     NumberPointerArray in_val_arr, val_arr;
     in_val_arr.init(in_vals.data(), count);
@@ -915,24 +915,172 @@ void LinearForward(vector<dtype *> &in_vals, int count, vector<int> &in_cols, in
     out_dim_arr.init(out_dims.data(), count);
     out_offset_arr.init(out_offsets.data(), count);
 
-    int max_in_col = *max_element(in_cols.begin(), in_cols.end());
-    int max_in_dim = max_in_col * in_row;
-    int block_count = DefaultBlockCountWithoutLimit(count * max_in_col * in_row);
+    int max_col = *max_element(cols.begin(), cols.end());
+    int max_in_dim = max_col * in_row;
+    int block_count = DefaultBlockCountWithoutLimit(count * max_col * in_row);
 
     KernelConcat<<<block_count, TPB>>>(in_val_arr.value, count, in_dim_arr.value, max_in_dim,
             in_offset_arr.value, concated_in_val.value);
     CheckCudaError();
 
-    MatrixMultiplyMatrix(W, concated_in_val.value, y.value, out_row, in_row, in_col_sum, false,
+    MatrixMultiplyMatrix(W, concated_in_val.value, y.value, out_row, in_row, col_sum, false,
             false, false);
 
-    int max_out_dim = max_in_col * out_row;
+    int max_out_dim = max_col * out_row;
     block_count = DefaultBlockCountWithoutLimit(count * max_out_dim);
-    cout << boost::format("max_in_col:%1% out_row:%2% count:%3% max_out_dim:%4%") % max_in_col %
-        out_row % count % max_out_dim << endl;
     KernelCopy<<<block_count, TPB>>>(bias, count, out_dim_arr.value, max_out_dim,
             out_offset_arr.value, out_row, y.value, val_arr.value);
     CheckCudaError();
+}
+
+__global__ void KernelAtomicAdd(dtype *src, int count, int *dims, int max_dim, int *offsets,
+        dtype **dest) {
+    int i = DeviceDefaultIndex();
+    int count_i = i / max_dim;
+    if (count_i < count) {
+        int dim_i = i % max_dim;
+        int dim = dims[count_i];
+        if (dim_i < dim) {
+            int offset = offsets[count_i];
+            dtype b = src[offset + dim_i];
+            DeviceAtomicAdd(dest[count_i] + dim_i, b);
+        }
+    }
+}
+
+__global__ void KernelLinearBackwardForBias(dtype *grad, int col, int row, dtype *bias_grad,
+        int *block_counters,
+        dtype *block_sums) {
+    __shared__ volatile extern dtype shared_sum[];
+    __shared__ volatile bool is_last_block;
+    if (threadIdx.x == 0 && blockIdx.y == 0) {
+        block_counters[blockIdx.x] = 0;
+    }
+    if (threadIdx.x == 0) {
+        is_last_block = false;
+    }
+
+    int row_i = blockIdx.x;
+    int col_i = blockIdx.y * blockDim.x + threadIdx.x;
+    shared_sum[threadIdx.x] = col_i < col ?  grad[row * col_i + row_i] : 0.0f;
+    __syncthreads();
+
+    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+        if (threadIdx.x < i) {
+            shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+        }
+        __syncthreads();
+    }
+
+    int block_sums_offset = blockIdx.x * gridDim.y + blockIdx.y;
+    if (threadIdx.x == 0) {
+        block_sums[block_sums_offset] = shared_sum[0];
+        if (atomicAdd(block_counters + blockIdx.x, 1) == gridDim.y - 1) {
+            is_last_block = true;
+        }
+    }
+    __syncthreads();
+
+    if (is_last_block) {
+        dtype sum = 0.0f;
+        for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
+            int offset = blockIdx.x * gridDim.y + i;
+            sum += block_sums[offset];
+        }
+
+        shared_sum[threadIdx.x] = sum;
+        __syncthreads();
+
+        for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+            if (threadIdx.x < i) {
+                shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
+            }
+            __syncthreads();
+        }
+
+        if (threadIdx.x == 0) {
+            dtype x = shared_sum[0];
+            DeviceAtomicAdd(bias_grad + row_i, x);
+        }
+    }
+}
+
+void LinearBackward(vector<dtype *> &grads, int count, vector<int> &cols, int in_row, int out_row,
+        dtype *W_val,
+        vector<dtype *> &in_vals,
+        dtype *bias_grad,
+        vector<dtype *> &in_grads,
+        dtype *W_grad) {
+    int col_sum = 0;
+    vector<int> in_offsets, out_offsets, in_dims, out_dims;
+    in_offsets.reserve(count);
+    out_offsets.reserve(count);
+    in_dims.reserve(count);
+    out_dims.reserve(count);
+    for (int col : cols) {
+        in_offsets.push_back(col_sum * in_row);
+        out_offsets.push_back(col_sum * out_row);
+        col_sum += col;
+        in_dims.push_back(in_row * col);
+        out_dims.push_back(out_row * col);
+    }
+
+    NumberArray concated_grad, concated_in_grad, concated_in_val;
+    concated_grad.init(col_sum * out_row);
+    concated_in_grad.init(col_sum * in_row);
+    concated_in_val.init(col_sum * in_row);
+
+    NumberPointerArray in_grad_arr, grad_arr, in_val_arr;
+    in_grad_arr.init(in_grads.data(), count);
+    grad_arr.init(grads.data(), count);
+    in_val_arr.init(in_vals.data(), count);
+
+    IntArray in_dim_arr, in_offset_arr, out_dim_arr, out_offset_arr;
+    in_dim_arr.init(in_dims.data(), count);
+    in_offset_arr.init(in_offsets.data(), count);
+    out_dim_arr.init(out_dims.data(), count);
+    out_offset_arr.init(out_offsets.data(), count);
+
+    int max_col = *max_element(cols.begin(), cols.end());
+    int max_out_dim = max_col * out_row;
+    int block_count = DefaultBlockCountWithoutLimit(count * max_col * out_row);
+
+    KernelConcat<<<block_count, TPB>>>(grad_arr.value, count, out_dim_arr.value, max_out_dim,
+            out_offset_arr.value, concated_grad.value);
+    CheckCudaError();
+
+    int max_in_dim = max_col * in_row;
+    block_count = DefaultBlockCountWithoutLimit(count * max_col * in_row);
+    KernelConcat<<<block_count, TPB>>>(in_val_arr.value, count, in_dim_arr.value, max_in_dim,
+            in_offset_arr.value, concated_in_val.value);
+    CheckCudaError();
+
+    KernelConcat<<<block_count, TPB>>>(in_grad_arr.value, count, in_dim_arr.value, max_in_dim,
+            in_offset_arr.value, concated_in_grad.value);
+    CheckCudaError();
+
+    MatrixMultiplyMatrix(concated_grad.value, concated_in_val.value, W_grad, out_row, col_sum,
+            in_row, true, true, false);
+    MatrixMultiplyMatrix(W_val, concated_grad.value, concated_in_grad.value, in_row, out_row,
+            col_sum, false, false, true);
+
+    KernelAtomicAdd<<<block_count, TPB>>>(concated_in_grad.value, count, in_dim_arr.value,
+            max_in_dim, in_offset_arr.value, in_grad_arr.value);
+    CheckCudaError();
+
+    if (bias_grad != nullptr) {
+        int thread_count = min(NextTwoIntegerPowerNumber(col_sum), TPB);
+        int block_y_count = (col_sum - 1 + thread_count) / thread_count;
+        dim3 block_dim(out_row, block_y_count, 1);
+        NumberArray block_sums;
+        block_sums.init(block_y_count * out_row);
+        IntArray block_counters;
+        block_counters.init(out_row);
+        KernelLinearBackwardForBias<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(
+                concated_grad.value, col_sum, out_row, bias_grad, block_counters.value,
+                block_sums.value);
+        CheckCudaError();
+    }
 }
 
 __device__ dtype maxIgnoringINF(dtype a, dtype b) {

@@ -241,6 +241,7 @@ public:
         loss_.zero();
 #endif
         batched_node_ = this;
+        column_ = 1;
         NodeAbs::clear();
     }
 

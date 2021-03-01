@@ -156,27 +156,27 @@ public:
             col_sum_ += batch.at(i)->getColumn();
         }
 
+#if TEST_CUDA
         x.init(inDim(), col_sum_);
         y.init(outDim(), col_sum_);
-#if TEST_CUDA
         b.init(outDim(), col_sum_);
 #endif
-        std::vector<dtype*> xs, ys;
-        xs.reserve(batch.size());
+        std::vector<dtype*> ys;
+        in_vals_.reserve(batch.size());
         ys.reserve(batch.size());
         cols_.reserve(batch.size());
 
         for (int i = 0; i < batch.size(); ++i) {
             LinearNode *n = static_cast<LinearNode*>(batch.at(i));
 
-            xs.push_back(n->getInput().val().value);
+            in_vals_.push_back(n->getInput().val().value);
             ys.push_back(n->val().value);
             cols_.push_back(n->getColumn());
 #if TEST_CUDA
             n->getInput().val().copyFromDeviceToHost();
 #endif
         }
-        n3ldg_cuda::LinearForward(xs, count, cols_, inDim(), outDim(), params().W.val.value, 
+        n3ldg_cuda::LinearForward(in_vals_, count, cols_, inDim(), outDim(), params().W.val.value, 
                 params().bUseB ? params().b.val.value : nullptr, ys);
 
 #if TEST_CUDA
@@ -235,63 +235,52 @@ public:
             ptr->getInput().loss().copyFromDeviceToHost();
         }
 #endif
-        Tensor2D lx, ly;
-        lx.init(inDim(), count);
-        ly.init(outDim(), count);
 
-        std::vector<dtype*> ly_vec;
-        ly_vec.reserve(count);
+        std::vector<dtype*> grads, in_grads;
+        grads.reserve(count);
+        in_grads.reserve(count);
         for (int i = 0; i < count; ++i) {
             LinearNode* ptr = (LinearNode*)batch[i];
-            ly_vec.push_back(ptr->loss().value);
-        }
-        n3ldg_cuda::CopyFromMultiVectorsToOneVector(ly_vec, ly.value, count, outDim());
-        n3ldg_cuda::MatrixMultiplyMatrix(ly.value, x.value, params().W.grad.value, outDim(), count,
-                inDim(), true, true, false);
-        n3ldg_cuda::MatrixMultiplyMatrix(params().W.val.value, ly.value, lx.value, inDim(),
-                outDim(), count, false, false, true);
-        std::vector<dtype*> losses;
-        losses.reserve(count);
-        for (int idx = 0; idx < count; idx++) {
-            LinearNode* ptr = (LinearNode*)batch[idx];
-            losses.push_back(ptr->getInput().loss().value);
+            grads.push_back(ptr->loss().value);
+            in_grads.push_back(ptr->getInput().loss().value);
         }
 
-        n3ldg_cuda::AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(ly.value, lx.value,
-                params().b.grad.value, losses, count, outDim(), inDim(), params().bUseB);
-
+        n3ldg_cuda::LinearBackward(grads, count, cols_, inDim(), outDim(), params().W.val.value,
+                in_vals_, params().bUseB ? params().b.grad.value : nullptr, in_grads,
+                params().W.grad.value);
 #if TEST_CUDA
-        for (int idx = 0; idx < count; idx++) {
-            LinearNode* ptr = (LinearNode*)batch[idx];
-            for (int idy = 0; idy < outDim(); idy++) {
-                ly[idx][idy] = ptr->getLoss()[idy];
-            }
-        }
+        Tensor2D lx, ly;
+        lx.init(inDim(), col_sum_);
+        ly.init(outDim(), col_sum_);
 
-        n3ldg_cuda::Assert(x.verify("backward x"));
+        int col_offset = 0;
+        for (int i = 0; i < count; i++) {
+            LinearNode &l = dynamic_cast<LinearNode &>(*batch.at(i));
+            Vec(ly.v + col_offset * outDim(), l.getDim()) = l.getLoss().vec();
+            col_offset += l.getColumn();
+        }
 
         params().W.grad.mat() += ly.mat() * x.mat().transpose();
-        n3ldg_cuda::Assert(params().W.grad.verify("LinearExecutor backward W grad"));
 
         if (params().bUseB) {
-            for (int idx = 0; idx < count; idx++) {
-                for (int idy = 0; idy < outDim(); idy++) {
-                    params().b.grad.v[idy] += ly[idx][idy];
-                }
+            for (int i = 0; i < col_sum_; ++i) {
+                params().b.grad.vec() += Vec(ly.v + i * outDim(), outDim());
             }
+        }
+
+        lx.mat() = params().W.val.mat().transpose() * ly.mat();
+
+        col_offset = 0;
+        for (int i = 0; i < count; i++) {
+            LinearNode& l = (LinearNode &)(*batch.at(i));
+            l.getInput().loss().vec() += Vec(lx.v + col_offset * inDim(), inDim());
+            col_offset += l.getColumn();
+        }
+
+        n3ldg_cuda::Assert(params().W.grad.verify("LinearExecutor backward W grad"));
+        if (params().bUseB) {
             n3ldg_cuda::Assert(params().b.grad.verify("backward b grad"));
         }
-
-        lx.mat() += params().W.val.mat().transpose() * ly.mat();
-        n3ldg_cuda::Assert(lx.verify("linear execute backward lx"));
-
-        for (int idx = 0; idx < count; idx++) {
-            LinearNode* ptr = (LinearNode*)batch[idx];
-            for (int idy = 0; idy < inDim(); idy++) {
-                ptr->getInput().loss()[idy] += lx[idx][idy];
-            }
-        }
-
         for (Node * n : batch) {
             LinearNode *ptr = static_cast<LinearNode *>(n);
             n3ldg_cuda::Assert(ptr->getInput().loss().verify("backward loss"));
@@ -301,9 +290,12 @@ public:
     }
 
 private:
+#if TEST_CUDA
     Tensor2D x, y, b;
+#endif
     int col_sum_ = 0;
     vector<int> cols_;
+    vector<dtype *> in_vals_;
 };
 #else
 class LinearExecutor :public Executor {

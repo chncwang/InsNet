@@ -205,6 +205,12 @@ void LinearForward(vector<dtype *> &in_vals, int count, vector<int> &in_cols, in
         dtype *W,
         dtype *bias,
         vector<dtype *> &vals);
+void LinearBackward(vector<dtype *> &grads, int count, vector<int> &cols, int in_row, int out_row,
+        dtype *W_val,
+        vector<dtype *> &in_vals,
+        dtype *bias_grad,
+        vector<dtype *> &in_grads,
+        dtype *W_grad);
 void AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(dtype *lty,
         dtype *lx, dtype *b, vector<dtype*> &losses, int count,
         int out_dim, int in_dim, bool use_b);
