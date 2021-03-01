@@ -235,9 +235,12 @@ public:
 
     void init(int dimm) override {
         Node::init(dimm);
+#if !USE_GPU || TEST_CUDA
         drop_mask_.init(dimm);
+#endif
     }
 
+#if !USE_GPU || TEST_CUDA
     virtual void generate_dropmask() {
         int dropNum = (int)(getDim() * drop_value_);
         std::vector<int> tmp_masks(getDim());
@@ -249,7 +252,9 @@ public:
             drop_mask_[idx] = tmp_masks[idx];
         }
     }
+#endif
 
+#if !USE_GPU || TEST_CUDA
     void compute() override {
         if (is_training_) {
 #if !TEST_CUDA
@@ -264,6 +269,15 @@ public:
     void backward() override {
         getInput().loss().vec() += loss().vec() * drop_mask_.vec();
     }
+#else
+    void compute() override {
+        abort();
+    }
+
+    void backward() override {
+        abort();
+    }
+#endif
 
     string typeSignature() const override {
         return Node::typeSignature() + "-" + to_string(drop_value_);
@@ -275,9 +289,11 @@ public:
         return is_training_;
     }
 
+#if !USE_GPU || TEST_CUDA
     Tensor1D &dropMask() {
         return drop_mask_;
     }
+#endif
 
     void setIsTraining(bool is_training) {
         is_training_ = is_training;
@@ -304,7 +320,9 @@ protected:
     }
 
 private:
+#if !USE_GPU || TEST_CUDA
     Tensor1D drop_mask_;
+#endif
     dtype drop_value_ = 0.0f;
     bool is_training_ = true;
 };

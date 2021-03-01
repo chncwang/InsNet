@@ -424,36 +424,6 @@ BatchedNode *concatHeads(Graph &graph, BatchedNode &input, int head) {
 
 namespace n3ldg_plus {
 
-//BatchedNode *dotAttention(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedNode& q,
-//        bool is_decoder_self_att,
-//        int head_count,
-//        UniParams &fusion_param,
-//        dtype dropout,
-//        bool is_training) {
-//    vector<int> dims(k.batch().size());
-//    for (int i = 1; i <= k.batch().size(); ++i) {
-//        dims.at(i - 1) = i;
-//    }
-
-//    int head_dim = q.getDim() / head_count;
-//    vector<int> offsets(head_count);
-//    for (int i = 0; i < head_count; ++i) {
-//        offsets.at(i) = i * head_dim;
-//    }
-
-//    BatchedNode *split_q = split(graph, q, head_dim, offsets);
-//    BatchedNode *split_k = split(graph, k, head_dim, offsets);
-//    BatchedNode *key_matrix = concatToMatrix(graph, *split_k, head_count);
-//    BatchedNode *split_v = split(graph, v, head_dim, offsets);
-//    BatchedNode *value_matrix = concatToMatrix(graph, *split_v, head_count);
-//    BatchedNode *split_attended = n3ldg_plus::dotAttention(graph, *key_matrix,
-//            *value_matrix, *split_q, is_decoder_self_att ? &dims : nullptr).first;
-//    BatchedNode *attended = concatHeads(graph, *split_attended, head_count);
-//    attended = n3ldg_plus::linear(graph, *attended, fusion_param);
-//    attended = n3ldg_plus::dropout(graph, *attended, dropout, is_training);
-//    return attended;
-//}
-
 BatchedNode *dotAttention(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedNode& q,
         bool is_decoder_self_att,
         int head_count,
@@ -491,6 +461,43 @@ BatchedNode *dotAttention(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedN
     return attended;
 }
 
+BatchedNode *dotAttentionDev(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedNode& q,
+        bool is_decoder_self_att,
+        int head_count,
+        UniParams &fusion_param,
+        dtype dropout,
+        bool use_mask,
+        bool is_training) {
+    int q_col = q.batch().size();
+    int v_col = v.batch().size();
+
+    int head_dim = q.getDim() / head_count;
+    vector<int> offsets(head_count);
+    for (int i = 0; i < head_count; ++i) {
+        offsets.at(i) = i * head_dim;
+    }
+
+    Node *query_matrix = concatToMatrix(graph, q);
+    Node *key_matrix = concatToMatrix(graph, k);
+    Node *value_matrix = concatToMatrix(graph, v);
+    BatchedNode *split_q = split(graph, *query_matrix, head_dim, offsets, q_col);
+    BatchedNode *split_k = split(graph, *key_matrix, head_dim, offsets, v_col);
+    BatchedNode *split_v = split(graph, *value_matrix, head_dim, offsets, v_col);
+    BatchedNode *split_attended = n3ldg_plus::dotAttention(graph, *split_k, *split_v, *split_q,
+            q_col, use_mask).first;
+    Node *attended_matrix = concat(graph, *split_attended, q_col);
+    attended_matrix = n3ldg_plus::linear(graph, *attended_matrix, fusion_param, q_col);
+    attended_matrix = n3ldg_plus::dropout(graph, *attended_matrix, dropout, is_training);
+    offsets.clear();
+    offsets.reserve(q.batch().size());
+    int row = q.getDim();
+    for (int i = 0; i < q.batch().size(); ++i) {
+        offsets.push_back(i * row);
+    }
+    BatchedNode *attended = split(graph, *attended_matrix, row, offsets);
+    return attended;
+}
+
 BatchedNode *transformerEncoder(Graph &graph, TransformerEncoderParams &params,
         BatchedNode &inputs,
         dtype dropout,
@@ -524,7 +531,7 @@ BatchedNode *transformerEncoder(Graph &graph, TransformerEncoderParams &params,
         BatchedNode *key = linear(graph, *normed, attention_head_params.k());
         BatchedNode *value = linear(graph, *normed, attention_head_params.v());
         BatchedNode *q = linear(graph, *normed, attention_head_params.q());
-        BatchedNode *attended = dotAttention(graph, *key, *value, *q, false, params.headCount(),
+        BatchedNode *attended = dotAttentionDev(graph, *key, *value, *q, false, params.headCount(),
                 layer_params.headsFusionParams(), dropout, false, is_training);
         BatchedNode *added = addInBatch(graph, {attended, last_layer});
         normed = layerNormalization(graph, layer_params.layerNormB(), *added);
