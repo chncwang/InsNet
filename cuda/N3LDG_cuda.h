@@ -175,7 +175,8 @@ void ActivationBackward(ActivatedEnum activated, vector<dtype*> &losses,
         int count,
         vector<int> &dims,
         vector<dtype*> &in_losses);
-void DropoutForward(vector<dtype*> &xs, int count, int dim,
+void DropoutForward(vector<dtype*> &xs, int count, vector<int> &dims, int max_dim,
+        vector<int> &offsets,
         bool is_training,
         dtype *drop_mask,
         dtype drop_factor,
@@ -225,7 +226,7 @@ void AddLtyToParamBiasAndAddLxToInputLossesForBiBackward(dtype *lty,
         int in_dim1,
         int in_dim2,
         bool use_b);
-void CalculateDropoutMask(dtype dropout_ratio, int count, int dim, dtype *mask);
+void CalculateDropoutMask(dtype dropout_ratio, int dim, dtype *mask);
 void ConcatForward(vector<dtype*> &in_vals, vector<int> &in_dims, vector<dtype*> &vals, int count,
         int in_count,
         int out_dim,

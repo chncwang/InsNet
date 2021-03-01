@@ -280,7 +280,7 @@ public:
 #endif
 
     string typeSignature() const override {
-        return Node::typeSignature() + "-" + to_string(drop_value_);
+        return Node::getNodeType() + "-" + to_string(drop_value_);
     }
 
     PExecutor generate() override;
@@ -343,8 +343,6 @@ public:
 
 class DropoutExecutor :public Executor {
 public:
-    Tensor2D drop_mask;
-
     bool isTraining() const {
         DropoutNode *node = dynamic_cast<DropoutNode *>(batch.front());
         return node->isTraining();
@@ -356,19 +354,29 @@ public:
     }
 
 #if USE_GPU
-    void CalculateDropMask(int count, int dim, const Tensor2D &mask) {
+    void CalculateDropMask() {
         if (isTraining()) {
-            n3ldg_cuda::CalculateDropoutMask(dropoutValue(), count, dim, mask.value);
+            n3ldg_cuda::CalculateDropoutMask(dropoutValue(), dim_sum_, drop_mask.value);
         }
     }
 
     void forward() {
         int count = batch.size();
         std::vector<dtype*> xs(count), ys(count);
-        drop_mask.init(getDim(), count);
+        dims_.reserve(count);
+        offsets_.reserve(count);
+
+        for (Node *node : batch) {
+            DropoutNode &dropout_node = dynamic_cast<DropoutNode&>(*node);
+            offsets_.push_back(dim_sum_);
+            dim_sum_ += dropout_node.getDim();
+            dims_.push_back(dropout_node.getDim());
+        }
+
+        drop_mask.init(dim_sum_);
         int i = 0;
         for (Node *n : batch) {
-            DropoutNode *dropout_node = static_cast<DropoutNode*>(n);
+            DropoutNode *dropout_node = dynamic_cast<DropoutNode*>(n);
 #if TEST_CUDA
             dropout_node->getInput().val().copyFromHostToDevice();
 #endif
@@ -376,18 +384,21 @@ public:
             ys.at(i++) = dropout_node->getVal().value;
         }
 
-        CalculateDropMask(count, getDim(), drop_mask);
-        n3ldg_cuda::DropoutForward(xs, count, getDim(), isTraining(), drop_mask.value,
-                dropoutValue(), ys);
+        CalculateDropMask();
+        max_dim_ = *max_element(dims_.begin(), dims_.end());
+        n3ldg_cuda::DropoutForward(xs, count, dims_, max_dim_, offsets_, isTraining(),
+                drop_mask.value, dropoutValue(), ys);
 #if TEST_CUDA
         if (isTraining()) {
             drop_mask.copyFromDeviceToHost();
+            int offset = 0;
             for (int i = 0; i < count; ++i) {
-                for (int j = 0; j < getDim(); ++j) {
-                    dtype v = drop_mask[i][j];
-                    static_cast<DropoutNode*>(batch.at(i))->dropMask()[j] = v <= dropoutValue() ?
+                for (int j = 0; j < batch.at(i)->getDim(); ++j) {
+                    dtype v = drop_mask[offset + j];
+                    dynamic_cast<DropoutNode*>(batch.at(i))->dropMask()[j] = v <= dropoutValue() ?
                         0 : 1;
                 }
+                offset += batch.at(i)->getDim();
             }
         }
         for (int idx = 0; idx < count; idx++) {
@@ -427,6 +438,12 @@ public:
         return defaultFLOPs();
     }
 #endif
+
+private:
+    Tensor1D drop_mask;
+    int dim_sum_ = 0;
+    vector<int> dims_, offsets_;
+    int max_dim_;
 };
 
 PExecutor DropoutNode::generate() {

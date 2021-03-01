@@ -689,29 +689,33 @@ void ActivationBackward(ActivatedEnum activated, vector<dtype*> &grads,
     CheckCudaError();
 }
 
-__global__ void KernelDropoutForward(dtype **xs, int count, int dim,
+__global__ void KernelDropoutForward(dtype **xs, int count, int *dims, int max_dim, int *offsets,
         bool is_training,
         dtype* drop_mask,
         dtype drop_factor,
         dtype **ys) {
-    int index = DeviceDefaultIndex();
-    int step = DeviceDefaultStep();
-    for (int i = index; i < dim * count; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        if (is_training) {
-            if (drop_mask[i] < drop_factor) {
-                ys[count_i][dim_i] = 0.0f;
+    int i = DeviceDefaultIndex();
+    if (i < count * max_dim) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+        int dim = dims[count_i];
+        if (dim_i < dim) {
+            if (is_training) {
+                int offset = offsets[count_i];
+                if (drop_mask[offset + dim_i] < drop_factor) {
+                    ys[count_i][dim_i] = 0.0f;
+                } else {
+                    ys[count_i][dim_i] = xs[count_i][dim_i];
+                }
             } else {
-                ys[count_i][dim_i] = xs[count_i][dim_i];
+                ys[count_i][dim_i] = (1 - drop_factor) * xs[count_i][dim_i];
             }
-        } else {
-            ys[count_i][dim_i] = (1 - drop_factor) * xs[count_i][dim_i];
         }
     }
 }
 
-void DropoutForward(vector<dtype*> &xs, int count, int dim,
+void DropoutForward(vector<dtype*> &xs, int count, vector<int> &dims, int max_dim,
+        vector<int> &offsets,
         bool is_training,
         dtype *drop_mask,
         dtype drop_factor,
@@ -721,11 +725,14 @@ void DropoutForward(vector<dtype*> &xs, int count, int dim,
         abort();
     }
     NumberPointerArray x_arr, y_arr;
-    x_arr.init((dtype**)xs.data(), xs.size());
-    y_arr.init((dtype**)ys.data(), ys.size());
-    int block_count = DefaultBlockCount(count * dim);
-    KernelDropoutForward<<<block_count, TPB>>>(x_arr.value, count, dim, is_training, drop_mask,
-            drop_factor, (dtype **)y_arr.value);
+    x_arr.init(xs.data(), count);
+    y_arr.init(ys.data(), count);
+    IntArray dim_arr, offset_arr;
+    dim_arr.init(dims.data(), count);
+    offset_arr.init(offsets.data(), count);
+    int block_count = DefaultBlockCountWithoutLimit(count * max_dim);
+    KernelDropoutForward<<<block_count, TPB>>>(x_arr.value, count, dim_arr.value, max_dim,
+            offset_arr.value, is_training, drop_mask, drop_factor, (dtype **)y_arr.value);
     CheckCudaError();
 }
 
@@ -1683,9 +1690,9 @@ curandGenerator_t &GetGenerator() {
     return gen;
 }
 
-void CalculateDropoutMask(dtype drop_factor, int count, int dim, dtype* mask) {
+void CalculateDropoutMask(dtype drop_factor, int dim, dtype* mask) {
     curandGenerator_t &gen = GetGenerator();
-    CallCurand(curandGenerateUniform(gen, mask, count * dim));
+    CallCurand(curandGenerateUniform(gen, mask, dim));
 }
 
 __global__ void KernelConcatForward(dtype **ins, int *in_rows, dtype **outs, int count,
