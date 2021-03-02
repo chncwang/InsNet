@@ -8,8 +8,6 @@
 
 class PAddNode : public Node, public Poolable<PAddNode> {
 public:
-    vector<Node *> ins;
-
     PAddNode() : Node("point-add") {}
 
     void initNode(int dim) override {
@@ -21,7 +19,7 @@ public:
     }
 
     void setInputs(const vector<Node *> &ins) override {
-        this->ins = ins;
+        this->ins_ = ins;
     }
 
     void forward(Graph &cg, const vector<Node *>& x) {
@@ -41,32 +39,36 @@ public:
     }
 
     void compute() override {
-        int nSize = ins.size();
+        int nSize = ins_.size();
         val().zero();
         for (int i = 0; i < nSize; ++i) {
             for (int idx = 0; idx < getDim(); idx++) {
-                val()[idx] += ins.at(i)->val()[idx];
+                val()[idx] += ins_.at(i)->val()[idx];
             }
         }
     }
 
 
     void backward() override {
-        int nSize = ins.size();
+        int nSize = ins_.size();
         for (int i = 0; i < nSize; ++i) {
             for (int idx = 0; idx < getDim(); idx++) {
-                ins.at(i)->loss()[idx] += loss()[idx];
+                ins_.at(i)->loss()[idx] += loss()[idx];
             }
         }
     }
 
-
-public:
     PExecutor generate() override;
 
     string typeSignature() const override {
-        return Node::typeSignature() + "-" + to_string(ins.size());
+        return Node::getNodeType() + "-" + to_string(ins_.size());
     }
+
+private:
+    vector<Node *> ins_;
+
+    friend class BatchedPAddNode;
+    friend class PAddExecutor;
 };
 
 class BatchedPAddNode : public BatchedNodeImpl<PAddNode> {
@@ -101,117 +103,96 @@ namespace n3ldg_plus {
     }
 }
 
+#if USE_GPU
 class PAddExecutor : public Executor {
 public:
-    int in_count;
-    int dim;
-    Tensor1D x, y;
-    int sumDim;
-
-#if !USE_GPU
-    int calculateFLOPs() override {
-        int sum = 0;
-        for (Node *node : batch) {
-            PAddNode *add = static_cast<PAddNode*>(node);
-            sum += add->getDim() * add->ins.size();
-        }
-        return sum;
-    }
-#endif
-
-#if USE_GPU
-    void  forward() {
+    void forward() override {
         int count = batch.size();
 
-        std::vector<std::vector<dtype*>> in_vals;
-        in_vals.reserve(in_count);
-        for (int i = 0; i < in_count; ++i) {
+        for (int i = 0; i < inCount(); ++i) {
             std::vector<dtype*> ins;
             ins.reserve(count);
             for (Node * n : batch) {
-                PAddNode *padd = static_cast<PAddNode*>(n);
-                ins.push_back(padd->ins.at(i)->val().value);
+                PAddNode *padd = dynamic_cast<PAddNode*>(n);
+                ins.push_back(padd->ins_.at(i)->val().value);
 #if TEST_CUDA
-                n3ldg_cuda::Assert(padd->ins.at(i)->val().verify("PAdd forward input"));
+                n3ldg_cuda::Assert(padd->ins_.at(i)->val().verify("PAdd forward input"));
 #endif
             }
-            in_vals.push_back(ins);
         }
-        std::vector<dtype *> outs;
+        std::vector<dtype*> in_vals, outs;
+        in_vals.reserve(count * inCount());
         outs.reserve(count);
+        dims_.reserve(count);
         for (Node * n : batch) {
-            PAddNode *padd = static_cast<PAddNode*>(n);
-            outs.push_back(padd->val().value);
-        }
-        n3ldg_cuda::PAddForward(in_vals, count, dim, in_count, outs);
-#if TEST_CUDA
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->compute();
-        }
-        for (Node *n : batch) {
-            n3ldg_cuda::Assert(n->val().verify("PAdd forward"));
-        }
-#endif
-    }
-#else
-    void  forward() override {
-        int count = batch.size();
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->compute();
-        }
-    }
-#endif
-
-#if USE_GPU
-    void backward() {
-        int count = batch.size();
-        std::vector<std::vector<dtype*>> in_losses;
-        in_losses.reserve(in_count);
-        for (int i = 0; i < in_count; ++i) {
-            std::vector<dtype*> ins;
-            ins.reserve(count);
-            for (Node * n : batch) {
-                PAddNode *padd = static_cast<PAddNode*>(n);
-                ins.push_back(padd->ins.at(i)->loss().value);
+            PAddNode &padd = dynamic_cast<PAddNode&>(*n);
+            outs.push_back(padd.val().value);
+            dims_.push_back(padd.getDim());
+            for (Node *in : padd.ins_) {
+                in_vals.push_back(in->getVal().value);
             }
-            in_losses.push_back(ins);
         }
-        std::vector<dtype *> out_losses;
-        out_losses.reserve(count);
-        for (Node * n : batch) {
-            PAddNode *padd = static_cast<PAddNode*>(n);
-            out_losses.push_back(padd->loss().value);
+        max_dim_ = *max_element(dims_.begin(), dims_.end());
+        n3ldg_cuda::PAddForward(in_vals, count, dims_, max_dim_, inCount(), outs, dim_arr_);
+#if TEST_CUDA
+        testForward();
+#endif
+    }
+
+    void backward() override {
+        int count = batch.size();
+        std::vector<dtype *> out_grads, in_grads;
+        out_grads.reserve(count);
+        in_grads.reserve(count * inCount());
+        for (Node *n : batch) {
+            PAddNode &padd = dynamic_cast<PAddNode&>(*n);
+            out_grads.push_back(padd.getLoss().value);
+            for (Node *in : padd.ins_) {
+                in_grads.push_back(in->getLoss().value);
+            }
         }
-        n3ldg_cuda::PAddBackward(out_losses, count, dim, in_count, in_losses);
+        n3ldg_cuda::PAddBackward(out_grads, count, max_dim_, inCount(), in_grads, dim_arr_);
+
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward();
         }
 
         for (Node *n : batch) {
-            PAddNode *add = static_cast<PAddNode*>(n);
-            for (Node *in : add->ins) {
+            PAddNode *add = dynamic_cast<PAddNode*>(n);
+            for (Node *in : add->ins_) {
                 n3ldg_cuda::Assert(in->loss().verify("PAddExecutor backward"));
             }
         }
         cout << "PAddExecutor backward tested" << endl;
 #endif
     }
-#else
-    void backward() override {
-        int count = batch.size();
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->backward();
-        }
+
+private:
+    int inCount() {
+        return dynamic_cast<PAddNode &>(*batch.front()).ins_.size();
     }
-#endif
+
+    vector<int> dims_;
+    int max_dim_;
+    n3ldg_cuda::IntArray dim_arr_;
 };
+#else
+class PAddExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        int sum = 0;
+        for (Node *node : batch) {
+            PAddNode *add = dynamic_cast<PAddNode*>(node);
+            sum += add->getDim() * add->ins_.size();
+        }
+        return sum;
+    }
+};
+#endif
 
 PExecutor PAddNode::generate() {
-    PAddExecutor* exec = new PAddExecutor();
-    exec->in_count = ins.size();
-    exec->dim = getDim();
-    return exec;
+    return new PAddExecutor();
 }
 
 #endif

@@ -367,10 +367,12 @@ void PMultiBackward(vector<dtype*> &losses, vector<dtype*> &in_vals1, vector<dty
         int dim,
         vector<dtype*> &in_losses1,
         vector<dtype*> &in_losses2);
-void PAddForward(vector<vector<dtype*>> &ins, int count, int dim, int in_count,
-        vector<dtype*> &vals);
-void PAddBackward(vector<dtype*> &losses, int count, int dim, int in_count,
-        vector<vector<dtype*>> &in_losses);
+void PAddForward(vector<dtype*> &ins, int count, vector<int> &dims, int max_dim, int in_count,
+        vector<dtype*> &vals,
+        IntArray &dim_arr);
+void PAddBackward(vector<dtype*> &grads, int count, int max_dim, int in_count,
+        vector<dtype*> &in_grads,
+        IntArray &dim_arr);
 dtype CrossEntropyLoss(vector<dtype *> &vals, vector<int> &answers, int count, dtype batchsize,
         vector<dtype *> &losses);
 dtype MultiCrossEntropyLoss(vector<dtype*> &vals, vector<vector<int>> &answers, int count, int dim,

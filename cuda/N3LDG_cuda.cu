@@ -3252,91 +3252,63 @@ void PMultiBackward(vector<dtype*> &grads,
     CheckCudaError();
 }
 
-__global__ void KernelPAddForward(dtype ***ins, int count, int dim,
-        int in_count,
+__global__ void KernelPAddForward(dtype **ins, int count, int *dims, int max_dim, int in_count,
         dtype **vals) {
-    int index = DeviceDefaultIndex();
-    int step = DeviceDefaultStep();
-    for (int i = index; i < count * dim; i+= step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        dtype sum = ins[0][count_i][dim_i];
-        for (int j = 1; j < in_count; ++j) {
-            sum += ins[j][count_i][dim_i];
+    int i = DeviceDefaultIndex();
+    if (i < count * max_dim) {
+        int count_i = i / max_dim;
+        int dim_i = i % max_dim;
+        int dim = dims[count_i];
+        if (dim_i < dim) {
+            dtype sum = 0;
+            for (int j = 0; j < in_count; ++j) {
+                sum += ins[count_i * in_count + j][dim_i];
+            }
+            vals[count_i][dim_i] = sum;
         }
-        vals[count_i][dim_i] = sum;
     }
 }
 
-void PAddForward(vector<vector<dtype*>> &ins, int count,
-        int dim,
-        int in_count,
-        vector<dtype*> &vals) {
-    vector<shared_ptr<NumberPointerArray>> gpu_addr;
-    gpu_addr.reserve(ins.size());
-    for (vector<dtype*> &x : ins) {
-        shared_ptr<NumberPointerArray> arr =
-            make_shared<NumberPointerArray>();
-        arr->init((dtype**)x.data(), x.size());
-        gpu_addr.push_back(arr);
-    }
-    vector<dtype**> ins_gpu;
-    ins_gpu.reserve(ins.size());
-    for (auto &ptr : gpu_addr) {
-        ins_gpu.push_back((dtype**)ptr->value);
-    }
-
-    NumberPointerPointerArray in_arr;
-    in_arr.init(ins_gpu.data(), ins_gpu.size());
-    NumberPointerArray out_arr;
+void PAddForward(vector<dtype*> &ins, int count, vector<int> &dims, int max_dim, int in_count,
+        vector<dtype*> &vals,
+        IntArray &dim_arr) {
+    NumberPointerArray out_arr, in_arr;
+    in_arr.init(ins.data(), ins.size());
     out_arr.init(vals.data(), vals.size());
-
-    int block_count = DefaultBlockCount(count * dim);
-    KernelPAddForward<<<block_count, TPB>>>(in_arr.value, count, dim, in_count,
-            (dtype **)out_arr.value);
+    dim_arr.init(dims.data(), dims.size());
+    int block_count = DefaultBlockCountWithoutLimit(count * max_dim);
+    KernelPAddForward<<<block_count, TPB>>>(in_arr.value, count, dim_arr.value, max_dim, in_count,
+            out_arr.value);
     CheckCudaError();
 }
 
-__global__ void KernelPAddBackward(dtype **grads, int count, int dim,
-        int in_count,
-        dtype ***in_grads) {
-    int index = DeviceDefaultIndex();
-    int step = DeviceDefaultStep();
-    int dim_mul_count = dim * count;
-    for (int i = index; i < dim_mul_count * in_count; i += step) {
-        int in_count_i = i / dim_mul_count;
-        int dim_mul_count_i = i % dim_mul_count;
-        int count_i = dim_mul_count_i / dim;
-        int dim_i = dim_mul_count_i % dim;
-        DeviceAtomicAdd(in_grads[in_count_i][count_i] + dim_i, grads[count_i][dim_i]);
+__global__ void KernelPAddBackward(dtype **grads, int count, int *dims, int max_dim, int in_count,
+        dtype **in_grads) {
+    int i = DeviceDefaultIndex();
+    int n = in_count * max_dim;
+    if (i < count * in_count * max_dim) {
+        int count_i = i / n;
+        int ni = i % n;
+        int dim_i = ni % max_dim;
+        int in_count_i = ni / max_dim;
+        int dim = dims[count_i];
+        if (dim_i < dim) {
+            DeviceAtomicAdd(in_grads[count_i * in_count + in_count_i] + dim_i,
+                    grads[count_i][dim_i]);
+        }
     }
 }
 
-void PAddBackward(vector<dtype*> &grads, int count, int dim,
-        int in_count,
-        vector<vector<dtype*>> &in_grads) {
-    vector<shared_ptr<NumberPointerArray>> gpu_addr;
-    gpu_addr.reserve(in_grads.size());
-    for (vector<dtype*> &x : in_grads) {
-        shared_ptr<NumberPointerArray> arr =
-            make_shared<NumberPointerArray>();
-        arr->init((dtype**)x.data(), x.size());
-        gpu_addr.push_back(arr);
-    }
-    vector<dtype**> in_grads_gpu;
-    in_grads_gpu.reserve(in_grads.size());
-    for (auto &ptr : gpu_addr) {
-        in_grads_gpu.push_back((dtype **)ptr->value);
-    }
+void PAddBackward(vector<dtype*> &grads, int count, int max_dim, int in_count,
+        vector<dtype*> &in_grads,
+        IntArray &dim_arr) {
+    NumberPointerArray in_grad_arr, out_grad_arr;
+    in_grad_arr.init(in_grads.data(), in_grads.size());
+    out_grad_arr.init(grads.data(), grads.size());
 
-    NumberPointerPointerArray in_loss_arr;
-    in_loss_arr.init(in_grads_gpu.data(), in_grads_gpu.size());
-    NumberPointerArray out_loss_arr;
-    out_loss_arr.init((dtype**)grads.data(), grads.size());
-
-    int block_count = DefaultBlockCount(in_count * count * dim);
-    KernelPAddBackward<<<block_count, TPB>>>(out_loss_arr.value,
-            count, dim, in_count, (dtype ***)in_loss_arr.value);
+    int block_count = DefaultBlockCountWithoutLimit(in_count * count * max_dim);
+    KernelPAddBackward<<<block_count, TPB>>>(out_grad_arr.value, count, dim_arr.value, max_dim,
+            in_count, in_grad_arr.value);
     CheckCudaError();
 }
 

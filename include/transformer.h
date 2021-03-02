@@ -461,7 +461,7 @@ BatchedNode *dotAttention(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedN
     return attended;
 }
 
-BatchedNode *dotAttentionDev(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedNode& q,
+Node *dotAttentionDev(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedNode& q,
         bool is_decoder_self_att,
         int head_count,
         UniParams &fusion_param,
@@ -488,14 +488,7 @@ BatchedNode *dotAttentionDev(Graph &graph, BatchedNode& k, BatchedNode& v, Batch
     Node *attended_matrix = concat(graph, *split_attended, q_col);
     attended_matrix = n3ldg_plus::linear(graph, *attended_matrix, fusion_param, q_col);
     attended_matrix = n3ldg_plus::dropout(graph, *attended_matrix, dropout, is_training);
-    offsets.clear();
-    offsets.reserve(q.batch().size());
-    int row = q.getDim();
-    for (int i = 0; i < q.batch().size(); ++i) {
-        offsets.push_back(i * row);
-    }
-    BatchedNode *attended = split(graph, *attended_matrix, row, offsets);
-    return attended;
+    return attended_matrix;
 }
 
 BatchedNode *transformerEncoder(Graph &graph, TransformerEncoderParams &params,
@@ -531,9 +524,17 @@ BatchedNode *transformerEncoder(Graph &graph, TransformerEncoderParams &params,
         BatchedNode *key = linear(graph, *normed, attention_head_params.k());
         BatchedNode *value = linear(graph, *normed, attention_head_params.v());
         BatchedNode *q = linear(graph, *normed, attention_head_params.q());
-        BatchedNode *attended = dotAttentionDev(graph, *key, *value, *q, false, params.headCount(),
+        Node *attended = dotAttentionDev(graph, *key, *value, *q, false, params.headCount(),
                 layer_params.headsFusionParams(), dropout, false, is_training);
-        BatchedNode *added = addInBatch(graph, {attended, last_layer});
+        Node *last_layer_matrix = concatToMatrix(graph, *last_layer);
+        Node *added_matrix = add(graph, {attended, last_layer_matrix});
+        vector<int> offsets;
+        offsets.reserve(q->batch().size());
+        int row = q->getDim();
+        for (int i = 0; i < q->batch().size(); ++i) {
+            offsets.push_back(i * row);
+        }
+        BatchedNode *added = split(graph, *added_matrix, row, offsets);
         normed = layerNormalization(graph, layer_params.layerNormB(), *added);
         BatchedNode *t = linear(graph, *normed, layer_params.ffnInnerParams());
         t = relu(graph, *t);
