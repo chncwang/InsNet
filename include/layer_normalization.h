@@ -88,7 +88,7 @@ public:
     Executor *generate() override;
 
     string typeSignature() const override {
-        return Node::typeSignature();
+        return Node::getNodeType() + to_string(getDim() / getColumn());
     }
 
 protected:
@@ -189,18 +189,24 @@ private:
 class LayerNormExecutor : public UniInputExecutor {
 public:
     void forward() override {
-        sds_.init(batch.size());
+        for (Node *node : batch) {
+            col_sum_ += node->getColumn();
+        }
+        sds_.init(col_sum_);
         int i = 0;
         for (Node *node : batch) {
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
             auto &input = s.getInput().getVal();
-            dtype mean = input.mat().sum() / s.getDim();
-            Tensor1D x;
-            x.init(s.getDim());
-            x.vec() = (input.vec() - mean).square();
-            dtype sd = sqrt(x.mat().sum() / s.getDim());
-            sds_[i++] = sd;
-            s.val().vec() = ((input.vec() - mean) / sd);
+            for (int j = 0; j < s.getColumn(); ++j) {
+                int row = getRow();
+                dtype mean = Mat(input.v + row * j, row, 1).sum() / row;
+                Tensor1D x;
+                x.init(row);
+                x.vec() = (Vec(input.v + row * j, row) - mean).square();
+                dtype sd = sqrt(x.mat().sum() / row);
+                sds_[i++] = sd;
+                Vec(s.val().v + row * j, row) = (Vec(input.v + row * j, row) - mean) / sd;
+            }
         }
     }
 
@@ -208,21 +214,24 @@ public:
         int i = 0;
         for (Node *node : batch) {
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
-            int n = s.getDim();
-            dtype c = 1.0 / (n * sds_[i]);
-            Tensor1D y2;
-            y2.init(n);
-            y2.vec() = s.getVal().vec().square();
-            Tensor1D m;
-            m.init(n);
-            m.vec() = s.getLoss().vec() * s.getVal().vec();
-            Tensor1D x;
-            x.init(n);
-            x.vec() = c * ((-y2.vec() + static_cast<dtype>(n -1)) * s.getLoss().vec() -
-                    ((m.mat().sum() - m.vec()) * s.getVal().vec() + s.getLoss().mat().sum() -
-                     s.getLoss().vec()));
-            s.getInput().loss().vec() += x.vec();
-            ++i;
+            int n = getRow();
+            for (int j = 0; j < s.getColumn(); ++j) {
+                dtype c = 1.0 / (n * sds_[i]);
+                Tensor1D y2;
+                y2.init(n);
+                y2.vec() = Vec(s.getVal().v + j * n, n).square();
+                Tensor1D m;
+                m.init(n);
+                m.vec() = Vec(s.getLoss().v + j * n, n) * Vec(s.getVal().v + j * n, n);
+                Tensor1D x;
+                x.init(n);
+                x.vec() = c * ((-y2.vec() +
+                            static_cast<dtype>(n -1)) * Vec(s.getLoss().v + j * n, n) -
+                        ((m.mat().sum() - m.vec()) * Vec(s.getVal().v + j * n, n) +
+                         Mat(s.getLoss().v + j * n, n, 1).sum() - Vec(s.getLoss().v + j * n, n)));
+                Vec(s.getInput().loss().v + j * n, n) += x.vec();
+                ++i;
+            }
         }
     }
 
@@ -231,7 +240,13 @@ public:
     }
 
 private:
+    int getRow() const {
+        Node &node = *batch.front();
+        return node.getDim() / node.getColumn();
+    }
+
     Tensor1D sds_;
+    int col_sum_ = 0;
 };
 #endif
 
@@ -252,19 +267,28 @@ public:
     }
 
     void compute() override {
-        val().vec() = getInput().getVal().vec() * params_->g().val.vec() + params_->b().val.vec();
+        int row = getDim() / getColumn();
+        for (int i = 0; i < getColumn(); ++i) {
+            Vec(val().v + i * row, row) = Vec(getInput().getVal().v + i * row, row) *
+                params_->g().val.vec() + params_->b().val.vec();
+        }
     }
 
     void backward() override {
-        getInput().loss().vec() += getLoss().vec() * params_->g().val.vec();
-        params_->g().grad.vec() += getLoss().vec() * getInput().getVal().vec();
-        params_->b().grad.vec() += getLoss().vec();
+        int row = getDim() / getColumn();
+        for (int i = 0; i < getColumn(); ++i) {
+            Vec(getInput().loss().v + i * row, row) += Vec(getLoss().v + i * row, row) *
+                params_->g().val.vec();
+            params_->g().grad.vec() += Vec(getLoss().v + i * row, row) *
+                Vec(getInput().getVal().v + i * row, row);
+            params_->b().grad.vec() += Vec(getLoss().v + i * row, row);
+        }
     }
 
     Executor *generate() override;
 
     string typeSignature() const override {
-        return Node::typeSignature() + "-" + addressToString(params_);
+        return Node::getNodeType() + "-" + addressToString(params_);
     }
 
 protected:
@@ -277,6 +301,8 @@ private:
 
     friend class BatchedPointwiseLinearNode;
     friend class PointwiseLinearExecutor;
+    friend Node *layerNormalization(Graph &graph, LayerNormalizationParams &params,
+            Node &input_layer, int col);
 };
 
 class BatchedPointwiseLinearNode : public BatchedNodeImpl<PointwiseLinearNode> {
@@ -355,25 +381,17 @@ Executor *PointwiseLinearNode::generate() {
 }
 
 Node *layerNormalization(Graph &graph, LayerNormalizationParams &params,
-        Node &input_layer) {
+        Node &input_layer,
+        int col = 1) {
     using namespace n3ldg_plus;
-    Node *sum = vectorSum(graph, input_layer, 1);
-    Node *avg = scaled(graph, *sum, 1.0 / input_layer.getDim());
-    Node *avg_vector = scalarToVector(graph, *avg, input_layer.getDim());
-    Node *zeros_around = sub(graph, input_layer, *avg_vector);
-    Node *square = pointwiseMultiply(graph, *zeros_around, *zeros_around);
-    Node *square_sum = vectorSum(graph, *square, 1);
-    Node *eps = bucket(graph, 1, 1e-6);
-    square_sum = add(graph, {square_sum, eps});
-    Node *var = scaled(graph, *square_sum, 1.0 / input_layer.getDim());
-    Node *standard_deviation = sqrt(graph, *var);
-    standard_deviation = scalarToVector(graph, *standard_deviation, input_layer.getDim());
-    Node *g = embedding(graph, params.g(), 0, true);
-    Node *factor = fullDiv(graph, *g, *standard_deviation);
-
-    Node *scaled = pointwiseMultiply(graph, *factor, *zeros_around);
-    Node *biased = bias(graph, *scaled, params.b());
-    return biased;
+    StandardLayerNormNode *a = StandardLayerNormNode::newNode(input_layer.getDim());
+    a->setColumn(col);
+    a->forward(graph, input_layer);
+    PointwiseLinearNode *b = PointwiseLinearNode::newNode(input_layer.getDim());
+    b->setColumn(col);
+    b->params_ = &params;
+    b->forward(graph, *a);
+    return b;
 }
 
 BatchedNode *layerNormalization(Graph &graph, LayerNormalizationParams &params,

@@ -503,6 +503,7 @@ BatchedNode *transformerEncoder(Graph &graph, TransformerEncoderParams &params,
         pos_ids.push_back(i);
     }
 
+    int row = inputs.getDim();
     BatchedNode *pos_emb = embedding(graph, params.positionalEncodingParam(), pos_ids, false);
     BatchedNode *scaled_input = scaled(graph, inputs, ::sqrt(inputs.getDim()));
     BatchedNode *pos_encoded = addInBatch(graph, {&pos_emb, &scaled_input});
@@ -528,18 +529,22 @@ BatchedNode *transformerEncoder(Graph &graph, TransformerEncoderParams &params,
                 layer_params.headsFusionParams(), dropout, false, is_training);
         Node *last_layer_matrix = concatToMatrix(graph, *last_layer);
         Node *added_matrix = add(graph, {attended, last_layer_matrix});
+        Node *normed2 = layerNormalization(graph, layer_params.layerNormB(), *added_matrix,
+                sentence_len);
+        Node *t_matrix = linear(graph, *normed2, layer_params.ffnInnerParams(), sentence_len);
         vector<int> offsets;
-        offsets.reserve(q->batch().size());
-        int row = q->getDim();
-        for (int i = 0; i < q->batch().size(); ++i) {
-            offsets.push_back(i * row);
+        for (int j = 0; j < sentence_len; ++j) {
+            offsets.push_back(j * row * 4);
         }
-        BatchedNode *added = split(graph, *added_matrix, row, offsets);
-        normed = layerNormalization(graph, layer_params.layerNormB(), *added);
-        BatchedNode *t = linear(graph, *normed, layer_params.ffnInnerParams());
+        BatchedNode *t = split(graph, *t_matrix, row * 4, offsets);
         t = relu(graph, *t);
         t = linear(graph, *t, layer_params.ffnOutterParams());
         t = n3ldg_plus::dropout(graph, *t, dropout, is_training);
+        offsets.clear();
+        for (int j = 0; j < sentence_len; ++j) {
+            offsets.push_back(j * row);
+        }
+        BatchedNode *added = split(graph, *added_matrix, row, offsets);
         t = addInBatch(graph, {added, t});
         last_layer = t;
     }
