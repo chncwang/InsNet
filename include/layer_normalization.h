@@ -155,15 +155,42 @@ public:
     }
 
     void backward() override {
+#if TEST_CUDA
+        for (Node *node : batch) {
+            StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
+            s.loss().verify("standard layernorm before backward grad");
+            s.loss().copyFromHostToDevice();
+            s.val().verify("standard layernorm before backward val");
+            s.val().copyFromHostToDevice();
+            s.getInput().loss().verify("standard layernorm before backward input grad");
+            s.getInput().loss().copyFromHostToDevice();
+        }
+#endif
         int count = batch.size();
         vector<dtype *> in_grads(count), grads(count);
         int i = 0;
+        int col_sum = 0;
+        vector<int> col_offsets(count), dims(count), dim_offsets(count);
+        int row = getRow();
         for (Node *node : batch) {
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
+            col_offsets.at(i) = col_sum;
+            dim_offsets.at(i) = col_sum * row;
+            dims.at(i) = s.getDim();
             in_grads.at(i) = s.getInput().getLoss().value;
             grads.at(i++) = s.getLoss().value;
+            col_sum += s.getColumn();
         }
-        n3ldg_cuda::StandardLayerNormBackward(grads, count, getDim(), vals_, sds_.value, in_grads);
+        n3ldg_cuda::NumberPointerArray grad_arr, in_grad_arr;
+        grad_arr.init(grads.data(), count);
+        in_grad_arr.init(in_grads.data(), count);
+        n3ldg_cuda::IntArray col_offset_arr, dim_arr, dim_offset_arr;
+        col_offset_arr.init(col_offsets.data(), count);
+        dim_arr.init(dims.data(), count);
+        dim_offset_arr.init(dim_offsets.data(), count);
+        n3ldg_cuda::StandardLayerNormBackward(grad_arr.value, count, row, col_arr_.value, col_sum,
+                max_col_, col_offset_arr.value, dim_arr.value, dim_offset_arr.value,
+                val_arr_.value, sds_.value, in_grad_arr.value);
 #if TEST_CUDA
         i = 0;
         for (Node *node : batch) {
@@ -330,15 +357,24 @@ public:
         int count = batch.size();
         in_vals_.reserve(count);
         vector<dtype *> vals(count);
+        vector<int> cols;
+        cols.reserve(count);
         int i = 0;
         for (Node *node : batch)  {
             PointwiseLinearNode &p = dynamic_cast<PointwiseLinearNode &>(*node);
             in_vals_.push_back(p.getInput().getVal().value);
             vals.at(i++) = p.getVal().value;
+            cols.push_back(p.getColumn());
         }
+        in_val_arr_.init(in_vals_.data(), count);
+        col_arr_.init(cols.data(), count);
+        int row = getRow();
+        max_col_ = *max_element(cols.begin(), cols.end());
+        n3ldg_cuda::NumberPointerArray val_arr;
+        val_arr.init(vals.data(), count);
 
-        n3ldg_cuda::PointwiseLinearForward(in_vals_, count, getDim(), params().g().val.value,
-                params().b().val.value, vals);
+        n3ldg_cuda::PointwiseLinearForward(in_val_arr_.value, count, row, col_arr_.value, max_col_,
+                params().g().val.value, params().b().val.value, val_arr.value);
 
 #if TEST_CUDA
         testForward();
@@ -367,6 +403,9 @@ public:
 
 private:
     vector<dtype *> in_vals_;
+    n3ldg_cuda::NumberPointerArray in_val_arr_;
+    n3ldg_cuda::IntArray col_arr_;
+    int max_col_;
 
     LayerNormalizationParams &params() {
         return *dynamic_cast<PointwiseLinearNode *>(batch.front())->params_;

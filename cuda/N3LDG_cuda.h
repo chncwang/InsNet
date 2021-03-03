@@ -413,11 +413,17 @@ void BiasBackward(vector<dtype *> &losses, int count, int dim, dtype *bias_loss,
 void StandardLayerNormForward(dtype **in_vals, int count, int row, int *cols, int max_col,
         dtype **vals,
         dtype *sds);
-void StandardLayerNormBackward(vector<dtype *> &grads, int count, int dim, vector<dtype *> &vals,
+void StandardLayerNormBackward(dtype **grads, int count, int row, int *cols, int col_sum,
+        int max_col,
+        int *col_offsets,
+        int *dims,
+        int *dim_offsets,
+        dtype **vals,
         dtype *sds,
-        vector<dtype *> &in_grads);
-void PointwiseLinearForward(vector<dtype *> &in_vals, int count, int dim, dtype *g, dtype *b,
-        vector<dtype *> &vals);
+        dtype **in_grads);
+void PointwiseLinearForward(dtype **in_vals, int count, int row, int *cols, int max_col, dtype *g,
+        dtype *b,
+        dtype **vals);
 void PointwiseLinearBackward(vector<dtype *> &grads, vector<dtype *> &in_vals, dtype *g_vals,
         int count,
         int dim,

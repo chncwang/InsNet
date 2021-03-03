@@ -887,6 +887,7 @@ protected:
     void testBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
         Executor::backward();
         verifyBackward(get_inputs);
+        cout << batch.front()->cachedTypeSig() << " backward tested" << endl;
     }
 
     void testBeforeBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
