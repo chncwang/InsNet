@@ -5038,6 +5038,8 @@ void StandardLayerNormBackward(dtype **grads, int count, int row, int *cols, int
         dtype **vals,
         dtype *sds,
         dtype **in_grads) {
+    cout << boost::format("count:%1% row:%2% col_sum:%3% max_col:%4%") % count % row % col_sum %
+        max_col << endl;
     NumberArray m, m_sum, grad_sum;
     m.init(col_sum * row);
     m_sum.init(count * max_col);
@@ -5097,122 +5099,6 @@ void PointwiseLinearForward(dtype **in_vals, int count, int row, int *cols, int 
             vals);
     CheckCudaError();
 }
-
-//__global__ void KernelPointwiseLinearBackwardForG(dtype *ins, int col, int row, dtype *g_grads,
-//        int *block_counters,
-//        dtype *block_sums) {
-//    __shared__ volatile extern dtype shared_sum[];
-//    __shared__ volatile bool is_last_block;
-//    if (threadIdx.x == 0 && blockIdx.y == 0) {
-//        block_counters[blockIdx.x] = 0;
-//    }
-//    if (threadIdx.x == 0) {
-//        is_last_block = false;
-//    }
-//
-//    int row_i = blockIdx.x;
-//    int col_i = blockIdx.y * blockDim.x + threadIdx.x;
-//    shared_sum[threadIdx.x] = col_i < col ?  ins[col_i * row + row_i] : 0.0f;
-//    __syncthreads();
-//
-//    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-//        if (threadIdx.x < i) {
-//            shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
-//        }
-//        __syncthreads();
-//    }
-//
-//    int block_sums_offset = blockIdx.x * gridDim.y + blockIdx.y;
-//    if (threadIdx.x == 0) {
-//        block_sums[block_sums_offset] = shared_sum[0];
-//        if (atomicAdd(block_counters + blockIdx.x, 1) == gridDim.y - 1) {
-//            is_last_block = true;
-//        }
-//    }
-//    __syncthreads();
-//
-//    if (is_last_block) {
-//        dtype sum = 0.0f;
-//        for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
-//            int offset = blockIdx.x * gridDim.y + i;
-//            sum += block_sums[offset];
-//        }
-//
-//        shared_sum[threadIdx.x] = sum;
-//        __syncthreads();
-//
-//        for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-//            if (threadIdx.x < i) {
-//                shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
-//            }
-//            __syncthreads();
-//        }
-//
-//        if (threadIdx.x == 0) {
-//            dtype x = shared_sum[0];
-//            DeviceAtomicAdd(g_grads + row_i, x);
-//        }
-//    }
-//}
-
-//__global__ void KernelPointwiseLinearBackwardForBias(dtype **grads, int count, int dim,
-//        dtype *bias_grads,
-//        int *block_counters,
-//        dtype *block_sums) {
-//    __shared__ volatile extern dtype shared_sum[];
-//    __shared__ volatile bool is_last_block;
-//    if (threadIdx.x == 0 && blockIdx.y == 0) {
-//        block_counters[blockIdx.x] = 0;
-//    }
-//    if (threadIdx.x == 0) {
-//        is_last_block = false;
-//    }
-//
-//    int dim_i = blockIdx.x;
-//    int count_i = blockIdx.y * blockDim.x + threadIdx.x;
-//    shared_sum[threadIdx.x] = count_i < count ?  grads[count_i][dim_i] : 0.0f;
-//    __syncthreads();
-//
-//    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-//        if (threadIdx.x < i) {
-//            shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
-//        }
-//        __syncthreads();
-//    }
-//
-//    int block_sums_offset = blockIdx.x * gridDim.y + blockIdx.y;
-//    if (threadIdx.x == 0) {
-//        block_sums[block_sums_offset] = shared_sum[0];
-//        if (atomicAdd(block_counters + blockIdx.x, 1) == gridDim.y - 1) {
-//            is_last_block = true;
-//        }
-//    }
-//    __syncthreads();
-//
-//    if (is_last_block) {
-//        dtype sum = 0.0f;
-//        for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
-//            int offset = blockIdx.x * gridDim.y + i;
-//            sum += block_sums[offset];
-//        }
-//
-//        shared_sum[threadIdx.x] = sum;
-//        __syncthreads();
-//
-//        for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-//            if (threadIdx.x < i) {
-//                shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
-//            }
-//            __syncthreads();
-//        }
-//
-//        if (threadIdx.x == 0) {
-//            dtype x = shared_sum[0];
-//            DeviceAtomicAdd(bias_grads + dim_i, x);
-//        }
-//    }
-//}
-
 __global__ void KernelPointwiseLinearBackwardForInput(dtype **grads, dtype *g_vals, int count,
         int row,
         int *cols,
