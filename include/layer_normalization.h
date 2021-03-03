@@ -385,14 +385,28 @@ public:
         int count = batch.size();
         vector<dtype *> grads(count), in_grads(count);
         int i = 0;
+        int col_sum = 0;
+        vector<int> dims(count), dim_offsets(count);
+        int row = getRow();
         for (Node *node : batch)  {
             PointwiseLinearNode &p = dynamic_cast<PointwiseLinearNode &>(*node);
             grads.at(i) = p.getLoss().value;
+            dims.at(i) = p.getDim();
+            dim_offsets.at(i) = col_sum * row;
             in_grads.at(i++) = p.getInput().getLoss().value;
+            col_sum += p.getColumn();
         }
+        n3ldg_cuda::NumberPointerArray grad_arr, in_grad_arr;
+        grad_arr.init(grads.data(), count);
+        in_grad_arr.init(in_grads.data(), count);
+        n3ldg_cuda::IntArray dim_arr, dim_offset_arr;
+        dim_arr.init(dims.data(), count);
+        dim_offset_arr.init(dim_offsets.data(), count);
 
-        n3ldg_cuda::PointwiseLinearBackward(grads, in_vals_, params().g().val.value, count,
-                getDim(), in_grads, params().g().grad.value, params().b().grad.value);
+        n3ldg_cuda::PointwiseLinearBackward(grad_arr.value, in_val_arr_.value,
+                params().g().val.value, count, row, col_arr_.value, max_col_, col_sum,
+                dim_arr.value, dim_offset_arr.value, in_grad_arr.value, params().g().grad.value,
+                params().b().grad.value);
 
 #if TEST_CUDA
         testBackward();
