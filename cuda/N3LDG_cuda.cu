@@ -5038,8 +5038,8 @@ void StandardLayerNormBackward(dtype **grads, int count, int row, int *cols, int
         dtype **vals,
         dtype *sds,
         dtype **in_grads) {
-    cout << boost::format("count:%1% row:%2% col_sum:%3% max_col:%4%") % count % row % col_sum %
-        max_col << endl;
+//    cout << boost::format("count:%1% row:%2% col_sum:%3% max_col:%4%") % count % row % col_sum %
+//        max_col << endl;
     NumberArray m, m_sum, grad_sum;
     m.init(col_sum * row);
     m_sum.init(count * max_col);

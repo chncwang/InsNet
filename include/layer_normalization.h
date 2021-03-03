@@ -195,21 +195,24 @@ public:
         i = 0;
         for (Node *node : batch) {
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
-            int n = s.getDim();
-            dtype c = 1.0 / (n * sds_[i]);
-            Tensor1D y2;
-            y2.init(n);
-            y2.vec() = s.getVal().vec().square();
-            Tensor1D m;
-            m.init(n);
-            m.vec() = s.getLoss().vec() * s.getVal().vec();
-            Tensor1D x;
-            x.init(n);
-            x.vec() = c * ((-y2.vec() + static_cast<dtype>(n -1)) * s.getLoss().vec() -
-                    ((m.mat().sum() - m.vec()) * s.getVal().vec() + s.getLoss().mat().sum() -
-                     s.getLoss().vec()));
-            s.getInput().loss().vec() += x.vec();
-            ++i;
+            int n = getRow();
+            for (int j = 0; j < s.getColumn(); ++j) {
+                dtype c = 1.0 / (n * sds_[i]);
+                Tensor1D y2;
+                y2.init(n);
+                y2.vec() = Vec(s.getVal().v + j * n, n).square();
+                Tensor1D m;
+                m.init(n);
+                m.vec() = Vec(s.getLoss().v + j * n, n) * Vec(s.getVal().v + j * n, n);
+                Tensor1D x;
+                x.init(n);
+                x.vec() = c * ((-y2.vec() +
+                            static_cast<dtype>(n -1)) * Vec(s.getLoss().v + j * n, n) -
+                        ((m.mat().sum() - m.vec()) * Vec(s.getVal().v + j * n, n) +
+                         Mat(s.getLoss().v + j * n, n, 1).sum() - Vec(s.getLoss().v + j * n, n)));
+                Vec(s.getInput().loss().v + j * n, n) += x.vec();
+                ++i;
+            }
         }
         verifyBackward();
 #endif
