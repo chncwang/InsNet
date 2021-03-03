@@ -81,10 +81,11 @@ public:
 #if TEST_CUDA
         UniInputExecutor::testForwardInpputs();
 #endif
-        vector<dtype *> in_vals(batch.size());
-        vals_.reserve(batch.size());
-        rows_.reserve(batch.size());
-        cols_.reserve(batch.size());
+        int count = batch.size();
+        vector<dtype *> in_vals(count);
+        vals_.reserve(count);
+        rows_.reserve(count);
+        cols_.reserve(count);
         int i = 0;
         for (Node *node : batch) {
             SoftmaxNode &s = dynamic_cast<SoftmaxNode &>(*node);
@@ -93,7 +94,13 @@ public:
             cols_.push_back(s.getColumn());
             in_vals.at(i++) = s.getInput().getVal().value;
         }
-        n3ldg_cuda::SoftmaxForward(in_vals, batch.size(), rows_, cols_, vals_);
+        row_arr_.init(rows_.data(), count);
+        col_arr_.init(cols_.data(), count);
+        val_arr_.init(vals_.data(), count);
+        max_col_ = *max_element(cols_.begin(), cols_.end());
+        max_row_ = *max_element(rows_.begin(), rows_.end());
+        n3ldg_cuda::SoftmaxForward(in_vals, count, row_arr_.value, max_row_, col_arr_.value,
+                max_col_, val_arr_.value);
 #if TEST_CUDA
         try {
             UniInputExecutor::testForward();
@@ -103,7 +110,7 @@ public:
             cerr << "input val:" << s.getInput().getVal().toString() << endl;
             cerr << "gpu:" << endl;
             s.getInput().getVal().print();
-            cout << boost::format("count:%1% dim:%2% col:%3%") % batch.size() % s.getDim() %
+            cout << boost::format("count:%1% dim:%2% col:%3%") % count % s.getDim() %
                 s.getColumn() << endl;
             abort();
         }
@@ -111,14 +118,22 @@ public:
     }
 
     void backward() override {
-        vector<dtype *> grads(batch.size()), in_grads(batch.size());
+        int count = batch.size();
+        vector<dtype *> grads(count), in_grads(count);
         int i = 0;
+        vector<int> offsets(count);
+        int dim_sum = 0;
         for (Node *node : batch) {
             SoftmaxNode &s = dynamic_cast<SoftmaxNode &>(*node);
+            offsets.at(i) = dim_sum;
+            dim_sum += s.getDim();
             grads.at(i) = s.getLoss().value;
             in_grads.at(i++) = s.getInput().getLoss().value;
         }
-        n3ldg_cuda::SoftmaxBackward(grads, vals_, batch.size(), rows_, cols_, in_grads);
+        n3ldg_cuda::IntArray offset_arr;
+        offset_arr.init(offsets.data(), count);
+        n3ldg_cuda::SoftmaxBackward(grads, val_arr_.value, count, row_arr_.value, max_row_,
+                col_arr_.value, max_col_, offset_arr.value, in_grads);
 #if TEST_CUDA
         UniInputExecutor::testBackward();
 #endif
@@ -127,6 +142,9 @@ public:
 private:
     vector<dtype *> vals_;
     vector<int> rows_, cols_;
+    n3ldg_cuda::IntArray row_arr_, col_arr_;
+    n3ldg_cuda::NumberPointerArray val_arr_;
+    int max_row_, max_col_;
 };
 #else
 class SoftmaxExecutor : public UniInputExecutor {
