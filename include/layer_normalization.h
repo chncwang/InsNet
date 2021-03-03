@@ -93,7 +93,7 @@ public:
 
 protected:
     virtual bool isDimLegal(const Node &input) const override {
-        return input.getDim() == getDim();;
+        return input.getDim() == getDim();
     }
 
 private:
@@ -114,31 +114,41 @@ class LayerNormExecutor : public UniInputExecutor {
 public:
     void forward() override {
         int count = batch.size();
-        Tensor1D means;
-        means.init(count);
-        sds_.init(count);
         vector<dtype *> in_vals(count), vals(count);
+        vector<int> cols(count);
         int i = 0;
         for (Node *node : batch) {
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
             in_vals.at(i) = s.getInput().getVal().value;
+            cols.at(i) = s.getColumn();
             vals.at(i++) = s.getVal().value;
         }
-        n3ldg_cuda::StandardLayerNormForward(in_vals, count, getDim(), vals, sds_.value);
+        val_arr_.init(vals.data(), count);
+
+        n3ldg_cuda::NumberPointerArray in_val_arr;
+        in_val_arr.init(in_vals.data(), count);
+        col_arr_.init(cols.data(), count);
+        max_col_ = *max_element(cols.begin(), cols.end());
+        sds_.init(count * max_col_);
+
+        n3ldg_cuda::StandardLayerNormForward(in_val_arr.value, count, getRow(), col_arr_.value,
+                max_col_, val_arr_.value, sds_.value);
         vals_ = move(vals);
 #if TEST_CUDA
-        cpu_sds_.init(batch.size());
         i = 0;
         for (Node *node : batch) {
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
             auto &input = s.getInput().getVal();
-            dtype mean = input.mat().sum() / s.getDim();
-            Tensor1D x;
-            x.init(s.getDim());
-            x.vec() = (input.vec() - mean).square();
-            dtype sd = sqrt(x.mat().sum() / s.getDim());
-            sds_[i++] = sd;
-            s.val().vec() = ((input.vec() - mean) / sd);
+            for (int j = 0; j < s.getColumn(); ++j) {
+                int row = getRow();
+                dtype mean = Mat(input.v + row * j, row, 1).sum() / row;
+                Tensor1D x;
+                x.init(row);
+                x.vec() = (Vec(input.v + row * j, row) - mean).square();
+                dtype sd = sqrt(x.mat().sum() / row);
+                sds_[i++] = sd;
+                Vec(s.val().v + row * j, row) = (Vec(input.v + row * j, row) - mean) / sd;
+            }
         }
         verifyForward();
 #endif
@@ -181,9 +191,9 @@ public:
 private:
     Tensor1D sds_;
     vector<dtype *> vals_;
-#if TEST_CUDA
-    n3ldg_cpu::Tensor1D cpu_sds_;
-#endif
+    n3ldg_cuda::NumberPointerArray val_arr_;
+    n3ldg_cuda::IntArray col_arr_;
+    int max_col_;
 };
 #else
 class LayerNormExecutor : public UniInputExecutor {
@@ -240,11 +250,6 @@ public:
     }
 
 private:
-    int getRow() const {
-        Node &node = *batch.front();
-        return node.getDim() / node.getColumn();
-    }
-
     Tensor1D sds_;
     int col_sum_ = 0;
 };

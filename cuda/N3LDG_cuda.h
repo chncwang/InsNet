@@ -410,7 +410,8 @@ void BiasForward(vector<dtype*> &in_vals, dtype *bias, int count, int dim,
         vector<dtype *> &vals);
 void BiasBackward(vector<dtype *> &losses, int count, int dim, dtype *bias_loss,
         vector<dtype *> input_losses);
-void StandardLayerNormForward(vector<dtype *> &in_vals, int count, int dim, vector<dtype *> &vals,
+void StandardLayerNormForward(dtype **in_vals, int count, int row, int *cols, int max_col,
+        dtype **vals,
         dtype *sds);
 void StandardLayerNormBackward(vector<dtype *> &grads, int count, int dim, vector<dtype *> &vals,
         dtype *sds,

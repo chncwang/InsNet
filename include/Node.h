@@ -765,6 +765,11 @@ public:
         return dynamic_cast<Node *>(batch.back())->getDim();
     }
 
+    int getRow() const {
+        Node &node = dynamic_cast<Node &>(*batch.front());
+        return node.getDim() / node.getColumn();
+    }
+
     string getNodeType() const {
         return batch.front()->getNodeType();
     }
