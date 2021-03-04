@@ -96,6 +96,10 @@ public:
 
     PExecutor generate() override;
 
+    string typeSignature() const override {
+        return Node::getNodeType();
+    }
+
 protected:
     virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
@@ -132,6 +136,10 @@ public:
         return new ActivationExecutor<ActivatedEnum::SIGMOID>;
     }
 
+    string typeSignature() const override {
+        return Node::getNodeType();
+    }
+
 protected:
     virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
@@ -164,7 +172,7 @@ public:
     }
 
     string typeSignature() const override {
-        return Node::typeSignature();
+        return Node::getNodeType();
     }
 
 protected:
@@ -200,6 +208,10 @@ public:
 
     void backward() override {
         getInput().loss().vec() += loss().vec() * val().vec().unaryExpr(ptr_fun(dsqrt));
+    }
+
+    string typeSignature() const override {
+        return Node::getNodeType();
     }
 
     PExecutor generate() override {

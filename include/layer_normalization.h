@@ -357,6 +357,9 @@ public:
 class PointwiseLinearExecutor : public UniInputExecutor {
 public:
     void forward() override {
+#if TEST_CUDA
+        testForwardInpputs();
+#endif
         int count = batch.size();
         in_vals_.reserve(count);
         vector<dtype *> vals(count);
@@ -441,8 +444,7 @@ Executor *PointwiseLinearNode::generate() {
     return new PointwiseLinearExecutor;
 }
 
-Node *layerNormalization(Graph &graph, LayerNormalizationParams &params,
-        Node &input_layer,
+Node *layerNormalization(Graph &graph, LayerNormalizationParams &params, Node &input_layer,
         int col = 1) {
     using namespace n3ldg_plus;
     StandardLayerNormNode *a = StandardLayerNormNode::newNode(input_layer.getDim());

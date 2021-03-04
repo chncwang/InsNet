@@ -595,9 +595,8 @@ __global__ void KernelActivationForward(ActivatedEnum activated, dtype **xs,
         int *dims,
         int max_dim,
         dtype **ys) {
-    int index = DeviceDefaultIndex();
-    int step = DeviceDefaultStep();
-    for (int i = index; i < max_dim * count; i += step) {
+    int i = DeviceDefaultIndex();
+    if (i < max_dim * count) {
         int count_i = i / max_dim;
         int dim_i = i % max_dim;
         if (dim_i < dims[count_i]) {
@@ -619,15 +618,13 @@ __global__ void KernelActivationForward(ActivatedEnum activated, dtype **xs,
     }
 }
 
-void ActivationForward(ActivatedEnum activated, vector<dtype*> &xs,
-        int count,
-        vector<int> &dims,
+void ActivationForward(ActivatedEnum activated, vector<dtype*> &xs, int count, vector<int> &dims,
         vector<dtype*> &ys) {
     int max_dim = *max_element(dims.begin(), dims.end());
     NumberPointerArray x_arr, y_arr;
     x_arr.init((dtype**)xs.data(), xs.size());
     y_arr.init((dtype**)ys.data(), ys.size());
-    int block_count = DefaultBlockCount(count * max_dim);
+    int block_count = DefaultBlockCountWithoutLimit(count * max_dim);
 
     IntArray dim_arr;
     dim_arr.init(dims.data(), dims.size());
@@ -644,9 +641,8 @@ __global__ void KernelActivationBackward(ActivatedEnum activated,
         int *dims,
         int max_dim,
         dtype** in_grads) {
-    int index = DeviceDefaultIndex();
-    int step = DeviceDefaultStep();
-    for (int i = index; i < max_dim * count; i += step) {
+    int i = DeviceDefaultIndex();
+    if (i < max_dim * count) {
         int count_i = i / max_dim;
         int dim_i = i % max_dim;
         if (dim_i < dims[count_i]) {
@@ -681,7 +677,7 @@ void ActivationBackward(ActivatedEnum activated, vector<dtype*> &grads,
     loss_arr.init((dtype**)grads.data(), grads.size());
     val_arr.init((dtype**)vals.data(), vals.size());
     in_loss_arr.init((dtype**)in_grads.data(), in_grads.size());
-    int block_count = DefaultBlockCount(count * max_dim);
+    int block_count = DefaultBlockCountWithoutLimit(count * max_dim);
     IntArray dim_arr;
     dim_arr.init(dims.data(), dims.size());
     KernelActivationBackward<<<block_count, TPB>>>(activated, loss_arr.value,
