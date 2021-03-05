@@ -804,6 +804,11 @@ public:
             bool use_lower_triangle_mask = false) {
         int a_col = a.getDim() / input_row;
         int b_col = b.getDim() / input_row;
+        if (use_lower_triangle_mask && a_col != b_col) {
+            cerr << boost::format("BatchedTranMatrixMulMatrixNode init a_col:%1% b_col:%2%\n") %
+                a_col % b_col;
+            abort();
+        }
         allocateBatch(a_col * b_col, a.batch().size());
         setInputsPerNode({&a, &b});
         for (Node *node : batch()) {

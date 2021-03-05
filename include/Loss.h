@@ -47,7 +47,6 @@ dtype crossEntropyLoss(vector<Node *> &nodes, const vector<int> &answers, dtype 
             nodes.size() % answers.size() << endl;
         abort();
     }
-    validateEqualNodeDims(nodes);
 #if USE_GPU
     vector<dtype*> vals, losses;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
