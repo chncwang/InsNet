@@ -497,7 +497,7 @@ Node *transformerEncoder(Graph &graph, TransformerEncoderParams &params, Batched
 
     BatchedNode *pos_emb = embedding(graph, params.positionalEncodingParam(), pos_ids, false);
     BatchedNode *scaled_input = scaled(graph, inputs, ::sqrt(inputs.getDim()));
-    BatchedNode *pos_encoded = addInBatch(graph, {&pos_emb, &scaled_input});
+    BatchedNode *pos_encoded = addInBatch(graph, {pos_emb, scaled_input});
     pos_encoded = n3ldg_plus::dropout(graph, *pos_encoded, dropout, is_training);
 
     int layer_count = params.layerCount();
@@ -680,7 +680,7 @@ public:
         BatchedNode *pos_emb = embedding(*graph_, params_->positionalEncodingParam(), pos_ids,
                 false);
         BatchedNode *scaled_input = scaled(*graph_, inputs, ::sqrt(inputs.getDim()));
-        BatchedNode *pos_encoded = addInBatch(*graph_, {&pos_emb, &scaled_input});
+        BatchedNode *pos_encoded = addInBatch(*graph_, {pos_emb, scaled_input});
         pos_encoded = n3ldg_plus::dropout(*graph_, *pos_encoded, dropout_, is_training_);
 
         int layer_count = params_->layerCount();
