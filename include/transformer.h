@@ -484,25 +484,25 @@ Node *dotAttentionDev(Graph &graph, Node& k, Node& v, int v_col, Node& q, int q_
     return attended_matrix;
 }
 
-Node *transformerEncoder(Graph &graph, TransformerEncoderParams &params, BatchedNode &inputs,
+Node *transformerEncoder(Graph &graph, TransformerEncoderParams &params, Node &inputs,
+        int sentence_len,
         dtype dropout,
         bool is_training) {
     using namespace n3ldg_plus;
-    int sentence_len = inputs.batch().size();
     vector<int> pos_ids;
     pos_ids.reserve(sentence_len);
     for (int i = 0; i < sentence_len; ++i) {
         pos_ids.push_back(i);
     }
 
-    BatchedNode *pos_emb = embedding(graph, params.positionalEncodingParam(), pos_ids, false);
-    BatchedNode *scaled_input = scaled(graph, inputs, ::sqrt(inputs.getDim()));
-    BatchedNode *pos_encoded = addInBatch(graph, {pos_emb, scaled_input});
+    Node *pos_emb = embedding(graph, params.positionalEncodingParam(), pos_ids, false);
+    Node *scaled_input = scaled(graph, inputs, ::sqrt(inputs.getDim()));
+    Node *pos_encoded = add(graph, {pos_emb, scaled_input});
     pos_encoded = n3ldg_plus::dropout(graph, *pos_encoded, dropout, is_training);
 
     int layer_count = params.layerCount();
 
-    Node *last_layer = concatToMatrix(graph, *pos_encoded);
+    Node *last_layer = pos_encoded;
     for (int i = 0; i < layer_count; ++i) {
         auto &layer_params = *params.layerParams().ptrs().at(i);
 
@@ -664,35 +664,31 @@ public:
             bool is_training) : TransformerDecoderBuilderAbs(graph, params, encoder_hiddens,
                 encoder_sentence_len, dropout, is_training) {}
 
-    void forward(BatchedNode &inputs) {
+    void forward(Node &inputs, int dec_sentence_len) {
         using namespace n3ldg_plus;
         if (!prepared_) {
             cerr << "TransformerDecoderBuilder forward - not prepared" << endl;
             abort();
         }
 
-        int sentence_len = inputs.batch().size();
         vector<int> pos_ids;
-        for (int i = 0; i < sentence_len; ++i) {
+        for (int i = 0; i < dec_sentence_len; ++i) {
             pos_ids.push_back(i);
         }
 
-        BatchedNode *pos_emb = embedding(*graph_, params_->positionalEncodingParam(), pos_ids,
-                false);
-        BatchedNode *scaled_input = scaled(*graph_, inputs, ::sqrt(inputs.getDim()));
-        BatchedNode *pos_encoded = addInBatch(*graph_, {pos_emb, scaled_input});
+        Node *pos_emb = embedding(*graph_, params_->positionalEncodingParam(), pos_ids, false);
+        Node *scaled_input = scaled(*graph_, inputs, ::sqrt(inputs.getDim()));
+        Node *pos_encoded = add(*graph_, {pos_emb, scaled_input});
         pos_encoded = n3ldg_plus::dropout(*graph_, *pos_encoded, dropout_, is_training_);
 
         int layer_count = params_->layerCount();
-        Node *last_layer = concatToMatrix(*graph_, *pos_encoded);
+        Node *last_layer = pos_encoded;
 
         vector<int> encoder_offsets;
         int encoder_dim = encoder_hiddens_->getDim() / encoder_sentence_len_;
         for (int i = 0; i < encoder_sentence_len_; ++i) {
             encoder_offsets.push_back(encoder_dim * i);
         }
-
-        int dec_sentence_len = inputs.batch().size();
 
         for (int i = 0; i < layer_count; ++i) {
             auto &layer_params = *params_->layerParams().ptrs().at(i);

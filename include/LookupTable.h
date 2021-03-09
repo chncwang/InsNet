@@ -229,16 +229,12 @@ public:
 };
 
 template <typename ParamType>
+class BatchedLookupNode;
+
+template <typename ParamType>
 class LookupNode : public Node, public Poolable<LookupNode<ParamType>> {
 public:
-    ParamType* param;
-    int xid;
-    bool should_backward = true;
-
-    LookupNode() : Node("lookup") {
-        xid = -1;
-        param = NULL;
-    }
+    LookupNode() : Node("lookup") {}
 
     void setNodeDim(int dim) override {
         setDim(dim);
@@ -248,136 +244,108 @@ public:
         init(dim);
     }
 
-    void setParam(LookupTable<ParamType>* paramInit) {
-        param = paramInit;
+    void setParam(LookupTable<ParamType>& param) {
+        param_ = param;
     }
 
     void setParam(ParamType &table) {
-        param = &table;
+        param_ = &table;
     }
 
-    void forward(Graph &graph, int &exid) {
-        xid = exid;
+    void connect(Graph &graph, const vector<int> &ids) {
+        ids_ = ids;
         graph.addNode(this);
     }
 
     PExecutor generate() override;
 
     string typeSignature() const override {
-        return Node::typeSignature() + "-" + addressToString(param);
+        return Node::getNodeType() + "-" + addressToString(param_);
     }
 
-    // for which do no require merge
     void compute() override {
-        if (xid >= 0) {
-            param->value(xid, val());
-        } else {
-            val().zero();
+        int dim = getDim() / ids_.size();
+        int i = 0;
+        for (int id : ids_) {
+            Vec(val().v + i++ * dim, dim) = Vec(param_->val[id], dim);
         }
     }
 
     void backward() override {
-        if (should_backward) {
-            param->loss(xid, loss());
+        if (should_backward_) {
+            int dim = getDim() / ids_.size();
+            int i = 0;
+            for (int id : ids_) {
+                Vec(param_->grad[id], dim) += Vec(loss().v + i++ * dim, dim);
+            }
         }
     }
-};
 
-template <typename ParamType>
-class BatchedLookupNode : public BatchedNodeImpl<LookupNode<ParamType>> {
-public:
-    void init(Graph &graph, ParamType &param, const vector<int> &ids, bool should_backward) {
-        BatchedNodeImpl<LookupNode<ParamType>>::allocateBatch(param.outDim(), ids.size());
-        auto &batch = BatchedNode::batch();
-        int i = 0;
-        for (Node *x : batch) {
-            LookupNode<ParamType> *node = dynamic_cast<LookupNode<ParamType> *>(x);
-            node->should_backward = should_backward;
-            node->setParam(param);
-            node->xid = ids.at(i);
-            ++i;
-        }
-        graph.addNode(this);
+    void setShouldBackward(bool should_backward) {
+        should_backward_ = should_backward;
     }
+
+private:
+    ParamType* param_ = nullptr;
+    vector<int> ids_;
+    bool should_backward_ = true;
+
+    friend class BatchedLookupNode<ParamType>;
 };
 
 namespace n3ldg_plus {
 
 template <typename ParamType>
-Node *embedding(Graph &graph,ParamType &lookup, int id, bool should_backward = true) {
-    LookupNode<ParamType>* input_lookup = LookupNode<ParamType>::newNode(lookup.outDim());
-    input_lookup->should_backward = should_backward;
+Node *embedding(Graph &graph,ParamType &lookup, const vector<int> ids,
+        bool should_backward = true) {
+    LookupNode<ParamType>* input_lookup =
+        LookupNode<ParamType>::newNode(lookup.outDim() * ids.size());
+    input_lookup->setShouldBackward(should_backward);
     input_lookup->setParam(lookup);
-    input_lookup->forward(graph, id);
+    input_lookup->connect(graph, ids);
+    return input_lookup;
+}
+
+template <typename ParamType>
+Node *embedding(Graph &graph,ParamType &lookup, int id, bool should_backward = true) {
+    return embedding(graph, lookup, {id}, should_backward);
+}
+
+template <typename ParamType>
+Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, int dim, const vector<string> &words,
+        bool should_backward = true) {
+    vector<int> ids;
+    ids.reserve(words.size());
+    for (const string &word : words) {
+        int id;
+        if (!lookup.findElemId(word)) {
+            if (lookup.nUNKId < 0) {
+                cerr << "nUNKId is negative:" << lookup.nUNKId << endl;
+                abort();
+            }
+            id = lookup.nUNKId;
+        } else {
+            id = lookup.getElemId(word);
+        }
+        ids.push_back(id);
+    }
+    LookupNode<ParamType>* input_lookup = LookupNode<ParamType>::newNode(dim * words.size());
+    input_lookup->setParam(lookup.E);
+    input_lookup->connect(graph, ids);
+    input_lookup->setShouldBackward(should_backward);
     return input_lookup;
 }
 
 template <typename ParamType>
 Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, int dim, const string &word,
         bool should_backward = true) {
-    int xid;
-    if (!lookup.findElemId(word)) {
-        if (lookup.nUNKId < 0) {
-            cerr << "nUNKId is negative:" << lookup.nUNKId << endl;
-            abort();
-        }
-        xid = lookup.nUNKId;
-    } else {
-        xid = lookup.getElemId(word);
-    }
-    LookupNode<ParamType>* input_lookup = LookupNode<ParamType>::newNode(dim);
-    input_lookup->setParam(lookup.E);
-    input_lookup->forward(graph, xid);
-    input_lookup->should_backward = should_backward;
-    return input_lookup;
+    return embedding(graph, lookup, dim, {word}, should_backward);
 }
 
 template <typename ParamType>
-Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, const string &word,
+Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, const vector<string> &words,
         bool should_backward = true) {
-    return embedding(graph, lookup, lookup.nDim, word, should_backward);
-}
-
-template <typename ParamType>
-BatchedNode *embedding(Graph &graph, ParamType &param, const vector<int> &ids,
-        bool should_backward = true) {
-    auto *node = new BatchedLookupNode<ParamType>;
-    node->init(graph, param, ids, should_backward);
-    return node;
-}
-
-template <typename ParamType>
-BatchedNode *embedding(Graph &graph, ParamType &param, int id, int batch_size,
-        bool should_backward = true) {
-    vector<int> ids;
-    ids.reserve(batch_size);
-    for (int i = 0; i < batch_size; ++i) {
-        ids.push_back(id);
-    }
-    auto *node = new BatchedLookupNode<ParamType>;
-    node->init(graph, param, ids, should_backward);
-    return node;
-}
-
-template <typename ParamType>
-BatchedNode *embedding(Graph &graph, LookupTable<ParamType> &param, const vector<string> &words,
-        bool should_backward = true) {
-    vector<int> ids;
-    ids.reserve(words.size());
-    for (const string &w : words) {
-        int id;
-        if (!param.findElemId(w)) {
-            if (param.nUNKId < 0) {
-                cerr << "nUNKId is negative:" << param.nUNKId << endl;
-                abort();
-            }
-            id = param.nUNKId;
-        } else {
-            id = param.getElemId(w);
-        }
-        ids.push_back(id);
-    }
-    return embedding<ParamType>(graph, param.E, ids, should_backward);
+    return embedding(graph, lookup, lookup.nDim, words, should_backward);
 }
 
 }
@@ -469,7 +437,7 @@ template<typename ParamType>
 PExecutor LookupNode<ParamType>::generate() {
     LookupExecutor<ParamType>* exec = new LookupExecutor<ParamType>();
 #if USE_GPU
-    exec->table = param;
+    exec->table = param_;
     exec->dim = getDim();
 #endif
     return exec;
