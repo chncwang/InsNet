@@ -88,10 +88,6 @@ public:
         param_ = &uni_params;
     }
 
-    UniParams &getParams() {
-        return *param_;
-    }
-
     void compute() override {
         abort();
     }
@@ -106,6 +102,14 @@ public:
         return Node::getNodeType() + "-" + addressToString(param_);
     }
 
+    Param &W() {
+        return param_->W;
+    }
+
+    Param *b() {
+        return param_->bUseB ? &param_->b : nullptr;
+    }
+
 protected:
     virtual bool isDimLegal(const Node &input) const override {
         return true;
@@ -115,28 +119,36 @@ private:
     UniParams* param_ = nullptr;
 };
 
-#if USE_GPU
-class LinearExecutor :public Executor {
-public:
-    UniParams &params() {
-        LinearNode *l = dynamic_cast<LinearNode *>(batch.front());
-        return l->getParams();
+class LinearExecutorBase : public Executor {
+protected:
+    Param &W() {
+        LinearNode &l = dynamic_cast<LinearNode &>(*batch.front());
+        return l.W();
+    }
+
+    Param *b() {
+        LinearNode &l = dynamic_cast<LinearNode &>(*batch.front());
+        return l.b();
     }
 
     int inDim() {
-        return params().W.outDim();
+        return W().outDim();
     }
 
     int outDim() {
-        return params().W.inDim();
+        return W().inDim();
     }
+};
 
+#if USE_GPU
+class LinearExecutor : public LinearExecutorBase {
+public:
     void  forward() {
         int count = batch.size();
 #if TEST_CUDA
-        params().W.val.copyFromDeviceToHost();
-        if (params().bUseB) {
-            params().b.val.copyFromDeviceToHost();
+        W().val.copyFromDeviceToHost();
+        if (b() != nullptr) {
+            b()->val.copyFromDeviceToHost();
         }
 #endif
         for (int i = 0; i < count; ++i) {
@@ -144,9 +156,9 @@ public:
         }
 
 #if TEST_CUDA
-        x.init(inDim(), col_sum_);
-        y.init(outDim(), col_sum_);
-        b.init(outDim(), col_sum_);
+        x_.init(inDim(), col_sum_);
+        y_.init(outDim(), col_sum_);
+        b_.init(outDim(), col_sum_);
 #endif
         std::vector<dtype*> ys;
         in_vals_.reserve(batch.size());
@@ -163,33 +175,33 @@ public:
             n->getInput().val().copyFromDeviceToHost();
 #endif
         }
-        n3ldg_cuda::LinearForward(in_vals_, count, cols_, inDim(), outDim(), params().W.val.value, 
-                params().bUseB ? params().b.val.value : nullptr, ys);
+        n3ldg_cuda::LinearForward(in_vals_, count, cols_, inDim(), outDim(), W().val.value, 
+                b() == nullptr ? nullptr : b()->val.value, ys);
 
 #if TEST_CUDA
         int col_offset = 0;
         for (int i = 0; i < count; i++) {
             LinearNode& l = dynamic_cast<LinearNode &>(*batch.at(i));
-            Vec(x.v + col_offset * inDim(), l.getInput().getDim()) = l.getInput().getVal().vec();
+            Vec(x_.v + col_offset * inDim(), l.getInput().getDim()) = l.getInput().getVal().vec();
 
             col_offset += l.getColumn();
         }
 
-        if (params().bUseB) {
+        if (b() != nullptr) {
             for (int i = 0; i < col_sum_; ++i) {
-                Vec(b.v + i * outDim(), outDim()) = params().b.val.vec();
+                Vec(b_.v + i * outDim(), outDim()) = b()->val.vec();
             }
         }
 
-        y.mat() = params().W.val.mat().transpose() * x.mat();
-        if (params().bUseB) {
-            y.vec() += b.vec();
+        y_.mat() = W().val.mat().transpose() * x_.mat();
+        if (b() != nullptr) {
+            y_.vec() += b_.vec();
         }
 
         col_offset = 0;
         for (int i = 0; i < count; i++) {
             LinearNode &l = dynamic_cast<LinearNode &>(*batch.at(i));
-            l.val().vec() = Vec(y.v + col_offset * outDim(), l.getDim());
+            l.val().vec() = Vec(y_.v + col_offset * outDim(), l.getDim());
             col_offset += l.getColumn();
         }
         Executor::verifyForward();
@@ -200,14 +212,14 @@ public:
     void backward() {
         int count = batch.size();
 #if TEST_CUDA
-        if (params().bUseB) {
-            n3ldg_cuda::Assert(params().b.grad.verify("before linear backward b grad"));
-            params().b.grad.copyFromDeviceToHost();
+        if (b() != nullptr) {
+            n3ldg_cuda::Assert(b()->grad.verify("before linear backward b grad"));
+            b()->grad.copyFromDeviceToHost();
         }
-        n3ldg_cuda::Assert(params().W.val.verify("before linear backward W val"));
-        params().W.val.copyFromDeviceToHost();
-        n3ldg_cuda::Assert(params().W.grad.verify("before linear backward W grad"));
-        params().W.grad.copyFromDeviceToHost();
+        n3ldg_cuda::Assert(W().val.verify("before linear backward W val"));
+        W().val.copyFromDeviceToHost();
+        n3ldg_cuda::Assert(W().grad.verify("before linear backward W grad"));
+        W().grad.copyFromDeviceToHost();
         for (int i = 0; i < count; ++i) {
             LinearNode* ptr = (LinearNode*)batch[i];
             n3ldg_cuda::Assert(ptr->loss().verify("before linear backward grad"));
@@ -228,9 +240,8 @@ public:
             in_grads.push_back(ptr->getInput().loss().value);
         }
 
-        n3ldg_cuda::LinearBackward(grads, count, cols_, inDim(), outDim(), params().W.val.value,
-                in_vals_, params().bUseB ? params().b.grad.value : nullptr, in_grads,
-                params().W.grad.value);
+        n3ldg_cuda::LinearBackward(grads, count, cols_, inDim(), outDim(), W().val.value, in_vals_,
+                b() == nullptr ? nullptr : b()->grad.value, in_grads, W().grad.value);
 #if TEST_CUDA
         Tensor2D lx, ly;
         lx.init(inDim(), col_sum_);
@@ -243,15 +254,15 @@ public:
             col_offset += l.getColumn();
         }
 
-        params().W.grad.mat() += x.mat() * ly.mat().transpose();
+        W().grad.mat() += x_.mat() * ly.mat().transpose();
 
-        if (params().bUseB) {
+        if (b() != nullptr) {
             for (int i = 0; i < col_sum_; ++i) {
-                params().b.grad.vec() += Vec(ly.v + i * outDim(), outDim());
+                b()->grad.vec() += Vec(ly.v + i * outDim(), outDim());
             }
         }
 
-        lx.mat() = params().W.val.mat() * ly.mat();
+        lx.mat() = W().val.mat() * ly.mat();
 
         col_offset = 0;
         for (int i = 0; i < count; i++) {
@@ -260,9 +271,9 @@ public:
             col_offset += l.getColumn();
         }
 
-        n3ldg_cuda::Assert(params().W.grad.verify("LinearExecutor backward W grad"));
-        if (params().bUseB) {
-            n3ldg_cuda::Assert(params().b.grad.verify("backward b grad"));
+        n3ldg_cuda::Assert(W().grad.verify("LinearExecutor backward W grad"));
+        if (b() != nullptr) {
+            n3ldg_cuda::Assert(b()->grad.verify("backward b grad"));
         }
         for (Node * n : batch) {
             LinearNode *ptr = static_cast<LinearNode *>(n);
@@ -274,35 +285,19 @@ public:
 
 private:
 #if TEST_CUDA
-    Tensor2D x, y, b;
+    Tensor2D x_, y_, b_;
 #endif
     int col_sum_ = 0;
     vector<int> cols_;
     vector<dtype *> in_vals_;
 };
 #else
-class LinearExecutor :public Executor {
+class LinearExecutor : public LinearExecutorBase {
 public:
-    Tensor2D x, y, b;
-
-    UniParams &params() {
-        LinearNode *l = dynamic_cast<LinearNode *>(batch.front());
-        return l->getParams();
-    }
-
-    int inDim() {
-        return params().W.outDim();
-    }
-
-    int outDim() {
-        return params().W.inDim();
-    }
-
-
     int calculateFLOPs() override {
-        int flops = params().W.inDim() * params().W.outDim() * batch.size() * 2;
-        if (params().bUseB) {
-            flops += params().W.inDim() * batch.size();
+        int flops = W().inDim() * W().outDim() * batch.size() * 2;
+        if (b() != nullptr) {
+            flops += W().inDim() * batch.size();
         }
         return flops;
     }
@@ -312,33 +307,34 @@ public:
         for (Node *node : batch) {
             col_sum_ += node->getColumn();
         }
-        x.init(inDim(), col_sum_);
-        y.init(outDim(), col_sum_);
-        b.init(outDim(), col_sum_);
+        x_.init(inDim(), col_sum_);
+        y_.init(outDim(), col_sum_);
+        b_.init(outDim(), col_sum_);
 
         int col_offset = 0;
         for (int i = 0; i < count; i++) {
             LinearNode& l = dynamic_cast<LinearNode &>(*batch.at(i));
-            Vec(x.v + col_offset * inDim(), l.getInput().getDim()) = l.getInput().getVal().vec();
+            Vec(x_.v + col_offset * inDim(), l.getInput().getDim()) = l.getInput().getVal().vec();
 
             col_offset += l.getColumn();
         }
 
-        if (params().bUseB) {
+        if (b() != nullptr) {
             for (int i = 0; i < col_sum_; ++i) {
-                Vec(b.v + i * outDim(), outDim()) = params().b.val.vec();
+                Vec(b_.v + i * outDim(), outDim()) = b()->val.vec();
             }
         }
 
-        y.mat() = params().W.val.mat().transpose() * x.mat();
-        if (params().bUseB) {
-            y.vec() += b.vec();
+        y_.mat() = W().val.mat().transpose() * x_.mat();
+
+        if (b() != nullptr) {
+            y_.vec() += b_.vec();
         }
 
         col_offset = 0;
         for (int i = 0; i < count; i++) {
             LinearNode &l = dynamic_cast<LinearNode &>(*batch.at(i));
-            l.val().vec() = Vec(y.v + col_offset * outDim(), l.getDim());
+            l.val().vec() = Vec(y_.v + col_offset * outDim(), l.getDim());
             col_offset += l.getColumn();
         }
     }
@@ -356,15 +352,15 @@ public:
             col_offset += l.getColumn();
         }
 
-        params().W.grad.mat() += x.mat() * ly.mat().transpose();
+        W().grad.mat() += x_.mat() * ly.mat().transpose();
 
-        if (params().bUseB) {
+        if (b() != nullptr) {
             for (int i = 0; i < col_sum_; ++i) {
-                params().b.grad.vec() += Vec(ly.v + i * outDim(), outDim());
+                b()->grad.vec() += Vec(ly.v + i * outDim(), outDim());
             }
         }
 
-        lx.mat() = params().W.val.mat() * ly.mat();
+        lx.mat() = W().val.mat() * ly.mat();
 
         col_offset = 0;
         for (int i = 0; i < count; i++) {
@@ -376,6 +372,7 @@ public:
 
 private:
     int col_sum_ = 0;
+    Tensor2D x_, y_, b_;
 };
 #endif
 
