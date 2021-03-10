@@ -23,14 +23,14 @@ public:
 
     UniParams(const string &name) : W(name + "-W"), b(name + "-b", true) {}
 
-    void init(int nOSize, int nISize, bool useB = true,
+    void init(int out_dim, int in_dim, bool useB = true,
             const std::function<dtype(int, int)> *bound = nullptr,
             InitDistribution dist = InitDistribution::UNI) {
-        W.init(nOSize, nISize, bound, dist);
+        W.init(in_dim, out_dim, bound, dist);
 
         bUseB = useB;
         if (bUseB) {
-            b.init(nOSize, 1);
+            b.init(out_dim, 1);
         }
     }
 
@@ -115,19 +115,6 @@ private:
     UniParams* param_ = nullptr;
 };
 
-class BatchedLinearNode : public BatchedNodeImpl<LinearNode> {
-public:
-    void init(Graph &graph, BatchedNode &input, UniParams &params) {
-        allocateBatch(params.W.outDim(), input.batch().size());
-        for (Node *node : batch()) {
-            LinearNode *l = dynamic_cast<LinearNode*>(node);
-            l->setParam(params);
-        }
-        setInputsPerNode({&input});
-        afterInit(graph, {&input});
-    }
-};
-
 #if USE_GPU
 class LinearExecutor :public Executor {
 public:
@@ -137,11 +124,11 @@ public:
     }
 
     int inDim() {
-        return params().W.inDim();
+        return params().W.outDim();
     }
 
     int outDim() {
-        return params().W.outDim();
+        return params().W.inDim();
     }
 
     void  forward() {
@@ -194,7 +181,7 @@ public:
             }
         }
 
-        y.mat() = params().W.val.mat() * x.mat();
+        y.mat() = params().W.val.mat().transpose() * x.mat();
         if (params().bUseB) {
             y.vec() += b.vec();
         }
@@ -205,11 +192,7 @@ public:
             l.val().vec() = Vec(y.v + col_offset * outDim(), l.getDim());
             col_offset += l.getColumn();
         }
-
-        for (int idx = 0; idx < count; idx++) {
-            LinearNode* ptr = (LinearNode*)batch[idx];
-            n3ldg_cuda::Assert(ptr->val().verify("linear forward val"));
-        }
+        Executor::verifyForward();
         cout << "linear forward tested" << endl;
 #endif
     }
@@ -260,7 +243,7 @@ public:
             col_offset += l.getColumn();
         }
 
-        params().W.grad.mat() += ly.mat() * x.mat().transpose();
+        params().W.grad.mat() += x.mat() * ly.mat().transpose();
 
         if (params().bUseB) {
             for (int i = 0; i < col_sum_; ++i) {
@@ -268,7 +251,7 @@ public:
             }
         }
 
-        lx.mat() = params().W.val.mat().transpose() * ly.mat();
+        lx.mat() = params().W.val.mat() * ly.mat();
 
         col_offset = 0;
         for (int i = 0; i < count; i++) {
@@ -308,18 +291,18 @@ public:
     }
 
     int inDim() {
-        return params().W.inDim();
+        return params().W.outDim();
     }
 
     int outDim() {
-        return params().W.outDim();
+        return params().W.inDim();
     }
 
 
     int calculateFLOPs() override {
         int flops = params().W.inDim() * params().W.outDim() * batch.size() * 2;
         if (params().bUseB) {
-            flops += params().W.outDim() * batch.size();
+            flops += params().W.inDim() * batch.size();
         }
         return flops;
     }
@@ -347,7 +330,7 @@ public:
             }
         }
 
-        y.mat() = params().W.val.mat() * x.mat();
+        y.mat() = params().W.val.mat().transpose() * x.mat();
         if (params().bUseB) {
             y.vec() += b.vec();
         }
@@ -373,7 +356,7 @@ public:
             col_offset += l.getColumn();
         }
 
-        params().W.grad.mat() += ly.mat() * x.mat().transpose();
+        params().W.grad.mat() += x.mat() * ly.mat().transpose();
 
         if (params().bUseB) {
             for (int i = 0; i < col_sum_; ++i) {
@@ -381,7 +364,7 @@ public:
             }
         }
 
-        lx.mat() = params().W.val.mat().transpose() * ly.mat();
+        lx.mat() = params().W.val.mat() * ly.mat();
 
         col_offset = 0;
         for (int i = 0; i < count; i++) {
@@ -468,43 +451,44 @@ public:
 };
 
 namespace n3ldg_plus {
-    Node *linearWordVector(Graph &graph, Node &input, Param &param, int dim,
-            int offset = 0) {
-        if (dim + offset > param.inDim()) {
-            cerr << boost::format("linearWordVector - dim:%1% offset%2% vocabulary_size:%3%") %
-                dim % offset % param.inDim() << endl;
-            abort();
-        }
 
-        if (input.getDim() != param.outDim()) {
-            cerr << boost::format("LinearWordVectorNode - input dim:%1% word vector dim:%2%") %
-                input.getDim() % param.outDim() << endl;
-            abort();
-        }
-
-        LinearWordVectorNode *node =  LinearWordVectorNode::newNode(dim);
-        node->setParam(param, offset);
-        node->forward(graph, input);
-        return node;
+Node *linearWordVector(Graph &graph, Node &input, Param &param, int dim,
+        int offset = 0) {
+    if (dim + offset > param.inDim()) {
+        cerr << boost::format("linearWordVector - dim:%1% offset%2% vocabulary_size:%3%") %
+            dim % offset % param.inDim() << endl;
+        abort();
     }
 
-    BatchedNode *linearWordVector(Graph &graph, BatchedNode &input, Param &param, int dim,
-            int offset = 0) {
-        if (dim + offset > param.inDim()) {
-            cerr << boost::format("linearWordVector - dim:%1% offset%2% vocabulary_size:%3%") %
-                dim % offset % param.inDim() << endl;
-            abort();
-        }
-
-        if (input.getDim() != param.outDim()) {
-            cerr << boost::format("LinearWordVectorNode - input dim:%1% word vector dim:%2%") %
-                input.getDim() % param.outDim() << endl;
-            abort();
-        }
-        BatchedLinearWordVectorNode *node = new BatchedLinearWordVectorNode;
-        node->init(graph, input, param, dim, offset);
-        return node;
+    if (input.getDim() != param.outDim()) {
+        cerr << boost::format("LinearWordVectorNode - input dim:%1% word vector dim:%2%") %
+            input.getDim() % param.outDim() << endl;
+        abort();
     }
+
+    LinearWordVectorNode *node =  LinearWordVectorNode::newNode(dim);
+    node->setParam(param, offset);
+    node->forward(graph, input);
+    return node;
+}
+
+BatchedNode *linearWordVector(Graph &graph, BatchedNode &input, Param &param, int dim,
+        int offset = 0) {
+    if (dim + offset > param.inDim()) {
+        cerr << boost::format("linearWordVector - dim:%1% offset%2% vocabulary_size:%3%") %
+            dim % offset % param.inDim() << endl;
+        abort();
+    }
+
+    if (input.getDim() != param.outDim()) {
+        cerr << boost::format("LinearWordVectorNode - input dim:%1% word vector dim:%2%") %
+            input.getDim() % param.outDim() << endl;
+        abort();
+    }
+    BatchedLinearWordVectorNode *node = new BatchedLinearWordVectorNode;
+    node->init(graph, input, param, dim, offset);
+    return node;
+}
 }
 
 #if USE_GPU
@@ -876,52 +860,19 @@ Executor *BiasNode::generate() {
 
 namespace n3ldg_plus {
 
-Node *linear(Graph &graph, Node &input, UniParams &params, int col = 1) {
-    if (input.getDim() / col != params.W.inDim()) {
+Node *linear(Graph &graph, Node &input, UniParams &params) {
+    if (input.getDim() % params.W.outDim() != 0) {
         cerr << boost::format("linear input dim:%1% W col:%2% W col:%3%\n") % input.getDim() %
             input.getColumn() % params.W.inDim() << endl;
         abort();
     }
-    int dim = params.W.outDim();
+    int col = input.getDim() / params.W.outDim();
+    int dim = params.W.inDim();
     LinearNode *uni = LinearNode::newNode(dim * col);
     uni->setColumn(col);
     uni->setParam(params);
     uni->forward(graph, input);
     return uni;
-}
-
-BatchedNode *linear(Graph &graph, BatchedNode &input, UniParams &params) {
-    if (input.getDim() != params.W.inDim()) {
-        cerr << boost::format("linear input dim:%1% W col:%2%\n") % input.getDim() %
-            params.W.inDim() << endl;
-        abort();
-    }
-    BatchedLinearNode *node = new BatchedLinearNode;
-    node->init(graph, input, params);
-    return node;
-}
-
-Node *uni(Graph &graph, UniParams &params, Node &input, ActivatedEnum activated_type =
-        ActivatedEnum::TANH) {
-    int dim = params.W.outDim();
-
-    Node *uni = linear(graph, input, params);
-
-    UniInputNode *activated;
-    if (activated_type == ActivatedEnum::TANH) {
-        activated = TanhNode::newNode(dim);
-    } else if (activated_type == ActivatedEnum::SIGMOID) {
-        activated = SigmoidNode::newNode(dim);
-    } else if (activated_type == ActivatedEnum::RELU) {
-        activated = ReluNode::newNode(dim);
-    } else {
-        cerr << "uni - unsupported activated " << activated << endl;
-        abort();
-    }
-
-    activated->forward(graph, *uni);
-
-    return activated;
 }
 
 Node *bias(Graph &graph, Node &input, BiasParam &param) {

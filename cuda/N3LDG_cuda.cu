@@ -934,7 +934,7 @@ void LinearForward(vector<dtype *> &in_vals, int count, vector<int> &cols, int i
     CheckCudaError();
 
     MatrixMultiplyMatrix(W, concated_in_val.value, y.value, out_row, in_row, col_sum, false,
-            false, false);
+            false, true);
 
     int max_out_dim = max_col * out_row;
     block_count = DefaultBlockCountWithoutLimit(count * max_out_dim);
@@ -1069,10 +1069,10 @@ void LinearBackward(vector<dtype *> &grads, int count, vector<int> &cols, int in
             in_offset_arr.value, concated_in_grad.value);
     CheckCudaError();
 
-    MatrixMultiplyMatrix(concated_grad.value, concated_in_val.value, W_grad, out_row, col_sum,
-            in_row, true, true, false);
+    MatrixMultiplyMatrix(concated_in_val.value, concated_grad.value, W_grad, in_row, col_sum,
+            out_row, true, true, false);
     MatrixMultiplyMatrix(W_val, concated_grad.value, concated_in_grad.value, in_row, out_row,
-            col_sum, false, false, true);
+            col_sum, false, false, false);
 
     KernelAtomicAdd<<<block_count, TPB>>>(concated_in_grad.value, count, in_dim_arr.value,
             max_in_dim, in_offset_arr.value, in_grad_arr.value);
