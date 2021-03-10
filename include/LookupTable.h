@@ -5,6 +5,7 @@
 #include "MyLib.h"
 #include "Alphabet.h"
 #include "Node.h"
+#include "MatrixNode.h"
 #include "Graph.h"
 #include "ModelUpdate.h"
 #include "profiler.h"
@@ -230,6 +231,8 @@ public:
 
 template <typename ParamType>
 class BatchedLookupNode;
+template <typename ParamType>
+class LookupExecutor;
 
 template <typename ParamType>
 class LookupNode : public Node, public Poolable<LookupNode<ParamType>> {
@@ -254,13 +257,15 @@ public:
 
     void connect(Graph &graph, const vector<int> &ids) {
         ids_ = ids;
+        setColumn(ids.size());
         graph.addNode(this);
     }
 
     PExecutor generate() override;
 
     string typeSignature() const override {
-        return Node::getNodeType() + "-" + addressToString(param_);
+        return Node::getNodeType() + "-" + addressToString(param_) +
+            (should_backward_ ? "-backward" : "nobackward");
     }
 
     void compute() override {
@@ -291,12 +296,13 @@ private:
     bool should_backward_ = true;
 
     friend class BatchedLookupNode<ParamType>;
+    friend class LookupExecutor<ParamType>;
 };
 
 namespace n3ldg_plus {
 
 template <typename ParamType>
-Node *embedding(Graph &graph,ParamType &lookup, const vector<int> ids,
+Node *embedding(Graph &graph,ParamType &lookup, const vector<int> &ids,
         bool should_backward = true) {
     LookupNode<ParamType>* input_lookup =
         LookupNode<ParamType>::newNode(lookup.outDim() * ids.size());
@@ -354,70 +360,89 @@ template<typename ParamType>
 #if USE_GPU
 class LookupExecutor :public Executor {
 public:
-    int dim;
-    ParamType *table;
-    std::vector<int> xids;
-    std::vector<int> backward_switches;
-
-    void  forward() {
+    void  forward() override {
         int count = batch.size();
-        xids.reserve(count);
+        vector<int> cols;
+        cols.reserve(count);
+        for (Node *node : batch) {
+            LookupNode<ParamType> &l = dynamic_cast<LookupNode<ParamType> &>(*node);
+            int col = l.getColumn();
+//            cout << "LookupExecutor forward col:" << col << endl;
+            cols.push_back(col);
+        }
+        max_col_ = *max_element(cols.begin(), cols.end());
+        vector<int> ids, backward_switches;
+        ids.reserve(count * max_col_);
+        backward_switches.reserve(count);
         std::vector<dtype*> vals;
         vals.reserve(count);
-        backward_switches.reserve(count);
-        for (int idx = 0; idx < count; idx++) {
-            LookupNode<ParamType> *n = static_cast<LookupNode<ParamType>*>(batch[idx]);
-            xids.push_back(n->xid);
-            vals.push_back(n->val().value);
-            backward_switches.push_back(n->should_backward ? 1 : 0);
+        for (Node *node : batch) {
+            LookupNode<ParamType> &l = dynamic_cast<LookupNode<ParamType> &>(*node);
+            for (int id : l.ids_) {
+                ids.push_back(id);
+            }
+            for (int i = 0; i < max_col_ - l.ids_.size(); ++i) {
+                ids.push_back(-1);
+            }
+            vals.push_back(l.getVal().value);
         }
+        id_arr_.init(ids.data(), ids.size());
+        col_arr_.init(cols.data(), count);
+        int row = getRow();
+        n3ldg_cuda::LookupForward(id_arr_.value, param().val.value, count, row, col_arr_.value,
+                max_col_, vals);
 
-        n3ldg_cuda::LookupForward(xids, table->val.value, count, dim, vals);
 #if TEST_CUDA
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->compute();
-            n3ldg_cuda::Assert(batch[idx]->val().verify("lookup forward"));
-        }
+        testForward();
 #endif
     }
 
-    void genericBackward(vector<dtype*> &losses);
-
-    void backward() {
-        int count = batch.size();
-        std::vector<dtype*> losses;
-        losses.reserve(count);
-        for (Node *n : batch) {
-            losses.push_back(n->loss().value);
+    void backward() override {
+        if (!shouldBackward()) {
+            return;
         }
-        genericBackward(losses);
+
+        int count = batch.size();
+        std::vector<dtype*> grads;
+        grads.reserve(count);
+        for (Node *n : batch) {
+            grads.push_back(n->loss().value);
+        }
+        genericBackward(grads);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward();
         }
 
-        n3ldg_cuda::Assert(table->grad.verify("lookup backward grad"));
+        n3ldg_cuda::Assert(param().grad.verify("lookup backward grad"));
 #endif
     }
+
+private:
+    void genericBackward(vector<dtype*> &);
+
+    ParamType &param() {
+        return *dynamic_cast<LookupNode<ParamType> &>(*batch.front()).param_;
+    }
+
+    bool shouldBackward() {
+        return dynamic_cast<LookupNode<ParamType> &>(*batch.front()).should_backward_;
+    }
+
+    n3ldg_cuda::IntArray id_arr_, backward_switch_arr_, col_arr_;
+    int max_col_;
 };
 
 template<>
-void LookupExecutor<SparseParam>::genericBackward(vector<dtype*> &losses) {
-        n3ldg_cuda::LookupBackward(xids, backward_switches,
-                losses,
-                batch.size(),
-                dim,
-                table->grad.value,
-                table->dIndexers.value);
+void LookupExecutor<SparseParam>::genericBackward(vector<dtype*> &grads) {
+        n3ldg_cuda::LookupBackward(id_arr_.value, grads, batch.size(), getRow(), col_arr_.value,
+                max_col_, param().grad.value, param().dIndexers.value);
 }
 
 template<>
-void LookupExecutor<Param>::genericBackward(vector<dtype*> &losses) {
-        n3ldg_cuda::LookupBackward(xids, backward_switches,
-                losses,
-                batch.size(),
-                dim,
-                table->grad.value);
+void LookupExecutor<Param>::genericBackward(vector<dtype*> &grads) {
+        n3ldg_cuda::LookupBackward(id_arr_.value, grads, batch.size(), getRow(), col_arr_.value,
+                max_col_, param().grad.value, nullptr);
 }
 
 #else
@@ -435,12 +460,7 @@ public:
 
 template<typename ParamType>
 PExecutor LookupNode<ParamType>::generate() {
-    LookupExecutor<ParamType>* exec = new LookupExecutor<ParamType>();
-#if USE_GPU
-    exec->table = param_;
-    exec->dim = getDim();
-#endif
-    return exec;
+    return new LookupExecutor<ParamType>();
 }
 
 #endif /*_LOOKUPTABLE_H*/

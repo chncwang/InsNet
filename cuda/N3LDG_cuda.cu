@@ -1928,124 +1928,66 @@ void BatchMemset(vector<dtype*> &vec, int count, vector<int> &dims, dtype value)
     CheckCudaError();
 }
 
-__global__ void KernelLookupForward(int *xids, dtype *vocabulary,
-        int count,
-        int dim,
+__global__ void KernelLookupForward(int *ids, dtype *vocabulary, int count, int row, int *cols,
+        int max_col,
         dtype **vals) {
-    int index = DeviceDefaultIndex();
-    int step = DeviceDefaultStep();
-    for (int i = index; i < count * dim; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        int xid = xids[count_i];
-        if (xid >= 0) {
-            int voc_i = xid * dim + dim_i;
-            vals[count_i][dim_i] = vocabulary[voc_i];
-        } else {
-            vals[count_i][dim_i] = 0.0f;
+    int i = DeviceDefaultIndex();
+    int n = row * max_col;
+    int count_i = i / n;
+    if (count_i < count) {
+        int ni = i % n;
+        int col_i = ni / row;
+        int col = cols[count_i];
+        if (col_i < col) {
+            int row_i = ni % row;
+            int id = ids[count_i * max_col + col_i];
+            int voc_i = id * row + row_i;
+            vals[count_i][ni] = vocabulary[voc_i];
         }
     }
 }
 
-void LookupForward(vector<int> &xids, dtype *vocabulary,
-        int count,
-        int dim,
+void LookupForward(int *ids, dtype *vocabulary, int count, int row, int *cols, int max_col,
         vector<dtype*> &vals) {
-    int block_count = min(BLOCK_COUNT, (count * dim - 1 + TPB) / TPB);
-    IntArray xid_arr;
-    xid_arr.init((int*)xids.data(), xids.size());
+    int block_count = DefaultBlockCountWithoutLimit(count * row * max_col);
     NumberPointerArray val_arr;
     val_arr.init((dtype**)vals.data(), vals.size());
-    KernelLookupForward<<<block_count, TPB>>>(xid_arr.value, vocabulary,
-            count, dim, const_cast<dtype**>(val_arr.value));
+    KernelLookupForward<<<block_count, TPB>>>(ids, vocabulary, count, row, cols, max_col,
+            val_arr.value);
     CheckCudaError();
 }
 
-__global__ void KernelLookupBackward(int *xids, int *should_backward,
-        dtype** grads,
-        int count,
-        int dim,
-        dtype *grad,
+__global__ void KernelLookupBackward(int *ids, dtype** grads, int count, int row, int *cols,
+        int max_col,
+        dtype *param_grad,
         bool *indexers) {
-    int index = DeviceDefaultIndex();
-    int step = DeviceDefaultStep();
-    for (int i = index; i < count * dim; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        int xid = xids[count_i];
-        if (should_backward[count_i]) {
-            if (dim_i == 0) {
-                indexers[xid] = true;
+    int i = DeviceDefaultIndex();
+    int n = row * max_col;
+    int count_i = i / n;
+    if (count_i < count) {
+        int ni = i % n;
+        int col_i = ni / row;
+        int col = cols[count_i];
+        if (col_i < col) {
+            int row_i = ni % row;
+            int id = ids[count_i * max_col + col_i];
+            if (indexers != nullptr && row_i == 0 && col_i == 0) {
+                indexers[id] = true;
             }
-            DeviceAtomicAdd(grad + xid * dim + dim_i, grads[count_i][dim_i]);
+            int voc_i = id * row + row_i;
+            DeviceAtomicAdd(param_grad + voc_i, grads[count_i][ni]);
         }
     }
 }
 
-void LookupBackward(vector<int> &xids, vector<int> &should_backward,
-        vector<dtype*> &grads,
-        int count,
-        int dim,
-        dtype *grad,
+void LookupBackward(int *ids, vector<dtype*> &grads, int count, int row, int *cols, int max_col,
+        dtype *param_grad,
         bool *indexers) {
-    int block_count = min((count * dim - 1 + TPB) / TPB, BLOCK_COUNT);
-    IntArray pl_arr;
-    pl_arr.init((int*)xids.data(), xids.size());
-    IntArray xid_arr;
-    xid_arr.init((int*)pl_arr.value, xids.size());
-    NumberPointerArray loss_arr;
-    loss_arr.init((dtype**)grads.data(), grads.size());
-    IntArray should_backward_arr;
-    should_backward_arr.init(should_backward.data(), should_backward.size());
-    KernelLookupBackward<<<block_count, TPB>>>(
-            const_cast<int *>(xid_arr.value),
-            should_backward_arr.value,
-            const_cast<dtype**>(loss_arr.value),
-            count,
-            dim,
-            grad,
-            indexers);
-    CheckCudaError();
-}
-
-__global__ void KernelLookupBackward(int *xids, int *should_backward,
-        dtype** grads,
-        int count,
-        int dim,
-        dtype *grad) {
-    int index = DeviceDefaultIndex();
-    int step = DeviceDefaultStep();
-    for (int i = index; i < count * dim; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        int xid = xids[count_i];
-        if (should_backward[count_i]) {
-            DeviceAtomicAdd(grad + xid * dim + dim_i, grads[count_i][dim_i]);
-        }
-    }
-}
-
-void LookupBackward(vector<int> &xids, vector<int> &should_backward,
-        vector<dtype*> &grads,
-        int count,
-        int dim,
-        dtype *grad) {
-    int block_count = min((count * dim - 1 + TPB) / TPB, BLOCK_COUNT);
-    IntArray pl_arr;
-    pl_arr.init((int*)xids.data(), xids.size());
-    IntArray xid_arr;
-    xid_arr.init((int*)pl_arr.value, xids.size());
-    NumberPointerArray loss_arr;
-    loss_arr.init((dtype**)grads.data(), grads.size());
-    IntArray should_backward_arr;
-    should_backward_arr.init(should_backward.data(), should_backward.size());
-    KernelLookupBackward<<<block_count, TPB>>>(
-            const_cast<int *>(xid_arr.value),
-            should_backward_arr.value,
-            const_cast<dtype**>(loss_arr.value),
-            count,
-            dim,
-            grad);
+    int block_count = DefaultBlockCountWithoutLimit(count * row * max_col);
+    NumberPointerArray grad_arr;
+    grad_arr.init((dtype**)grads.data(), grads.size());
+    KernelLookupBackward<<<block_count, TPB>>>(ids, grad_arr.value, count, row, cols, max_col,
+            param_grad, indexers);
     CheckCudaError();
 }
 

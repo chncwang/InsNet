@@ -241,22 +241,11 @@ void ScalarConcatForward(vector<dtype *> &ins, int count, vector<int> &dims,
 void ScalarConcatBackward(vector<dtype *> &losses, int count, vector<int> &dims,
         int max_dim,
         vector<dtype *> in_losses);
-void LookupForward(vector<int> &xids, dtype *vocabulary,
-        int count,
-        int dim,
+void LookupForward(int *ids, dtype *vocabulary, int count, int row, int *cols, int max_col,
         vector<dtype*> &vals);
-void LookupBackward(vector<int> &xids,
-        vector<int> &should_backward,
-        vector<dtype*> &losses,
-        int count,
-        int dim,
-        dtype *grad,
+void LookupBackward(int *ids, vector<dtype*> &grads, int count, int row, int *cols, int max_col,
+        dtype *param_grad,
         bool *indexers);
-void LookupBackward(vector<int> &xids, vector<int> &should_backward,
-        vector<dtype*> &losses,
-        int count,
-        int dim,
-        dtype *grad);
 void ParamRowForward(dtype *param, int row_index, int param_row_count, int count, int dim,
         vector<dtype*> &vals);
 void PoolForward(PoolingEnum pooling, vector<dtype*> &in_vals,
