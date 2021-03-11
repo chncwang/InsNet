@@ -60,11 +60,11 @@ struct GRUParams : public N3LDGSerializable, TunableCombination<BaseParam>
     }
 
     int inDim() {
-        return update_input.W.inDim();
+        return update_input.W().outDim();
     }
 
     int outDim() {
-        return update_input.W.outDim();
+        return update_input.W().inDim();
     }
 
 #if USE_GPU

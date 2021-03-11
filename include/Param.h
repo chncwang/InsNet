@@ -24,6 +24,8 @@ public:
 
     Param(const string &name, bool is_bias = false) : BaseParam(name, is_bias) {}
 
+    virtual ~Param() = default;
+
     virtual void init(int outDim, int inDim) override {
         init(outDim, inDim, nullptr);
     }

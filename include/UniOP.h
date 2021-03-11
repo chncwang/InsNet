@@ -17,59 +17,96 @@ class UniParams : public N3LDGSerializable, public TunableCombination<BaseParam>
 #endif
 {
 public:
-    Param W;
-    Param b;
-    bool bUseB = true;
+    UniParams(const string &name) : b_(name + "-b", true), name_(name) {}
 
-    UniParams(const string &name) : W(name + "-W"), b(name + "-b", true) {}
+    ~UniParams() {
+        if (W_ != nullptr && is_W_owner_) {
+            delete W_;
+        }
+    }
 
-    void init(int out_dim, int in_dim, bool useB = true,
+    void init(int out_dim, int in_dim, bool use_b = true,
             const std::function<dtype(int, int)> *bound = nullptr,
             InitDistribution dist = InitDistribution::UNI) {
-        W.init(in_dim, out_dim, bound, dist);
-
-        bUseB = useB;
-        if (bUseB) {
-            b.init(out_dim, 1);
+        if (W_ != nullptr) {
+            cerr << "UniParams init already initialized" << endl;
+            abort();
         }
+        W_ = new Param(name_ + "-W");
+        W_->init(in_dim, out_dim, bound, dist);
+        is_W_owner_ = true;
+
+        bias_enabled_ = use_b;
+        if (use_b) {
+            b_.init(out_dim, 1);
+        }
+    }
+
+    void init(Param &W) {
+        if (W_ != nullptr) {
+            cerr << "UniParams init already initialized" << endl;
+            abort();
+        }
+        W_ = &W;
+        is_W_owner_ = false;
+        bias_enabled_ = false;
     }
 
     Json::Value toJson() const override {
         Json::Value json;
-        json["use_b"] = bUseB;
-        json["w"] = W.toJson();
-        if (bUseB) {
-            json["b"] = b.toJson();
+        json["use_b"] = bias_enabled_;
+        json["w"] = W_->toJson();
+        if (bias_enabled_) {
+            json["b"] = b_.toJson();
         }
         return json;
     }
 
     void fromJson(const Json::Value &json) override {
-        bUseB = json["use_b"].asBool();
-        W.fromJson(json["w"]);
-        if (bUseB) {
-            b.fromJson(json["b"]);
+        bias_enabled_ = json["use_b"].asBool();
+        W_->fromJson(json["w"]);
+        if (bias_enabled_) {
+            b_.fromJson(json["b"]);
         }
     }
 
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
-        std::vector<Transferable *> ptrs = {&W};
-        if (bUseB) {
-            ptrs.push_back(&b);
+        std::vector<Transferable *> ptrs = {W_};
+        if (bias_enabled_) {
+            ptrs.push_back(&b_);
         }
         return ptrs;
     }
 #endif
 
+    Param &W() {
+        return *W_;
+    }
+
+    Param &b() {
+        return b_;
+    }
+
+    bool biasEnabled() const {
+        return bias_enabled_;
+    }
+
 protected:
-    virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
-        if (bUseB) {
-            return {&W, &b};
+    std::vector<Tunable<BaseParam>*> tunableComponents() override {
+        if (bias_enabled_) {
+            return {W_, &b_};
         } else {
-            return {&W};
+            return {W_};
         }
     }
+
+private:
+    Param *W_ = nullptr;
+    Param b_;
+    string name_;
+    bool bias_enabled_ = true;
+    bool is_W_owner_ = true;
 };
 
 class LinearNode : public UniInputNode, public Poolable<LinearNode> {
@@ -103,11 +140,11 @@ public:
     }
 
     Param &W() {
-        return param_->W;
+        return param_->W();
     }
 
     Param *b() {
-        return param_->bUseB ? &param_->b : nullptr;
+        return param_->biasEnabled() ? &param_->b() : nullptr;
     }
 
 protected:
@@ -380,347 +417,6 @@ Executor * LinearNode::generate() {
     return new LinearExecutor();
 };
 
-class LinearWordVectorExecutor;
-
-class LinearWordVectorNode : public UniInputNode, public Poolable<LinearWordVectorNode> {
-public:
-    LinearWordVectorNode() : UniInputNode("linear_word_vector_node") {}
-
-    void initNode(int dim) override {
-        init(dim);
-    }
-
-    void setNodeDim(int dim) override {
-        setDim(dim);
-    }
-
-    bool isDimLegal(const Node &input) const override {
-        return input.getDim() == param_->outDim();
-    }
-
-    void setParam(Param &word_vectors, int offset = 0) {
-        if (offset + getDim() > word_vectors.inDim()) {
-            cerr << boost::format("offset:%1% getDim():%2% word_vectors.inDim():%3%") % offset %
-                getDim() % word_vectors.inDim() << endl;
-            abort();
-        }
-        param_ = &word_vectors;
-        offset_ = offset;
-    }
-
-    void compute() override {
-        abort();
-    }
-
-    void backward() override {
-        abort();
-    }
-
-    Executor* generate() override;
-
-    string typeSignature() const override {
-        return Node::typeSignature() + "-" + addressToString(param_) + "-" + to_string(offset_);
-    }
-
-    int getOffset() const {
-        return offset_;
-    }
-
-private:
-    Param *param_ = nullptr;
-    int offset_ = 0;
-
-    friend class LinearWordVectorExecutor;
-};
-
-class BatchedLinearWordVectorNode : public BatchedNodeImpl<LinearWordVectorNode> {
-public:
-    void init(Graph &graph, BatchedNode &input, Param &param, int dim, int offset) {
-        allocateBatch(dim, input.batch().size());
-
-        for (Node *node : batch()) {
-            LinearWordVectorNode *l = dynamic_cast<LinearWordVectorNode *>(node);
-            l->setParam(param, offset);
-        }
-        setInputsPerNode({&input});
-        afterInit(graph, {&input});
-    }
-};
-
-namespace n3ldg_plus {
-
-Node *linearWordVector(Graph &graph, Node &input, Param &param, int dim,
-        int offset = 0) {
-    if (dim + offset > param.inDim()) {
-        cerr << boost::format("linearWordVector - dim:%1% offset%2% vocabulary_size:%3%") %
-            dim % offset % param.inDim() << endl;
-        abort();
-    }
-
-    if (input.getDim() != param.outDim()) {
-        cerr << boost::format("LinearWordVectorNode - input dim:%1% word vector dim:%2%") %
-            input.getDim() % param.outDim() << endl;
-        abort();
-    }
-
-    LinearWordVectorNode *node =  LinearWordVectorNode::newNode(dim);
-    node->setParam(param, offset);
-    node->forward(graph, input);
-    return node;
-}
-
-BatchedNode *linearWordVector(Graph &graph, BatchedNode &input, Param &param, int dim,
-        int offset = 0) {
-    if (dim + offset > param.inDim()) {
-        cerr << boost::format("linearWordVector - dim:%1% offset%2% vocabulary_size:%3%") %
-            dim % offset % param.inDim() << endl;
-        abort();
-    }
-
-    if (input.getDim() != param.outDim()) {
-        cerr << boost::format("LinearWordVectorNode - input dim:%1% word vector dim:%2%") %
-            input.getDim() % param.outDim() << endl;
-        abort();
-    }
-    BatchedLinearWordVectorNode *node = new BatchedLinearWordVectorNode;
-    node->init(graph, input, param, dim, offset);
-    return node;
-}
-}
-
-#if USE_GPU
-
-class LinearWordVectorExecutor : public UniInputExecutor {
-public:
-    Tensor2D x, y;
-
-    int inDim() {
-        return param().outDim();
-    }
-
-    int outDim() {
-        return param().inDim();
-    }
-
-    Param &param() {
-        return *dynamic_cast<LinearWordVectorNode *>(batch.front())->param_;
-    }
-
-    void forward() {
-        int count = batch.size();
-
-        x.init(inDim(), count);
-        y.init(outDim(), count);
-        std::vector<dtype*> xs, ys;
-        xs.reserve(batch.size());
-        ys.reserve(batch.size());
-#if TEST_CUDA
-        param().val.copyFromDeviceToHost();
-#endif
-
-        for (int i = 0; i < batch.size(); ++i) {
-            LinearWordVectorNode *n = static_cast<LinearWordVectorNode*>(batch.at(i));
-#if TEST_CUDA
-            n->getInput().val().copyFromDeviceToHost();
-#endif
-            xs.push_back(n->getInput().val().value);
-            ys.push_back(n->val().value);
-        }
-
-        n3ldg_cuda::CopyForUniNodeForward(xs, nullptr, x.value, y.value, count, inDim(), outDim(),
-                false);
-        int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
-        n3ldg_cuda::MatrixMultiplyMatrix(param().val.value + offset * inDim(), x.value, y.value,
-                outDim(), inDim(), count, false, false, true);
-
-        std::vector<dtype*> vals;
-        vals.reserve(count);
-        for (Node *node : batch) {
-            vals.push_back(node->val().value);
-        }
-
-        n3ldg_cuda::CopyFromOneVectorToMultiVals(y.value, vals, count, outDim());
-#if TEST_CUDA
-        for (int i = 0; i < count; i++) {
-            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
-            memcpy(x.v + i * inDim(), ptr->getInput().val().v, inDim() * sizeof(dtype));
-        }
-        Mat scoped_matrix(param().val.mat().data() + offset * inDim(), inDim(), outDim());
-        y.mat() = scoped_matrix.transpose() * x.mat();
-        n3ldg_cuda::Assert(x.verify("forward x"));
-        n3ldg_cuda::Assert(y.verify("linear word forward y"));
-
-        for (int idx = 0; idx < count; idx++) {
-            LinearNode* ptr = (LinearNode*)batch[idx];
-            for (int idy = 0; idy < outDim(); idy++) {
-                ptr->val()[idy] = y[idx][idy];
-            }
-            n3ldg_cuda::Assert(ptr->val().verify("linear forward val"));
-        }
-        cout << "LinearWordVectorExecutor forward tested" << endl;
-#endif
-    }
-
-    void backward() {
-        int count = batch.size();
-        Tensor2D lx, ly;
-        lx.init(inDim(), count);
-        ly.init(outDim(), count);
-#if TEST_CUDA
-        param().grad.copyFromDeviceToHost();
-#endif
-
-        std::vector<dtype*> ly_vec;
-        ly_vec.reserve(count);
-        for (int i = 0; i < count; ++i) {
-            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
-#if TEST_CUDA
-            ptr->loss().copyFromDeviceToHost();
-            ptr->val().copyFromDeviceToHost();
-#endif
-            ly_vec.push_back(ptr->loss().value);
-        }
-        n3ldg_cuda::CopyFromMultiVectorsToOneVector(ly_vec, ly.value, count, outDim());
-        int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
-        n3ldg_cuda::MatrixMultiplyMatrix(x.value, ly.value, param().grad.value + inDim() * offset,
-                inDim(), count, outDim(), true, true, false);
-        n3ldg_cuda::MatrixMultiplyMatrix(param().val.value + offset * inDim(), ly.value, lx.value,
-                inDim(), outDim(), count, false, false, false);
-        std::vector<dtype*> losses;
-        losses.reserve(count);
-        for (int idx = 0; idx < count; idx++) {
-            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
-            losses.push_back(ptr->getInput().loss().value);
-        }
-
-        n3ldg_cuda::AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(ly.value, lx.value,
-                nullptr, losses, count, outDim(), inDim(), false);
-#if TEST_CUDA
-        for (int idx = 0; idx < count; idx++) {
-            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
-            memcpy(ly.v + idx * outDim(), ptr->loss().v, outDim() * sizeof(dtype));
-            ptr->loss().copyFromDeviceToHost();
-        }
-
-        n3ldg_cuda::Assert(x.verify("backward x"));
-        n3ldg_cuda::Assert(ly.verify("backward ly"));
-
-        auto scoped_grad = x.mat() * ly.mat().transpose();
-        MatrixXdtype full_grad(inDim(), param().inDim()), left(inDim(), offset),
-                     right(inDim(), param().inDim() - offset - outDim());
-        left.setZero();
-        right.setZero();
-        full_grad << left, scoped_grad, right;
-        param().grad.mat() += full_grad;
-        function<void(void)> print = [&]()->void {
-            cerr << "outdim:" << outDim() << " param indim:" << param().inDim() << " offset:" <<
-                offset << " indim:" << inDim() << endl;
-//            cerr << "cpu:" << endl << param->grad.toString() << endl << "gpu:" << endl;
-//            param->grad.print();
-        };
-        n3ldg_cuda::Assert(param().grad.verify("LinearWordVectorExecutor backward W grad"), "",
-                print);
-
-        Mat scoped_matrix(param().val.mat().data() + offset * inDim(), inDim(), outDim());
-        lx.mat() = scoped_matrix * ly.mat();
-        n3ldg_cuda::Assert(lx.verify("linear word vector execute backward lx"));
-
-        for (int idx = 0; idx < count; idx++) {
-            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
-            for (int idy = 0; idy < inDim(); idy++) {
-                ptr->getInput().loss()[idy] += lx[idx][idy];
-            }
-        }
-
-        for (Node * n : batch) {
-            LinearWordVectorNode *ptr = static_cast<LinearWordVectorNode *>(n);
-            n3ldg_cuda::Assert(ptr->getInput().loss().verify("backward loss"));
-        }
-        cout << "LinearWordVectorNode backward tested" << endl;
-#endif
-    }
-};
-
-#else
-
-class LinearWordVectorExecutor : public Executor {
-public:
-    Tensor2D x, y;
-
-    int inDim() {
-        return param().outDim();
-    }
-
-    int outDim() {
-        return param().inDim();
-    }
-
-    Param &param() {
-        return *dynamic_cast<LinearWordVectorNode *>(batch.front())->param_;
-    }
-
-    int calculateFLOPs() override {
-        LinearWordVectorNode *node = static_cast<LinearWordVectorNode*>(batch.front());
-        return node->getDim() * node->getInput().getDim() * batch.size() * 2;
-    }
-
-    void forward() override {
-        int count = batch.size();
-        x.init(inDim(), count);
-        y.init(outDim(), count);
-
-        for (int i = 0; i < count; i++) {
-            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
-            memcpy(x.v + i * inDim(), ptr->getInput().val().v, inDim() * sizeof(dtype));
-        }
-        int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
-        Mat scoped_matrix(param().val.mat().data() + offset * inDim(), inDim(), outDim());
-        y.mat() = scoped_matrix.transpose() * x.mat();
-
-        for (int i = 0; i < count; i++) {
-            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch.at(i);
-            memcpy(ptr->val().v, y.v + i * outDim(), outDim() * sizeof(dtype));
-        }
-    }
-
-    void backward() override {
-        Tensor2D lx, ly;
-        int count = batch.size();
-        lx.init(inDim(), count);
-        ly.init(outDim(), count);
-
-        for (int idx = 0; idx < count; idx++) {
-            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
-            memcpy(ly.v + idx * outDim(), ptr->loss().v, outDim() * sizeof(dtype));
-        }
-
-        int offset = static_cast<LinearWordVectorNode*>(batch.front())->offset_;
-        auto scoped_grad = x.mat() * ly.mat().transpose();
-        MatrixXdtype full_grad(inDim(), param().inDim()), left(inDim(), offset),
-                     right(inDim(), param().inDim() - offset - outDim());
-        left.setZero();
-        right.setZero();
-        full_grad << left, scoped_grad, right;
-        param().grad.mat() += full_grad;
-
-        Mat scoped_matrix(param().val.mat().data() + offset * inDim(), inDim(), outDim());
-        lx.mat() = scoped_matrix * ly.mat();
-
-        for (int idx = 0; idx < count; idx++) {
-            LinearWordVectorNode* ptr = (LinearWordVectorNode*)batch[idx];
-            for (int idy = 0; idy < inDim(); idy++) {
-                ptr->getInput().loss()[idy] += lx[idx][idy];
-            }
-        }
-    }
-};
-
-#endif
-
-Executor* LinearWordVectorNode::generate() {
-    return new LinearWordVectorExecutor();
-}
-
 class BiasParam : public Param {
 public:
     BiasParam(const string &name) : Param(name, true) {}
@@ -858,16 +554,43 @@ Executor *BiasNode::generate() {
 namespace n3ldg_plus {
 
 Node *linear(Graph &graph, Node &input, UniParams &params) {
-    if (input.getDim() % params.W.outDim() != 0) {
+    if (input.getDim() % params.W().outDim() != 0) {
         cerr << boost::format("linear input dim:%1% W col:%2% W col:%3%\n") % input.getDim() %
-            input.getColumn() % params.W.inDim() << endl;
+            input.getColumn() % params.W().inDim() << endl;
         abort();
     }
-    int col = input.getDim() / params.W.outDim();
-    int dim = params.W.inDim();
+    int col = input.getDim() / params.W().outDim();
+    int dim = params.W().inDim();
     LinearNode *uni = LinearNode::newNode(dim * col);
     uni->setColumn(col);
     uni->setParam(params);
+    uni->forward(graph, input);
+    return uni;
+}
+
+Node *linear(Graph &graph, Node &input, Param &param) {
+    if (input.getDim() % param.outDim() != 0) {
+        cerr << boost::format("linear input dim:%1% W col:%2% W col:%3%\n") % input.getDim() %
+            input.getColumn() % param.inDim() << endl;
+        abort();
+    }
+
+    static map<void *, UniParams *> param_map;
+    auto it = param_map.find(&param);
+    UniParams *uni_params;
+    if (it == param_map.end()) {
+        uni_params = new UniParams("uni" + addressToString(&param));
+        uni_params->init(param);
+        param_map.insert(make_pair(&param, uni_params));
+    } else {
+        uni_params = it->second;
+    }
+
+    int col = input.getDim() / param.outDim();
+    int dim = param.inDim();
+    LinearNode *uni = LinearNode::newNode(dim * col);
+    uni->setColumn(col);
+    uni->setParam(*uni_params);
     uni->forward(graph, input);
     return uni;
 }

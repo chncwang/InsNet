@@ -66,15 +66,15 @@ struct LSTM1Params : public N3LDGSerializable, TunableCombination<BaseParam>
         cell_hidden.init(nOSize, nOSize, false);
         cell_input.init(nOSize, nISize, true);
 
-        forget_input.b.val.assignAll(1.0f);
+        forget_input.b().val.assignAll(1.0f);
     }
 
     int inDim() {
-        return input_input.W.inDim();
+        return input_input.W().outDim();
     }
 
     int outDim() {
-        return input_input.W.outDim();
+        return input_input.W().inDim();
     }
 
 #if USE_GPU

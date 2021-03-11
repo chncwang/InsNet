@@ -114,8 +114,9 @@ public:
 
 namespace n3ldg_plus {
 
-Node* split(Graph &graph, Node &input, int dim, int offset) {
-    SplitNode *split = SplitNode::newNode(dim);
+Node* split(Graph &graph, Node &input, int dim, int offset, int col = 1) {
+    SplitNode *split = SplitNode::newNode(dim * col);
+    split->setColumn(col);
     split->forward(graph, input, offset);
     return split;
 }
