@@ -3,11 +3,22 @@
 
 #include <Node.h>
 
-vector<int> cpuPredict(const vector<Node *> &nodes) {
-    vector<int> result;
+vector<vector<int>> cpuPredict(const vector<Node *> &nodes, int row) {
+    vector<vector<int>> result;
+    result.reserve(nodes.size());
     for (Node *node : nodes) {
-        result.push_back(std::max_element(node->getVal().v,
-                    node->getVal().v + node->getDim()) - node->getVal().v);
+        int col = node->getDim() / row;
+        if (col * row != node->getDim()) {
+            cerr << boost::format("cpuPredict - row:%1% node dim:%2%\n") % row % node->getDim();
+            abort();
+        }
+        vector<int> ids;
+        ids.reserve(col);
+        for (int i = 0; i < col; ++i) {
+            ids.push_back(std::max_element(node->getVal().v + i * row,
+                    node->getVal().v + (i + 1) * row) - node->getVal().v - i * row);
+        }
+        result.push_back(ids);
     }
     return result;
 }
@@ -22,26 +33,38 @@ vector<int> gpuPredict(const vector<Node *> &nodes) {
 
 #endif
 
-vector<int> predict(const vector<Node *> &nodes) {
-    validateEqualNodeDims(nodes);
+vector<vector<int>> predict(const vector<Node *> &nodes, int row) {
 #if USE_GPU
     return gpuPredict(nodes);
 #else
-    return cpuPredict(nodes);
+    return cpuPredict(nodes, row);
 #endif
 }
 
-dtype cpuCrossEntropyLoss(vector<Node *> &nodes, const vector<int> &answers, dtype factor) {
+dtype cpuCrossEntropyLoss(vector<Node *> &nodes, int row,
+        const vector<vector<int>> &answers_vector,
+        dtype factor) {
     dtype loss = 0;
     for (int i = 0; i < nodes.size(); ++i) {
-        int answer = answers.at(i);
-        nodes.at(i)->loss()[answer] -= 1 / nodes.at(i)->getVal()[answer] * factor;
-        loss -= log(nodes.at(i)->getVal()[answer]);
+        const auto &answers = answers_vector.at(i);
+        int col = nodes.at(i)->getDim() / row;
+        if (col * row != nodes.at(i)->getDim()) {
+            cerr << boost::format("cpuCrossEntropyLoss row:%1% node dim:%2%") % row %
+                nodes.at(i)->getDim() << endl;
+            abort();
+        }
+        for (int j = 0; j < col; ++j) {
+            int answer = answers.at(j);
+            nodes.at(i)->loss()[row * j + answer] -=
+                1 / nodes.at(i)->getVal()[row * j + answer] * factor;
+            loss -= log(nodes.at(i)->getVal()[row * j + answer]);
+        }
     }
     return loss * factor;
 }
 
-dtype crossEntropyLoss(vector<Node *> &nodes, const vector<int> &answers, dtype factor) {
+dtype crossEntropyLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers,
+        dtype factor) {
     if (nodes.size() != answers.size()) {
         cerr << boost::format("crossEntropyLoss - node size is %1%, but answer size is %2%") %
             nodes.size() % answers.size() << endl;
@@ -62,7 +85,7 @@ dtype crossEntropyLoss(vector<Node *> &nodes, const vector<int> &answers, dtype 
 #endif
     return loss;
 #else
-    return cpuCrossEntropyLoss(nodes, answers, factor);
+    return cpuCrossEntropyLoss(nodes, row, answers, factor);
 #endif
 }
 
@@ -128,8 +151,16 @@ pair<float, vector<int>> KLLoss(vector<Node *> &nodes,
 #else
     dtype loss = cpuKLLoss(nodes, answers, factor);
 #endif
-    auto predicted_ids = predict(nodes);
-    pair<float, vector<int>> result = make_pair(loss, predicted_ids);
+    auto predicted_ids = predict(nodes, nodes.front()->getDim());
+    vector<int> ids;
+    for (const auto &x : predicted_ids) {
+        if (x.size() != 1) {
+            cerr << boost::format("KLLoss x size:%1%\n") % x.size();
+            abort();
+        }
+        ids.push_back(x.front());
+    }
+    pair<float, vector<int>> result = make_pair(loss, ids);
     return result;
 }
 

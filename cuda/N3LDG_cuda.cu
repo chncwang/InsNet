@@ -960,7 +960,7 @@ __global__ void KernelAtomicAdd(dtype *src, int count, int *dims, int max_dim, i
 
 __global__ void KernelLinearBackwardForBias(dtype *grad, int col, int row, dtype *bias_grad,
         int *block_counters,
-        dtype *block_sums) {
+        volatile dtype *block_sums) {
     __shared__ volatile extern dtype shared_sum[];
     __shared__ volatile bool is_last_block;
     if (threadIdx.x == 0 && blockIdx.y == 0) {
@@ -2286,7 +2286,7 @@ __global__ void KernelTranMatrixMulVectorForward(dtype **matrices, dtype **vecto
         int *cols,
         int max_col,
         int row,
-        dtype *block_sums,
+        volatile dtype *block_sums,
         int *block_counters,
         dtype **vals) {
     __shared__ volatile extern dtype shared_sum[];
@@ -4078,7 +4078,8 @@ void VectorSumBackward(vector<dtype*> &grads, int count, int col, vector<int> &r
     CheckCudaError();
 }
 
-__global__ void KernelMaxScalar(dtype **v, int count, int *rows, int *cols, dtype *block_maxes,
+__global__ void KernelMaxScalar(dtype **v, int count, int *rows, int *cols,
+        volatile dtype *block_maxes,
         int *block_counters,
         dtype *max_vals) {
     __shared__ volatile extern dtype shared_max[];
@@ -4192,7 +4193,8 @@ __global__ void KernelDiv(dtype **numerators, dtype *denominators, int count, in
     }
 }
 
-__global__ void KernelVectorSum(dtype **v, int count, int *rows, int *cols, dtype *block_sums,
+__global__ void KernelVectorSum(dtype **v, int count, int *rows, int *cols,
+        volatile dtype *block_sums,
         int *block_counters,
         dtype *results) {
     __shared__ volatile extern dtype shared_sum[];
@@ -4315,7 +4317,7 @@ __global__ void KernelPointwiseMul(dtype **a, dtype **b, int count, int *rows, i
 
 __global__ void KernelVectorSum(dtype *v, int count, int *rows, int max_row, int *cols,
         int *v_offsets,
-        dtype *block_sums,
+        volatile dtype *block_sums,
         int *block_counters,
         dtype *results) {
     __shared__ volatile extern dtype shared_sum[];
@@ -4678,7 +4680,7 @@ void BiasBackward(vector<dtype *> &grads, int count, int dim, dtype *bias_grad,
             (dtype **)input_grad_arr.value);
 }
 
-__global__ void KernelSum(dtype **v, int count, int row, int *cols, dtype *block_sums,
+__global__ void KernelSum(dtype **v, int count, int row, int *cols, volatile dtype *block_sums,
         int *block_counters,
         bool cal_mean,
         bool cal_sqrt,
@@ -4830,7 +4832,7 @@ __global__ void KernelPointwiseMul(dtype **a, dtype **b, int count, int *dims, i
 }
 
 __global__ void KernelSum(dtype *v, int count, int row, int *cols, int *col_offsets,
-        dtype *block_sums,
+        volatile dtype *block_sums,
         int *block_counters,
         dtype *sum_vals) {
     __shared__ volatile extern dtype shared_sum[];

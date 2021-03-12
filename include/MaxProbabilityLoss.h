@@ -8,12 +8,4 @@
 
 #include "MyLib.h"
 
-std::pair<dtype, std::vector<int>> maxLogProbabilityLoss(std::vector<Node *> &nodes,
-        const std::vector<int> &answers,
-        dtype factor) {
-    dtype loss = crossEntropyLoss(nodes, answers, factor);
-    vector<int> predicted_ids = predict(nodes);
-    return make_pair(loss, predicted_ids);
-}
-
 #endif

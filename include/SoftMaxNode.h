@@ -186,13 +186,10 @@ BatchedNode *minusMaxScalar(Graph &graph, BatchedNode &input, int input_col) {
 
 Node* softmax(Graph &graph, Node &input, int input_col) {
     using namespace n3ldg_plus;
-    Node *subtracted = minusMaxScalar(graph, input, input_col);
-    Node *exp = n3ldg_plus::exp(graph, *subtracted);
-    Node *sum = vectorSum(graph, *exp, input_col);
-    int input_row = input.getDim() / input_col;
-    sum = scalarToVector(graph, *sum, input_row);
-    Node *div = n3ldg_plus::fullDiv(graph, *exp, *sum);
-    return div;
+    SoftmaxNode *node = SoftmaxNode::newNode(input.getDim());
+    node->setColumn(input_col);
+    node->forward(graph, input);
+    return node;
 }
 
 BatchedNode* softmax(Graph &graph, BatchedNode &input, int col = 1) {
