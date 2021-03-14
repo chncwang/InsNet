@@ -1205,7 +1205,6 @@ bool Verify(dtype *host, dtype *device, int len, const char* message) {
     CallCuda(MyCudaMemcpy(dev_success, &success, sizeof(bool),
                 cudaMemcpyHostToDevice));
     dtype abs_max = AbsMax(arr.value, len);
-    cudaDeviceSynchronize();
     KernelVerify<<<block_count, TPB>>>(arr.value, device, len, abs_max, m, dev_success);
     CheckCudaError();
     CallCuda(MyCudaMemcpy(&success, dev_success, sizeof(bool),
@@ -3326,19 +3325,27 @@ void SoftMaxLoss(vector<dtype*> &vals, vector<dtype*> &losses, int *correct_coun
     CheckCudaError();
 }
 
-__global__ void KernelCrossEntropyLoss(dtype **vals, int *answers, int count,
+__global__ void KernelCrossEntropyLoss(dtype **vals, int *answers, int count, int *cols,
+        int max_col,
+        int row,
         dtype factor,
-        dtype **losses) {
-    int index = DeviceDefaultIndex();
-    int step = DeviceDefaultStep();
-    for (int i = index; i < count; i += step) {
-        int answer = answers[i];
-        DeviceAtomicAdd(losses[i] + answer, - 1 / vals[i][answer] * factor);
+        dtype **grads) {
+    int i = DeviceDefaultIndex();
+    if (i < count * max_col) {
+        int count_i = i / max_col;
+        int col_i = i % max_col;
+        int col = cols[count_i];
+        if (col_i < col) {
+            int answer = answers[count_i * max_col + col_i];
+            DeviceAtomicAdd(grads[count_i] + col_i * row + answer,
+                    -1 / vals[count_i][col_i * row + answer] * factor);
+        }
     }
 }
 
-__global__ void KernelCrossEntropgyLossValue(dtype **vals, int *answers,
-        int count,
+__global__ void KernelCrossEntropgyLossValue(dtype **vals, int *answers, int count, int *cols,
+        int max_col,
+        int row,
         volatile dtype *global_sum,
         int *block_counter,
         dtype *result) {
@@ -3351,10 +3358,18 @@ __global__ void KernelCrossEntropgyLossValue(dtype **vals, int *answers,
     if (threadIdx.x == 0) {
         is_last_block = false;
     }
-    shared_sum[threadIdx.x] = 0.0f;
-    for (int i = index; i < count; i += blockDim.x * gridDim.x) {
-        int answer_offset = answers[i];
-        shared_sum[threadIdx.x] -= cuda_log(vals[i][answer_offset]);
+    int count_i = index / max_col;
+    if (count_i < count) {
+        int col = cols[count_i];
+        int col_i = index % max_col;
+        if (col_i < col) {
+            int answer_id = answers[index];
+            shared_sum[threadIdx.x] = -cuda_log(vals[count_i][row * col_i + answer_id]);
+        } else {
+            shared_sum[threadIdx.x] = 0.0f;
+        }
+    } else {
+        shared_sum[threadIdx.x] = 0.0f;
     }
 
     __syncthreads();
@@ -3395,20 +3410,39 @@ __global__ void KernelCrossEntropgyLossValue(dtype **vals, int *answers,
     }
 }
 
-dtype CrossEntropyLoss(vector<dtype *> &vals, vector<int> &answers, int count,
+dtype CrossEntropyLoss(vector<dtype *> &vals, const vector<vector<int>> &answers, int count,
+        int row,
         dtype factor,
-        vector<dtype *> &losses) {
-    NumberPointerArray val_arr, loss_arr;
+        vector<dtype *> &grads) {
+    NumberPointerArray val_arr, grad_arr;
     val_arr.init((dtype**)vals.data(), vals.size());
-    loss_arr.init((dtype**)losses.data(), losses.size());
-    IntArray answer_arr;
-    answer_arr.init((int*)answers.data(), answers.size());
+    grad_arr.init((dtype**)grads.data(), grads.size());
+    IntArray answer_arr, col_arr;
 
-    KernelCrossEntropyLoss<<<DefaultBlockCount(count), TPB>>>(val_arr.value, answer_arr.value,
-            count, factor, (dtype **)loss_arr.value);
+    vector<int> cols;
+    cols.reserve(count);
+    for (const auto &it : answers) {
+        cols.push_back(it.size());
+    }
+    col_arr.init(cols.data(), cols.size());
+
+    int max_col = *max_element(cols.begin(), cols.end());
+    vector<int> answers_1d;
+    answers_1d.reserve(count * max_col);
+    for (int i = 0; i < count; ++i) {
+        for (int answer : answers.at(i)) {
+            answers_1d.push_back(answer);
+        }
+        for (int j = 0; j < max_col - answers.at(i).size(); ++j) {
+            answers_1d.push_back(0);
+        }
+    }
+    answer_arr.init(answers_1d.data(), answers_1d.size());
+    KernelCrossEntropyLoss<<<DefaultBlockCountWithoutLimit(count * max_col), TPB>>>(val_arr.value,
+            answer_arr.value, count, col_arr.value, max_col, row, factor, grad_arr.value);
     CheckCudaError();
 
-    int block_count = DefaultBlockCount(count);
+    int block_count = DefaultBlockCountWithoutLimit(count * max_col);
     NumberArray global_sum;
     global_sum.init(block_count);
     DeviceInt block_counter;
@@ -3416,7 +3450,7 @@ dtype CrossEntropyLoss(vector<dtype *> &vals, vector<int> &answers, int count,
     DeviceNumber result;
     result.init();
     KernelCrossEntropgyLossValue<<<block_count, TPB>>>(val_arr.value, answer_arr.value, count,
-            global_sum.value, block_counter.value, result.value);
+            col_arr.value, max_col, row, global_sum.value, block_counter.value, result.value);
     CheckCudaError();
     result.copyFromDeviceToHost();
     return result.v * factor;
@@ -3758,15 +3792,40 @@ void Max(dtype **v, int count, int dim, int *max_indexes, dtype *max_vals) {
     CheckCudaError();
 }
 
-vector<int> Predict(vector<dtype*> &vals, int count, int dim) {
+vector<vector<int>> Predict(vector<dtype*> &vals, int count, vector<int> &cols, int row) {
+    int col_sum = accumulate(cols.begin(), cols.end(), 0);
+    vector<dtype *> split_vals;
+    split_vals.reserve(col_sum);
+    int loop_i = 0;
+    for (dtype *addr : vals) {
+        int col = cols.at(loop_i++);
+        for (int i = 0; i < col; ++i) {
+            split_vals.push_back(addr + row * i);
+        }
+    }
+
     NumberPointerArray val_arr;
-    val_arr.init((dtype**)vals.data(), vals.size());
+    val_arr.init(split_vals.data(), col_sum);
     IntArray max_index_arr;
-    max_index_arr.init(vals.size());
+    max_index_arr.init(col_sum);
     NumberArray max_val_arr;
-    max_val_arr.init(vals.size());
-    Max(val_arr.value, count, dim, max_index_arr.value, max_val_arr.value);
-    return max_index_arr.toCpu();
+    max_val_arr.init(col_sum);
+    Max(val_arr.value, col_sum, row, max_index_arr.value, max_val_arr.value);
+    vector<int> merged_indexes = max_index_arr.toCpu();
+    int merged_indexes_i = 0;
+
+    vector<vector<int>> result_indexes;
+    result_indexes.reserve(count);
+    for (int i = 0; i < count; ++i) {
+        int col = cols.at(i);
+        vector<int> indexes;
+        indexes.reserve(col);
+        for (int j = 0; j < col; ++j) {
+            indexes.push_back(merged_indexes.at(merged_indexes_i++));
+        }
+        result_indexes.push_back(move(indexes));
+    }
+    return result_indexes;
 }
 
 

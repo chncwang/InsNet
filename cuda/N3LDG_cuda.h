@@ -362,8 +362,10 @@ void PAddForward(vector<dtype*> &ins, int count, vector<int> &dims, int max_dim,
 void PAddBackward(vector<dtype*> &grads, int count, int max_dim, int in_count,
         vector<dtype*> &in_grads,
         IntArray &dim_arr);
-dtype CrossEntropyLoss(vector<dtype *> &vals, vector<int> &answers, int count, dtype batchsize,
-        vector<dtype *> &losses);
+dtype CrossEntropyLoss(vector<dtype *> &vals, const vector<vector<int>> &answers, int count,
+        int row,
+        dtype factor,
+        vector<dtype *> &grads);
 dtype MultiCrossEntropyLoss(vector<dtype*> &vals, vector<vector<int>> &answers, int count, int dim,
         dtype factor,
         vector<dtype*> &losses);
@@ -425,7 +427,7 @@ void PointwiseLinearBackward(dtype **grads, dtype **in_vals, dtype *g_vals, int 
         dtype **in_grads,
         dtype *g_grads,
         dtype *bias_grads);
-vector<int> Predict(vector<dtype*> &vals, int count, int dim);
+vector<vector<int>> Predict(vector<dtype*> &vals, int count, vector<int> &cols, int row);
 int Predict(dtype* val, int dim);
 void Max(dtype **v, int count, int dim, int *max_indexes, dtype *max_vals);
 pair<dtype, vector<int>> SoftMaxLoss(vector<dtype *> &vals_vector,
