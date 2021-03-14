@@ -181,6 +181,8 @@ public:
 
     virtual bool isBatched() const = 0;
 
+    virtual bool isPooled() const = 0;
+
     virtual NodeAbs &topologicalNode() = 0;
 
     string toString() const {
@@ -278,12 +280,20 @@ public:
         return false;
     }
 
+    virtual bool isPooled() const override {
+        return is_pooled_;
+    }
+
     virtual NodeAbs &topologicalNode() override {
         return *batched_node_;
     }
 
     void setBatchedNode(NodeAbs *node) {
         batched_node_ = node;
+    }
+
+    void setIsPooled(bool is_pooled) {
+        is_pooled_ = is_pooled;
     }
 
     virtual void setInputs(const vector<Node*> &inputs) {}
@@ -331,6 +341,7 @@ private:
     int dim_;
     int column_ = 1;
     NodeAbs *batched_node_;
+    bool is_pooled_ = true;
 };
 
 class BatchedNode : public NodeAbs {
@@ -341,6 +352,10 @@ public:
 
     bool isBatched() const override {
         return true;
+    }
+
+    bool isPooled() const override {
+        return false;
     }
 
     NodeAbs &topologicalNode() override {
@@ -443,12 +458,12 @@ public:
     BatchedNodeImpl() = default;
 
 protected:
-    void allocateBatch(int dim, int size) {
+    void allocateBatch(int dim, int size, bool pool = true) {
         if (!batch().empty()) {
             cerr << "batch not empty" << endl;
             abort();
         }
-        auto v = NodeType::newNodeVector(dim, size);
+        auto v = NodeType::newNodeVector(dim, size, pool);
         batch().reserve(v.size());
         for (auto *x : v) {
             x->setBatchedNode(this);
@@ -456,7 +471,7 @@ protected:
         }
     }
 
-    void allocateBatch(const vector<int> &dims) {
+    void allocateBatch(const vector<int> &dims, bool pool = true) {
         if (!batch().empty()) {
             cerr << "batch not empty" << endl;
             abort();
@@ -464,8 +479,9 @@ protected:
 
         batch().reserve(dims.size());
         for (int dim : dims) {
-            auto node = NodeType::newNode(dim);
+            auto node = NodeType::newNode(dim, pool);
             node->setBatchedNode(this);
+            node->setIsPooled(pool);
             batch().push_back(node);
         }
     }
@@ -497,16 +513,17 @@ int NextTwoIntegerPowerNumber(int number) {
 template <typename T>
 class Poolable {
 public:
-    static vector<T *> newNodeVector(int key, int size) {
+    static vector<T *> newNodeVector(int key, int size, bool pool = true) {
         if (key <= 0) {
             cerr << "newNode key:" << key << endl;
             abort();
         }
         vector<T *> results(size);
-        if (!globalPoolEnabled()) {
+        if (!globalPoolEnabled() || !pool) {
             for (int i = 0; i < size; ++i) {
                 T *node = new T;
                 node->initNode(key);
+                node->setIsPooled(false);
                 results.at(i) = node;
             }
             return results;
@@ -552,14 +569,15 @@ public:
         return nodes;
     }
 
-    static T *newNode(int key) {
+    static T *newNode(int key, bool pool = true) {
         if (key <= 0) {
             cerr << "newNode key:" << key << endl;
             abort();
         }
-        if (!globalPoolEnabled()) {
+        if (!globalPoolEnabled() || !pool) {
             T *node = new T;
             node->initNode(key);
+            node->setIsPooled(false);
             node->setNodeDim(key);
             node->setBatchedNode(node);
             return node;

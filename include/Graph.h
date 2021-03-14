@@ -71,6 +71,13 @@ public:
         if (globalPoolEnabled()) {
             for (NodeAbs *node : finish_nodes) {
                 if (node->isBatched()) {
+                    for (Node *inner : node->batch()) {
+                        if (!inner->isPooled()) {
+                            delete inner;
+                        }
+                    }
+                    delete node;
+                } else if (!node->isPooled()) {
                     delete node;
                 }
             }

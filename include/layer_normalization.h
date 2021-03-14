@@ -447,7 +447,9 @@ Executor *PointwiseLinearNode::generate() {
 Node *layerNormalization(Graph &graph, LayerNormalizationParams &params, Node &input_layer,
         int col = 1) {
     using namespace n3ldg_plus;
-    StandardLayerNormNode *a = StandardLayerNormNode::newNode(input_layer.getDim());
+    bool pool = col == 1;
+    StandardLayerNormNode *a = StandardLayerNormNode::newNode(input_layer.getDim(), pool);
+    a->setIsPooled(pool);
     a->setColumn(col);
     a->forward(graph, input_layer);
     PointwiseLinearNode *b = PointwiseLinearNode::newNode(input_layer.getDim());

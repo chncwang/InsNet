@@ -98,7 +98,8 @@ public:
     }
 
     void init(Graph &graph, Node &input, int row, const vector<int> &offsets, int col = 1) {
-        allocateBatch(row * col, offsets.size());
+        bool pool = col == 1;
+        allocateBatch(row * col, offsets.size(), pool);
         int i = 0;
         for (int offset : offsets) {
             SplitNode *s = dynamic_cast<SplitNode *>(batch().at(i++));

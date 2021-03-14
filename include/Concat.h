@@ -349,7 +349,7 @@ Node *concat(Graph &graph, BatchedNode &inputs, int col = 1) {
     for (Node *in : inputs.batch()) {
         dim += in->getDim();
     }
-    ConcatNode *concat = ConcatNode::newNode(dim);
+    ConcatNode *concat = ConcatNode::newNode(dim, col == 1);
     concat->setColumn(col);
     concat->setInputs(inputs.batch());
     inputs.addParent(concat);

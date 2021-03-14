@@ -304,8 +304,10 @@ namespace n3ldg_plus {
 template <typename ParamType>
 Node *embedding(Graph &graph,ParamType &lookup, const vector<int> &ids,
         bool should_backward = true) {
+    bool pool = ids.size() == 1;
     LookupNode<ParamType>* input_lookup =
-        LookupNode<ParamType>::newNode(lookup.outDim() * ids.size());
+        LookupNode<ParamType>::newNode(lookup.outDim() * ids.size(), pool);
+    input_lookup->setIsPooled(pool);
     input_lookup->setShouldBackward(should_backward);
     input_lookup->setParam(lookup);
     input_lookup->connect(graph, ids);

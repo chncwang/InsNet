@@ -424,43 +424,7 @@ BatchedNode *concatHeads(Graph &graph, BatchedNode &input, int head) {
 
 namespace n3ldg_plus {
 
-BatchedNode *dotAttention(Graph &graph, BatchedNode& k, BatchedNode& v, BatchedNode& q,
-        int head_count,
-        UniParams &fusion_param,
-        dtype dropout,
-        bool use_mask,
-        bool is_training) {
-    int q_col = q.batch().size();
-    int v_col = v.batch().size();
-
-    int head_dim = q.getDim() / head_count;
-    vector<int> offsets(head_count);
-    for (int i = 0; i < head_count; ++i) {
-        offsets.at(i) = i * head_dim;
-    }
-
-    Node *query_matrix = concatToMatrix(graph, q);
-    Node *key_matrix = concatToMatrix(graph, k);
-    Node *value_matrix = concatToMatrix(graph, v);
-    BatchedNode *split_q = split(graph, *query_matrix, head_dim, offsets, q_col);
-    BatchedNode *split_k = split(graph, *key_matrix, head_dim, offsets, v_col);
-    BatchedNode *split_v = split(graph, *value_matrix, head_dim, offsets, v_col);
-    BatchedNode *split_attended = n3ldg_plus::dotAttention(graph, *split_k, *split_v, *split_q,
-            q_col, use_mask).first;
-    Node *attended_matrix = concat(graph, *split_attended, q_col);
-    attended_matrix = n3ldg_plus::linear(graph, *attended_matrix, fusion_param);
-    offsets.clear();
-    offsets.reserve(q.batch().size());
-    int row = q.getDim();
-    for (int i = 0; i < q.batch().size(); ++i) {
-        offsets.push_back(i * row);
-    }
-    BatchedNode *attended = split(graph, *attended_matrix, row, offsets);
-    attended = n3ldg_plus::dropout(graph, *attended, dropout, is_training);
-    return attended;
-}
-
-Node *dotAttentionDev(Graph &graph, Node& k, Node& v, int v_col, Node& q, int q_col,
+Node *dotAttention(Graph &graph, Node& k, Node& v, int v_col, Node& q, int q_col,
         int head_count,
         UniParams &fusion_param,
         dtype dropout,
@@ -512,7 +476,7 @@ Node *transformerEncoder(Graph &graph, TransformerEncoderParams &params, Node &i
         Node *key = linear(graph, *normed, attention_head_params.k());
         Node *value = linear(graph, *normed, attention_head_params.v());
         Node *q = linear(graph, *normed, attention_head_params.q());
-        Node *attended = dotAttentionDev(graph, *key, *value, sentence_len, *q, sentence_len,
+        Node *attended = dotAttention(graph, *key, *value, sentence_len, *q, sentence_len,
                 params.headCount(), layer_params.headsFusionParams(), dropout, false,
                 is_training);
         Node *added = add(graph, {attended, last_layer});
@@ -697,7 +661,7 @@ public:
             Node *v = linear(*graph_, *normed, attention_head_params.v());
             Node *q = linear(*graph_, *normed, attention_head_params.q());
 //            cout << "k v q dim:" << k->getDim() << " " << v->getDim() << " " <<  q->getDim() << endl;
-            Node *attended = dotAttentionDev(*graph_, *k, *v, dec_sentence_len, *q,
+            Node *attended = dotAttention(*graph_, *k, *v, dec_sentence_len, *q,
                     dec_sentence_len, params_->headCount(), layer_params.selfFusion(), dropout_,
                     true, is_training_);
             Node *added = add(*graph_, {attended, last_layer});
@@ -706,7 +670,7 @@ public:
 
             auto &attention_head_params_for_encoder = layer_params.encoderAttention();
             q = linear(*graph_, *normed, attention_head_params_for_encoder.q());
-            attended = dotAttentionDev(*graph_, *encoder_key_matrices_.at(i),
+            attended = dotAttention(*graph_, *encoder_key_matrices_.at(i),
                     *encoder_value_matrices_.at(i), encoder_sentence_len_, *q, dec_sentence_len,
                     params_->headCount(), layer_params.encoderFusion(), dropout_, false,
                     is_training_);

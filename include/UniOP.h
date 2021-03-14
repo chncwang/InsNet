@@ -588,7 +588,9 @@ Node *linear(Graph &graph, Node &input, Param &param) {
 
     int col = input.getDim() / param.outDim();
     int dim = param.inDim();
-    LinearNode *uni = LinearNode::newNode(dim * col);
+    bool pool = col == 1;
+    LinearNode *uni = LinearNode::newNode(dim * col, pool);
+    uni->setIsPooled(pool);
     uni->setColumn(col);
     uni->setParam(*uni_params);
     uni->forward(graph, input);
