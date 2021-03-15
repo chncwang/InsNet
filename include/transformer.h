@@ -151,8 +151,8 @@ public:
 
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
-        return {&multi_head_attention_params_, &heads_fusion_params_,
-            &ffn_inner_params_, &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_};
+        return {&multi_head_attention_params_, &heads_fusion_params_, &ffn_inner_params_,
+            &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_};
     }
 #endif
 
@@ -368,15 +368,17 @@ public:
 
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
-        return {&self_attention_, &encoder_attention_, &ffn_inner_params_, &ffn_outter_params_,
-            &layer_norm_a_, &layer_norm_b_, &layer_norm_c_};
+        return {&self_attention_, &encoder_attention_, &self_fusion_, &encoder_fusion_,
+            &ffn_inner_params_, &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_,
+            &layer_norm_c_};
     }
 #endif
 
 protected:
     virtual std::vector<Tunable<BaseParam>*> tunableComponents() override {
-        return {&self_attention_, &encoder_attention_, &ffn_inner_params_, &ffn_outter_params_,
-            &layer_norm_a_, &layer_norm_b_, &layer_norm_c_};
+        return {&self_attention_, &encoder_attention_, &self_fusion_, &encoder_fusion_,
+            &ffn_inner_params_, &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_,
+            &layer_norm_c_};
     }
 
 private:
