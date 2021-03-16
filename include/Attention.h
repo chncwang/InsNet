@@ -92,6 +92,11 @@ struct AdditiveAttentionParams : public N3LDGSerializable, TunableCombination<Ba
         w3t.fromJson(json["w3t"]);
     }
 
+    template<typename Archive>
+    void serialize(Archive &ar) {
+        ar(k, q, w3t);
+    }
+
     void init(int k_size, int q_size) {
         int out = std::max(k_size, q_size);
         k.init(out, k_size, false);

@@ -50,6 +50,12 @@ struct GRUParams : public N3LDGSerializable, TunableCombination<BaseParam>
         candidate_hidden.fromJson(json["candidate_hidden"]);
     }
 
+    template<typename Archive>
+    void serialize(Archive &ar) {
+        ar(update_input, update_hidden, reset_input, reset_hidden, candidate_input,
+                candidate_hidden);
+    }
+
     void init(int out_size, int in_size) {
         update_input.init(out_size, in_size);
         update_hidden.init(out_size, out_size);

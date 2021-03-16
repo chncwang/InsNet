@@ -70,6 +70,14 @@ public:
         }
     }
 
+    template<typename Archive>
+    void serialize(Archive &ar) {
+        ar(bias_enabled_, *W_);
+        if (bias_enabled_) {
+            ar(b_);
+        }
+    }
+
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
         std::vector<Transferable *> ptrs = {W_};

@@ -167,6 +167,13 @@ public:
         m_id_to_string = stringVectorFromJson(json["m_id_to_string"]);
         m_size = json["m_size"].asInt();
     }
+
+    template<typename Archive>
+    void serialize(Archive &ar) {
+        ar(m_string_to_id);
+        ar(m_id_to_string);
+        ar(m_size);
+    }
 };
 
 typedef basic_quark Alphabet;

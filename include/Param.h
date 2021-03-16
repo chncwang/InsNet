@@ -251,6 +251,12 @@ public:
         is_fixed = json["is_fixed"].asBool();
     }
 
+
+    template<typename Archive>
+    void serialize(Archive &ar) {
+        ar(val, aux_square, aux_mean, iter, is_fixed);
+    }
+
     void value(const int& featId, Tensor1D& out) {
         if (out.dim != val.row) {
             cerr << boost::format("Param value - out dim is %1% param row is %2%") % out.dim %
@@ -313,6 +319,13 @@ struct ParamArray : public N3LDGSerializable, public TunableCombination<BasePara
         for (int i = 0; i < size; ++i) {
             ParamType *param = params.at(i).get();
             param->fromJson(json[name + std::to_string(i)]);
+        }
+    }
+
+    template<typename Archive>
+    void serialize(Archive &ar) {
+        for (auto &param : params) {
+            ar(*param);
         }
     }
 

@@ -10,7 +10,6 @@
 #include <map>
 #include <memory>
 #include "Def.h"
-#include "serializable.h"
 #include <boost/format.hpp>
 #include <iostream>
 #include <iostream>
@@ -127,6 +126,12 @@ void n3ldg_cpu::Tensor1D::fromJson(const Json::Value &json) {
     for (int i = 0; i < dim; ++i) {
         v[i] = json_arr[i].asFloat();
     }
+}
+
+template<typename Archive>
+void n3ldg_cpu::Tensor1D::serialize(Archive &ar) {
+    ar(dim);
+    ar(cereal::binary_data(v, dim * sizeof(dtype)));
 }
 
 std::vector<dtype> n3ldg_cpu::Tensor1D::toCpu() const {
@@ -291,6 +296,13 @@ void n3ldg_cpu::Tensor2D::fromJson(const Json::Value &json) {
     for (int i = 0; i < row * col; ++i) {
         v[i] = json_arr[i].asFloat();
     }
+}
+
+template<typename Archive>
+void n3ldg_cpu::Tensor2D::serialize(Archive &ar) {
+    ar(row);
+    ar(col);
+    ar(cereal::binary_data(v, row * col * sizeof(dtype)));
 }
 
 #if USE_GPU

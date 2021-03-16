@@ -49,6 +49,11 @@ public:
         b_.fromJson(json["b"]);
     }
 
+    template<typename Archive>
+    void serialize(Archive &ar) {
+        ar(g_, b_);
+    }
+
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
         return {&g_, &b_};

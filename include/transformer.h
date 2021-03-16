@@ -57,6 +57,11 @@ public:
         v_.fromJson(json["v"]);
     }
 
+    template<typename Archive>
+    void serialize(Archive &ar) {
+        ar(q_, k_, v_);
+    }
+
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
         return {&q_, &k_, &v_};
@@ -147,6 +152,12 @@ public:
         ffn_outter_params_.fromJson(json["ffn_outter_params"]);
         layer_norm_a_.fromJson(json["layer_norm_a"]);
         layer_norm_b_.fromJson(json["layer_norm_b"]);
+    }
+
+    template<typename Archive>
+    void serialize(Archive &ar) {
+        ar(multi_head_attention_params_, heads_fusion_params_, ffn_inner_params_,
+                ffn_outter_params_, layer_norm_a_, layer_norm_b_);
     }
 
 #if USE_GPU
@@ -245,6 +256,11 @@ public:
     void fromJson(const Json::Value &json) override {
         positional_encoding_param_.fromJson(json["positional_encoding_param"]);
         layer_params_.fromJson(json["layer_params"]);
+    }
+
+    template<typename Archive>
+    void serialize(Archive &ar) {
+        ar(positional_encoding_param_, layer_params_);
     }
 
 #if USE_GPU
@@ -364,6 +380,12 @@ public:
         layer_norm_a_.fromJson(json["layer_norm_a"]);
         layer_norm_b_.fromJson(json["layer_norm_b"]);
         layer_norm_c_.fromJson(json["layer_norm_c"]);
+    }
+
+    template<typename Archive>
+    void serialize(Archive &ar) {
+        ar(self_attention_, encoder_attention_, self_fusion_, encoder_fusion_, ffn_inner_params_,
+                ffn_outter_params_, layer_norm_a_, layer_norm_b_, layer_norm_c_);
     }
 
 #if USE_GPU

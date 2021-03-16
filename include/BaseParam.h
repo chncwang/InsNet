@@ -2,6 +2,7 @@
 #define BasePARAM_H_
 
 #include "boost/format.hpp"
+#include "serializable.h"
 
 #if USE_GPU
 #include "N3LDG_cuda.h"
@@ -13,26 +14,6 @@
 typedef n3ldg_cuda::Tensor2D Tensor2D;
 #else
 typedef n3ldg_cpu::Tensor2D Tensor2D;
-#endif
-
-#if USE_GPU
-class TransferableComponents : public n3ldg_cuda::Transferable
-{
-public:
-    void copyFromHostToDevice() override {
-        for (auto *t : transferablePtrs()) {
-            t->copyFromHostToDevice();
-        }
-    }
-
-    void copyFromDeviceToHost() override {
-        for (auto *t : transferablePtrs()) {
-            t->copyFromDeviceToHost();
-        }
-    }
-
-    virtual std::vector<n3ldg_cuda::Transferable *> transferablePtrs() = 0;
-};
 #endif
 
 template <typename T>

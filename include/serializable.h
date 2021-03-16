@@ -4,29 +4,30 @@
 #include <iostream>
 #include <json/json.h>
 #include <boost/format.hpp>
+#include <MyTensor.h>
+#include "cereal/cereal.hpp"
+#include "cereal/archives/binary.hpp"
+#include "cereal/types/unordered_map.hpp"
+#include "cereal/types/string.hpp"
+#include "cereal/types/vector.hpp"
 
-class N3LDGSerializable {
+#if USE_GPU
+class TransferableComponents : public n3ldg_cuda::Transferable
+{
 public:
-    virtual Json::Value toJson() const = 0;
-    virtual void fromJson(const Json::Value &) = 0;
-
-    std::string toString() const {
-        Json::StreamWriterBuilder builder;
-        builder["commentStyle"] = "None";
-        builder["indentation"] = "";
-        return Json::writeString(builder, toJson());
-    }
-
-    void fromString(const std::string &str) {
-        Json::CharReaderBuilder builder;
-        auto reader = std::unique_ptr<Json::CharReader>(builder.newCharReader());
-        Json::Value root;
-        std::string error;
-        if (!reader->parse(str.c_str(), str.c_str() + str.size(), &root, &error)) {
-            std::cerr << boost::format("parse json error:%1%") % error << std::endl;
-            abort();
+    void copyFromHostToDevice() override {
+        for (auto *t : transferablePtrs()) {
+            t->copyFromHostToDevice();
         }
     }
-};
 
+    void copyFromDeviceToHost() override {
+        for (auto *t : transferablePtrs()) {
+            t->copyFromDeviceToHost();
+        }
+    }
+
+    virtual std::vector<n3ldg_cuda::Transferable *> transferablePtrs() = 0;
+};
+#endif
 #endif

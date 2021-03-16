@@ -7,11 +7,41 @@
 #include <map>
 #include <memory>
 #include "Def.h"
-#include "serializable.h"
 #include <iostream>
 #include <iostream>
+#include "cereal/cereal.hpp"
+#include "cereal/archives/binary.hpp"
+#include "cereal/types/unordered_map.hpp"
+#include "cereal/types/string.hpp"
+#include "cereal/types/vector.hpp"
+#include "json/json.h"
+#include <boost/format.hpp>
 
 using namespace Eigen;
+
+class N3LDGSerializable {
+public:
+    virtual Json::Value toJson() const = 0;
+    virtual void fromJson(const Json::Value &) = 0;
+
+    std::string toString() const {
+        Json::StreamWriterBuilder builder;
+        builder["commentStyle"] = "None";
+        builder["indentation"] = "";
+        return Json::writeString(builder, toJson());
+    }
+
+    void fromString(const std::string &str) {
+        Json::CharReaderBuilder builder;
+        auto reader = std::unique_ptr<Json::CharReader>(builder.newCharReader());
+        Json::Value root;
+        std::string error;
+        if (!reader->parse(str.c_str(), str.c_str() + str.size(), &root, &error)) {
+            std::cerr << boost::format("parse json error:%1%") % error << std::endl;
+            abort();
+        }
+    }
+};
 
 namespace n3ldg_cpu {
 
@@ -56,6 +86,9 @@ struct Tensor1D : public N3LDGSerializable {
     virtual Json::Value toJson() const;
 
     virtual void fromJson(const Json::Value &json);
+
+    template<typename Archive>
+    void serialize(Archive &ar);
 
     virtual void print() const;
 
@@ -110,6 +143,9 @@ struct Tensor2D : public N3LDGSerializable {
     virtual Json::Value toJson() const;
 
     virtual void fromJson(const Json::Value &json);
+
+    template<typename Archive>
+    void serialize(Archive &ar);
 };
 
 }

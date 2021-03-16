@@ -321,6 +321,11 @@ public:
         aux_square.fromJson(json["aux_square"]);
         aux_mean.fromJson(json["aux_mean"]);
     }
+
+    template<typename Archive>
+    void serialize(Archive &ar) {
+        ar(val, aux_square, aux_mean);
+    }
 };
 
 #endif /* SPARSEPARAM_H_ */

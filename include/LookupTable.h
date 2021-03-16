@@ -227,6 +227,18 @@ public:
         E.init(nDim, nVSize);
         E.fromJson(json["e"]);
     }
+
+    template<typename Archive>
+    void save(Archive &ar) const {
+        ar(bFineTune, nDim, nVSize, nUNKId, elems, E);
+    }
+
+    template<typename Archive>
+    void load(Archive &ar) {
+        ar(bFineTune, nDim, nVSize, nUNKId, elems);
+        E.init(nDim, nVSize);
+        ar(E);
+    }
 };
 
 template <typename ParamType>
