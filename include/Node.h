@@ -373,6 +373,12 @@ public:
 
     BatchedNode() : NodeAbs("") {}
 
+    virtual ~BatchedNode() {
+        if (dims_ != nullptr) {
+            delete dims_;
+        }
+    }
+
     string shape() const {
         bool dims_same = true;
         for (int i = 1; i < batch().size(); ++i) {
