@@ -188,7 +188,6 @@ Node* softmax(Graph &graph, Node &input, int input_col) {
     using namespace n3ldg_plus;
     bool pool = input_col == 1;
     SoftmaxNode *node = SoftmaxNode::newNode(input.getDim(), pool);
-    node->setIsPooled(pool);
     node->setColumn(input_col);
     node->forward(graph, input);
     return node;

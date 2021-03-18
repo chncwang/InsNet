@@ -516,6 +516,8 @@ int NextTwoIntegerPowerNumber(int number) {
     return result;
 }
 
+constexpr int BIG_VECTOR_SIZE = 1024 * 16;
+
 template <typename T>
 class Poolable {
 public:
@@ -525,7 +527,7 @@ public:
             abort();
         }
         vector<T *> results(size);
-        if (!globalPoolEnabled() || !pool) {
+        if (!globalPoolEnabled() || (!pool && key >= BIG_VECTOR_SIZE)) {
             for (int i = 0; i < size; ++i) {
                 T *node = new T;
                 node->initNode(key);
@@ -580,7 +582,7 @@ public:
             cerr << "newNode key:" << key << endl;
             abort();
         }
-        if (!globalPoolEnabled() || !pool) {
+        if (!globalPoolEnabled() || (!pool && key >= BIG_VECTOR_SIZE)) {
             T *node = new T;
             node->initNode(key);
             node->setIsPooled(false);

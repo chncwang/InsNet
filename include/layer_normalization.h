@@ -454,7 +454,6 @@ Node *layerNormalization(Graph &graph, LayerNormalizationParams &params, Node &i
     using namespace n3ldg_plus;
     bool pool = col == 1;
     StandardLayerNormNode *a = StandardLayerNormNode::newNode(input_layer.getDim(), pool);
-    a->setIsPooled(pool);
     a->setColumn(col);
     a->forward(graph, input_layer);
     PointwiseLinearNode *b = PointwiseLinearNode::newNode(input_layer.getDim());
