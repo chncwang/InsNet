@@ -327,7 +327,8 @@ Node *embedding(Graph &graph,ParamType &lookup, const vector<int> &ids,
 
 template <typename ParamType>
 Node *embedding(Graph &graph,ParamType &lookup, int id, bool should_backward = true) {
-    return embedding(graph, lookup, {id}, should_backward);
+    vector<int> ids = {id};
+    return embedding(graph, lookup, ids, should_backward);
 }
 
 template <typename ParamType>
@@ -358,13 +359,21 @@ Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, int dim, const vec
 template <typename ParamType>
 Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, int dim, const string &word,
         bool should_backward = true) {
-    return embedding(graph, lookup, dim, {word}, should_backward);
+    vector<string> words = {word};
+    return embedding(graph, lookup, dim, words, should_backward);
 }
 
 template <typename ParamType>
 Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, const vector<string> &words,
         bool should_backward = true) {
     return embedding(graph, lookup, lookup.nDim, words, should_backward);
+}
+
+template <typename ParamType>
+Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, const string &word,
+        bool should_backward = true) {
+    vector<string> words = {word};
+    return embedding(graph, lookup, words, should_backward);
 }
 
 }
