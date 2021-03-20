@@ -1,0 +1,2 @@
+.. mdinclude:: ../../examples/README.md
+
