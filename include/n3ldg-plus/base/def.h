@@ -1,5 +1,5 @@
-#ifndef N3LDG_DEF_H
-#define N3LDG_DEF_H
+#ifndef N3LDG_PLUS_DEF_H
+#define N3LDG_PLUS_DEF_H
 
 #include "eigen/Eigen/Dense"
 #include "eigen//unsupported/Eigen/CXX11/Tensor"

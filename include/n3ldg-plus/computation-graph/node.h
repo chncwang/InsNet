@@ -1,112 +1,15 @@
-#ifndef BasicNode
-#define BasicNode
+#ifndef N3LDG_PLUS_NODE_H
+#define N3LDG_PLUS_NODE_H
 
-#include <iomanip>
-#include <functional>
 #include <string>
-#include <tuple>
-#include <memory>
-#include <utility>
 #include <vector>
 #include <set>
+#include <map>
+#include <iostream>
+#include "fmt/core.h"
 #include "n3ldg-plus/base/tensor.h"
-#include "n3ldg-plus/util/util.h"
-#include "n3ldg-plus/util/profiler.h"
 
 namespace n3ldg_plus {
-
-#if USE_GPU
-#include "N3LDG_cuda.h"
-using n3ldg_cuda::Tensor1D;
-using n3ldg_cuda::Tensor2D;
-#else
-using cpu::Tensor1D;
-using cpu::Tensor2D;
-#endif
-
-dtype fexp(const dtype& x) {
-    return exp(x);
-}
-
-dtype flog(const dtype& x) {
-    return log(x);
-}
-
-dtype dequal(const dtype& x, const dtype& y) {
-    return 1;
-}
-
-dtype dtanh(const dtype& x, const dtype& y) {
-    return (1 + y) * (1 - y);
-}
-
-dtype dleaky_relu(const dtype& x, const dtype& y) {
-    if (x < 0) return 0.1;
-    return 1;
-}
-
-dtype dselu(const dtype& x, const dtype& y) {
-    dtype lambda = 1.0507009873554804934193349852946;
-    dtype alpha = 1.6732632423543772848170429916717;
-    if (x <= 0) return lambda * alpha + y;
-    return lambda;
-}
-
-dtype dsigmoid(const dtype& x, const dtype& y) {
-    return (1 - y) * y;
-}
-
-dtype drelu(const dtype& x, const dtype& y) {
-    if (y <= 0) return 0;
-    return 1;
-}
-
-dtype dexp(const dtype& x, const dtype& y) {
-    return y;
-}
-
-dtype dlog(const dtype& x, const dtype& y) {
-    if(x < 0.001) return 1000;
-    return 1.0 / x;
-}
-
-dtype dsqrt(dtype y) {
-    return 0.5 / y;
-}
-
-//useful functions
-dtype fequal(const dtype& x) {
-    return x;
-}
-
-dtype ftanh(const dtype& x) {
-    return tanh(x);
-}
-
-dtype fsigmoid(const dtype& x) {
-    return 1.0 / (1.0 + exp(-x));
-}
-
-dtype frelu(const dtype& x) {
-    if (x <= 0) return 0;
-    return x;
-}
-
-dtype fleaky_relu(const dtype& x) {
-    if (x < 0) return (0.1*x);
-    return x;
-}
-
-dtype fselu(const dtype& x) {
-    dtype lambda = 1.0507009873554804934193349852946;
-    dtype alpha = 1.6732632423543772848170429916717;
-    if (x <= 0) return lambda * alpha * (exp(x) - 1);
-    return lambda * x;
-}
-
-dtype fsqrt(const dtype &x) {
-    return sqrt(x);
-}
 
 class Executor;
 class NodeAbs;
@@ -116,11 +19,7 @@ public:
     virtual void addNode(NodeAbs *node) = 0;
 };
 
-std::string addressToString(const void* p) {
-    std::stringstream ss;
-    ss << p;  
-    return ss.str();
-}
+std::string addressToString(const void* p);
 
 class Node;
 
@@ -137,19 +36,9 @@ public:
         return node_type_;
     }
 
-    std::string cachedTypeSig() const {
-        if (type_sig_.empty()) {
-            type_sig_ = typeSignature();
-        }
-        return type_sig_;
-    }
+    std::string cachedTypeSig() const;
 
-    virtual void clear() {
-        degree_ = 0;
-        depth_ = 0;
-        type_sig_.clear();
-        parents_.clear();
-    }
+    virtual void clear();
 
     virtual std::vector<Node *> &batch() {
         std::cerr << "NodeAbs unsupported op" << std::endl;
@@ -168,14 +57,7 @@ public:
         return depth_;
     }
 
-    virtual void addParent(NodeAbs* parent) {
-        NodeAbs &topo = topologicalNode();
-        if (topo.degree_ >= 0) {
-            topo.parents_.push_back(parent);
-            parent->degree_++;
-            parent->depth_ = std::max(topo.depth_ + 1, parent->depth_);
-        }
-    }
+    virtual void addParent(NodeAbs* parent);
 
     const std::vector<NodeAbs *> getParents() const {
         return parents_;
@@ -204,9 +86,7 @@ public:
     virtual void compute() = 0;
     virtual void backward() = 0;
 
-    virtual std::string typeSignature() const override {
-        return getNodeType() + "-" + std::to_string(dim_) + "-";
-    }
+    virtual std::string typeSignature() const override;
 
     const Tensor1D &getVal() const {
         return val_;
@@ -228,14 +108,7 @@ public:
         return dim_;
     }
 
-    virtual void clear() override {
-#if !USE_GPU || TEST_CUDA
-        loss_.zero();
-#endif
-        batched_node_ = this;
-        column_ = 1;
-        NodeAbs::clear();
-    }
+    virtual void clear() override;
 
     Node (const Node &) = delete;
 
@@ -257,14 +130,7 @@ public:
         return Mat(loss().v, getRow(), column_);
     }
 
-    void setColumn(int column) {
-        if (getDim() % column != 0) {
-            std::cerr << fmt::format("MatrixNode setColumn - dim:{} column:{}\n", getDim(),
-                    column);
-            abort();
-        }
-        column_ = column;
-    }
+    void setColumn(int column);
 
     virtual bool isBatched() const override {
         return false;
@@ -289,33 +155,17 @@ public:
     virtual void setInputs(const std::vector<Node*> &inputs) {}
 
 protected:
-    void afterForward(NodeContainer &container, const std::vector<Node*> &ins) {
-        for (Node *in : ins) {
-            in->addParent(this);
-        }
-        container.addNode(this);
-    }
+    void afterConnect(NodeContainer &container, const std::vector<Node*> &ins);
 
-    std::string isVectorSig() const {
-        return column_ == 1 ? "-vector-" : "-matrix-";
-    }
+    std::string isVectorSig() const;
 
-    Node(const std::string &node_type, int dim = 0) : NodeAbs(node_type), dim_(dim) {}
+    Node(const std::string &node_type, int dim = 0);
 
     virtual void setDim(int dim) {
         dim_ = dim;
     }
 
-    virtual void init(int ndim) {
-        if (ndim <= 0) {
-            std::cerr << fmt::format("Node init - dim is less than 0:{} type:{}\n", ndim,
-                    getNodeType());
-            abort();
-        }
-        dim_ = ndim;
-        val_.init(dim_);
-        loss_.init(dim_);
-    }
+    virtual void init(int ndim);
 
 private:
     Tensor1D val_;
@@ -328,9 +178,7 @@ private:
 
 class BatchedNode : public NodeAbs {
 public:
-    virtual std::string typeSignature() const override {
-        return "Batched-" + batch_.front()->typeSignature();
-    }
+    virtual std::string typeSignature() const override;
 
     bool isBatched() const override {
         return true;
@@ -344,45 +192,19 @@ public:
         return *this;
     }
 
-    virtual void clear() override {
-        batch_.clear();
-        NodeAbs::clear();
-    }
+    virtual void clear() override;
 
     int getDim() const override {
         return batch_.front()->getDim();
     }
 
-    BatchedNode() : NodeAbs("") {}
+    BatchedNode();
 
-    virtual ~BatchedNode() {
-        if (dims_ != nullptr) {
-            delete dims_;
-        }
-    }
+    virtual ~BatchedNode();
 
-    std::string shape() const {
-        bool dims_same = true;
-        for (int i = 1; i < batch().size(); ++i) {
-            if (batch().front()->getDim() != batch().at(i)->getDim()) {
-                dims_same = false;
-                break;
-            }
-        }
-        if (dims_same) {
-            return fmt::format("batch size:{} dim:{}", batch().size(), getDim());
-        } else {
-            std::string str = fmt::format("batch size:{} dims:", batch().size());
-            for (int dim : getDims()) {
-                str += std::to_string(dim) + ",";
-            }
-            return str;
-        }
-    }
+    std::string shape() const;
 
-    virtual std::string getNodeType() const override {
-        return "Batched-" + batch_.front()->getNodeType();
-    }
+    virtual std::string getNodeType() const override;
 
     std::vector<Node *> &batch() override {
         return batch_;
@@ -396,35 +218,12 @@ public:
         return batch_.front()->generate();
     }
 
-    const std::vector<int> &getDims() const {
-        if (dims_ == nullptr) {
-            dims_ = new std::vector<int>(batch_.size());
-            int i = 0;
-            for (Node *node : batch_) {
-                dims_->at(i++) = node->getDim();
-            }
-        }
-        return *dims_;
-    }
+    const std::vector<int> &getDims() const;
 
 protected:
-    void afterInit(NodeContainer &graph, const std::vector<BatchedNode *> &ins) {
-        for (NodeAbs *x : ins) {
-            x->addParent(this);
-        }
-        graph.addNode(this);
-    }
+    void afterInit(NodeContainer &graph, const std::vector<BatchedNode *> &ins);
 
-    void setInputsPerNode(const std::vector<BatchedNode *> &batched_inputs) {
-        for (int i = 0; i < batch_.size(); ++i) {
-            std::vector<Node *> ins(batched_inputs.size());
-            int j = 0;
-            for (BatchedNode *in : batched_inputs) {
-                ins.at(j++) = in->batch().at(i);
-            }
-            batch().at(i)->setInputs(ins);
-        }
-    }
+    void setInputsPerNode(const std::vector<BatchedNode *> &batched_inputs);
 
 private:
     std::vector<Node *> batch_;
@@ -466,22 +265,23 @@ protected:
     }
 };
 
-std::set<std::pair<std::vector<Node *>, int> *>& globalPoolReferences() {
+
+inline std::set<std::pair<std::vector<Node *>, int> *>& globalPoolReferences() {
     static std::set<std::pair<std::vector<Node *>, int> *> o;
     return o;
 }
 
-bool &globalPoolEnabled() {
+inline bool &globalPoolEnabled() {
     static bool pool_enabled = true;
     return pool_enabled;
 }
 
-bool &globalLimitedDimEnabled() {
+inline bool &globalLimitedDimEnabled() {
     static bool enabled = false;
     return enabled;
 }
 
-int NextTwoIntegerPowerNumber(int number) {
+inline int NextTwoIntegerPowerNumber(int number) {
     int result = 1;
     while (number > result) {
         result <<= 1;
@@ -617,58 +417,19 @@ std::map<int, std::pair<std::vector<Node *>, int>>::iterator Poolable<T>::last_i
 template<typename T>
 int Poolable<T>::last_key_;
 
-void validateEqualNodeDims(const std::vector<Node *> &nodes) {
-    for (int i = 1; i < nodes.size(); ++i) {
-        if (nodes.at(i)->getDim() != nodes.front()->getDim()) {
-            std::cerr << fmt::format(
-                    "validateEqualNodeDims - first node size is {}, but {}st is {}",
-                nodes.size(), i, nodes.front()->getDim());
-            abort();
-        }
-    }
-}
-
-auto cpu_get_node_val = [](Node *node) {
-    return node->val().v;
-};
-
-auto cpu_get_node_loss = [](Node *node) {
-    return node->loss().v;
-};
-
-#if USE_GPU
-
-auto gpu_get_node_val = [](Node *node) {
-    return node->val().value;
-};
-
-auto gpu_get_node_loss = [](Node *node) {
-    return node->loss().value;
-};
-
-#endif
+void validateEqualNodeDims(const std::vector<Node *> &nodes);
 
 class UniInputNode : public Node {
 public:
     UniInputNode(const std::string &node_type) : Node(node_type) {}
 
-    virtual std::string typeSignature() const override {
-        return Node::typeSignature() + "-" + std::to_string(input_->getDim()) + "-";
-    }
+    virtual std::string typeSignature() const override;
 
     virtual void setInputs(const std::vector<Node *> &ins) override {
         input_ = ins.front();
     }
 
-    void forward(NodeContainer &container, Node &input) {
-        if (!isDimLegal(input)) {
-            std::cerr << fmt::format("dim:%1% input dim:%2%\n", Node::getDim(), input.getDim());
-            abort();
-        }
-        std::vector<Node*> ins = {&input};
-        setInputs(ins);
-        Node::afterForward(container, ins);
-    }
+    void connect(NodeContainer &container, Node &input);
 
     Node &getInput() const {
         return *input_;
@@ -693,24 +454,7 @@ std::vector<Node*> toNodePointers(const std::vector<T *> &vec) {
 }
 
 #if USE_GPU
-void clearNodes(std::vector<Node*> &nodes) {
-    n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-    profiler.BeginEvent("clearNodes");
-    std::vector<dtype*> grads(nodes.size());
-    vector<int> dims(nodes.size());
-    int i = 0;
-    for (Node *n : nodes) {
-        grads.at(i) = n->getLoss().value;
-        dims.at(i++) = n->getDim();
-    }
-    n3ldg_cuda::BatchMemset(grads, grads.size(), dims, 0.0f);
-#if TEST_CUDA
-    for (Node *node : nodes) {
-        node->loss().verify("clearNodes");
-    }
-#endif
-    profiler.EndEvent();
-}
+void clearNodes(std::vector<Node*> &nodes);
 #endif
 
 class Executor {
@@ -720,35 +464,13 @@ public:
     virtual ~Executor() = default;
 
 #if USE_GPU
-    vector<dtype *> getVals() {
-        vector<dtype *> vals(batch.size());
-        int i = 0;
-        for (NodeAbs *node : batch) {
-            Node *x = dynamic_cast<Node *>(node);
-            vals.at(i++) = x->getVal().value;
-        }
-        return vals;
-    }
+    vector<dtype *> getVals();
 
-    vector<dtype *> getGrads() {
-        vector<dtype *> grads(batch.size());
-        int i = 0;
-        for (NodeAbs *node : batch) {
-            Node *x = dynamic_cast<Node *>(node);
-            grads.at(i++) = x->getLoss().value;
-        }
-        return grads;
-    }
+    vector<dtype *> getGrads();
 #else
     virtual int calculateFLOPs() = 0;
 
-    virtual int calculateActivations() {
-        int sum = 0;
-        for (Node *node : batch) {
-            sum += node->getDim();
-        }
-        return sum;
-    }
+    virtual int calculateActivations();
 #endif
 
     int getDim() const {
@@ -772,219 +494,48 @@ public:
         return batch.size();
     }
 
-    void forwardFully() {
-        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-        profiler.BeginEvent(batch.front()->getNodeType() + " forward");
-        forward();
-
-        profiler.EndCudaEvent();
-        for (NodeAbs *node : topo_nodes) {
-            node->setDegree(-1);
-        }
-    }
+    void forwardFully();
 
     void backwardFully() {
-        n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-        profiler.BeginEvent(getNodeType() + " backward");
         backward();
-        profiler.EndEvent();
     }
 
-    virtual void backward() {
-        for (NodeAbs *node : batch) {
-            Node *x = dynamic_cast<Node *>(node);
-            x->backward();
-        }
-    }
+    virtual void backward();
 
 protected:
-    virtual void forward() {
-        for (NodeAbs *node : batch) {
-            Node *x = dynamic_cast<Node *>(node);
-            x->compute();
-        }
-    }
+    virtual void forward();
 
-    int defaultFLOPs() {
-        int sum = 0;
-        for (NodeAbs *node : batch) {
-            Node *x = dynamic_cast<Node *>(node);
-            sum += x->getDim();
-        }
-        return sum;
-    }
+    int defaultFLOPs();
 
 #if TEST_CUDA
-    void testForward() {
-        Executor::forward();
-        verifyForward();
-    }
+    void testForward();
 
-    void verifyForward() {
-        int i = 0;
-        for (NodeAbs *node : batch) {
-            Node *x = dynamic_cast<Node *>(node);
-            if(!x->getVal().verify((getNodeType() + " forward").c_str())) {
-                cout << "cpu:" << endl;
-                cout << x->getVal().toJson();
-                cout << "gpu:" << endl;
-                x->getVal().print();
-                throw n3ldg_cuda::CudaVerificationException(i);
-            }
-            ++i;
-        }
-    }
+    void verifyForward();
 
-    void testForwardInpputs(const function<vector<Node*>(Node &node)> &get_inputs) {
-        for (NodeAbs *node : batch) {
-            Node *x = dynamic_cast<Node *>(node);
-            vector<Node*> inputs = get_inputs(*x);
-            for (Node *input : inputs) {
-                n3ldg_cuda::Assert(input->getVal().verify((getNodeType() +
-                                " forward input").c_str()));
-            }
-        }
-    }
+    void testForwardInpputs(const function<vector<Node*>(Node &node)> &get_inputs);
 
-    void testForwardInpputs(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
-        for (NodeAbs *node : batch) {
-            Node *x = dynamic_cast<Node *>(node);
-            auto inputs = get_inputs(*x);
-            for (auto &input : inputs) {
-                n3ldg_cuda::Assert(input.first->getVal().verify((getNodeType() +
-                                " forward input").c_str()));
-            }
-        }
-    }
+    void testForwardInpputs(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs);
 
-    void verifyBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
-        for (NodeAbs *node : batch) {
-            Node *x = dynamic_cast<Node *>(node);
-            auto inputs = get_inputs(*x);
-            for (pair<Node*, string> &input : inputs) {
-                if (!input.first->getLoss().verify((getNodeType() +
-                                " backward " + input.second).c_str())) {
-                    cout << "cpu:" << endl << input.first->getLoss().toString() << endl;;
-                    cerr << "gpu:" << endl;
-                    input.first->getLoss().print();
-                    cerr << input.second << endl;
-                    abort();
-                }
-            }
-        }
-    }
+    void verifyBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs);
 
-    void testBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
-        Executor::backward();
-        verifyBackward(get_inputs);
-        cout << batch.front()->cachedTypeSig() << " backward tested" << endl;
-    }
+    void testBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs);
 
-    void testBeforeBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
-        for (NodeAbs *node : batch) {
-            Node *x = dynamic_cast<Node *>(node);
-            auto inputs = get_inputs(*x);
-            for (pair<Node*, string> &input : inputs) {
-                n3ldg_cuda::Assert(input.first->getLoss().verify((getNodeType() + " backward " +
-                                input.second).c_str()));
-            }
-        }
-    }
+    void testBeforeBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs);
 #endif
-};
-
-auto get_inputs = [](Node &node) {
-    UniInputNode &uni_input = static_cast<UniInputNode&>(node);
-    std::vector<Node*> inputs = {&uni_input.getInput()};
-    return inputs;
-};
-
-void printZeroGrads(Node &node, int level = 0) {
-    bool all_zero = true;
-    for (int i = 0; i < node.getDim(); ++i) {
-        if (std::abs(node.getLoss()[i]) > 1e-6) {
-            all_zero = false;
-            break;
-        }
-    }
-    if (all_zero) {
-        std::cout << "type sig:" << node.cachedTypeSig() << " level:" << level << std::endl;
-        std::cout << "t parents count:" << node.topologicalNode().getParents().size() << std::endl;
-        for (NodeAbs *t_p : node.topologicalNode().getParents()) {
-            std::cout << "parent sig:" << t_p->cachedTypeSig() << std::endl;
-            for (Node *b : t_p->batch()) {
-                printZeroGrads(*b, level + 1);
-                break;
-            }
-        }
-    }
 };
 
 class UniInputExecutor : public Executor {
 protected:
 #if TEST_CUDA
-    void testForwardInpputs() {
-        for (NodeAbs *node : batch) {
-            Node *x = dynamic_cast<Node *>(node);
-            vector<Node*> inputs = get_inputs(*x);
-            for (Node *input : inputs) {
-                n3ldg_cuda::Assert(input->getVal().verify((getNodeType() +
-                                " forward input").c_str()));
-            }
-        }
-    }
+    void testForwardInpputs();
 
-    void testBeforeBackward() {
-        auto get_inputs = [](Node &node) {
-            UniInputNode &uni_input = static_cast<UniInputNode&>(node);
-            vector<pair<Node*, string>> inputs = {make_pair(uni_input.input_, "input")};
-            return inputs;
-        };
-        Executor::testBeforeBackward(get_inputs);
-    }
+    void testBeforeBackward();
 
-    void verifyBackward() {
-        auto get_inputs = [](Node &node) {
-            UniInputNode &uni_input = static_cast<UniInputNode&>(node);
-            vector<pair<Node*, string>> inputs = {make_pair(uni_input.input_, "input")};
-            return inputs;
-        };
-        Executor::verifyBackward(get_inputs);
-    }
+    void verifyBackward();
 
-    void testBackward() {
-        auto get_inputs = [](Node &node) {
-            UniInputNode &uni_input = static_cast<UniInputNode&>(node);
-            vector<pair<Node*, string>> inputs = {make_pair(uni_input.input_, "input")};
-            return inputs;
-        };
-        Executor::testBackward(get_inputs);
-    }
+    void testBackward();
 #endif
 };
-
-typedef  Executor* PExecutor;
-
-#if USE_GPU
-
-typedef dtype N3LDGActivated(const dtype &x);
-ActivatedEnum ToActivatedEnum(N3LDGActivated func) {
-    if (func == ftanh) {
-        return ActivatedEnum::TANH;
-    } else if (func == fsigmoid) {
-        return ActivatedEnum::SIGMOID;
-    } else if (func == frelu) {
-        return ActivatedEnum::RELU;
-    } else if (func == fleaky_relu) {
-        return ActivatedEnum::LEAKY_RELU;
-    } else if (func == fselu) {
-        return ActivatedEnum::SELU;
-    } else {
-        abort();
-    }
-}
-
-#endif
 
 }
 
