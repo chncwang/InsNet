@@ -548,7 +548,7 @@ Node *linear(Graph &graph, Node &input, LinearParam &params) {
     LinearNode *uni = LinearNode::newNode(dim * col);
     uni->setColumn(col);
     uni->setParam(params);
-    uni->forward(graph, input);
+    uni->connect(graph, input);
     return uni;
 }
 
@@ -576,7 +576,7 @@ Node *linear(Graph &graph, Node &input, Param &param) {
     LinearNode *uni = LinearNode::newNode(dim * col, pool);
     uni->setColumn(col);
     uni->setParam(*uni_params);
-    uni->forward(graph, input);
+    uni->connect(graph, input);
     return uni;
 }
 
@@ -584,7 +584,7 @@ Node *bias(Graph &graph, Node &input, BiasParam &param) {
     int dim = input.getDim();
     BiasNode *node = BiasNode::newNode(dim);
     node->setParam(param);
-    node->forward(graph, input);
+    node->connect(graph, input);
     return node;
 }
 

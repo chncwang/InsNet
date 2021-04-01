@@ -9,6 +9,8 @@ using std::pair;
 
 namespace n3ldg_plus {
 
+namespace {
+
 vector<vector<int>> cpuPredict(const vector<Node *> &nodes, int row) {
     vector<vector<int>> result;
     result.reserve(nodes.size());
@@ -51,6 +53,7 @@ vector<vector<int>> gpuPredict(const vector<Node *> &nodes, int row) {
 }
 
 #endif
+}
 
 vector<vector<int>> predict(const vector<Node *> &nodes, int row) {
 #if USE_GPU
@@ -59,6 +62,8 @@ vector<vector<int>> predict(const vector<Node *> &nodes, int row) {
     return cpuPredict(nodes, row);
 #endif
 }
+
+namespace {
 
 dtype cpuLikelihoodLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers_vector,
         dtype factor) {
@@ -79,6 +84,8 @@ dtype cpuLikelihoodLoss(vector<Node *> &nodes, int row, const vector<vector<int>
         }
     }
     return loss * factor;
+}
+
 }
 
 dtype likelihoodLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers,
@@ -124,6 +131,8 @@ dtype likelihoodLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &
 #endif
 }
 
+namespace {
+
 float cpuBinaryLikelihoodLoss(vector<Node *> &nodes, const vector<vector<int>> &answers,
         dtype factor) {
     dtype loss = 0;
@@ -139,7 +148,8 @@ float cpuBinaryLikelihoodLoss(vector<Node *> &nodes, const vector<vector<int>> &
     return loss * factor;
 }
 
-float cpuKLDivergenceLoss(vector<Node *> &nodes, const vector<shared_ptr<vector<dtype>>> &answers,
+float cpuKLDivergenceLoss(vector<Node *> &nodes,
+        const vector<shared_ptr<vector<dtype>>> &answers,
         dtype factor) {
     dtype loss = 0;
     for (int i = 0; i < nodes.size(); ++i) {
@@ -157,6 +167,8 @@ float cpuKLDivergenceLoss(vector<Node *> &nodes, const vector<shared_ptr<vector<
     }
 
     return loss * factor;
+}
+
 }
 
 pair<float, vector<int>> KLDivergenceLoss(vector<Node *> &nodes,

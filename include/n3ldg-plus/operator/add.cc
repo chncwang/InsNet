@@ -1,8 +1,10 @@
 #include "n3ldg-plus/operator/add.h"
-#include "eigen/Eigen/Dense"
-#include "n3ldg-plus/util/util.h"
-#include "n3ldg-plus/computation-graph/node.h"
-#include "n3ldg-plus/computation-graph/graph.h"
+
+using std::vector;
+using std::cerr;
+using std::endl;
+using std::string;
+using std::to_string;
 
 namespace n3ldg_plus {
 
@@ -18,19 +20,19 @@ public:
         setDim(dim);
     }
 
-    void setInputs(const std::vector<Node *> &ins) override {
+    void setInputs(const vector<Node *> &ins) override {
         this->ins_ = ins;
     }
 
-    void connect(Graph &cg, const std::vector<Node *>& x) {
+    void connect(Graph &cg, const vector<Node *>& x) {
         if (x.empty()) {
-            std::cerr << "empty inputs for add" << std::endl;
+            cerr << "empty inputs for add" << endl;
             abort();
         }
 
         for (int i = 0; i < x.size(); i++) {
             if (x.at(i)->getDim() != getDim()) {
-                std::cerr << "dim does not match" << std::endl;
+                cerr << "dim does not match" << endl;
                 abort();
             }
         }
@@ -59,12 +61,12 @@ public:
 
     Executor *generate() override;
 
-    std::string typeSignature() const override {
-        return Node::getNodeType() + "-" + std::to_string(ins_.size());
+    string typeSignature() const override {
+        return Node::getNodeType() + "-" + to_string(ins_.size());
     }
 
 private:
-    std::vector<Node *> ins_;
+    vector<Node *> ins_;
 
     friend class BatchedPAddNode;
     friend class PAddExecutor;
@@ -72,12 +74,12 @@ private:
 
 class BatchedPAddNode : public BatchedNodeImpl<PAddNode> {
 public:
-    void init(Graph &graph, const std::vector<BatchedNode *> &inputs) {
+    void init(Graph &graph, const vector<BatchedNode *> &inputs) {
         allocateBatch(inputs.front()->getDim(), inputs.front()->batch().size());
 
         for (BatchedNode *in : inputs) {
             if (in->getDim() != getDim()) {
-                std::cerr << "dim does not match" << std::endl;
+                cerr << "dim does not match" << endl;
                 abort();
             }
         }
@@ -94,7 +96,7 @@ public:
         int count = batch.size();
 
         for (int i = 0; i < inCount(); ++i) {
-            std::vector<dtype*> ins;
+            vector<dtype*> ins;
             ins.reserve(count);
             for (Node * n : batch) {
                 PAddNode *padd = dynamic_cast<PAddNode*>(n);
@@ -104,7 +106,7 @@ public:
 #endif
             }
         }
-        std::vector<dtype*> in_vals, outs;
+        vector<dtype*> in_vals, outs;
         in_vals.reserve(count * inCount());
         outs.reserve(count);
         dims_.reserve(count);
@@ -125,7 +127,7 @@ public:
 
     void backward() override {
         int count = batch.size();
-        std::vector<dtype *> out_grads, in_grads;
+        vector<dtype *> out_grads, in_grads;
         out_grads.reserve(count);
         in_grads.reserve(count * inCount());
         for (Node *n : batch) {
@@ -179,14 +181,14 @@ Executor *PAddNode::generate() {
     return new PAddExecutor();
 }
 
-Node *add(Graph &graph, const std::vector<Node*> &inputs) {
+Node *add(Graph &graph, const vector<Node*> &inputs) {
     int dim = inputs.front()->getDim();
     PAddNode *result = PAddNode::newNode(dim);
     result->connect(graph, inputs);
     return result;
 }
 
-BatchedNode *addInBatch(Graph &graph, const std::vector<BatchedNode *> &inputs) {
+BatchedNode *addInBatch(Graph &graph, const vector<BatchedNode *> &inputs) {
     BatchedPAddNode *node = new BatchedPAddNode;
     node->init(graph, inputs);
     return node;

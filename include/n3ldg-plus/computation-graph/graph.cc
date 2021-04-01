@@ -10,24 +10,7 @@ using std::endl;
 
 namespace n3ldg_plus {
 
-int GetDegree(map<void*, int> &degree_map, NodeAbs *p) {
-    auto it = degree_map.find(p);
-    if (it == degree_map.end()) {
-        degree_map.insert(pair<void*, int>(p, p->getDegree()));
-        return p->getDegree();
-    } else {
-        return it->second;
-    }
-}
-
-void DecreaseDegree(map<void*, int> &degree_map, NodeAbs *p) {
-    auto it = degree_map.find(p);
-    if (it == degree_map.end()) {
-        degree_map.insert(pair<void*, int>(p, p->getDegree() - 1));
-    } else {
-        --(it->second);
-    }
-}
+namespace {
 
 void Insert(NodeAbs *node, NodeMap& node_map) {
     string x_hash = node->cachedTypeSig();
@@ -47,6 +30,8 @@ int Size(const NodeMap &map) {
         sum += it.second.size();
     }
     return sum;
+}
+
 }
 
 Graph::Graph(bool eager, bool calculate_flops, bool calculate_activations) : eager_(eager),
