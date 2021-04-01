@@ -2,9 +2,6 @@
 #define N3LDG_PLUS_SPLIT_H
 
 #include "n3ldg-plus/computation-graph/graph.h"
-#if USE_GPU
-#include "N3LDG_cuda.h"
-#endif
 
 namespace n3ldg_plus {
 

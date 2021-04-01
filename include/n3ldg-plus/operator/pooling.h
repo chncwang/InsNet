@@ -5,7 +5,6 @@
 
 namespace n3ldg_plus {
 
-
 Node *maxPool(Graph &graph, std::vector<Node *> &inputs);
 
 Node *minPool(Graph &graph, std::vector<Node *> &inputs);
