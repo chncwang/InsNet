@@ -1,5 +1,5 @@
-#ifndef PMultiOP
-#define PMultiOP
+#ifndef N3LDG_PLUS_MUL_H
+#define N3LDG_PLUS_MUL_H
 
 #include "n3ldg-plus/computation-graph/graph.h"
 
