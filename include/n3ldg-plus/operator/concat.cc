@@ -108,7 +108,7 @@ public:
         vals.reserve(count);
         cols_.reserve(count);
         for (Node *node : batch) {
-            ConcatNode *concat = static_cast<ConcatNode*>(node);
+            ConcatNode *concat = dynamic_cast<ConcatNode*>(node);
             for (Node *in : concat->ins_) {
                 in_vals.push_back(in->val().value);
             }
@@ -118,7 +118,7 @@ public:
 
         ConcatNode &first = dynamic_cast<ConcatNode &>(*batch.front());
         row_ = first.getDim() / first.getColumn();
-        n3ldg_cuda::ConcatForward(in_vals, static_cast<ConcatNode*>(batch.at(0))->in_rows_, vals,
+        n3ldg_cuda::ConcatForward(in_vals, dynamic_cast<ConcatNode*>(batch.at(0))->in_rows_, vals,
                 count, inCount(), row_, cols_);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
@@ -135,14 +135,14 @@ public:
         in_losses.reserve(inCount() * count);
         losses.reserve(count);
         for (Node *node : batch) {
-            ConcatNode *concat = static_cast<ConcatNode*>(node);
+            ConcatNode *concat = dynamic_cast<ConcatNode*>(node);
             for (Node *in : concat->ins_) {
                 in_losses.push_back(in->loss().value);
             }
             losses.push_back(node->loss().value);
         }
 
-        n3ldg_cuda::ConcatBackward(in_losses, static_cast<ConcatNode*>(batch.at(0))->in_rows_,
+        n3ldg_cuda::ConcatBackward(in_losses, dynamic_cast<ConcatNode*>(batch.at(0))->in_rows_,
                 losses, count, inCount(), row_, cols_);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
@@ -150,7 +150,7 @@ public:
         }
         for (int idx = 0; idx < count; idx++) {
             for (int j = 0; j < inCount(); ++j) {
-                n3ldg_cuda::Assert(static_cast<ConcatNode *>(batch[idx])->
+                n3ldg_cuda::Assert(dynamic_cast<ConcatNode *>(batch[idx])->
                         ins_.at(j)->loss().verify("concat backward"));
             }
         }

@@ -156,7 +156,7 @@ public:
         cols_.reserve(batch.size());
 
         for (int i = 0; i < batch.size(); ++i) {
-            LinearNode *n = static_cast<LinearNode*>(batch.at(i));
+            LinearNode *n = dynamic_cast<LinearNode*>(batch.at(i));
 
             in_vals_.push_back(n->getInput().val().value);
             ys.push_back(n->val().value);
@@ -266,7 +266,7 @@ public:
             n3ldg_cuda::Assert(b()->grad.verify("backward b grad"));
         }
         for (Node * n : batch) {
-            LinearNode *ptr = static_cast<LinearNode *>(n);
+            LinearNode *ptr = dynamic_cast<LinearNode *>(n);
             n3ldg_cuda::Assert(ptr->getInput().loss().verify("backward loss"));
         }
         cout << "linear backward tested" << endl;
@@ -444,7 +444,7 @@ public:
         dtype *bias = param()->val.value;
         vector<dtype*> inputs, vals;
         for (Node *node : batch) {
-            BiasNode *bias_node = static_cast<BiasNode *>(node);
+            BiasNode *bias_node = dynamic_cast<BiasNode *>(node);
             inputs.push_back(bias_node->getInput().getVal().value);
             vals.push_back(bias_node->getVal().value);
         }
@@ -459,7 +459,7 @@ public:
         dtype *bias = param()->grad.value;
         vector<dtype *> losses, in_losses;
         for (Node *node : batch) {
-            BiasNode *bias_node = static_cast<BiasNode *>(node);
+            BiasNode *bias_node = dynamic_cast<BiasNode *>(node);
             losses.push_back(bias_node->getLoss().value);
             in_losses.push_back(bias_node->getInput().getLoss().value);
         }
@@ -474,7 +474,7 @@ public:
 
 private:
     BiasParam *param() {
-        return static_cast<BiasNode*>(batch.front())->bias_param_;
+        return dynamic_cast<BiasNode*>(batch.front())->bias_param_;
     }
 };
 #else

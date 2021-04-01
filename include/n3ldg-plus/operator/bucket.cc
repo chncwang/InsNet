@@ -106,7 +106,7 @@ public:
         int batch_i = 0;
         int j = 0;
         for (Node *node : batch) {
-            BucketNode *bucket = static_cast<BucketNode*>(node);
+            BucketNode *bucket = dynamic_cast<BucketNode*>(node);
             ys.at(batch_i++) = bucket->val().value;
             for (int i = 0; i < getDim(); ++i) {
                 cpu_x.at(j++) = bucket->input_.at(i);
@@ -115,7 +115,7 @@ public:
         n3ldg_cuda::BucketForward(cpu_x, count, getDim(), ys);
 #if TEST_CUDA
         for (Node *node : batch) {
-            BucketNode *bucket = static_cast<BucketNode*>(node);
+            BucketNode *bucket = dynamic_cast<BucketNode*>(node);
             dtype *v = node->val().v;
             for (int i = 0; i < getDim(); ++i) {
                 v[i] = bucket->input_.at(i);
@@ -125,7 +125,7 @@ public:
 #endif
 #else
         for (Node *node : batch) {
-            BucketNode *bucket = static_cast<BucketNode*>(node);
+            BucketNode *bucket = dynamic_cast<BucketNode*>(node);
             node->val() = bucket->input_;
         }
 #endif

@@ -140,7 +140,7 @@ public:
 #endif
         in_counts.reserve(batch.size());
         for (Node *node : batch) {
-            MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(node);
+            MatrixConcatNode *concat = dynamic_cast<MatrixConcatNode*>(node);
             in_counts.push_back(concat->getColumn());
         }
         max_in_count = *max_element(in_counts.begin(), in_counts.end());
@@ -150,7 +150,7 @@ public:
         int node_i = -1;
         for (Node *node : batch) {
             ++node_i;
-            MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(node);
+            MatrixConcatNode *concat = dynamic_cast<MatrixConcatNode*>(node);
             vals.push_back(concat->getVal().value);
             for (int i = 0; i < max_in_count; ++i) {
                 in_vals.push_back(i < in_counts.at(node_i) ?
@@ -171,7 +171,7 @@ public:
         int node_i = -1;
         for (Node *node : batch) {
             ++node_i;
-            MatrixConcatNode *concat = static_cast<MatrixConcatNode*>(node);
+            MatrixConcatNode *concat = dynamic_cast<MatrixConcatNode*>(node);
             grads.push_back(concat->getLoss().value);
             for (int i = 0; i < max_in_count; ++i) {
                 in_grads.push_back(i < in_counts.at(node_i) ?
@@ -182,7 +182,7 @@ public:
 #if TEST_CUDA
         auto get_inputs = [&](Node &node) {
             vector<pair<Node*, string>> pairs;
-            MatrixConcatNode &concat = static_cast<MatrixConcatNode&>(node);
+            MatrixConcatNode &concat = dynamic_cast<MatrixConcatNode&>(node);
             for (Node *input : concat.getInputs()) {
                 pairs.push_back(make_pair(input, input->getNodeType()));
             }
@@ -319,13 +319,13 @@ public:
     void forward() override {
 #if TEST_CUDA
         auto get_inputs = [&](Node &node)->vector<Node *> {
-            MatrixAndVectorMultiNode &multi = static_cast<MatrixAndVectorMultiNode&>(node);
+            MatrixAndVectorMultiNode &multi = dynamic_cast<MatrixAndVectorMultiNode&>(node);
             vector<Node *> inputs = {multi.matrix_, multi.vector_};
             return inputs;
         };
         testForwardInpputs(get_inputs);
         for (Node *node : batch) {
-            MatrixAndVectorMultiNode *multi = static_cast<MatrixAndVectorMultiNode *>(node);
+            MatrixAndVectorMultiNode *multi = dynamic_cast<MatrixAndVectorMultiNode *>(node);
             multi->matrix_->val().copyFromHostToDevice();
             multi->vector_->val().copyFromHostToDevice();
         }
@@ -335,12 +335,12 @@ public:
         vector_vals_.reserve(batch.size());
         cols_.reserve(batch.size());
         for (Node *node : batch) {
-            MatrixAndVectorMultiNode *multi = static_cast<MatrixAndVectorMultiNode *>(node);
+            MatrixAndVectorMultiNode *multi = dynamic_cast<MatrixAndVectorMultiNode *>(node);
             matrix_vals_.push_back(multi->matrix_->getVal().value);
             vector_vals_.push_back(multi->vector_->getVal().value);
             cols_.push_back(multi->vector_->getDim());
         }
-        MatrixAndVectorMultiNode *x = static_cast<MatrixAndVectorMultiNode *>(batch.front());
+        MatrixAndVectorMultiNode *x = dynamic_cast<MatrixAndVectorMultiNode *>(batch.front());
         row_ = x->getDim();
         n3ldg_cuda::MatrixAndVectorMultiForward(matrix_vals_, vector_vals_, batch.size(), row_,
                 cols_, vals);
@@ -357,7 +357,7 @@ public:
         matrix_grads.reserve(batch.size());
         vector_grads.reserve(batch.size());
         for (Node *node : batch) {
-            MatrixAndVectorMultiNode *multi = static_cast<MatrixAndVectorMultiNode *>(node);
+            MatrixAndVectorMultiNode *multi = dynamic_cast<MatrixAndVectorMultiNode *>(node);
             matrix_grads.push_back(multi->matrix_->getLoss().value);
             vector_grads.push_back(multi->vector_->getLoss().value);
         }
@@ -365,7 +365,7 @@ public:
                 row_, cols_, matrix_grads, vector_grads);
 #if TEST_CUDA
         auto get_inputs = [&](Node &node) {
-            MatrixAndVectorMultiNode &multi = static_cast<MatrixAndVectorMultiNode&>(node);
+            MatrixAndVectorMultiNode &multi = dynamic_cast<MatrixAndVectorMultiNode&>(node);
             vector<pair<Node *, string>> inputs = {make_pair(multi.matrix_, "matrix"),
             make_pair(multi.vector_, "vector")};
             return inputs;
@@ -868,7 +868,7 @@ public:
 #if TEST_CUDA
         auto get_inputs = [&](Node &node) {
             vector<pair<Node*, string>> pairs;
-            TranMatrixMulMatrixNode &t = static_cast<TranMatrixMulMatrixNode &>(node);
+            TranMatrixMulMatrixNode &t = dynamic_cast<TranMatrixMulMatrixNode &>(node);
             pairs.push_back(make_pair(t.ins_.at(0), "a"));
             pairs.push_back(make_pair(t.ins_.at(1), "b"));
             return pairs;

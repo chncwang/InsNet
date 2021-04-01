@@ -80,7 +80,7 @@ public:
         denominators.reserve(batch.size());
         dims.reserve(batch.size());
         for (Node *node : batch) {
-            FullDivNode *div = static_cast<FullDivNode*>(node);
+            FullDivNode *div = dynamic_cast<FullDivNode*>(node);
             numerators.push_back(div->numerator_->getVal().value);
             denominators.push_back(div->denominator_->getVal().value);
             results.push_back(div->getVal().value);
@@ -101,7 +101,7 @@ public:
         numerator_losses.reserve(batch.size());
         denominator_losses.reserve(batch.size());
         for (Node *node : batch) {
-            FullDivNode *div = static_cast<FullDivNode*>(node);
+            FullDivNode *div = dynamic_cast<FullDivNode*>(node);
             losses.push_back(node->getLoss().value);
             numerator_losses.push_back(div->numerator_->getLoss().value);
             denominator_losses.push_back(div->denominator_->getLoss().value);
@@ -111,7 +111,7 @@ public:
                 numerator_losses, denominator_losses);
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {
-            FullDivNode &div = static_cast<FullDivNode&>(node);
+            FullDivNode &div = dynamic_cast<FullDivNode&>(node);
             vector<pair<Node*, string>> results = {make_pair(div.denominator_, "denominator"),
                     make_pair(div.numerator_, "numerator")};
             return results;

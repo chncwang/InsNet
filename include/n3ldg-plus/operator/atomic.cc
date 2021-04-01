@@ -20,7 +20,7 @@ public:
         vector<dtype*> inputs(batch.size());
         int i = 0;
         for (Node *node : batch) {
-            UniInputNode *expnode = static_cast<UniInputNode*>(node);
+            UniInputNode *expnode = dynamic_cast<UniInputNode*>(node);
             inputs.at(i++) = expnode->getInput().getVal().value;
             vals.push_back(expnode->getVal().value);
             dims_.push_back(node->getDim());
@@ -47,7 +47,7 @@ public:
 
         int i = 0;
         for (Node *node : batch) {
-            UniInputNode *exp = static_cast<UniInputNode*>(node);
+            UniInputNode *exp = dynamic_cast<UniInputNode*>(node);
             losses.at(i) = exp->getLoss().value;
             input_losses.at(i++) = exp->getInput().getLoss().value;
         }
@@ -419,7 +419,7 @@ public:
         vector<dtype*> losses(count), in_losses(count);
         int i = 0;
         for (Node *n : batch) {
-            DropoutNode *dropout_node = static_cast<DropoutNode*>(n);
+            DropoutNode *dropout_node = dynamic_cast<DropoutNode*>(n);
 #if TEST_CUDA
             dropout_node->loss().copyFromHostToDevice();
             dropout_node->getInput().loss().copyFromHostToDevice();
@@ -434,7 +434,7 @@ public:
             n->backward();
         }
         for (Node *n : batch) {
-            DropoutNode *dropout_node = static_cast<DropoutNode*>(n);
+            DropoutNode *dropout_node = dynamic_cast<DropoutNode*>(n);
             n3ldg_cuda::Assert(dropout_node->getInput().loss().verify("DropoutExecutor backward"));
         }
 #endif
@@ -536,7 +536,7 @@ public:
         vector<int> head_dims(batch.size());
         int dim = Executor::getDim();
         for (int i = 0; i < batch.size(); ++i) {
-            MaxScalarNode *node = static_cast<MaxScalarNode*>(batch.at(i));
+            MaxScalarNode *node = dynamic_cast<MaxScalarNode*>(batch.at(i));
             inputs.at(i) = node->getInput().getVal().value;
             results.at(i) = node->getVal().value;
             int head_dim = node->getInput().getDim() / dim;
@@ -562,7 +562,7 @@ public:
 
         int i = 0;
         for (Node *node : batch) {
-            MaxScalarNode *max_scalar = static_cast<MaxScalarNode*>(node);
+            MaxScalarNode *max_scalar = dynamic_cast<MaxScalarNode*>(node);
             losses.at(i) = max_scalar->getLoss().value;
             input_losses.at(i++) = max_scalar->getInput().getLoss().value;
         }
@@ -668,7 +668,7 @@ public:
         dims_.reserve(batch.size());
         int i = 0;
         for (Node *node : batch) {
-            ScalarToVectorNode *n = static_cast<ScalarToVectorNode*>(node);
+            ScalarToVectorNode *n = dynamic_cast<ScalarToVectorNode*>(node);
             inputs.at(i) = n->getInput().getVal().value;
             results.at(i++) = n->getVal().value;
             dims_.push_back(n->getDim() / n->getInput().getDim());
@@ -686,7 +686,7 @@ public:
         cout << "scalarToVector test before backward..." << endl;
         UniInputExecutor::testBeforeBackward();
         for (Node *node : batch) {
-            ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(node);
+            ScalarToVectorNode * n = dynamic_cast<ScalarToVectorNode*>(node);
             n->loss().copyFromHostToDevice();
             n->getInput().loss().copyFromHostToDevice();
         }
@@ -695,7 +695,7 @@ public:
         vector<dtype*> input_losses(batch.size());
         int i = 0;
         for (Node *node : batch) {
-            ScalarToVectorNode * n = static_cast<ScalarToVectorNode*>(node);
+            ScalarToVectorNode * n = dynamic_cast<ScalarToVectorNode*>(node);
             losses.at(i) = n->getLoss().value;
             input_losses.at(i++) = n->getInput().getLoss().value;
         }
@@ -831,7 +831,7 @@ class SumExecutor : public UniInputExecutor {
         dims_.reserve(batch.size());
         int i = 0;
         for (Node *node : batch) {
-            SumNode *sum = static_cast<SumNode*>(node);
+            SumNode *sum = dynamic_cast<SumNode*>(node);
             inputs.at(i) = sum->getInput().getVal().value;
             results.at(i++) = sum->getVal().value;
             int row = sum->getInput().getDim()/ getDim();
@@ -859,7 +859,7 @@ class SumExecutor : public UniInputExecutor {
             node->loss().copyFromDeviceToHost();
 #endif
             losses.at(i) = node->getLoss().value;
-            SumNode *sum = static_cast<SumNode*>(node);
+            SumNode *sum = dynamic_cast<SumNode*>(node);
             input_losses.at(i++) = sum->getInput().getLoss().value;
         }
 
@@ -954,7 +954,7 @@ public:
         factors.reserve(batch.size());
         int i = 0;
         for (Node *node : batch) {
-            ScaledNode *scaled = static_cast<ScaledNode *>(node);
+            ScaledNode *scaled = dynamic_cast<ScaledNode *>(node);
             in_vals.at(i++) = scaled->getInput().getVal().value;
             dims.push_back(scaled->getDim());
             factors.push_back(scaled->factor_);
@@ -971,7 +971,7 @@ public:
         vector<dtype *> in_grads(batch.size());
         int i = 0;
         for (Node *node : batch) {
-            ScaledNode *scaled = static_cast<ScaledNode *>(node);
+            ScaledNode *scaled = dynamic_cast<ScaledNode *>(node);
             in_grads.at(i++) = scaled->getInput().getLoss().value;
         }
         auto grads = getGrads();
