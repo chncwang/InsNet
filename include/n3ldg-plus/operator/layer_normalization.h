@@ -15,7 +15,7 @@ public:
 
     void init(int dim) {
         g_.init(dim, 1);
-        g_.val.assignAll(1);
+        g_.val().assignAll(1);
         b_.initAsBias(dim);
     }
 

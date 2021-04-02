@@ -20,10 +20,6 @@ class SparseParams {
         nDim = 0;
     }
 
-    void exportAdaParams(ModelUpdate& ada) {
-        ada.addParam(&W);
-    }
-
     void initWeights(int nOSize) {
         if (nVSize == 0) {
             std::cerr << "nVSize is 0" << std::endl;

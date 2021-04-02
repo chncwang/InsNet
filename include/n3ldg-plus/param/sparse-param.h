@@ -50,14 +50,13 @@ public:
         aux_square.initOnMemoryAndDevice(outDim, inDim);
         aux_mean.initOnMemoryAndDevice(outDim, inDim);
 #else
-        val.init(outDim, inDim);
+        val_.init(outDim, inDim);
         aux_square.init(outDim, inDim);
         aux_mean.init(outDim, inDim);
 #endif
         dtype bound = std::sqrt(6.0 / (outDim + inDim));
-        //dtype bound = 0.001;
-        val.random(bound);
-        grad.init(outDim, inDim);
+        val_.random(bound);
+        grad_.init(outDim, inDim);
         indexers.resize(inDim);
         indexers = false;
         last_update.resize(inDim);
@@ -90,8 +89,8 @@ public:
 #else
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
-            for (int idx = 0; idx < grad.row; idx++) {
-                grad[index][idx] = 0;
+            for (int idx = 0; idx < grad_.row; idx++) {
+                grad_[index][idx] = 0;
             }
         }
         indexers = false;
@@ -99,14 +98,14 @@ public:
     }
 
     int outDim() override {
-        return val.row;
+        return val_.row;
     }
 
     int inDim() override {
-        return val.col;
+        return val_.col;
     }
 
-    void updateAdagrad(dtype alpha, dtype reg, dtype eps) override {
+    void adagrad(dtype alpha, dtype reg, dtype eps) override {
 #if USE_GPU
         n3ldg_cuda::UpdateAdagrad(val.value, grad.value, indexers.size(),
                 grad.col, aux_square.value, dIndexers.value, alpha, reg, eps);
@@ -127,18 +126,18 @@ public:
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
             if (!indexers[index]) continue;
-            for (int idx = 0; idx < grad.row; idx++) {
-                grad[index][idx] = grad[index][idx] + val[index][idx] * reg;
-                aux_square[index][idx] = aux_square[index][idx] + grad[index][idx] *
-                    grad[index][idx];
-                val[index][idx] = val[index][idx] - grad[index][idx] * alpha /
+            for (int idx = 0; idx < grad_.row; idx++) {
+                grad_[index][idx] = grad_[index][idx] + val_[index][idx] * reg;
+                aux_square[index][idx] = aux_square[index][idx] + grad_[index][idx] *
+                    grad_[index][idx];
+                val_[index][idx] = val_[index][idx] - grad_[index][idx] * alpha /
                     std::sqrt(aux_square[index][idx] + eps);
             }
         }
 #endif
     }
 
-    void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override {
+    void adam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override {
 #if USE_GPU
         n3ldg_cuda::UpdateAdam(val.value, grad.value, grad.row, indexers.size(), aux_mean.value,
                 aux_square.value, dIndexers.value, dIters.value, belta1, belta2, alpha, reg, eps);
@@ -164,24 +163,23 @@ public:
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
             if (!indexers[index]) continue;
-            for (int idx = 0; idx < grad.row; idx++) {
-                grad[index][idx] = grad[index][idx] + val[index][idx] * reg;
-                aux_mean[index][idx] = belta1 * aux_mean[index][idx] + (1 - belta1) * grad[index][idx];
-                aux_square[index][idx] = belta2 * aux_square[index][idx] + (1 - belta2) * grad[index][idx] * grad[index][idx];
+            for (int idx = 0; idx < grad_.row; idx++) {
+                grad_[index][idx] = grad_[index][idx] + val_[index][idx] * reg;
+                aux_mean[index][idx] = belta1 * aux_mean[index][idx] + (1 - belta1) * grad_[index][idx];
+                aux_square[index][idx] = belta2 * aux_square[index][idx] + (1 - belta2) * grad_[index][idx] * grad_[index][idx];
                 lr_t = alpha * std::sqrt(1 - std::pow(belta2, last_update[index] + 1)) / (1 - std::pow(belta1, last_update[index] + 1));
-                val[index][idx] = val[index][idx] - aux_mean[index][idx] * lr_t / std::sqrt(aux_square[index][idx] + eps);
+                val_[index][idx] = val_[index][idx] - aux_mean[index][idx] * lr_t / std::sqrt(aux_square[index][idx] + eps);
             }
             last_update[index]++;
         }
 #endif
     }
 
-    void updateAdamW(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override {
-        updateAdam(belta1, belta2, alpha, reg, eps);
+    void adamW(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override {
+        adam(belta1, belta2, alpha, reg, eps); // TODO
     }
 
     void randpoint(int& idx, int &idy) override {
-        //select indexes randomly
         std::vector<int> idRows, idCols;
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
@@ -189,7 +187,7 @@ public:
             idCols.push_back(index);
         }
 
-        for (int i = 0; i < val.row; i++) {
+        for (int i = 0; i < val_.row; i++) {
             idRows.push_back(i);
         }
 
@@ -200,7 +198,7 @@ public:
         idy = idRows.at(0);
     }
 
-    dtype squareGradNorm() override {
+    dtype gradSquareSum() override {
 #if USE_GPU && !TEST_CUDA
         dtype result = n3ldg_cuda::SquareSum(grad.value, dIndexers.value,
                 indexers.size(), val.row);
@@ -232,8 +230,8 @@ public:
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
             if (!indexers[index]) continue;
-            for (int idx = 0; idx < val.row; idx++) {
-                sumNorm += grad[index][idx] * grad[index][idx];
+            for (int idx = 0; idx < val_.row; idx++) {
+                sumNorm += grad_[index][idx] * grad_[index][idx];
             }
         }
 
@@ -243,68 +241,68 @@ public:
 
     void rescaleGrad(dtype scale) override {
 #if USE_GPU
-        n3ldg_cuda::Rescale(grad.value, grad.size, scale);
+        n3ldg_cuda::Rescale(grad_.value, grad_.size, scale);
 #if TEST_CUDA
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
             for (int idx = 0; idx < val.row; idx++) {
-                grad[index][idx] = grad[index][idx] * scale;
+                grad_[index][idx] = grad_[index][idx] * scale;
             }
         }
-        n3ldg_cuda::Assert(grad.verify("SparseParam rescaleGrad"));
+        n3ldg_cuda::Assert(grad_.verify("SparseParam rescaleGrad"));
 #endif
 #else
         int inDim = indexers.size();
         for (int index = 0; index < inDim; index++) {
             if (!indexers[index]) continue;
-            for (int idx = 0; idx < val.row; idx++) {
-                grad[index][idx] = grad[index][idx] * scale;
+            for (int idx = 0; idx < val_.row; idx++) {
+                grad_[index][idx] = grad_[index][idx] * scale;
             }
         }
 #endif
     }
 
-    void value(const int& featId, Tensor1D& out) {
-        assert(out.dim == val.row);
-        memcpy(out.v, val[featId], val.row * sizeof(dtype));
+    void val_ue(const int& featId, Tensor1D& out) {
+        assert(out.dim == val_.row);
+        memcpy(out.v, val_[featId], val_.row * sizeof(dtype));
     }
 
-    void value(const std::vector<int>& featIds, Tensor1D& out) {
-        assert(out.dim == val.row);
+    void val_ue(const std::vector<int>& featIds, Tensor1D& out) {
+        assert(out.dim == val_.row);
         int featNum = featIds.size();
         int featId;
         for (int i = 0; i < featNum; i++) {
             featId = featIds[i];
-            for (int idx = 0; idx < val.row; idx++) {
-                out[idx] += val[featId][idx];
+            for (int idx = 0; idx < val_.row; idx++) {
+                out[idx] += val_[featId][idx];
             }
         }
     }
 
     void loss(const int& featId, const Tensor1D& loss) {
-        assert(loss.dim == val.row);
+        assert(loss.dim == val_.row);
         indexers[featId] = true;
-        for (int idx = 0; idx < val.row; idx++) {
-            grad[featId][idx] += loss[idx];
+        for (int idx = 0; idx < val_.row; idx++) {
+            grad_[featId][idx] += loss[idx];
         }
     }
 
     void loss(const std::vector<int>& featIds, const Tensor1D& loss) {
-        assert(loss.dim == val.row);
+        assert(loss.dim == val_.row);
         int featNum = featIds.size();
         int featId;
         for (int i = 0; i < featNum; i++) {
             featId = featIds[i];
             indexers[featId] = true;
-            for (int idx = 0; idx < val.row; idx++) {
-                grad[featId][idx] += loss[idx];
+            for (int idx = 0; idx < val_.row; idx++) {
+                grad_[featId][idx] += loss[idx];
             }
         }
     }
 
     template<typename Archive>
     void serialize(Archive &ar) {
-        ar(val, aux_square, aux_mean);
+        ar(val_, aux_square, aux_mean);
     }
 };
 

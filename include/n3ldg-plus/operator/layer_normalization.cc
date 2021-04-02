@@ -246,7 +246,7 @@ public:
         int row = getDim() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
             Vec(val().v + i * row, row) = Vec(getInput().getVal().v + i * row, row) *
-                params_->g().val.vec() + params_->b().val.vec();
+                params_->g().val().vec() + params_->b().val().vec();
         }
     }
 
@@ -254,10 +254,10 @@ public:
         int row = getDim() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
             Vec(getInput().loss().v + i * row, row) += Vec(getLoss().v + i * row, row) *
-                params_->g().val.vec();
-            params_->g().grad.vec() += Vec(getLoss().v + i * row, row) *
+                params_->g().val().vec();
+            params_->g().grad().vec() += Vec(getLoss().v + i * row, row) *
                 Vec(getInput().getVal().v + i * row, row);
-            params_->b().grad.vec() += Vec(getLoss().v + i * row, row);
+            params_->b().grad().vec() += Vec(getLoss().v + i * row, row);
         }
     }
 
