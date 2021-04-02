@@ -1,9 +1,6 @@
-#ifndef CHECKGREAD_H_
-#define CHECKGREAD_H_
+#ifndef N3LDG_PLUS_CHECK_GRAD_H
+#define N3LDG_PLUS_CHECK_GRAD_H
 
-#include <eigen/Eigen/Dense>
-#include <functional>
-#include "n3ldg-plus/computation-graph/node.h"
 #include "n3ldg-plus/param/base-param.h"
 
 namespace n3ldg_plus {

@@ -1,15 +1,9 @@
-/*
- * Metric.h
- *
- *  Created on: Mar 17, 2015
- *      Author: mszhang
- */
+#ifndef N3LDG_PLUS_METRIC
+#define N3LDG_PLUS_METRIC
 
-#ifndef SRC_METRIC_H_
-#define SRC_METRIC_H_
+#include <iostream>
 
-
-using namespace std;
+namespace n3ldg_plus {
 
 struct Metric {
 
@@ -86,5 +80,8 @@ struct Metric {
 
 };
 
-#endif /* SRC_EXAMPLE_H_ */
+}
+
+#endif
+
 

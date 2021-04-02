@@ -1,10 +1,10 @@
 #ifndef _ALPHABET_
 #define _ALPHABET_
 
-#include "n3ldg-plus/util/util.h"
 #include "n3ldg-plus/base/serializable.h"
-#include <boost/format.hpp>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace n3ldg_plus {
 /*

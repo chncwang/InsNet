@@ -10,7 +10,7 @@
 #include <vector>
 #include <algorithm>
 
-namespace n3ldg_cuda {
+namespace n3ldg_plus {
 
 struct Event {
     std::string name;
@@ -147,7 +147,6 @@ private:
     Event *root_ = nullptr;
     bool enabled_ = false;
 };
-
 
 }
 

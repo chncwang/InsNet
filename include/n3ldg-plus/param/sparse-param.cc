@@ -1,5 +1,7 @@
 #include "n3ldg-plus/param/sparse-param.h"
 
+using std::vector;
+
 namespace n3ldg_plus {
 
 void SparseParam::init(int outDim, int inDim) {
@@ -12,7 +14,7 @@ void SparseParam::init(int outDim, int inDim) {
     aux_square_.init(outDim, inDim);
     aux_mean_.init(outDim, inDim);
 #endif
-    dtype bound = std::sqrt(6.0 / (outDim + inDim));
+    dtype bound = sqrt(6.0 / (outDim + inDim));
     val_.random(bound);
     grad_.init(outDim, inDim);
     indexers.resize(inDim);
@@ -83,7 +85,7 @@ void SparseParam::adagrad(dtype alpha, dtype reg, dtype eps) {
             aux_square_[index][idx] = aux_square_[index][idx] + grad_[index][idx] *
                 grad_[index][idx];
             val_[index][idx] = val_[index][idx] - grad_[index][idx] * alpha /
-                std::sqrt(aux_square_[index][idx] + eps);
+                sqrt(aux_square_[index][idx] + eps);
         }
     }
 #endif
@@ -125,10 +127,10 @@ void SparseParam::adam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype
                 grad_[index][idx];
             aux_square_[index][idx] = belta2 * aux_square_[index][idx] + (1 - belta2) *
                 grad_[index][idx] * grad_[index][idx];
-            lr_t = alpha * std::sqrt(1 - std::pow(belta2, last_update[index] + 1)) /
-                (1 - std::pow(belta1, last_update[index] + 1));
+            lr_t = alpha * sqrt(1 - pow(belta2, last_update[index] + 1)) /
+                (1 - pow(belta1, last_update[index] + 1));
             val_[index][idx] = val_[index][idx] - aux_mean_[index][idx] * lr_t /
-                std::sqrt(aux_square_[index][idx] + eps);
+                sqrt(aux_square_[index][idx] + eps);
         }
         last_update[index]++;
     }
@@ -136,7 +138,7 @@ void SparseParam::adam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype
 }
 
 void SparseParam::randpoint(int& idx, int &idy) {
-    std::vector<int> idRows, idCols;
+    vector<int> idRows, idCols;
     int inDim = indexers.size();
     for (int index = 0; index < inDim; index++) {
         if (!indexers[index]) continue;

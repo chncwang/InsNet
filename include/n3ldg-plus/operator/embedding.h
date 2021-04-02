@@ -5,6 +5,7 @@
 #include "n3ldg-plus/param/param.h"
 #include "n3ldg-plus/nlp/alphabet.h"
 #include "n3ldg-plus/computation-graph/graph.h"
+#include "n3ldg-plus/util/util.h"
 
 namespace n3ldg_plus {
 
@@ -44,25 +45,23 @@ public:
         if (!inited) {
             elems = alpha;
             nVSize = elems.size();
-            nUNKId = elems.from_string(unknownkey);
+            nUNKId = elems.from_string(UNKNOWN_WORD);
             initWeights(dim, fineTune);
             inited = true;
         }
     }
 
-    //initialization by pre-trained embeddings
     void init(const Alphabet &alpha, const std::string& inFile, bool fineTune = true,
             dtype norm = -1) {
         elems = alpha;
         nVSize = elems.size();
-        nUNKId = elems.from_string(unknownkey);
+        nUNKId = elems.from_string(UNKNOWN_WORD);
         initWeights(inFile, fineTune, norm);
     }
 
     void initWeights(int dim, bool tune) {
         if (dim <=0 || nVSize == 0 || (nVSize == 1 && nUNKId >= 0)) {
-            std::cerr << boost::format("LookupTable initWeights - dim:%1% size:%2%") % dim % nVSize
-                << std::endl;
+            std::cerr << fmt::format("LookupTable initWeights - dim:{} size:{}\n", dim, nVSize);
             std::cerr << "please check the alphabet" << std::endl;
             abort();
         }
@@ -158,7 +157,7 @@ public:
             }
             indexers.insert(nUNKId);
             count++;
-            std::cout << unknownkey << " not found, using averaged value to initialize." << std::endl;
+            std::cout << UNKNOWN_WORD << " not found, using averaged value to initialize." << std::endl;
         }
 
 

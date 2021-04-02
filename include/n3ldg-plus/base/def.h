@@ -35,6 +35,8 @@ enum ActivatedEnum {
     SQRT=6
 };
 
+extern const std::string UNKNOWN_WORD;
+
 }
 
 #endif

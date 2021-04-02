@@ -1,4 +1,7 @@
 #include "n3ldg-plus/nlp/alphabet.h"
+#include <iostream>
+#include "n3ldg-plus/base/def.h"
+#include "n3ldg-plus/util/util.h"
 
 using std::ifstream;
 using std::string;
@@ -42,7 +45,7 @@ int basic_quark::from_string(const std::string& str) const {
     StringToId::const_iterator it = m_string_to_id.find(str);
     if (it != m_string_to_id.end()) {
         return it->second;
-    } else if (str == unknownkey) {
+    } else if (str == UNKNOWN_WORD) {
         return -1;
     } else {
         std::cerr << str << " not found" << std::endl;
@@ -103,7 +106,7 @@ void basic_quark::init(const std::string& inFile, bool bUseUnknown) {
         }
     }
     if (bUseUnknown) {
-        from_string(unknownkey);
+        from_string(UNKNOWN_WORD);
     }
 }
 
