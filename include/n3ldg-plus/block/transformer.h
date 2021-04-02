@@ -114,7 +114,7 @@ inline void initPositionalEncodingParam(Param &param, int dim, int max_sentence_
                 int half = (dim_i - 1) / 2;
                 v = cos(pos_i / pow(1e4, 2.0 * half / dim));
             }
-            param.val[pos_i][dim_i] = v;
+            param.val()[pos_i][dim_i] = v;
         }
     }
 #if USE_GPU

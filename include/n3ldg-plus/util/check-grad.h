@@ -53,15 +53,15 @@ public:
             _params[i]->randpoint(idx, idy);
             printf("%s, Checking gradient for %s[%d][%d]:\n", description.c_str(),
                     _names[i].c_str(), idx, idy);
-            orginValue = _params[i]->val[idx][idy];
+            orginValue = _params[i]->val()[idx][idy];
 
-            _params[i]->val[idx][idy] = orginValue + CHECK_GRAD_STEP;
+            _params[i]->val()[idx][idy] = orginValue + CHECK_GRAD_STEP;
             plused_loss = 0.0;
             for (int j = 0; j < examples.size(); j++) {
                 plused_loss += classifier->cost(examples[j]);
             }
 
-            _params[i]->val[idx][idy] = orginValue - CHECK_GRAD_STEP;
+            _params[i]->val()[idx][idy] = orginValue - CHECK_GRAD_STEP;
             minused_loss = 0.0;
             for (int j = 0; j < examples.size(); j++) {
                 minused_loss += classifier->cost(examples[j]);
@@ -70,11 +70,11 @@ public:
             printf("plused_loss:%.10f, minused_loss:%.10f\n", plused_loss, minused_loss);
 
             mockGrad = (plused_loss - minused_loss) * 0.5 / CHECK_GRAD_STEP;
-            computeGrad = _params[i]->grad[idx][idy];
+            computeGrad = _params[i]->grad()[idx][idy];
 
             printf("    mock grad = %.20f,\ncomputed grad = %.20f\n\n", mockGrad, computeGrad);
 
-            _params[i]->val[idx][idy] = orginValue;
+            _params[i]->val()[idx][idy] = orginValue;
         }
     }
 };

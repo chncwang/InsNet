@@ -1,12 +1,6 @@
 #ifndef BasePARAM_H_
 #define BasePARAM_H_
 
-#include "n3ldg-plus/base/serializable.h"
-
-#if USE_GPU
-#include "N3LDG_cuda.h"
-#endif
-
 #include "n3ldg-plus/base/tensor.h"
 
 namespace n3ldg_plus {
@@ -56,9 +50,6 @@ class BaseParam : public TunableAtom<BaseParam>
 #endif
 {
 public:
-    Tensor2D val;
-    Tensor2D grad;
-
     BaseParam(const std::string &name, bool is_bias = false) : is_bias_(is_bias), name_(name) {}
 
     bool isBias() const {
@@ -66,9 +57,9 @@ public:
     }
 
     virtual void init(int outDim, int inDim) = 0;
-    virtual void updateAdagrad(dtype alpha, dtype reg, dtype eps) = 0;
-    virtual void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) = 0;
-    virtual void updateAdamW(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) = 0;
+    virtual void adagrad(dtype alpha, dtype reg, dtype eps) = 0;
+    virtual void adam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) = 0;
+    virtual void adamW(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) = 0;
     virtual int outDim() = 0;
     virtual int inDim() = 0;
     virtual void clearGrad() = 0;
@@ -76,8 +67,11 @@ public:
         return name_;
     }
 
+    [[deprecated]]
     virtual void randpoint(int& idx, int &idy) = 0;
-    virtual dtype squareGradNorm() = 0;
+
+    virtual dtype gradSquareSum() = 0;
+
     virtual void rescaleGrad(dtype scale) = 0;
 
 #if USE_GPU
@@ -86,9 +80,18 @@ public:
     }
 #endif
 
-private:
+    Tensor2D &val() {
+        return val_;
+    }
+
+    Tensor2D &grad() {
+        return grad_;
+    }
+
+protected:
     bool is_bias_ = false;
     std::string name_;
+    Tensor2D val_, grad_;
 };
 
 }

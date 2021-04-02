@@ -136,9 +136,9 @@ public:
     void  forward() {
         int count = batch.size();
 #if TEST_CUDA
-        W().val.copyFromDeviceToHost();
+        W().val().copyFromDeviceToHost();
         if (b() != nullptr) {
-            b()->val.copyFromDeviceToHost();
+            b()->val().copyFromDeviceToHost();
         }
 #endif
         for (int i = 0; i < count; ++i) {
@@ -165,8 +165,8 @@ public:
             n->getInput().val().copyFromDeviceToHost();
 #endif
         }
-        n3ldg_cuda::LinearForward(in_vals_, count, cols_, inDim(), outDim(), W().val.value, 
-                b() == nullptr ? nullptr : b()->val.value, ys);
+        n3ldg_cuda::LinearForward(in_vals_, count, cols_, inDim(), outDim(), W().val().value, 
+                b() == nullptr ? nullptr : b()->val().value, ys);
 
 #if TEST_CUDA
         int col_offset = 0;
@@ -179,11 +179,11 @@ public:
 
         if (b() != nullptr) {
             for (int i = 0; i < col_sum_; ++i) {
-                Vec(b_.v + i * outDim(), outDim()) = b()->val.vec();
+                Vec(b_.v + i * outDim(), outDim()) = b()->val().vec();
             }
         }
 
-        y_.mat() = W().val.mat().transpose() * x_.mat();
+        y_.mat() = W().val().mat().transpose() * x_.mat();
         if (b() != nullptr) {
             y_.vec() += b_.vec();
         }
@@ -203,13 +203,13 @@ public:
         int count = batch.size();
 #if TEST_CUDA
         if (b() != nullptr) {
-            n3ldg_cuda::Assert(b()->grad.verify("before linear backward b grad"));
-            b()->grad.copyFromDeviceToHost();
+            n3ldg_cuda::Assert(b()->grad().verify("before linear backward b grad"));
+            b()->grad().copyFromDeviceToHost();
         }
-        n3ldg_cuda::Assert(W().val.verify("before linear backward W val"));
-        W().val.copyFromDeviceToHost();
-        n3ldg_cuda::Assert(W().grad.verify("before linear backward W grad"));
-        W().grad.copyFromDeviceToHost();
+        n3ldg_cuda::Assert(W().val().verify("before linear backward W val"));
+        W().val().copyFromDeviceToHost();
+        n3ldg_cuda::Assert(W().grad().verify("before linear backward W grad"));
+        W().grad().copyFromDeviceToHost();
         for (int i = 0; i < count; ++i) {
             LinearNode* ptr = (LinearNode*)batch[i];
             n3ldg_cuda::Assert(ptr->loss().verify("before linear backward grad"));
@@ -230,8 +230,8 @@ public:
             in_grads.push_back(ptr->getInput().loss().value);
         }
 
-        n3ldg_cuda::LinearBackward(grads, count, cols_, inDim(), outDim(), W().val.value, in_vals_,
-                b() == nullptr ? nullptr : b()->grad.value, in_grads, W().grad.value);
+        n3ldg_cuda::LinearBackward(grads, count, cols_, inDim(), outDim(), W().val().value, in_vals_,
+                b() == nullptr ? nullptr : b()->grad().value, in_grads, W().grad().value);
 #if TEST_CUDA
         Tensor2D lx, ly;
         lx.init(inDim(), col_sum_);
@@ -244,15 +244,15 @@ public:
             col_offset += l.getColumn();
         }
 
-        W().grad.mat() += x_.mat() * ly.mat().transpose();
+        W().grad().mat() += x_.mat() * ly.mat().transpose();
 
         if (b() != nullptr) {
             for (int i = 0; i < col_sum_; ++i) {
-                b()->grad.vec() += Vec(ly.v + i * outDim(), outDim());
+                b()->grad().vec() += Vec(ly.v + i * outDim(), outDim());
             }
         }
 
-        lx.mat() = W().val.mat() * ly.mat();
+        lx.mat() = W().val().mat() * ly.mat();
 
         col_offset = 0;
         for (int i = 0; i < count; i++) {
@@ -261,9 +261,9 @@ public:
             col_offset += l.getColumn();
         }
 
-        n3ldg_cuda::Assert(W().grad.verify("LinearExecutor backward W grad"));
+        n3ldg_cuda::Assert(W().grad().verify("LinearExecutor backward W grad"));
         if (b() != nullptr) {
-            n3ldg_cuda::Assert(b()->grad.verify("backward b grad"));
+            n3ldg_cuda::Assert(b()->grad().verify("backward b grad"));
         }
         for (Node * n : batch) {
             LinearNode *ptr = dynamic_cast<LinearNode *>(n);
@@ -311,11 +311,11 @@ public:
 
         if (b() != nullptr) {
             for (int i = 0; i < col_sum_; ++i) {
-                Vec(b_.v + i * outDim(), outDim()) = b()->val.vec();
+                Vec(b_.v + i * outDim(), outDim()) = b()->val().vec();
             }
         }
 
-        y_.mat() = W().val.mat().transpose() * x_.mat();
+        y_.mat() = W().val().mat().transpose() * x_.mat();
 
         if (b() != nullptr) {
             y_.vec() += b_.vec();
@@ -342,15 +342,15 @@ public:
             col_offset += l.getColumn();
         }
 
-        W().grad.mat() += x_.mat() * ly.mat().transpose();
+        W().grad().mat() += x_.mat() * ly.mat().transpose();
 
         if (b() != nullptr) {
             for (int i = 0; i < col_sum_; ++i) {
-                b()->grad.vec() += Vec(ly.v + i * outDim(), outDim());
+                b()->grad().vec() += Vec(ly.v + i * outDim(), outDim());
             }
         }
 
-        lx.mat() = W().val.mat() * ly.mat();
+        lx.mat() = W().val().mat() * ly.mat();
 
         col_offset = 0;
         for (int i = 0; i < count; i++) {
@@ -392,14 +392,14 @@ public:
 
     void compute() override {
         for (int i = 0; i < getDim(); ++i) {
-            val()[i] = getInput().getVal()[i] + bias_param_->val[0][i];
+            val()[i] = getInput().getVal()[i] + bias_param_->val()[0][i];
         }
     }
 
     void backward() override {
         getInput().loss().vec() += loss().vec();
         for (int i = 0; i < getDim(); ++i) {
-            bias_param_->grad[0][i] += getLoss()[i];
+            bias_param_->grad()[0][i] += getLoss()[i];
         }
     }
 
@@ -441,7 +441,7 @@ public:
 class BiasExecutor : public UniInputExecutor {
 public:
     void forward() override {
-        dtype *bias = param()->val.value;
+        dtype *bias = param()->val().value;
         vector<dtype*> inputs, vals;
         for (Node *node : batch) {
             BiasNode *bias_node = dynamic_cast<BiasNode *>(node);
@@ -456,7 +456,7 @@ public:
     }
 
     void backward() override {
-        dtype *bias = param()->grad.value;
+        dtype *bias = param()->grad().value;
         vector<dtype *> losses, in_losses;
         for (Node *node : batch) {
             BiasNode *bias_node = dynamic_cast<BiasNode *>(node);
@@ -467,7 +467,7 @@ public:
 #if TEST_CUDA
         UniInputExecutor::testBackward();
         cout << "count:" << batch.size() << endl;
-        n3ldg_cuda::Assert(param()->grad.verify("bias backward bias grad"));
+        n3ldg_cuda::Assert(param()->grad().verify("bias backward bias grad"));
         cout << "Bias backward tested" << endl;
 #endif
     }

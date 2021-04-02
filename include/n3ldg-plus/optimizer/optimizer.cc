@@ -5,7 +5,7 @@ namespace n3ldg_plus {
 void Optimizer::clipGrad(dtype clip_value) {
     dtype sum = 0;
     for (int idx = 0; idx < params_.size(); idx++) {
-        sum += params_.at(idx)->squareGradNorm();
+        sum += params_.at(idx)->gradSquareSum();
     }
     dtype sqrt_sum = sqrt(sum);
     if (sqrt_sum > clip_value) {

@@ -23,7 +23,7 @@ void LSTMParam::init(int nOSize, int nISize) {
     forget_input.init(nOSize, nISize, true);
     cell_hidden.init(nOSize, nOSize, false);
     cell_input.init(nOSize, nISize, true);
-    forget_input.b().val.assignAll(1.0f);
+    forget_input.b().val().assignAll(1.0f);
 }
 
 #if USE_GPU

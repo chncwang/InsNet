@@ -48,7 +48,7 @@ public:
         int dim = getDim() / ids_.size();
         int i = 0;
         for (int id : ids_) {
-            Vec(val().v + i++ * dim, dim) = Vec(param_->val[id], dim);
+            Vec(val().v + i++ * dim, dim) = Vec(param_->val()[id], dim);
         }
     }
 
@@ -57,7 +57,7 @@ public:
             int dim = getDim() / ids_.size();
             int i = 0;
             for (int id : ids_) {
-                Vec(param_->grad[id], dim) += Vec(loss().v + i++ * dim, dim);
+                Vec(param_->grad()[id], dim) += Vec(loss().v + i++ * dim, dim);
             }
         }
     }

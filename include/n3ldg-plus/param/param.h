@@ -1,13 +1,8 @@
-#ifndef PARAM_H_
-#define PARAM_H_
+#ifndef N3LDG_PLUS_PARAM_H
+#define N3LDG_PLUS_PARAM_H
 
-#include "eigen/Eigen/Dense"
 #include "n3ldg-plus/param/base-param.h"
-#include "n3ldg-plus/base/tensor.h"
-#include "n3ldg-plus/computation-graph/node.h"
-#if USE_GPU
-#include "N3LDG_cuda.h"
-#endif
+#include "fmt/core.h"
 
 namespace n3ldg_plus {
 
@@ -16,14 +11,8 @@ enum InitDistribution {
     NORM = 1
 };
 
-// Notice: aux is an auxiliary variable to help parameter updating
 class Param : public BaseParam {
 public:
-    Tensor2D aux_square;
-    Tensor2D aux_mean;
-    int iter;
-    bool is_fixed = false;
-
     Param(const std::string &name, bool is_bias = false) : BaseParam(name, is_bias) {}
 
     virtual ~Param() = default;
@@ -33,35 +22,7 @@ public:
     }
 
     void init(int outDim, int inDim, const std::function<dtype(int, int)> *cal_bound,
-            InitDistribution dist = InitDistribution::UNI) {
-#if USE_GPU
-        val.initOnMemoryAndDevice(outDim, inDim);
-        aux_square.initOnMemoryAndDevice(outDim, inDim);
-        aux_mean.initOnMemoryAndDevice(outDim, inDim);
-#else
-        val.init(outDim, inDim);
-        aux_square.init(outDim, inDim);
-        aux_mean.init(outDim, inDim);
-#endif
-        grad.init(outDim, inDim);
-        if (isBias()) {
-            val.assignAll(0.0f);
-        } else {
-            dtype bound = cal_bound == nullptr ? sqrt(6.0 / (outDim + inDim)) :
-                (*cal_bound)(outDim, inDim);
-            if (dist == InitDistribution::UNI) {
-                val.random(bound);
-            } else {
-                val.randomNorm(bound);
-            }
-        }
-        iter = 0;
-#if USE_GPU
-        n3ldg_cuda::Memset(grad.value, outDim * inDim, 0.0f);
-        n3ldg_cuda::Memset(aux_square.value, outDim * inDim, 0.0f);
-        n3ldg_cuda::Memset(aux_mean.value, outDim * inDim, 0.0f);
-#endif
-    }
+            InitDistribution dist = InitDistribution::UNI);
 
 #if USE_GPU
     std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
@@ -77,11 +38,11 @@ public:
 #endif
 
     int outDim() override {
-        return val.row;
+        return val_.row;
     }
 
     int inDim() override {
-        return val.col;
+        return val_.col;
     }
 
     void clearGrad() override {
@@ -92,136 +53,20 @@ public:
         n3ldg_cuda::Assert(grad.verify("Param clearGrad"));
 #endif
 #else
-        grad.zero();
+        grad_.zero();
 #endif
     }
 
-    void updateAdagrad(dtype alpha, dtype reg, dtype eps) override {
-        if (is_fixed) {
-            return;
-        }
-#if USE_GPU
-        n3ldg_cuda::UpdateAdagrad(val.value, grad.value, val.row, val.col,
-                aux_square.value, alpha, reg, eps);
-#if TEST_CUDA
-        if (!isBias()) grad.vec() = grad.vec() + val.vec() * reg;
-        aux_square.vec() = aux_square.vec() + grad.vec().square();
-        val.vec() = val.vec() - grad.vec() * alpha / (aux_square.vec() + eps).sqrt();
-        n3ldg_cuda::Assert(val.verify("Param adagrad"));
-#endif
-#else
-        if (!isBias()) grad.vec() = grad.vec() + val.vec() * reg;
-        aux_square.vec() = aux_square.vec() + grad.vec().square();
-        val.vec() = val.vec() - grad.vec() * alpha / (aux_square.vec() + eps).sqrt();
-#endif
-    }
+    void adagrad(dtype alpha, dtype reg, dtype eps) override;
 
-    void updateAdam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override {
-        if (is_fixed) {
-            return;
-        }
-#if USE_GPU
-#if TEST_CUDA
-        n3ldg_cuda::Assert(val.verify("Param adam begin val"));
-        n3ldg_cuda::Assert(grad.verify("Param adam begin grad"));
-        n3ldg_cuda::Assert(aux_mean.verify("Param adam begin aux_mean"));
-        n3ldg_cuda::Assert(aux_square.verify("Param adam begin aux_square"));
-#endif
-        n3ldg_cuda::UpdateAdam(val.value, grad.value, val.row, val.col, isBias(),
-                aux_mean.value,
-                aux_square.value,
-                iter,
-                belta1,
-                belta2,
-                alpha,
-                reg,
-                eps);
-#if TEST_CUDA
-        if (!isBias()) grad.vec() = grad.vec() + val.vec() * reg;
-        aux_mean.vec() = belta1 * aux_mean.vec() + (1 - belta1) * grad.vec();
-        aux_square.vec() = belta2 * aux_square.vec() + (1 - belta2) * grad.vec().square();
-        dtype lr_t = alpha * sqrt(1 - pow(belta2, iter + 1)) / (1 - pow(belta1, iter + 1));
-        val.vec() = val.vec() - aux_mean.vec() * lr_t / (aux_square.vec() + eps).sqrt();
-        n3ldg_cuda::Assert(val.verify("Param adam"));
-#endif
-#else
-        if (!isBias()) grad.vec() = grad.vec() + val.vec() * reg;
-        aux_mean.vec() = belta1 * aux_mean.vec() + (1 - belta1) * grad.vec();
-        aux_square.vec() = belta2 * aux_square.vec() + (1 - belta2) * grad.vec().square();
-        dtype lr_t = alpha * sqrt(1 - pow(belta2, iter + 1)) / (1 - pow(belta1, iter + 1));
-        val.vec() = val.vec() - aux_mean.vec() * lr_t / (aux_square.vec() + eps).sqrt();
-#endif
-        iter++;
-    }
+    void adam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override;
 
-    void updateAdamW(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override {
-        if (is_fixed) {
-            return;
-        }
-#if USE_GPU
-#if TEST_CUDA
-        n3ldg_cuda::Assert(val.verify("Param adam begin val"));
-        n3ldg_cuda::Assert(grad.verify("Param adam begin grad"));
-        n3ldg_cuda::Assert(aux_mean.verify("Param adam begin aux_mean"));
-        n3ldg_cuda::Assert(aux_square.verify("Param adam begin aux_square"));
-#endif
-        n3ldg_cuda::UpdateAdamW(val.value, grad.value, val.row, val.col, isBias(), aux_mean.value,
-                aux_square.value, iter, belta1, belta2, alpha, reg, eps);
-#if TEST_CUDA
-        aux_mean.vec() = belta1 * aux_mean.vec() + (1 - belta1) * grad.vec();
-        aux_square.vec() = belta2 * aux_square.vec() + (1 - belta2) * grad.vec().square();
-        dtype lr_t = alpha * sqrt(1 - pow(belta2, iter + 1)) / (1 - pow(belta1, iter + 1));
-        val.vec() = (1 - (isBias() ? 0.0f : reg)) * val.vec() -
-            aux_mean.vec() * lr_t / (aux_square.vec() + eps).sqrt();
-        n3ldg_cuda::Assert(val.verify("Param adam"));
-#endif
-#else
-        aux_mean.vec() = belta1 * aux_mean.vec() + (1 - belta1) * grad.vec();
-        aux_square.vec() = belta2 * aux_square.vec() + (1 - belta2) * grad.vec().square();
-        dtype lr_t = alpha * sqrt(1 - pow(belta2, iter + 1)) / (1 - pow(belta1, iter + 1));
-        val.vec() = (1 - (isBias() ? 0.0f : reg)) * val.vec() -
-            aux_mean.vec() * lr_t / (aux_square.vec() + eps).sqrt();
-#endif
-        iter++;
-    }
+    void adamW(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override;
 
-    void randpoint(int& idx, int &idy) override {
-        std::vector<int> idRows, idCols;
-        for (int i = 0; i < val.row; i++)
-            idRows.push_back(i);
-        for (int i = 0; i < val.col; i++)
-            idCols.push_back(i);
+    [[deprecated("Such util functions should not be a member method")]]
+    void randpoint(int& idx, int &idy) override;
 
-        random_shuffle(idRows.begin(), idRows.end());
-        random_shuffle(idCols.begin(), idCols.end());
-
-        idy = idRows.at(0);
-        idx = idCols.at(0);
-    }
-
-    dtype squareGradNorm() override {
-#if USE_GPU && !TEST_CUDA
-        return n3ldg_cuda::SquareSum(grad.value, grad.size);
-#elif USE_GPU && TEST_CUDA
-        cout << "squareGradNorm - param name:" << this->getParamName() << endl;
-        n3ldg_cuda::Assert(grad.verify("squareGradNorm grad"));
-        dtype cuda = n3ldg_cuda::SquareSum(grad.value, grad.size);
-        dtype sumNorm = 0.0;
-        for (int i = 0; i < grad.size; i++) {
-            sumNorm += grad.v[i] * grad.v[i];
-        }
-        if (!isEqual(sumNorm, cuda)) {
-            std::cout << "cpu:" << sumNorm << " cuda:" << cuda << std::endl;
-        }
-        return sumNorm;
-#else
-        dtype sumNorm = 0.0;
-        for (int i = 0; i < grad.size; i++) {
-            sumNorm += grad.v[i] * grad.v[i];
-        }
-        return sumNorm;
-#endif
-    }
+    dtype gradSquareSum() override;
 
     void rescaleGrad(dtype scale) override {
 #if USE_GPU
@@ -231,30 +76,26 @@ public:
         n3ldg_cuda::Assert(grad.verify("Param rescaleGrad"));
 #endif
 #else
-        grad.vec() = grad.vec() * scale;
+        grad_.vec() = grad_.vec() * scale;
 #endif
     }
 
     template<typename Archive>
     void serialize(Archive &ar) {
-        ar(val, aux_square, aux_mean, iter, is_fixed);
+        ar(val_, aux_square_, aux_mean_, iter_, is_fixed_);
     }
 
-    void value(const int& featId, Tensor1D& out) {
-        if (out.dim != val.row) {
-            std::cerr << fmt::format("Param value - out dim is {} param row is {}\n", out.dim,
-                    val.row);
-            abort();
-        }
-        memcpy(out.v, val[featId], val.row * sizeof(dtype));
-    }
+    [[deprecated]]
+    void value(const int& featId, Tensor1D& out);
 
-    void loss(const int& featId, const Tensor1D& loss) {
-        assert(loss.dim == val.row);
-        for (int idx = 0; idx < val.row; idx++) {
-            grad[featId][idx] += loss[idx];
-        }
-    }
+    [[deprecated]]
+    void loss(const int& featId, const Tensor1D& loss);
+
+private:
+    Tensor2D aux_square_;
+    Tensor2D aux_mean_;
+    int iter_ = 0;
+    bool is_fixed_ = false;
 };
 
 template<typename ParamType>
@@ -317,4 +158,4 @@ protected:
 
 }
 
-#endif /* PARAM_H_ */
+#endif
