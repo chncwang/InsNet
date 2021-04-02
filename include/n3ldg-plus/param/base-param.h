@@ -91,7 +91,7 @@ public:
 protected:
     bool is_bias_ = false;
     std::string name_;
-    Tensor2D val_, grad_;
+    Tensor2D val_, grad_, aux_square_, aux_mean_;
 };
 
 }

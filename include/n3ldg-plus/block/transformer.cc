@@ -102,8 +102,7 @@ void TransformerDecoderLayerParams::init(int dim, int head_count) {
 #if USE_GPU
 vector<n3ldg_cuda::Transferable *> TransformerDecoderLayerParams::transferablePtrs() {
     return {&self_attention_, &encoder_attention_, &self_fusion_, &encoder_fusion_,
-        &ffn_inner_params_, &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_,
-        &layer_norm_c_};
+        &ffn_inner_params_, &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_, &layer_norm_c_};
 }
 #endif
 

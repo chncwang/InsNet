@@ -82,20 +82,11 @@ public:
 
     template<typename Archive>
     void serialize(Archive &ar) {
-        ar(val_, aux_square_, aux_mean_, iter_, is_fixed_);
+        ar(val_, aux_square_, aux_mean_, iter_);
     }
 
-    [[deprecated]]
-    void value(const int& featId, Tensor1D& out);
-
-    [[deprecated]]
-    void loss(const int& featId, const Tensor1D& loss);
-
 private:
-    Tensor2D aux_square_;
-    Tensor2D aux_mean_;
     int iter_ = 0;
-    bool is_fixed_ = false;
 };
 
 template<typename ParamType>

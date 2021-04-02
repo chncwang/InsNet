@@ -38,9 +38,6 @@ void Param::init(int outDim, int inDim, const function<dtype(int, int)> *cal_bou
 }
 
 void Param::adagrad(dtype alpha, dtype reg, dtype eps) {
-    if (is_fixed_) {
-        return;
-    }
 #if USE_GPU
     n3ldg_cuda::UpdateAdagrad(val.value, grad.value, val.row, val.col,
             aux_square.value, alpha, reg, eps);
@@ -58,9 +55,6 @@ void Param::adagrad(dtype alpha, dtype reg, dtype eps) {
 }
 
 void Param::adam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) {
-    if (is_fixed_) {
-        return;
-    }
 #if USE_GPU
 #if TEST_CUDA
     n3ldg_cuda::Assert(val.verify("Param adam begin val"));
@@ -96,9 +90,6 @@ void Param::adam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) 
 }
 
 void Param::adamW(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) {
-    if (is_fixed_) {
-        return;
-    }
 #if USE_GPU
 #if TEST_CUDA
     n3ldg_cuda::Assert(val.verify("Param adam begin val"));
@@ -162,22 +153,6 @@ dtype Param::gradSquareSum() {
     }
     return sumNorm;
 #endif
-}
-
-void Param::value(const int& featId, Tensor1D& out) {
-    if (out.dim != val_.row) {
-        cerr << fmt::format("Param value - out dim is {} param row is {}\n", out.dim,
-                val_.row);
-        abort();
-    }
-    memcpy(out.v, val_[featId], val_.row * sizeof(dtype));
-}
-
-void Param::loss(const int& featId, const Tensor1D& loss) {
-    assert(loss.dim == val.row);
-    for (int idx = 0; idx < val_.row; idx++) {
-        grad_[featId][idx] += loss[idx];
-    }
 }
 
 }

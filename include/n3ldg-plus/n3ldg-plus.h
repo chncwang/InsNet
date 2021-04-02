@@ -22,7 +22,6 @@
 #include "n3ldg-plus/operator/sub.h"
 #include "n3ldg-plus/param/param.h"
 #include "n3ldg-plus/param/sparse-param.h"
-#include "n3ldg-plus/param/sparse-op.h"
 #include "n3ldg-plus/optimizer/optimizer.h"
 #include "n3ldg-plus/block/lstm.h"
 #include "n3ldg-plus/block/gru.h"
