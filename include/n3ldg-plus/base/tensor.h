@@ -1,7 +1,7 @@
 #ifndef N3LDG_PLUS_TENSOR_H
 #define N3LDG_PLUS_TENSOR_H
 
-#include "n3ldg-plus/base/def.h"
+#include "n3ldg-plus/base/eigen-def.h"
 #include "cereal/cereal.hpp"
 #include "cereal/archives/binary.hpp"
 #include "cereal/types/unordered_map.hpp"

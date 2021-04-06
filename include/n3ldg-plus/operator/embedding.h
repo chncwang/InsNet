@@ -68,7 +68,7 @@ public:
         nDim = dim;
         std::cout << fmt::format("initWeights dim:{} vocabulary_size:{}\n", nDim, nVSize);
         E.init(nDim, nVSize);
-        E.val.random(std::sqrt(1.0 / nDim));
+        E.val().random(std::sqrt(1.0 / nDim));
         bFineTune = tune;
 #if USE_GPU
         E.val.copyFromHostToDevice();
@@ -140,20 +140,20 @@ public:
                 for (int idy = 0; idy < nDim; idy++) {
                     dtype curValue = atof(vecInfo[idy + 1].c_str());
                     sum[idy] += curValue;
-                    E.val[wordId][idy] += curValue;
+                    E.val()[wordId][idy] += curValue;
                 }
             }
         }
 
         if (count == 0) {
-            E.val.random(std::sqrt(3.0 / nDim));
+            E.val().random(std::sqrt(3.0 / nDim));
             std::cout << "find no overlapped lexicons in the embedding file" << std::endl;
             abort();
         }
 
         if (nUNKId >= 0 && !bHasUnknown) {
             for (int idx = 0; idx < nDim; idx++) {
-                E.val[nUNKId][idx] = sum[idx] / (count + 1);
+                E.val()[nUNKId][idx] = sum[idx] / (count + 1);
             }
             indexers.insert(nUNKId);
             count++;
@@ -166,7 +166,7 @@ public:
             if (indexers.find(id) == indexers.end()) {
                 oovWords++;
                 for (int idy = 0; idy < nDim; idy++) {
-                    E.val[id][idy] = nUNKId >= 0 ? E.val[nUNKId][idy] : sum[idy] / (count + 1);
+                    E.val()[id][idy] = nUNKId >= 0 ? E.val()[nUNKId][idy] : sum[idy] / (count + 1);
                 }
             }
         }
@@ -176,10 +176,10 @@ public:
         std::cout << "unknown id" << nUNKId << std::endl;
         bFineTune = tune;
         if (norm > 0) {
-            E.val.norm2one(norm);
+            E.val().norm2one(norm);
         }
 #if USE_GPU
-        E.val.copyFromHostToDevice();
+        E.val().copyFromHostToDevice();
 #endif
     }
 

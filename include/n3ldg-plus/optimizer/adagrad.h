@@ -7,7 +7,7 @@ namespace n3ldg_plus {
 
 class AdagradOptimizer : public Optimizer {
 public:
-    AdagradOptimizer(std::vector<BaseParam *> &params, dtype learning_rate=1e-2,
+    AdagradOptimizer(const std::vector<BaseParam *> &params, dtype learning_rate=1e-2,
             dtype l2_penalty=0, dtype eps=1e-10) : Optimizer(params, learning_rate),
     reg_(l2_penalty), eps_(eps) {}
 

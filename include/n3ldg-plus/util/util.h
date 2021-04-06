@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <string>
+#include <functional>
 
 #include "n3ldg-plus/util/nrmat.h"
 #include "n3ldg-plus/base/def.h"

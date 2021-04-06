@@ -7,7 +7,7 @@ namespace n3ldg_plus {
 
 class Optimizer {
 public:
-    Optimizer(std::vector<BaseParam *> &params, dtype learning_rate) : params_(params),
+    Optimizer(const std::vector<BaseParam *> &params, dtype learning_rate) : params_(params),
     lr_(learning_rate) {}
 
     virtual void step() = 0;
@@ -19,6 +19,10 @@ public:
 
     void setLearningRate(dtype learning_rate) {
         lr_ = learning_rate;
+    }
+
+    dtype getLearningRate() const {
+        return lr_;
     }
 
     void zeroGrad();

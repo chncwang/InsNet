@@ -1,8 +1,7 @@
 #ifndef N3LDG_PLUS_DEF_H
 #define N3LDG_PLUS_DEF_H
 
-#include "eigen/Eigen/Dense"
-#include "eigen//unsupported/Eigen/CXX11/Tensor"
+#include <string>
 
 #if USE_DOUBLE
 #define USE_FLOAT 0
@@ -14,14 +13,8 @@ namespace n3ldg_plus {
 
 #if USE_FLOAT
 typedef float dtype;
-typedef Eigen::TensorMap<Eigen::Tensor<float, 1>>  Vec;
-typedef Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> > Mat;
-typedef Eigen::MatrixXf MatrixXdtype;
 #else
 typedef double dtype;
-typedef Eigen::TensorMap<Eigen::Tensor<double, 1>>  Vec;
-typedef Eigen::Map<Matrix<double, Dynamic, Dynamic, ColMajor> > Mat;
-typedef Matrix<double, Dynamic, Dynamic> MatrixXdtype;
 #endif
 
 constexpr dtype INF = 1e30;

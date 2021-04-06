@@ -18,7 +18,6 @@ bool my_getline(ifstream &inf, string &line) {
 }
 
 void split_bychar(const string& str, vector<string>& vec, char separator) {
-    assert(vec.empty());
     vec.clear();
     string::size_type pos1 = 0, pos2 = 0;
     string word;
