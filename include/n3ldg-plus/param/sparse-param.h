@@ -11,29 +11,12 @@ class SparseParam : public BaseParam {
 public:
     SparseParam(const std::string &name = "sparse") : BaseParam(name) {}
 
+    ~SparseParam();
+
 #if USE_GPU
-    cuda::BoolArray dIndexers;
-    cuda::IntArray dIters;
+    void copyFromHostToDevice() override;
 
-    void copyFromHostToDevice() override {
-        BaseParam::copyFromHostToDevice();
-        cuda::MyCudaMemcpy(dIters.value, last_update.c_buf(), sizeof(int) * dIters.len,
-                cudaMemcpyHostToDevice);
-        aux_square_.copyFromHostToDevice();
-        aux_mean_.copyFromHostToDevice();
-    }
-
-    void copyFromDeviceToHost() override {
-        BaseParam::copyFromDeviceToHost();
-        cuda::MyCudaMemcpy(last_update.c_buf(), dIters.value, sizeof(int) * dIters.len,
-                cudaMemcpyDeviceToHost);
-        aux_square_.copyFromDeviceToHost();
-        aux_mean_.copyFromDeviceToHost();
-    }
-
-    virtual std::string name() const {
-        return "SparseParam";
-    }
+    void copyFromDeviceToHost() override;
 #endif
 
     void init(int outDim, int inDim) override;
@@ -68,6 +51,11 @@ public:
         ar(val_, aux_square_, aux_mean_);
     }
 
+#if USE_GPU
+    cuda::BoolArray *dIndexers = nullptr;
+    cuda::IntArray *dIters = nullptr;
+#endif
+
 private:
     nr::NRVec<bool> indexers;
     nr::NRVec<int> last_update;
@@ -75,4 +63,4 @@ private:
 
 }
 
-#endif /* SPARSEPARAM_H_ */
+#endif

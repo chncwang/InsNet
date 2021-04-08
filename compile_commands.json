@@ -1,168 +1,163 @@
 [
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/base/def.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/base/def.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/base/def.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/base/def.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/base/def.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/base/tensor.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/base/tensor.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/base/tensor.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/base/tensor.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/base/tensor.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/base/transferable.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/base/transferable.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/base/transferable.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/base/transferable.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/base/transferable.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/block/attention.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/block/attention.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/block/attention.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/block/attention.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/block/attention.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/block/gru.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/block/gru.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/block/gru.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/block/gru.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/block/gru.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/block/lstm.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/block/lstm.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/block/lstm.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/block/lstm.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/block/lstm.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/block/transformer.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/block/transformer.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/block/transformer.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/block/transformer.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/block/transformer.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/computation-graph/graph.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/computation-graph/graph.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/computation-graph/graph.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/computation-graph/graph.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/computation-graph/graph.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/computation-graph/node.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/computation-graph/node.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/computation-graph/node.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/computation-graph/node.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/computation-graph/node.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/loss/loss.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/loss/loss.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/loss/loss.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/loss/loss.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/loss/loss.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/nlp/alphabet.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/nlp/alphabet.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/nlp/alphabet.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/nlp/alphabet.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/nlp/alphabet.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/add.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/add.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/add.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/add.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/add.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/atomic.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/atomic.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/atomic.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/atomic.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/atomic.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/bucket.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/bucket.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/bucket.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/bucket.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/bucket.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/concat.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/concat.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/concat.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/concat.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/concat.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/div.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/div.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/div.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/div.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/div.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/embedding.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/embedding.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/embedding.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/embedding.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/embedding.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/layer_normalization.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/layer_normalization.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/layer_normalization.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/layer_normalization.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/layer_normalization.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/linear.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/linear.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/linear.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/linear.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/linear.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/matrix.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/matrix.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/matrix.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/matrix.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/matrix.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/mul.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/mul.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/mul.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/mul.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/mul.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/pooling.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/pooling.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/pooling.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/pooling.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/pooling.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/softmax.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/softmax.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/softmax.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/softmax.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/softmax.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/split.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/split.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/split.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/split.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/split.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/sub.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/sub.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/operator/sub.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/sub.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/operator/sub.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/optimizer/adagrad.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/optimizer/adagrad.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/optimizer/adagrad.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/optimizer/adagrad.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/optimizer/adagrad.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/optimizer/adam.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/optimizer/adam.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/optimizer/adam.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/optimizer/adam.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/optimizer/adam.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/optimizer/adamw.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/optimizer/adamw.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/optimizer/adamw.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/optimizer/adamw.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/optimizer/adamw.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/optimizer/optimizer.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/optimizer/optimizer.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/optimizer/optimizer.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/optimizer/optimizer.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/optimizer/optimizer.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/param/param.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/param/param.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/param/param.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/param/param.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/param/param.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/param/sparse-param.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/param/sparse-param.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/param/sparse-param.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/param/sparse-param.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/param/sparse-param.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/util/util.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/util/util.cc",
+  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/util/util.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/util/util.cc",
   "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/util/util.cc"
-},
-{
-  "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build",
-  "command": "/usr/bin/c++ -DUSE_GPU -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include -I/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/fmt/include -I/usr/local/cuda/samples/common/inc -isystem /usr/local/cuda/include  -fPIC -std=c++14 -Ofast -march=native -O3 -DNDEBUG -std=gnu++14 -o CMakeFiles/n3ldg_plus.dir/include/n3ldg-plus/n3ldg-plus.cc.o -c /home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/n3ldg-plus.cc",
-  "file": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/include/n3ldg-plus/n3ldg-plus.cc"
 },
 {
   "directory": "/home/chncwang/Projects/stance-conversation/3rd/n3ldg-plus/build/include/fmt",

@@ -222,7 +222,7 @@ private:
 template<>
 void LookupExecutor<SparseParam>::genericBackward(vector<dtype*> &grads) {
         cuda::LookupBackward(id_arr_.value, grads, batch.size(), getRow(), col_arr_.value,
-                max_col_, param().grad().value, param().dIndexers.value);
+                max_col_, param().grad().value, param().dIndexers->value);
 }
 
 template<>

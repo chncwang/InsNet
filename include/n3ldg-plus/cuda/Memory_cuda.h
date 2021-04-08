@@ -6,9 +6,9 @@
 #include <list>
 #include <unordered_map>
 #include <map>
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <helper_cuda.h>
+//#include <cuda.h>
+//#include <cuda_runtime.h>
+//#include <helper_cuda.h>
 #include <iostream>
 #include "fmt/core.h"
 
@@ -28,7 +28,7 @@ struct MemoryBlock {
     MemoryBlock(void *p, int size, void *buddy = nullptr) {
         static int global_id;
         if (size <= 0 || (size & (size - 1)) != 0) {
-            ::std::cerr << "illegal size:" << size << ::std::endl;
+            std::cerr << "illegal size:" << size << std::endl;
             abort();
         }
         this->p = p;
@@ -37,10 +37,10 @@ struct MemoryBlock {
         this->id = global_id++;
     }
 
-    ::std::string toString() const {
-        ::std::stringstream p_stream;
+    std::string toString() const {
+        std::stringstream p_stream;
         p_stream << p;
-        ::std::stringstream buddy_stream;
+        std::stringstream buddy_stream;
         buddy_stream << buddy;
         return fmt::format("p:{} size:{} buddy:{} id:{}", p_stream.str(), size, buddy_stream.str(),
                 id);
@@ -52,19 +52,16 @@ public:
     MemoryPool(const MemoryPool &) = delete;
     static MemoryPool& Ins();
 
-    cudaError_t Malloc(void **p, int size);
-    cudaError_t Free(void *p);
+    void Malloc(void **p, int size);
+    void Free(void *p);
 
     void Init(float size_in_gb) {
-        ::std::cout << fmt::format("MemoryPool Init size:{}\n", size_in_gb);
-        ::std::vector<void*> pointers;
+        std::cout << fmt::format("MemoryPool Init size:{}\n", size_in_gb);
+        std::vector<void*> pointers;
         if (size_in_gb > 0.0f) {
             for (int i = 0; i < static_cast<int>(size_in_gb); ++i) {
-                void *m = NULL;
-                if (this->Malloc(&m, (1 << 30)) != cudaSuccess) {
-                    ::std::cerr << "MemoryPool Init: OMM error!" << ::std::endl;
-                    abort();
-                }
+                void *m = nullptr;
+                Malloc(&m, (1 << 30));
                 pointers.push_back(m);
             }
             for (void* m : pointers) {
@@ -73,17 +70,17 @@ public:
         }
     }
 
-    ::std::string toString() const {
-        ::std::string free_block_str = "[";
+    std::string toString() const {
+        std::string free_block_str = "[";
         int i = 0;
         for (auto & v : free_blocks_) {
-            ::std::string arr = "[";
+            std::string arr = "[";
             for (auto &it : v) {
                 arr += it.second.toString() + ",";
             }
             arr += "]";
             if (!v.empty()) {
-                ::std::string str = fmt::format("{i:{}, v:{}}", i, arr);
+                std::string str = fmt::format("{i:{}, v:{}}", i, arr);
                 free_block_str += str + ",";
             }
             i++;
@@ -94,8 +91,8 @@ public:
 
 private:
     MemoryPool() = default;
-    ::std::vector<::std::map<void*, MemoryBlock>> free_blocks_;
-    ::std::unordered_map<void *, MemoryBlock> busy_blocks_;
+    std::vector<std::map<void*, MemoryBlock>> free_blocks_;
+    std::unordered_map<void *, MemoryBlock> busy_blocks_;
 };
 
 }

@@ -71,7 +71,7 @@ public:
         E.val().random(std::sqrt(1.0 / nDim));
         bFineTune = tune;
 #if USE_GPU
-        E.val.copyFromHostToDevice();
+        E.val().copyFromHostToDevice();
 #endif
     }
 

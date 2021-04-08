@@ -126,7 +126,7 @@ using n3ldg_plus::dtype;
 bool Verify(dtype *host, dtype* device, int len, const char* message);
 
 struct Tensor1D : public n3ldg_plus::cpu::Tensor1D, public Transferable {
-    dtype *value = NULL;
+    dtype *value = nullptr;
 
     Tensor1D();
     Tensor1D(const Tensor1D &);
@@ -159,7 +159,7 @@ private:
 };
 
 struct Tensor2D : public n3ldg_plus::cpu::Tensor2D, public Transferable {
-    dtype *value = NULL;
+    dtype *value = nullptr;
 
     Tensor2D();
     Tensor2D(const Tensor2D &);

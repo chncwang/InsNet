@@ -1,3 +1,4 @@
+#if USE_GPU
 #ifndef N3LDG_CUDA_N3LDG_CUDA_H
 #define N3LDG_CUDA_N3LDG_CUDA_H
 
@@ -6,9 +7,6 @@
 #include "Memory_cuda.h"
 #include <iostream>
 #include <cassert>
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <helper_cuda.h>
 #include <vector>
 #include <string>
 #include <cmath>
@@ -49,27 +47,33 @@ struct GPUArray {
     ::std::vector<T> toCpu() const;
 };
 
-cudaError_t MyCudaMemcpy(void *dest, void *src, size_t count, cudaMemcpyKind kind);
-void CallCuda(cudaError_t status);
+enum MyCudaMemcpyKind {
+    HOST_TO_DEVICE = 0,
+    DEVICE_TO_HOST = 1,
+    DEVICE_TO_DEVICE = 2
+};
+
+void MyCudaMemcpy(void *dest, void *src, size_t count, MyCudaMemcpyKind kind);
+void CallCuda(int status);
 
 template <typename T>
 void GPUArray<T>::init(T *host_arr, int len) {
     if (value != nullptr) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        MemoryPool::Ins().Free(value);
         value = nullptr;
     }
-    CallCuda(MemoryPool::Ins().Malloc((void**)&value, len * sizeof(T)));
-    CallCuda(MyCudaMemcpy(value, host_arr, len * sizeof(T), cudaMemcpyHostToDevice));
+    MemoryPool::Ins().Malloc((void**)&value, len * sizeof(T));
+    MyCudaMemcpy(value, host_arr, len * sizeof(T), MyCudaMemcpyKind::HOST_TO_DEVICE);
     this->len = len;
 }
 
 template <typename T>
 void GPUArray<T>::init(int len) {
     if (value != nullptr) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        MemoryPool::Ins().Free(value);
         value = nullptr;
     }
-    CallCuda(MemoryPool::Ins().Malloc((void**)&value, len * sizeof(T)));
+    MemoryPool::Ins().Malloc((void**)&value, len * sizeof(T));
     this->len = len;
 }
 
@@ -81,14 +85,14 @@ template <typename T>
         ::std::cerr << "GPUArray::toCpu - value is nullptr" << ::std::endl;
         abort();
     }
-    CallCuda(MyCudaMemcpy(result.data(), value, sizeof(T) * len, cudaMemcpyDeviceToHost));
+    MyCudaMemcpy(result.data(), value, sizeof(T) * len, MyCudaMemcpyKind::DEVICE_TO_HOST);
     return result;
 }
 
 template <typename T>
 GPUArray<T>::~GPUArray() {
     if (value != nullptr) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        MemoryPool::Ins().Free(value);
         value = nullptr;
     }
 }
@@ -551,4 +555,5 @@ void *GraphHostAlloc();
 }
 }
 
+#endif
 #endif

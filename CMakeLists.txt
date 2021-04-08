@@ -42,7 +42,6 @@ if(USE_CUDA)
     set(libs ${libs} n3ldg_plus_cuda)
 endif()
 
-
 add_subdirectory(include/fmt)
 aux_source_directory(include/n3ldg-plus/base n3ldg_plus_src)
 aux_source_directory(include/n3ldg-plus/block n3ldg_plus_src)
@@ -53,7 +52,6 @@ aux_source_directory(include/n3ldg-plus/operator n3ldg_plus_src)
 aux_source_directory(include/n3ldg-plus/optimizer n3ldg_plus_src)
 aux_source_directory(include/n3ldg-plus/param n3ldg_plus_src)
 aux_source_directory(include/n3ldg-plus/util n3ldg_plus_src)
-aux_source_directory(include/n3ldg-plus n3ldg_plus_src)
 
 add_library(n3ldg_plus STATIC ${n3ldg_plus_src})
 target_include_directories(n3ldg_plus PUBLIC include PUBLIC include/fmt/include)

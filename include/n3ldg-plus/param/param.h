@@ -28,13 +28,9 @@ public:
 #if USE_GPU
     std::vector<cuda::Transferable *> transferablePtrs() override {
         auto v = BaseParam::transferablePtrs();
-        v.push_back(&aux_square_);
         v.push_back(&aux_mean_);
+        v.push_back(&aux_square_);
         return v;
-    }
-
-    virtual std::string name() const {
-        return "Param";
     }
 #endif
 

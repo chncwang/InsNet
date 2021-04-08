@@ -8,9 +8,7 @@
 #include <iostream>
 #include "fmt/core.h"
 #include "n3ldg-plus/base/tensor.h"
-#if USE_GPU
 #include "n3ldg-plus/cuda/N3LDG_cuda.h"
-#endif
 
 namespace n3ldg_plus {
 

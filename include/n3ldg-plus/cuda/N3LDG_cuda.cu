@@ -7,6 +7,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <helper_cuda.h>
 #include <cublas_v2.h>
 #include <curand.h>
 #include <curand_kernel.h>
@@ -37,6 +40,7 @@ using std::endl;
 using std::make_pair;
 using std::pair;
 using std::shared_ptr;
+using fmt::format;
 
 namespace n3ldg_plus {
 namespace cuda {
@@ -116,12 +120,21 @@ cublasHandle_t& GetCublasHandle() {
     return handle;
 }
 
-cudaError_t MyCudaMemcpy(void *dest, void *src, size_t count,
-        cudaMemcpyKind kind) {
+void MyCudaMemcpy(void *dest, void *src, size_t count, MyCudaMemcpyKind kind) {
+    cudaMemcpyKind k;
+    if (kind == MyCudaMemcpyKind::DEVICE_TO_HOST) {
+        k = cudaMemcpyDeviceToHost;
+    } else if (kind == MyCudaMemcpyKind::HOST_TO_DEVICE) {
+        k = cudaMemcpyHostToDevice;
+    } else if (kind == MyCudaMemcpyKind::DEVICE_TO_DEVICE) {
+        k = cudaMemcpyDeviceToDevice;
+    } else {
+        cerr << format("MyCudaMemcpy - invalid kind:{}\n", kind);
+        abort();
+    }
     cudaError_t e;
-    e = cudaMemcpyAsync(dest, src, count, kind);
+    e = cudaMemcpyAsync(dest, src, count, k);
     CallCuda(e);
-    return e;
 }
 
 int NextTwoIntegerPowerNumber(int number) {
@@ -135,7 +148,7 @@ int NextTwoIntegerPowerNumber(int number) {
 template <>
 vector<bool> GPUArray<bool>::toCpu() const {
     bool *cpu_arr = new bool[len];
-    CallCuda(MyCudaMemcpy(cpu_arr, value, sizeof(bool) * len, cudaMemcpyDeviceToHost));
+    MyCudaMemcpy(cpu_arr, value, sizeof(bool) * len, MyCudaMemcpyKind::DEVICE_TO_HOST);
     vector<bool> result;
     result.resize(len);
     for (int i = 0; i < len; ++i) {
@@ -147,41 +160,41 @@ vector<bool> GPUArray<bool>::toCpu() const {
 
 void DeviceInt::init() {
     if (value != NULL) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        MemoryPool::Ins().Free(value);
         value = NULL;
     }
-    CallCuda(MemoryPool::Ins().Malloc((void**)&value, sizeof(int)));
+    MemoryPool::Ins().Malloc((void**)&value, sizeof(int));
 }
 
 void DeviceInt::copyFromDeviceToHost() {
-    CallCuda(MyCudaMemcpy(&v, value, sizeof(int), cudaMemcpyDeviceToHost));
+    MyCudaMemcpy(&v, value, sizeof(int), MyCudaMemcpyKind::DEVICE_TO_HOST);
 }
 
 void DeviceInt::copyFromHostToDevice() {
-    CallCuda(MyCudaMemcpy(value, &v, sizeof(int), cudaMemcpyHostToDevice));
+    MyCudaMemcpy(value, &v, sizeof(int), MyCudaMemcpyKind::HOST_TO_DEVICE);
 }
 
 DeviceInt::~DeviceInt() {
     if (value != NULL) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        MemoryPool::Ins().Free(value);
     }
 }
 
 void DeviceNumber::init() {
     if (value != NULL) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        MemoryPool::Ins().Free(value);
         value = NULL;
     }
-    CallCuda(MemoryPool::Ins().Malloc((void**)&value, sizeof(int)));
+    MemoryPool::Ins().Malloc((void**)&value, sizeof(int));
 }
 
 void DeviceNumber::copyFromDeviceToHost() {
-    CallCuda(MyCudaMemcpy(&v, value, sizeof(dtype), cudaMemcpyDeviceToHost));
+    MyCudaMemcpy(&v, value, sizeof(dtype), MyCudaMemcpyKind::DEVICE_TO_HOST);
 }
 
 DeviceNumber::~DeviceNumber() {
     if (value != NULL) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        MemoryPool::Ins().Free(value);
     }
 }
 
@@ -200,7 +213,7 @@ void Tensor1D::initOnMemoryAndDevice(int dim) {
 }
 
 void Tensor1D::initOnDevice(int dim) {
-    CallCuda(MemoryPool::Ins().Malloc((void**)&value, dim * sizeof(dtype)));
+    MemoryPool::Ins().Malloc((void**)&value, dim * sizeof(dtype));
     this->dim = dim;
 }
 
@@ -212,19 +225,19 @@ void Tensor1D::initOnMemory(int len) {
 Tensor1D::Tensor1D(const Tensor1D &t) {
     dim = t.dim;
     memcpy(v, t.v, dim *sizeof(dtype));
-    CallCuda(MyCudaMemcpy(value, t.value, dim * sizeof(dtype), cudaMemcpyDeviceToDevice));
+    MyCudaMemcpy(value, t.value, dim * sizeof(dtype), MyCudaMemcpyKind::DEVICE_TO_DEVICE);
 }
 
 std::vector<dtype> Tensor1D::toCpu() const {
     std::vector<dtype> result;
     result.resize(dim);
-    CallCuda(MyCudaMemcpy(result.data(), value, dim * sizeof(dtype), cudaMemcpyDeviceToHost));
+    MyCudaMemcpy(result.data(), value, dim * sizeof(dtype), MyCudaMemcpyKind::DEVICE_TO_HOST);
     return result;
 }
 
 Tensor1D::~Tensor1D() {
     if (value != NULL) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        MemoryPool::Ins().Free(value);
     }
 }
 
@@ -236,14 +249,14 @@ void Tensor1D::print() const {
 void Tensor1D::copyFromHostToDevice() {
     assert(v != NULL);
     assert(value != NULL);
-    CallCuda(MyCudaMemcpy(value, v, dim * sizeof(dtype), cudaMemcpyHostToDevice));
+    MyCudaMemcpy(value, v, dim * sizeof(dtype), MyCudaMemcpyKind::HOST_TO_DEVICE);
 }
 
 void Tensor1D::copyFromDeviceToHost() {
     if (v == nullptr) {
         initOnMemory(dim);
     }
-    CallCuda(MyCudaMemcpy(v, value, dim * sizeof(dtype), cudaMemcpyDeviceToHost));
+    MyCudaMemcpy(v, value, dim * sizeof(dtype), MyCudaMemcpyKind::DEVICE_TO_HOST);
 }
 
 __device__ int DeviceDefaultIndex();
@@ -296,8 +309,7 @@ void Tensor2D::init(int row, int col) {
 }
 
 void Tensor2D::initOnDevice(int row, int col) {
-    CallCuda(MemoryPool::Ins().Malloc((void**)&value,
-                row * col * sizeof(dtype)));
+    MemoryPool::Ins().Malloc((void**)&value, row * col * sizeof(dtype));
     this->row = row;
     this->col = col;
     this->size = row * col;
@@ -307,13 +319,12 @@ Tensor2D::Tensor2D(const Tensor2D &t) {
     row = t.row;
     col = t.col;
     memcpy(v, t.v, sizeof(dtype) * row * col);
-    CallCuda(MyCudaMemcpy(value, t.value, sizeof(dtype) * row * col,
-                cudaMemcpyDeviceToDevice));
+    MyCudaMemcpy(value, t.value, sizeof(dtype) * row * col, MyCudaMemcpyKind::DEVICE_TO_DEVICE);
 }
 
 Tensor2D::~Tensor2D() {
     if (value != NULL) {
-        CallCuda(MemoryPool::Ins().Free(value));
+        MemoryPool::Ins().Free(value);
     }
 }
 
@@ -323,11 +334,11 @@ void Tensor2D::print() const {
 }
 
 void Tensor2D::copyFromHostToDevice() {
-    CallCuda(MyCudaMemcpy(value, v, size * sizeof(dtype), cudaMemcpyHostToDevice));
+    MyCudaMemcpy(value, v, size * sizeof(dtype), MyCudaMemcpyKind::HOST_TO_DEVICE);
 }
 
 void Tensor2D::copyFromDeviceToHost() {
-    CallCuda(MyCudaMemcpy(v, value, size * sizeof(dtype), cudaMemcpyDeviceToHost));
+    MyCudaMemcpy(v, value, size * sizeof(dtype), MyCudaMemcpyKind::DEVICE_TO_HOST);
 }
 
 void Assert(bool v, const string &message, const function<void(void)> &call) {
@@ -405,7 +416,7 @@ void Random(dtype *v, int len, dtype bound) {
         mem[i] =  (dtype(rand()) / RAND_MAX) * (max - min) + min;
     }
 
-    CallCuda(MyCudaMemcpy(v, mem, len * sizeof(dtype), cudaMemcpyHostToDevice));
+    MyCudaMemcpy(v, mem, len * sizeof(dtype), MyCudaMemcpyKind::HOST_TO_DEVICE);
 
     free(mem);
 }
@@ -533,13 +544,12 @@ void CopyFromHostToDevice(vector<dtype*> &src,
         memcpy(long_src + i * dim, src.at(i), dim * sizeof(dtype));
     }
     dtype *long_dest = NULL;
-    CallCuda(MemoryPool::Ins().Malloc((void**)&long_dest,
-                count * dim * sizeof(dtype*)));
+    MemoryPool::Ins().Malloc((void**)&long_dest, count * dim * sizeof(dtype*));
     CallCuda(cudaMemcpy(long_dest, long_src, count * dim * sizeof(dtype*),
                 cudaMemcpyHostToDevice));
     CopyFromOneVectorToMultiVals(long_dest, dest, count, dim);
     free(long_src);
-    CallCuda(MemoryPool::Ins().Free(long_dest));
+    MemoryPool::Ins().Free(long_dest);
 }
 
 __global__ void KernelCopyFromMultiVectorsToOneVector(dtype **src, dtype *dest, int count,
@@ -567,8 +577,7 @@ void CopyFromMultiVectorsToOneVector(vector<dtype*> &src,
 
 void CopyFromDeviceToHost(vector<dtype*> &src, vector<dtype*> &dest, int count, int dim) {
     dtype *long_src = NULL;
-    CallCuda(MemoryPool::Ins().Malloc((void**)&long_src,
-                count * dim * sizeof(dtype*)));
+    MemoryPool::Ins().Malloc((void**)&long_src, count * dim * sizeof(dtype*));
     CopyFromMultiVectorsToOneVector(src, long_src, count, dim);
     dtype *long_dest = (dtype*)malloc(count * dim * sizeof(dtype));
     if (long_dest == NULL) {
@@ -580,7 +589,7 @@ void CopyFromDeviceToHost(vector<dtype*> &src, vector<dtype*> &dest, int count, 
     for (int i = 0; i < count; ++i) {
         memcpy(dest.at(i), long_dest + i * dim, dim * sizeof(dtype));
     }
-    CallCuda(MemoryPool::Ins().Free(long_src));
+    MemoryPool::Ins().Free(long_src);
     free(long_dest);
 }
 
@@ -1189,20 +1198,17 @@ bool Verify(dtype *host, dtype *device, int len, const char* message) {
     arr.init(host, len);
     int block_count = DefaultBlockCount(len);
     char *m = NULL;
-    CallCuda(MemoryPool::Ins().Malloc((void**)&m,
-                (strlen(message) + 1) * sizeof(char)));
-    CallCuda(MyCudaMemcpy(m, (void *)message,
-                (strlen(message) + 1) * sizeof(char), cudaMemcpyHostToDevice));
+    MemoryPool::Ins().Malloc((void**)&m, (strlen(message) + 1) * sizeof(char));
+    MyCudaMemcpy(m, (void *)message, (strlen(message) + 1) * sizeof(char),
+            MyCudaMemcpyKind::HOST_TO_DEVICE);
     bool success = true;
     bool *dev_success = NULL;
-    CallCuda(MemoryPool::Ins().Malloc((void**)&dev_success, 8 * sizeof(bool)));
-    CallCuda(MyCudaMemcpy(dev_success, &success, sizeof(bool),
-                cudaMemcpyHostToDevice));
+    MemoryPool::Ins().Malloc((void**)&dev_success, 8 * sizeof(bool));
+    MyCudaMemcpy(dev_success, &success, sizeof(bool), MyCudaMemcpyKind::HOST_TO_DEVICE);
     dtype abs_max = AbsMax(arr.value, len);
     KernelVerify<<<block_count, TPB>>>(arr.value, device, len, abs_max, m, dev_success);
     CheckCudaError();
-    CallCuda(MyCudaMemcpy(&success, dev_success, sizeof(bool),
-                cudaMemcpyDeviceToHost));
+    MyCudaMemcpy(&success, dev_success, sizeof(bool), MyCudaMemcpyKind::DEVICE_TO_HOST);
     MemoryPool::Ins().Free(dev_success);
     MemoryPool::Ins().Free(m);
     cudaDeviceSynchronize();
@@ -1233,19 +1239,16 @@ bool Verify(bool *host, bool *device, int len, const char* message) {
     arr.init(host, len);
     int block_count = (len + TPB - 1) / TPB;
     char *m = NULL;
-    CallCuda(MemoryPool::Ins().Malloc((void**)&m,
-                (strlen(message) + 1) * sizeof(char)));
-    CallCuda(MyCudaMemcpy(m, (void *)message,
-                (strlen(message) + 1) * sizeof(char), cudaMemcpyHostToDevice));
+    MemoryPool::Ins().Malloc((void**)&m, (strlen(message) + 1) * sizeof(char));
+    MyCudaMemcpy(m, (void *)message, (strlen(message) + 1) * sizeof(char),
+            MyCudaMemcpyKind::HOST_TO_DEVICE);
     bool success = true;
     bool *dev_success = NULL;
-    CallCuda(MemoryPool::Ins().Malloc((void**)&dev_success, 8 * sizeof(bool)));
-    CallCuda(MyCudaMemcpy(dev_success, &success, sizeof(bool),
-                cudaMemcpyHostToDevice));
+    MemoryPool::Ins().Malloc((void**)&dev_success, 8 * sizeof(bool));
+    MyCudaMemcpy(dev_success, &success, sizeof(bool), MyCudaMemcpyKind::HOST_TO_DEVICE);
     KernelVerify<<<block_count, TPB>>>(arr.value, device, len, m, dev_success);
     CheckCudaError();
-    CallCuda(MyCudaMemcpy(&success, dev_success, sizeof(bool),
-                cudaMemcpyDeviceToHost));
+    MyCudaMemcpy(&success, dev_success, sizeof(bool), MyCudaMemcpyKind::DEVICE_TO_HOST);
     MemoryPool::Ins().Free(dev_success);
     MemoryPool::Ins().Free(m);
     cudaDeviceSynchronize();
@@ -1273,19 +1276,16 @@ bool Verify(int *host, int *device, int len, const char* message) {
     arr.init(host, len);
     int block_count = (len + TPB - 1) / TPB;
     char *m = NULL;
-    CallCuda(MemoryPool::Ins().Malloc((void**)&m,
-                (strlen(message) + 1) * sizeof(char)));
-    CallCuda(MyCudaMemcpy(m, (void*)message,
-                (strlen(message) + 1) * sizeof(char), cudaMemcpyHostToDevice));
+    MemoryPool::Ins().Malloc((void**)&m, (strlen(message) + 1) * sizeof(char));
+    MyCudaMemcpy(m, (void*)message, (strlen(message) + 1) * sizeof(char),
+            MyCudaMemcpyKind::HOST_TO_DEVICE);
     bool success = true;
     bool *dev_success = NULL;
-    CallCuda(MemoryPool::Ins().Malloc((void**)&dev_success, sizeof(bool)));
-    CallCuda(MyCudaMemcpy(dev_success, &success, sizeof(bool),
-                cudaMemcpyHostToDevice));
+    MemoryPool::Ins().Malloc((void**)&dev_success, sizeof(bool));
+    MyCudaMemcpy(dev_success, &success, sizeof(bool), MyCudaMemcpyKind::HOST_TO_DEVICE);
     KernelVerify<<<block_count, TPB>>>(arr.value, device, len, m, dev_success);
     CheckCudaError();
-    CallCuda(MyCudaMemcpy(&success, dev_success, sizeof(bool),
-                cudaMemcpyDeviceToHost));
+    MyCudaMemcpy(&success, dev_success, sizeof(bool), MyCudaMemcpyKind::DEVICE_TO_HOST);
     MemoryPool::Ins().Free(dev_success);
     MemoryPool::Ins().Free(m);
     cudaDeviceSynchronize();
@@ -1310,17 +1310,23 @@ void appendFreeBlock(MemoryBlock &memory_block,
         int i,
         unordered_map<void*, MemoryBlock> &busy_blocks) {
     if (memory_block.size != (1 << i)) {
-        cerr << fmt::format("incorrect block size {}, but i is {}\n", memory_block.size, i);
+        cerr << format("incorrect block size {}, but i is {}\n", memory_block.size, i);
         abort();
     }
     free_blocks.at(i).insert(make_pair(memory_block.p, memory_block));
 }
 
-cudaError_t MemoryPool::Malloc(void **p, int size) {
-    assert(*p == NULL);
+void MemoryPool::Malloc(void **p, int size) {
+    if (*p != nullptr) {
+        cerr << "MemoryPool Malloc p is not nullptr.\n";
+        abort();
+    }
 #if DEVICE_MEMORY == 1
     cudaError_t r = cudaMalloc(p, size);
-    return r;
+    if (r == cudaSuccess) {
+        cerr << format("MemoryPool Malloc cudaMalloc failed status:{}\n", r);
+        abort();
+    }
 #else
     int fit_size = 1;
     int n = 0;
@@ -1367,7 +1373,10 @@ cudaError_t MemoryPool::Malloc(void **p, int size) {
         }
     }
 
-    return status;
+    if (status != cudaSuccess) {
+        cerr << format("MemoryPool Malloc cudaMalloc failed status:{}\n", status);
+        abort();
+    }
 #endif
 }
 
@@ -1406,7 +1415,7 @@ MemoryBlock mergeBlocks(MemoryBlock &a, MemoryBlock &b) {
     if ((char*)pair.second->p - (char*)pair.first->p != a.size ||
             (a.p != b.buddy && a.buddy != b.p)) {
         cerr << "a and b are not buddies" << endl;
-        cerr << fmt::format("a:{}\nb:{}\n", a.toString(), b.toString());
+        cerr << format("a:{}\nb:{}\n", a.toString(), b.toString());
         abort();
     }
     MemoryBlock block(pair.first->p, pair.first->size << 1, pair.first->buddy);
@@ -1434,10 +1443,13 @@ void returnFreeBlock(MemoryBlock &block, vector<map<void*, MemoryBlock>> &free_b
     }
 }
 
-cudaError_t MemoryPool::Free(void *p) {
+void MemoryPool::Free(void *p) {
 #if DEVICE_MEMORY == 1
     cudaError_t r = cudaFree(p);
-    return r;
+    if (r != cudaSuccess) {
+        cerr << format("MemoryPool::Free error status:{}\n", r);
+        abort();
+    }
 #else
     auto it = busy_blocks_.find(p);
     if (it == busy_blocks_.end()) {
@@ -1451,7 +1463,7 @@ cudaError_t MemoryPool::Free(void *p) {
         ++n;
     }
     if (it->second.size != (1 << n)) {
-        cerr << fmt::format("size:{} n:{}\n", it->second.size, n);
+        cerr << format("size:{} n:{}\n", it->second.size, n);
         abort();
     }
 
@@ -1465,9 +1477,9 @@ cudaError_t MemoryPool::Free(void *p) {
     }
 
     if (busy_blocks_.find(p) != busy_blocks_.end()) {
-        cerr << "Malloc - find freed p in busy blocks" << endl;
+        cerr << "MemoryPool Free - find freed p in busy blocks" << endl;
+        abort();
     }
-    return cudaSuccess;
 #endif
 }
 
@@ -1643,8 +1655,7 @@ curandState_t *GetCurandStates() {
     static curandState_t *states;
     if (states == NULL) {
         MemoryPool &pool = MemoryPool::Ins();
-        CallCuda(pool.Malloc((void**)&states, sizeof(curandState_t) *
-                    MAX_BATCH_COUNT));
+        pool.Malloc((void**)&states, sizeof(curandState_t) * MAX_BATCH_COUNT);
         KernelInitCurandStates<<<BLOCK_COUNT, TPB>>>( states);
         CheckCudaError();
     }
@@ -3746,9 +3757,10 @@ void Max(dtype **v, int count, int dim, int *max_indexes, dtype *max_vals) {
     KernelSingleMax<<<1, 1>>>(v, count, dim, max_indexer_arr.value, max_val_arr.value);
     CheckCudaError();
     vector<int> max_indexer_target(count), max_indexer_gold(count);
-    MyCudaMemcpy(max_indexer_target.data(), max_indexes, count * sizeof(int), cudaMemcpyDeviceToHost);
+    MyCudaMemcpy(max_indexer_target.data(), max_indexes, count * sizeof(int),
+            MyCudaMemcpyKind::DEVICE_TO_HOST);
     MyCudaMemcpy(max_indexer_gold.data(), max_indexer_arr.value, count * sizeof(int),
-            cudaMemcpyDeviceToHost);
+            MyCudaMemcpyKind::DEVICE_TO_HOST);
     for (int i = 0; i < count; ++i) {
         if (max_indexer_target.at(i) != max_indexer_gold.at(i)) {
             cerr << format("max_indexer_target:%1% max_indexer_gold:%2%") % max_indexer_target.at(i)
@@ -3961,7 +3973,7 @@ void MaxScalarForward(vector<dtype*> &inputs, int count, int head_count, vector<
     CheckCudaError();
     if (max_indexes != nullptr) {
         MyCudaMemcpy(max_indexes->data(), max_index_arr.value, count * sizeof(int),
-                cudaMemcpyDeviceToHost);
+                MyCudaMemcpyKind::DEVICE_TO_HOST);
     }
 }
 

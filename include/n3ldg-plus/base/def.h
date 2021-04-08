@@ -29,7 +29,6 @@ enum ActivatedEnum {
 };
 
 extern const std::string UNKNOWN_WORD;
-
 }
 
 #endif

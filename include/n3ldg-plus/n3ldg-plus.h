@@ -31,8 +31,4 @@
 #include "n3ldg-plus/block/transformer.h"
 #include "n3ldg-plus/loss/loss.h"
 
-#if USE_GPU
-#include "N3LDG_cuda.h"
-#endif
-
 #endif
