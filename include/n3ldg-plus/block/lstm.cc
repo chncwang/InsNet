@@ -27,7 +27,7 @@ void LSTMParam::init(int nOSize, int nISize) {
 }
 
 #if USE_GPU
-vector<Transferable *> LSTMParam::transferablePtrs() {
+vector<cuda::Transferable *> LSTMParam::transferablePtrs() {
     return {&input_hidden, &input_input, &output_hidden, &output_input, &forget_input,
         &forget_hidden, &cell_hidden, &cell_input};
 }

@@ -7,7 +7,7 @@ namespace n3ldg_plus {
 
 struct LSTMParam : TunableCombination<BaseParam>
 #if USE_GPU
-, public TransferableComponents
+, public cuda::TransferableComponents
 #endif
 {
     LinearParam input_hidden;
@@ -19,7 +19,7 @@ struct LSTMParam : TunableCombination<BaseParam>
     LinearParam cell_hidden;
     LinearParam cell_input;
 
-    LSTMParam(const std::string &name);
+    LSTMParam(const ::std::string &name);
 
     void init(int nOSize, int nISize);
 
@@ -32,11 +32,11 @@ struct LSTMParam : TunableCombination<BaseParam>
     }
 
 #if USE_GPU
-    std::vector<Transferable *> transferablePtrs() override;
+    ::std::vector<Transferable *> transferablePtrs() override;
 #endif
 
 protected:
-    std::vector<Tunable<BaseParam> *> tunableComponents() override;
+    ::std::vector<Tunable<BaseParam> *> tunableComponents() override;
 };
 
 class LSTMBuilder {
@@ -49,17 +49,17 @@ public:
             dtype dropout_value,
             bool is_training);
 
-    const std::vector<Node *> &cells() {
+    const ::std::vector<Node *> &cells() {
         return cells_;
     }
 
-    const std::vector<Node *> &hiddens() {
+    const ::std::vector<Node *> &hiddens() {
         return hiddens_;
     }
 
 private:
-    std::vector<Node*> cells_;
-    std::vector<Node*> hiddens_;
+    ::std::vector<Node*> cells_;
+    ::std::vector<Node*> hiddens_;
 };
 
 }

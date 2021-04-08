@@ -5,6 +5,7 @@ using std::ptr_fun;
 using std::string;
 using std::to_string;
 using std::vector;
+using std::cerr;
 
 namespace n3ldg_plus {
 
@@ -25,7 +26,7 @@ public:
             vals.push_back(expnode->getVal().value);
             dims_.push_back(node->getDim());
         }
-        n3ldg_cuda::ActivationForward(activation, inputs, batch.size(), dims_, vals);
+        cuda::ActivationForward(activation, inputs, batch.size(), dims_, vals);
 #if TEST_CUDA
         Executor::testForward();
         cout << "exp forward tested" << endl;
@@ -52,7 +53,7 @@ public:
             input_losses.at(i++) = exp->getInput().getLoss().value;
         }
 
-        n3ldg_cuda::ActivationBackward(activation, losses, vals, batch.size(), dims_,
+        cuda::ActivationBackward(activation, losses, vals, batch.size(), dims_,
                 input_losses);
 #if TEST_CUDA
         UniInputExecutor::testBackward();
@@ -362,7 +363,7 @@ public:
 #if USE_GPU
     void CalculateDropMask() {
         if (isTraining()) {
-            n3ldg_cuda::CalculateDropoutMask(dropoutValue(), dim_sum_, drop_mask.value);
+            cuda::CalculateDropoutMask(dropoutValue(), dim_sum_, drop_mask.value);
         }
     }
 
@@ -392,7 +393,7 @@ public:
 
         CalculateDropMask();
         max_dim_ = *max_element(dims_.begin(), dims_.end());
-        n3ldg_cuda::DropoutForward(xs, count, dims_, max_dim_, offsets_, isTraining(),
+        cuda::DropoutForward(xs, count, dims_, max_dim_, offsets_, isTraining(),
                 drop_mask.value, dropoutValue(), ys);
 #if TEST_CUDA
         if (isTraining()) {
@@ -409,7 +410,7 @@ public:
         }
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
-            n3ldg_cuda::Assert(batch.at(idx)->val().verify("Dropout forward"));
+            cuda::Assert(batch.at(idx)->val().verify("Dropout forward"));
         }
 #endif
     }
@@ -427,7 +428,7 @@ public:
             losses.at(i) = dropout_node->loss().value;
             in_losses.at(i++) = dropout_node->getInput().loss().value;
         }
-        n3ldg_cuda::DropoutBackward(losses, count, dims_, max_dim_, offsets_, isTraining(),
+        cuda::DropoutBackward(losses, count, dims_, max_dim_, offsets_, isTraining(),
                 drop_mask.value, dropoutValue(), in_losses);
 #if TEST_CUDA
         for (Node *n : batch) {
@@ -435,7 +436,7 @@ public:
         }
         for (Node *n : batch) {
             DropoutNode *dropout_node = dynamic_cast<DropoutNode*>(n);
-            n3ldg_cuda::Assert(dropout_node->getInput().loss().verify("DropoutExecutor backward"));
+            cuda::Assert(dropout_node->getInput().loss().verify("DropoutExecutor backward"));
         }
 #endif
     }
@@ -448,6 +449,8 @@ public:
 private:
     Tensor1D drop_mask;
     vector<int> dims_, offsets_;
+    int dim_sum_ = 0;
+    int max_dim_;
 };
 
 Executor *DropoutNode::generate() {
@@ -541,14 +544,13 @@ public:
             results.at(i) = node->getVal().value;
             int head_dim = node->getInput().getDim() / dim;
             if (head_dim * dim != node->getInput().getDim()) {
-                cerr << boost::format(
-                        "MaxScalarExecutor forward head_dim:%1% dim:%2% input dim:%3%") % head_dim
-                    % dim % node->getInput().getDim() << endl;
+                cerr << fmt::format("MaxScalarExecutor forward head_dim:{} dim:{} input dim:{}\n",
+                        head_dim, dim, node->getInput().getDim());
                 abort();
             }
             head_dims.at(i) = head_dim;
         }
-        n3ldg_cuda::MaxScalarForward(inputs, batch.size(), dim, head_dims, results, &max_indexes);
+        cuda::MaxScalarForward(inputs, batch.size(), dim, head_dims, results, &max_indexes);
 
 #if TEST_CUDA
         testForward();
@@ -567,7 +569,7 @@ public:
             input_losses.at(i++) = max_scalar->getInput().getLoss().value;
         }
 
-        n3ldg_cuda::MaxScalarBackward(losses, max_indexes, batch.size(), input_losses);
+        cuda::MaxScalarBackward(losses, max_indexes, batch.size(), input_losses);
 #if TEST_CUDA
         UniInputExecutor::testBackward();
         cout << "max scalar backward tested" << endl;
@@ -674,7 +676,7 @@ public:
             dims_.push_back(n->getDim() / n->getInput().getDim());
         }
         int dim = dynamic_cast<ScalarToVectorNode *>(batch.front())->getInput().getDim();
-        n3ldg_cuda::ScalarToVectorForward(inputs, batch.size(), dim, dims_, results);
+        cuda::ScalarToVectorForward(inputs, batch.size(), dim, dims_, results);
 #if TEST_CUDA
         Executor::testForward();
         cout << "scalarToVector tested" << endl;
@@ -700,7 +702,7 @@ public:
             input_losses.at(i++) = n->getInput().getLoss().value;
         }
         int dim = dynamic_cast<ScalarToVectorNode *>(batch.front())->getInput().getDim();
-        n3ldg_cuda::ScalarToVectorBackward(losses, batch.size(), dim, dims_, input_losses);
+        cuda::ScalarToVectorBackward(losses, batch.size(), dim, dims_, input_losses);
 #if TEST_CUDA
         cout << "scalarToVector test backward..." << endl;
         UniInputExecutor::testBackward();
@@ -836,13 +838,13 @@ class SumExecutor : public UniInputExecutor {
             results.at(i++) = sum->getVal().value;
             int row = sum->getInput().getDim()/ getDim();
             if (row * getDim() != sum->getInput().getDim()) {
-                cerr << boost::format("SumExecutor forward row:%1% dim:%2% input dim:%3%") %
-                    row % getDim() % sum->getInput().getDim() << endl;
+                cerr << fmt::format("SumExecutor forward row:{} dim:{} input dim:{}\n", row,
+                        getDim(), sum->getInput().getDim());
                 abort();
             }
             dims_.push_back(row);
         }
-        n3ldg_cuda::VectorSumForward(inputs, batch.size(), getDim(), dims_, results);
+        cuda::VectorSumForward(inputs, batch.size(), getDim(), dims_, results);
 #if TEST_CUDA
         Executor::testForward();
         cout << "sum tested" << endl;
@@ -855,7 +857,7 @@ class SumExecutor : public UniInputExecutor {
         int i = 0;
         for (Node *node : batch) {
 #if TEST_CUDA
-            n3ldg_cuda::Assert(node->loss().verify("input loss"));
+            cuda::Assert(node->loss().verify("input loss"));
             node->loss().copyFromDeviceToHost();
 #endif
             losses.at(i) = node->getLoss().value;
@@ -863,7 +865,7 @@ class SumExecutor : public UniInputExecutor {
             input_losses.at(i++) = sum->getInput().getLoss().value;
         }
 
-        n3ldg_cuda::VectorSumBackward(losses, batch.size(), getDim(), dims_, input_losses);
+        cuda::VectorSumBackward(losses, batch.size(), getDim(), dims_, input_losses);
 #if TEST_CUDA
         UniInputExecutor::testBackward();
         cout << "sum backward tested" << endl;
@@ -960,7 +962,7 @@ public:
             factors.push_back(scaled->factor_);
         }
         auto vals = getVals();
-        n3ldg_cuda::ScaledForward(in_vals, batch.size(), dims, factors, vals);
+        cuda::ScaledForward(in_vals, batch.size(), dims, factors, vals);
 #if TEST_CUDA
         testForward();
         cout << "ScaledExecutor forward tested" << endl;
@@ -975,7 +977,7 @@ public:
             in_grads.at(i++) = scaled->getInput().getLoss().value;
         }
         auto grads = getGrads();
-        n3ldg_cuda::ScaledBackward(grads, batch.size(), dims, factors, in_grads);
+        cuda::ScaledBackward(grads, batch.size(), dims, factors, in_grads);
 #if TEST_CUDA
         testBackward();
         cout << "ScaledExecutor backward tested" << endl;

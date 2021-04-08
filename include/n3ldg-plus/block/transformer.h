@@ -8,7 +8,7 @@ namespace n3ldg_plus {
 
 class AttentionHeadParams : public TunableCombination<BaseParam>
 #if USE_GPU
-, public TransferableComponents
+, public cuda::TransferableComponents
 #endif
 {
 public:
@@ -34,7 +34,7 @@ public:
     }
 
 #if USE_GPU
-    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override;
+    std::vector<cuda::Transferable *> transferablePtrs() override;
 #endif
 
 protected:
@@ -48,7 +48,7 @@ private:
 
 class TransformerEncoderLayerParams : public TunableCombination<BaseParam>
 #if USE_GPU
-, public TransferableComponents
+, public cuda::TransferableComponents
 #endif
 {
 public:
@@ -87,7 +87,7 @@ public:
     }
 
 #if USE_GPU
-    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override;
+    std::vector<cuda::Transferable *> transferablePtrs() override;
 #endif
 
 protected:
@@ -118,14 +118,14 @@ inline void initPositionalEncodingParam(Param &param, int dim, int max_sentence_
         }
     }
 #if USE_GPU
-    param.val.copyFromHostToDevice();
+    param.val().copyFromHostToDevice();
 #endif
 }
 
 template <typename T>
 class TransformerParams : public TunableCombination<BaseParam>
 #if USE_GPU
-, public TransferableComponents
+, public cuda::TransferableComponents
 #endif
 {
 public:
@@ -172,7 +172,7 @@ public:
     }
 
 #if USE_GPU
-    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
+    std::vector<cuda::Transferable *> transferablePtrs() override {
         return {&positional_encoding_param_, &layer_params_};
     }
 #endif
@@ -193,7 +193,7 @@ typedef TransformerParams<TransformerEncoderLayerParams> TransformerEncoderParam
 
 class TransformerDecoderLayerParams : public TunableCombination<BaseParam>
 #if USE_GPU
-, public TransferableComponents
+, public cuda::TransferableComponents
 #endif
 {
 public:
@@ -244,7 +244,7 @@ public:
     }
 
 #if USE_GPU
-    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override;
+    std::vector<cuda::Transferable *> transferablePtrs() override;
 #endif
 
 protected:

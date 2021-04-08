@@ -82,11 +82,11 @@ public:
             in_vals2.push_back(pmulti->in2->val().value);
             vals.push_back(pmulti->val().value);
         }
-        n3ldg_cuda::PMultiForward(in_vals1, in_vals2, count, getDim(), vals);
+        cuda::PMultiForward(in_vals1, in_vals2, count, getDim(), vals);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
-            n3ldg_cuda::Assert(batch[idx]->val().verify("PMultiExecutor forward"));
+            cuda::Assert(batch[idx]->val().verify("PMultiExecutor forward"));
         }
 #endif
     }
@@ -107,16 +107,16 @@ public:
             losses1.push_back(pmulti->in1->loss().value);
             losses2.push_back(pmulti->in2->loss().value);
         }
-        n3ldg_cuda::PMultiBackward(losses, vals1, vals2, count, getDim(), losses1, losses2);
+        cuda::PMultiBackward(losses, vals1, vals2, count, getDim(), losses1, losses2);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward();
         }
         for (Node *n : batch) {
             PMultiNode *pmulti = dynamic_cast<PMultiNode*>(n);
-            n3ldg_cuda::Assert(pmulti->in1->loss().verify(
+            cuda::Assert(pmulti->in1->loss().verify(
                         "PMultiExecutor backward in1 loss"));
-            n3ldg_cuda::Assert(pmulti->in2->loss().verify(
+            cuda::Assert(pmulti->in2->loss().verify(
                         "PMultiExecutor backward in2 loss"));
         }
 #endif

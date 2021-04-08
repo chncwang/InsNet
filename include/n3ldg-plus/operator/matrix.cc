@@ -157,7 +157,7 @@ public:
                         concat->getInputs().at(i)->getVal().value : nullptr);
             }
         }
-        n3ldg_cuda::MatrixConcatForward(in_vals, getCount(), getRow(), in_counts, vals);
+        cuda::MatrixConcatForward(in_vals, getCount(), getRow(), in_counts, vals);
 #if TEST_CUDA
         testForward();
         cout << "MatrixConcat forward tested" << endl;
@@ -178,7 +178,7 @@ public:
                         concat->getInputs().at(i)->getLoss().value : nullptr);
             }
         }
-        n3ldg_cuda::MatrixConcatBackward(grads, getCount(), getRow(), in_counts, in_grads);
+        cuda::MatrixConcatBackward(grads, getCount(), getRow(), in_counts, in_grads);
 #if TEST_CUDA
         auto get_inputs = [&](Node &node) {
             vector<pair<Node*, string>> pairs;
@@ -342,7 +342,7 @@ public:
         }
         MatrixAndVectorMultiNode *x = dynamic_cast<MatrixAndVectorMultiNode *>(batch.front());
         row_ = x->getDim();
-        n3ldg_cuda::MatrixAndVectorMultiForward(matrix_vals_, vector_vals_, batch.size(), row_,
+        cuda::MatrixAndVectorMultiForward(matrix_vals_, vector_vals_, batch.size(), row_,
                 cols_, vals);
 #if TEST_CUDA
         testForward();
@@ -361,7 +361,7 @@ public:
             matrix_grads.push_back(multi->matrix_->getLoss().value);
             vector_grads.push_back(multi->vector_->getLoss().value);
         }
-        n3ldg_cuda::MatrixAndVectorMultiBackward(grads, matrix_vals_, vector_vals_, batch.size(),
+        cuda::MatrixAndVectorMultiBackward(grads, matrix_vals_, vector_vals_, batch.size(),
                 row_, cols_, matrix_grads, vector_grads);
 #if TEST_CUDA
         auto get_inputs = [&](Node &node) {
@@ -498,7 +498,7 @@ public:
         testForwardInpputs(get_inputs);
 #endif
 
-        n3ldg_cuda::MatrixMulMatrixForward(a_vals_, b_vals_, count, ks_, b_cols_, row_, vals);
+        cuda::MatrixMulMatrixForward(a_vals_, b_vals_, count, ks_, b_cols_, row_, vals);
 #if TEST_CUDA
         testForward();
 #endif
@@ -518,7 +518,7 @@ public:
             b_grads.push_back(m.ins_.at(1)->getLoss().value);
         }
 
-        n3ldg_cuda::MatrixMulMatrixBackward(grads, a_vals_, b_vals_, count, ks_, b_cols_, row_,
+        cuda::MatrixMulMatrixBackward(grads, a_vals_, b_vals_, count, ks_, b_cols_, row_,
                 a_grads, b_grads);
 
 #if TEST_CUDA
@@ -677,7 +677,7 @@ public:
             vectors_.push_back(t->vector_->getVal().value);
             vals_.push_back(t->getVal().value);
         }
-        n3ldg_cuda::TranMatrixMulVectorForward(matrices_, vectors_, batch.size(), cols_, row(),
+        cuda::TranMatrixMulVectorForward(matrices_, vectors_, batch.size(), cols_, row(),
                 vals_);
 #if TEST_CUDA
         testForward();
@@ -705,7 +705,7 @@ public:
             matrix_grads.push_back(t->matrix_->getLoss().value);
             vector_grads.push_back(t->vector_->getLoss().value);
         }
-        n3ldg_cuda::TranMatrixMulVectorBackward(grads, matrices_, vectors_, batch.size(),
+        cuda::TranMatrixMulVectorBackward(grads, matrices_, vectors_, batch.size(),
                 cols_, row(), matrix_grads, vector_grads);
 #if TEST_CUDA
         testBackward(get_inputs);
@@ -843,7 +843,7 @@ public:
             b_cols_.push_back(t.ins_.at(1)->getDim() / input_row_);
         }
 
-        n3ldg_cuda::TranMatrixMulMatrixForward(a_vals_, b_vals_, count, a_cols_, b_cols_,
+        cuda::TranMatrixMulMatrixForward(a_vals_, b_vals_, count, a_cols_, b_cols_,
                 input_row_, use_lower_triangle_mask_, vals);
 
 #if TEST_CUDA
@@ -862,7 +862,7 @@ public:
             b_grads.push_back(t.ins_.at(1)->getLoss().value);
             grads.push_back(t.getLoss().value);
         }
-        n3ldg_cuda::TranMatrixMulMatrixBackward(grads, a_vals_, b_vals_, count, a_cols_, b_cols_,
+        cuda::TranMatrixMulMatrixBackward(grads, a_vals_, b_vals_, count, a_cols_, b_cols_,
                 input_row_, a_grads, b_grads);
 
 #if TEST_CUDA

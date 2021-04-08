@@ -1,4 +1,5 @@
 #include "n3ldg-plus/computation-graph/node.h"
+#include "n3ldg-plus/cuda/N3LDG_cuda.h"
 
 using std::string;
 using std::to_string;
@@ -180,8 +181,6 @@ void UniInputNode::connect(NodeContainer &container, Node &input) {
 
 #if USE_GPU
 void clearNodes(vector<Node*> &nodes) {
-    n3ldg_cuda::Profiler &profiler = n3ldg_cuda::Profiler::Ins();
-    profiler.BeginEvent("clearNodes");
     vector<dtype*> grads(nodes.size());
     vector<int> dims(nodes.size());
     int i = 0;
@@ -189,13 +188,12 @@ void clearNodes(vector<Node*> &nodes) {
         grads.at(i) = n->getLoss().value;
         dims.at(i++) = n->getDim();
     }
-    n3ldg_cuda::BatchMemset(grads, grads.size(), dims, 0.0f);
+    cuda::BatchMemset(grads, grads.size(), dims, 0.0f);
 #if TEST_CUDA
     for (Node *node : nodes) {
         node->loss().verify("clearNodes");
     }
 #endif
-    profiler.EndEvent();
 }
 #endif
 

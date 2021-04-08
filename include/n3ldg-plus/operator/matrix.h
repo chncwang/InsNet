@@ -5,7 +5,7 @@
 
 namespace n3ldg_plus {
 
-Node *concatToMatrix(Graph &graph, const std::vector<Node *> &inputs);
+Node *concatToMatrix(Graph &graph, const ::std::vector<Node *> &inputs);
 
 Node *concatToMatrix(Graph &graph, BatchedNode &input);
 
@@ -24,10 +24,10 @@ Node *tranMatrixMulVector(Graph &graph, Node &matrix, Node &vec, int dim);
 Node *tranMatrixMulVector(Graph &graph, Node &matrix, Node &vec);
 
 BatchedNode *tranMatrixMulVector(Graph &graph, Node &matrix, BatchedNode &vec,
-        const std::vector<int> *dims = nullptr);
+        const ::std::vector<int> *dims = nullptr);
 
 BatchedNode *tranMatrixMulVector(Graph &graph, BatchedNode &matrix, BatchedNode &vec,
-        const std::vector<int> *dims = nullptr);
+        const ::std::vector<int> *dims = nullptr);
 
 BatchedNode *tranMatrixMulMatrix(Graph &graph, BatchedNode &a, BatchedNode &b, int input_row,
         bool use_lower_triangle_mask = false);

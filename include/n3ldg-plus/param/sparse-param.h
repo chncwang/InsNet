@@ -3,6 +3,7 @@
 
 #include "n3ldg-plus/param/base-param.h"
 #include "n3ldg-plus/util/nrmat.h"
+#include "n3ldg-plus/cuda/N3LDG_cuda.h"
 
 namespace n3ldg_plus {
 
@@ -11,12 +12,12 @@ public:
     SparseParam(const std::string &name = "sparse") : BaseParam(name) {}
 
 #if USE_GPU
-    n3ldg_cuda::BoolArray dIndexers;
-    n3ldg_cuda::IntArray dIters;
+    cuda::BoolArray dIndexers;
+    cuda::IntArray dIters;
 
     void copyFromHostToDevice() override {
         BaseParam::copyFromHostToDevice();
-        n3ldg_cuda::MyCudaMemcpy(dIters.value, last_update.c_buf(), sizeof(int) * dIters.len,
+        cuda::MyCudaMemcpy(dIters.value, last_update.c_buf(), sizeof(int) * dIters.len,
                 cudaMemcpyHostToDevice);
         aux_square_.copyFromHostToDevice();
         aux_mean_.copyFromHostToDevice();
@@ -24,7 +25,7 @@ public:
 
     void copyFromDeviceToHost() override {
         BaseParam::copyFromDeviceToHost();
-        n3ldg_cuda::MyCudaMemcpy(last_update.c_buf(), dIters.value, sizeof(int) * dIters.len,
+        cuda::MyCudaMemcpy(last_update.c_buf(), dIters.value, sizeof(int) * dIters.len,
                 cudaMemcpyDeviceToHost);
         aux_square_.copyFromDeviceToHost();
         aux_mean_.copyFromDeviceToHost();

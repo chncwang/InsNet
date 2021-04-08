@@ -1,6 +1,7 @@
 #ifndef N3LDG_PLUS_TENSOR_H
 #define N3LDG_PLUS_TENSOR_H
 
+#include "transferable.h"
 #include "n3ldg-plus/base/eigen-def.h"
 #include "cereal/cereal.hpp"
 #include "cereal/archives/binary.hpp"
@@ -120,15 +121,11 @@ struct Tensor2D {
 
 namespace cuda {
 
-class Transferable {
-public:
-    virtual void copyFromHostToDevice() = 0;
-    virtual void copyFromDeviceToHost() = 0;
-};
+using n3ldg_plus::dtype;
 
 bool Verify(dtype *host, dtype* device, int len, const char* message);
 
-struct Tensor1D : public n3ldg_cpu::Tensor1D, public Transferable {
+struct Tensor1D : public n3ldg_plus::cpu::Tensor1D, public Transferable {
     dtype *value = NULL;
 
     Tensor1D();
@@ -161,7 +158,7 @@ private:
     void initOnDevice(int len);
 };
 
-struct Tensor2D : public n3ldg_cpu::Tensor2D, public Transferable {
+struct Tensor2D : public n3ldg_plus::cpu::Tensor2D, public Transferable {
     dtype *value = NULL;
 
     Tensor2D();
@@ -195,15 +192,6 @@ private:
 
 
 }
-#endif
-
-#if USE_GPU
-#include "N3LDG_cuda.h"
-using cuda::Tensor1D;
-using cuda::Tensor2D;
-#else
-using cpu::Tensor1D;
-using cpu::Tensor2D;
 #endif
 
 }

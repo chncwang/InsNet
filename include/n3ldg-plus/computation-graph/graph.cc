@@ -148,9 +148,7 @@ void Graph::forward() {
         }
         free_nodes.erase(min_hash);
 #if USE_GPU
-        profiler.BeginEvent("clear nodes");
         clearNodes(cur_exec->batch);
-        profiler.EndCudaEvent();
 #endif
         //            cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl << endl;
 

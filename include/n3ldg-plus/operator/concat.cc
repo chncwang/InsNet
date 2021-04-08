@@ -1,7 +1,4 @@
 #include "n3ldg-plus/operator/concat.h"
-#if USE_GPU
-#include "N3LDG_cuda.h"
-#endif
 
 using std::vector;
 using std::string;
@@ -118,12 +115,12 @@ public:
 
         ConcatNode &first = dynamic_cast<ConcatNode &>(*batch.front());
         row_ = first.getDim() / first.getColumn();
-        n3ldg_cuda::ConcatForward(in_vals, dynamic_cast<ConcatNode*>(batch.at(0))->in_rows_, vals,
+        cuda::ConcatForward(in_vals, dynamic_cast<ConcatNode*>(batch.at(0))->in_rows_, vals,
                 count, inCount(), row_, cols_);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
-            n3ldg_cuda::Assert(batch[idx]->val().verify("concat forward"));
+            cuda::Assert(batch[idx]->val().verify("concat forward"));
         }
         cout << "concat forward tested" << endl;
 #endif
@@ -142,7 +139,7 @@ public:
             losses.push_back(node->loss().value);
         }
 
-        n3ldg_cuda::ConcatBackward(in_losses, dynamic_cast<ConcatNode*>(batch.at(0))->in_rows_,
+        cuda::ConcatBackward(in_losses, dynamic_cast<ConcatNode*>(batch.at(0))->in_rows_,
                 losses, count, inCount(), row_, cols_);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
@@ -150,7 +147,7 @@ public:
         }
         for (int idx = 0; idx < count; idx++) {
             for (int j = 0; j < inCount(); ++j) {
-                n3ldg_cuda::Assert(dynamic_cast<ConcatNode *>(batch[idx])->
+                cuda::Assert(dynamic_cast<ConcatNode *>(batch[idx])->
                         ins_.at(j)->loss().verify("concat backward"));
             }
         }

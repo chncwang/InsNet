@@ -1,6 +1,5 @@
 #include "N3LDG_cuda.h"
 #include <array>
-#include <boost/format.hpp>
 #include <cstdlib>
 #include <cstddef>
 #include <functional>
@@ -9,27 +8,38 @@
 #include <cmath>
 #include <cstdio>
 #include <cublas_v2.h>
-#include "Printf_cuda.cuh"
-#include "Printf_cuda.cu"
-#include "Memory_cuda.h"
 #include <curand.h>
 #include <curand_kernel.h>
-#include "cnmem.h"
 #include <string>
 #include <utility>
 #include <cstring>
 #include <cstdint>
 #include <chrono>
+#include <unordered_map>
 #include <thread>
 #include <numeric>
 #include <memory>
-#include "profiler.h"
-#include "MyTensor-def.h"
+#include "fmt/core.h"
+#include "Printf_cuda.cuh"
+#include "Printf_cuda.cu"
+#include "Memory_cuda.h"
+#include "n3ldg-plus/base/tensor.h"
 
-namespace n3ldg_cuda {
+using n3ldg_plus::cuda::MemoryPool;
+using std::vector;
+using std::string;
+using std::map;
+using std::unordered_map;
+using std::function;
+using std::cerr;
+using std::cout;
+using std::endl;
+using std::make_pair;
+using std::pair;
+using std::shared_ptr;
 
-using namespace std;
-using boost::format;
+namespace n3ldg_plus {
+namespace cuda {
 
 #if USE_FLOAT
 #define cuda_sqrt(x) sqrtf(x)
@@ -83,10 +93,6 @@ void CheckCudaError() {
         cerr << "cuda error:" << cudaGetErrorString(error) << endl;
         abort();
     }
-}
-
-void CallCnmem(cnmemStatus_t status) {
-    assert(status == CNMEM_STATUS_SUCCESS);
 }
 
 void CallCublas(cublasStatus_t status) {
@@ -272,7 +278,7 @@ void CheckIsNumber(dtype *v, int dim) {
 }
 
 void Tensor1D::checkIsNumber() const {
-    n3ldg_cuda::CheckIsNumber(value, dim);
+    CheckIsNumber(value, dim);
 }
 
 void Tensor2D::initOnMemoryAndDevice(int row, int col) {
@@ -487,22 +493,10 @@ void InitCuda(int device_id, float memory_in_gb) {
     cout << "device_id:" << device_id << endl;
     CallCuda(cudaSetDeviceFlags(cudaDeviceMapHost));
 
-#if DEVICE_MEMORY == 0
-    cnmemDevice_t device;
-    device.size = 10000000000;
-    device.device = device_id;
-    cnmemInit(1, &device, CNMEM_FLAGS_DEFAULT);
-#else
     CallCuda(cudaSetDevice(device_id));
-#endif
     CallCuda(cudaDeviceSetCacheConfig(cudaFuncCachePreferL1));
     CallCuda(cudaPrintfInit());
     MemoryPool::Ins().Init(memory_in_gb);
-}
-
-void EndCuda() {
-    cudaPrintfEnd();
-    Profiler::Ins().Print();
 }
 
 __global__ void KernelCopyFromOneVectorToMultiVectors(dtype *src,
@@ -1316,8 +1310,7 @@ void appendFreeBlock(MemoryBlock &memory_block,
         int i,
         unordered_map<void*, MemoryBlock> &busy_blocks) {
     if (memory_block.size != (1 << i)) {
-        cerr << boost::format("incorrect block size %1%, but i is %2%") % memory_block.size % i <<
-            endl;
+        cerr << fmt::format("incorrect block size {}, but i is {}\n", memory_block.size, i);
         abort();
     }
     free_blocks.at(i).insert(make_pair(memory_block.p, memory_block));
@@ -1325,15 +1318,8 @@ void appendFreeBlock(MemoryBlock &memory_block,
 
 cudaError_t MemoryPool::Malloc(void **p, int size) {
     assert(*p == NULL);
-    Profiler &profiler = Profiler::Ins();
-    profiler.BeginEvent("Malloc");
-#if DEVICE_MEMORY == 0
-    CallCnmem(cnmemMalloc(p, size, NULL));
-    profiler.EndEvent();
-    return cudaSuccess;
-#elif DEVICE_MEMORY == 1
+#if DEVICE_MEMORY == 1
     cudaError_t r = cudaMalloc(p, size);
-    profiler.EndEvent();
     return r;
 #else
     int fit_size = 1;
@@ -1380,7 +1366,6 @@ cudaError_t MemoryPool::Malloc(void **p, int size) {
             free_blocks_.at(n).erase(free_blocks_.at(n).rbegin()->first);
         }
     }
-    profiler.EndEvent();
 
     return status;
 #endif
@@ -1421,7 +1406,7 @@ MemoryBlock mergeBlocks(MemoryBlock &a, MemoryBlock &b) {
     if ((char*)pair.second->p - (char*)pair.first->p != a.size ||
             (a.p != b.buddy && a.buddy != b.p)) {
         cerr << "a and b are not buddies" << endl;
-        cerr << boost::format("a:%1%\nb:%2%") % a.toString() % b.toString() << endl;
+        cerr << fmt::format("a:{}\nb:{}\n", a.toString(), b.toString());
         abort();
     }
     MemoryBlock block(pair.first->p, pair.first->size << 1, pair.first->buddy);
@@ -1431,8 +1416,6 @@ MemoryBlock mergeBlocks(MemoryBlock &a, MemoryBlock &b) {
 void returnFreeBlock(MemoryBlock &block, vector<map<void*, MemoryBlock>> &free_blocks,
         int power,
         unordered_map<void*, MemoryBlock> &busy_blocks) {
-    Profiler &profiler = Profiler::Ins();
-    profiler.BeginEvent("returnFreeBlock");
     MemoryBlock current_block = block;
     for (int i = power; i <= MAX_BLOCK_POWER; ++i) {
         map<void*, MemoryBlock> &v = free_blocks.at(i);
@@ -1449,18 +1432,11 @@ void returnFreeBlock(MemoryBlock &block, vector<map<void*, MemoryBlock>> &free_b
             v.erase(it);
         }
     }
-    profiler.EndEvent();
 }
 
 cudaError_t MemoryPool::Free(void *p) {
-    Profiler &profiler = Profiler::Ins();
-    profiler.BeginEvent("Free");
-#if DEVICE_MEMORY == 0
-    CallCnmem(cnmemFree(p, NULL));
-    profiler.EndEvent();
-#elif DEVICE_MEMORY == 1
+#if DEVICE_MEMORY == 1
     cudaError_t r = cudaFree(p);
-    profiler.EndEvent();
     return r;
 #else
     auto it = busy_blocks_.find(p);
@@ -1475,7 +1451,7 @@ cudaError_t MemoryPool::Free(void *p) {
         ++n;
     }
     if (it->second.size != (1 << n)) {
-        cerr << boost::format("size:%1% n:%2%") % it->second.size % n << endl;
+        cerr << fmt::format("size:{} n:{}\n", it->second.size, n);
         abort();
     }
 
@@ -1488,17 +1464,11 @@ cudaError_t MemoryPool::Free(void *p) {
         abort();
     }
 
-    profiler.EndEvent();
     if (busy_blocks_.find(p) != busy_blocks_.end()) {
-        cerr << boost::format("Malloc - find freed p in busy blocks") << endl;
+        cerr << "Malloc - find freed p in busy blocks" << endl;
     }
     return cudaSuccess;
 #endif
-}
-
-void Profiler::EndCudaEvent() {
-    //cudaDeviceSynchronize();
-    EndEvent();
 }
 
 __global__ void KernelAddLtyToParamBiasAndAddLxToInputLossesForUniBackward(
@@ -4993,8 +4963,6 @@ void StandardLayerNormBackward(dtype **grads, int count, int row, int *cols, int
         dtype **vals,
         dtype *sds,
         dtype **in_grads) {
-//    cout << boost::format("count:%1% row:%2% col_sum:%3% max_col:%4%") % count % row % col_sum %
-//        max_col << endl;
     NumberArray m, m_sum, grad_sum;
     m.init(col_sum * row);
     m_sum.init(count * max_col);
@@ -5494,4 +5462,5 @@ void *GraphHostAlloc() {
     return m;
 }
 
+}
 }

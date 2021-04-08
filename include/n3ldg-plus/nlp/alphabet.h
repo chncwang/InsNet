@@ -1,7 +1,6 @@
 #ifndef _ALPHABET_
 #define _ALPHABET_
 
-#include "n3ldg-plus/base/serializable.h"
 #include <string>
 #include <unordered_map>
 #include <vector>

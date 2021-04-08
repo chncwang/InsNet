@@ -1,8 +1,8 @@
 #include "n3ldg-plus/operator/layer_normalization.h"
 
-using std::string;
-using std::to_string;
-using std::vector;
+using ::std::string;
+using ::std::to_string;
+using ::std::vector;
 
 namespace n3ldg_plus {
 
@@ -66,13 +66,13 @@ public:
         }
         val_arr_.init(vals.data(), count);
 
-        n3ldg_cuda::NumberPointerArray in_val_arr;
+        cuda::NumberPointerArray in_val_arr;
         in_val_arr.init(in_vals.data(), count);
         col_arr_.init(cols.data(), count);
         max_col_ = *max_element(cols.begin(), cols.end());
         sds_.init(count * max_col_);
 
-        n3ldg_cuda::StandardLayerNormForward(in_val_arr.value, count, getRow(), col_arr_.value,
+        cuda::StandardLayerNormForward(in_val_arr.value, count, getRow(), col_arr_.value,
                 max_col_, val_arr_.value, sds_.value);
         vals_ = move(vals);
 #if TEST_CUDA
@@ -122,14 +122,14 @@ public:
             grads.at(i++) = s.getLoss().value;
             col_sum += s.getColumn();
         }
-        n3ldg_cuda::NumberPointerArray grad_arr, in_grad_arr;
+        cuda::NumberPointerArray grad_arr, in_grad_arr;
         grad_arr.init(grads.data(), count);
         in_grad_arr.init(in_grads.data(), count);
-        n3ldg_cuda::IntArray col_offset_arr, dim_arr, dim_offset_arr;
+        cuda::IntArray col_offset_arr, dim_arr, dim_offset_arr;
         col_offset_arr.init(col_offsets.data(), count);
         dim_arr.init(dims.data(), count);
         dim_offset_arr.init(dim_offsets.data(), count);
-        n3ldg_cuda::StandardLayerNormBackward(grad_arr.value, count, row, col_arr_.value, col_sum,
+        cuda::StandardLayerNormBackward(grad_arr.value, count, row, col_arr_.value, col_sum,
                 max_col_, col_offset_arr.value, dim_arr.value, dim_offset_arr.value,
                 val_arr_.value, sds_.value, in_grad_arr.value);
 #if TEST_CUDA
@@ -162,8 +162,8 @@ public:
 private:
     Tensor1D sds_;
     vector<dtype *> vals_;
-    n3ldg_cuda::NumberPointerArray val_arr_;
-    n3ldg_cuda::IntArray col_arr_;
+    cuda::NumberPointerArray val_arr_;
+    cuda::IntArray col_arr_;
     int max_col_;
 };
 #else
@@ -317,11 +317,11 @@ public:
         col_arr_.init(cols.data(), count);
         int row = getRow();
         max_col_ = *max_element(cols.begin(), cols.end());
-        n3ldg_cuda::NumberPointerArray val_arr;
+        cuda::NumberPointerArray val_arr;
         val_arr.init(vals.data(), count);
 
-        n3ldg_cuda::PointwiseLinearForward(in_val_arr_.value, count, row, col_arr_.value, max_col_,
-                params().g().val.value, params().b().val.value, val_arr.value);
+        cuda::PointwiseLinearForward(in_val_arr_.value, count, row, col_arr_.value, max_col_,
+                params().g().val().value, params().b().val().value, val_arr.value);
 
 #if TEST_CUDA
         testForward();
@@ -343,17 +343,17 @@ public:
             in_grads.at(i++) = p.getInput().getLoss().value;
             col_sum += p.getColumn();
         }
-        n3ldg_cuda::NumberPointerArray grad_arr, in_grad_arr;
+        cuda::NumberPointerArray grad_arr, in_grad_arr;
         grad_arr.init(grads.data(), count);
         in_grad_arr.init(in_grads.data(), count);
-        n3ldg_cuda::IntArray dim_arr, dim_offset_arr;
+        cuda::IntArray dim_arr, dim_offset_arr;
         dim_arr.init(dims.data(), count);
         dim_offset_arr.init(dim_offsets.data(), count);
 
-        n3ldg_cuda::PointwiseLinearBackward(grad_arr.value, in_val_arr_.value,
-                params().g().val.value, count, row, col_arr_.value, max_col_, col_sum,
-                dim_arr.value, dim_offset_arr.value, in_grad_arr.value, params().g().grad.value,
-                params().b().grad.value);
+        cuda::PointwiseLinearBackward(grad_arr.value, in_val_arr_.value,
+                params().g().val().value, count, row, col_arr_.value, max_col_, col_sum,
+                dim_arr.value, dim_offset_arr.value, in_grad_arr.value, params().g().grad().value,
+                params().b().grad().value);
 
 #if TEST_CUDA
         testBackward();
@@ -364,8 +364,8 @@ public:
 
 private:
     vector<dtype *> in_vals_;
-    n3ldg_cuda::NumberPointerArray in_val_arr_;
-    n3ldg_cuda::IntArray col_arr_;
+    cuda::NumberPointerArray in_val_arr_;
+    cuda::IntArray col_arr_;
     int max_col_;
 
     LayerNormalizationParams &params() {

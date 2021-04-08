@@ -26,7 +26,7 @@ void GRUParam::init(int out_size, int in_size) {
 }
 
 #if USE_GPU
-vector<Transferable *> GRUParam::transferablePtrs() {
+vector<cuda::Transferable *> GRUParam::transferablePtrs() {
     return {&update_input, &update_hidden, &reset_input, &reset_hidden, &candidate_input,
         &candidate_hidden};
 }

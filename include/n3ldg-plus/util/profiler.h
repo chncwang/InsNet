@@ -99,13 +99,9 @@ public:
         running_events_.pop();
     }
 
-#if USE_GPU
-    void EndCudaEvent();
-#else
     void EndCudaEvent() {
         EndEvent();
     }
-#endif
 
     void Print() {
         while (!running_events_.empty()) {

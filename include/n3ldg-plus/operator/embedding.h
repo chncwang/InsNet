@@ -12,7 +12,7 @@ namespace n3ldg_plus {
 template<typename ParamType>
 class LookupTable : public TunableCombination<BaseParam>
 #if USE_GPU
-, public TransferableComponents
+, public cuda::TransferableComponents
 #endif
 {
 public:
@@ -32,7 +32,7 @@ public:
     }
 
 #if USE_GPU
-    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
+    std::vector<cuda::Transferable *> transferablePtrs() override {
         return {&E};
     }
 

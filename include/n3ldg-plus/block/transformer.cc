@@ -28,7 +28,7 @@ void AttentionHeadParams::init(int out_dim, int in_dim) {
 
 
 #if USE_GPU
-vector<n3ldg_cuda::Transferable *> AttentionHeadParams::transferablePtrs() {
+vector<cuda::Transferable *> AttentionHeadParams::transferablePtrs() {
     return {&q_, &k_, &v_};
 }
 #endif
@@ -61,7 +61,7 @@ void TransformerEncoderLayerParams::init(int dim, int head_count) {
 }
 
 #if USE_GPU
-vector<n3ldg_cuda::Transferable *> TransformerEncoderLayerParams::transferablePtrs() {
+vector<cuda::Transferable *> TransformerEncoderLayerParams::transferablePtrs() {
     return {&multi_head_attention_params_, &heads_fusion_params_, &ffn_inner_params_,
         &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_};
 }
@@ -100,7 +100,7 @@ void TransformerDecoderLayerParams::init(int dim, int head_count) {
 }
 
 #if USE_GPU
-vector<n3ldg_cuda::Transferable *> TransformerDecoderLayerParams::transferablePtrs() {
+vector<cuda::Transferable *> TransformerDecoderLayerParams::transferablePtrs() {
     return {&self_attention_, &encoder_attention_, &self_fusion_, &encoder_fusion_,
         &ffn_inner_params_, &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_, &layer_norm_c_};
 }

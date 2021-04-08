@@ -6,7 +6,7 @@
 
 namespace n3ldg_plus {
 
-typedef std::unordered_map<std::string, std::vector<NodeAbs *>> NodeMap;
+typedef ::std::unordered_map<::std::string, ::std::vector<NodeAbs *>> NodeMap;
 
 class Graph : public NodeContainer {
 public:
@@ -22,7 +22,7 @@ public:
 
     void addNode(NodeAbs *x) override;
 
-    const std::map<std::string, int64_t> &getFLOPs() const {
+    const ::std::map<::std::string, int64_t> &getFLOPs() const {
         return flops_table_;
     }
 
@@ -30,18 +30,18 @@ public:
         return activations_;
     }
 
-    void addFLOPs(int64_t flops, const std::string &name);
+    void addFLOPs(int64_t flops, const ::std::string &name);
 
 protected:
-    std::vector<Executor *> execs;
+    ::std::vector<Executor *> execs;
     NodeMap free_nodes;
-    std::map<std::string, std::pair<int, int>> node_type_depth;
-    std::vector<NodeAbs *> finish_nodes;
+    ::std::map<::std::string, ::std::pair<int, int>> node_type_depth;
+    ::std::vector<NodeAbs *> finish_nodes;
 
 private:
     bool eager_ = false;
     bool calculate_flops_ = false;
-    std::map<std::string, int64_t> flops_table_;
+    ::std::map<::std::string, int64_t> flops_table_;
 
     bool calculate_activations_ = false;
     int64_t activations_ = 0;

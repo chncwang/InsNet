@@ -112,7 +112,7 @@ public:
                 cpu_x.at(j++) = bucket->input_.at(i);
             }
         }
-        n3ldg_cuda::BucketForward(cpu_x, count, getDim(), ys);
+        cuda::BucketForward(cpu_x, count, getDim(), ys);
 #if TEST_CUDA
         for (Node *node : batch) {
             BucketNode *bucket = dynamic_cast<BucketNode*>(node);
@@ -120,7 +120,7 @@ public:
             for (int i = 0; i < getDim(); ++i) {
                 v[i] = bucket->input_.at(i);
             }
-            n3ldg_cuda::Assert(node->val().verify("bucket forward"));
+            cuda::Assert(node->val().verify("bucket forward"));
         }
 #endif
 #else

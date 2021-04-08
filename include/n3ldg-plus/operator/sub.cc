@@ -111,7 +111,7 @@ class SubExecutor : public Executor {
             dims_.push_back(node->getDim());
         }
 
-        n3ldg_cuda::SubForward(minuend, subtrahend, batch.size(), dims_, results);
+        cuda::SubForward(minuend, subtrahend, batch.size(), dims_, results);
 #if TEST_CUDA
         testForward();
         cout << "sub forward tested" << endl;
@@ -132,7 +132,7 @@ class SubExecutor : public Executor {
         testBeforeBackward(getInput);
 #endif
         int count = batch.size();
-        n3ldg_cuda::SubBackward(losses, count, dims_, minuend_losses, subtrahend_losses);
+        cuda::SubBackward(losses, count, dims_, minuend_losses, subtrahend_losses);
 #if TEST_CUDA
         cout << "test sub backward..." << endl;
         Executor::testBackward(getInput);

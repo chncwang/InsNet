@@ -2,6 +2,7 @@
 #define N3LDG_PLUS_PARAM_H
 
 #include "n3ldg-plus/param/base-param.h"
+#include "n3ldg-plus/base/transferable.h"
 #include "fmt/core.h"
 
 namespace n3ldg_plus {
@@ -25,10 +26,10 @@ public:
             InitDistribution dist = InitDistribution::UNI);
 
 #if USE_GPU
-    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
+    std::vector<cuda::Transferable *> transferablePtrs() override {
         auto v = BaseParam::transferablePtrs();
-        v.push_back(&aux_square);
-        v.push_back(&aux_mean);
+        v.push_back(&aux_square_);
+        v.push_back(&aux_mean_);
         return v;
     }
 
@@ -45,17 +46,7 @@ public:
         return val_.col;
     }
 
-    void clearGrad() override {
-#if USE_GPU
-        n3ldg_cuda::Memset(grad.value, grad.size, 0.0f);
-#if TEST_CUDA
-        grad.zero();
-        n3ldg_cuda::Assert(grad.verify("Param clearGrad"));
-#endif
-#else
-        grad_.zero();
-#endif
-    }
+    void clearGrad() override;
 
     void adagrad(dtype alpha, dtype reg, dtype eps) override;
 
@@ -68,17 +59,7 @@ public:
 
     dtype gradSquareSum() override;
 
-    void rescaleGrad(dtype scale) override {
-#if USE_GPU
-        n3ldg_cuda::Rescale(grad.value, grad.size, scale);
-#if TEST_CUDA
-        grad.vec() = grad.vec() * scale;
-        n3ldg_cuda::Assert(grad.verify("Param rescaleGrad"));
-#endif
-#else
-        grad_.vec() = grad_.vec() * scale;
-#endif
-    }
+    void rescaleGrad(dtype scale) override;
 
     template<typename Archive>
     void serialize(Archive &ar) {
@@ -92,7 +73,7 @@ private:
 template<typename ParamType>
 struct ParamArray : public TunableCombination<BaseParam>
 #if USE_GPU
-, public TransferableComponents
+, public cuda::TransferableComponents
 #endif
 {
     ParamArray(const std::string &nam) : name(nam) {}
@@ -128,8 +109,8 @@ struct ParamArray : public TunableCombination<BaseParam>
     }
 
 #if USE_GPU
-    std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
-        std::vector<n3ldg_cuda::Transferable *> results;
+    std::vector<cuda::Transferable *> transferablePtrs() override {
+        std::vector<cuda::Transferable *> results;
         for (auto &p : params) {
             results.push_back(p.get());
         }

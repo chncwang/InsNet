@@ -7,7 +7,7 @@ namespace n3ldg_plus {
 
 struct GRUParam : public TunableCombination<BaseParam>
 #if USE_GPU
-, public TransferableComponents
+, public cuda::TransferableComponents
 #endif
 {
     LinearParam update_input;
@@ -17,7 +17,7 @@ struct GRUParam : public TunableCombination<BaseParam>
     LinearParam candidate_input;
     LinearParam candidate_hidden;
 
-    GRUParam(const std::string &name);
+    GRUParam(const ::std::string &name);
 
     template<typename Archive>
     void serialize(Archive &ar) {
@@ -36,11 +36,11 @@ struct GRUParam : public TunableCombination<BaseParam>
     }
 
 #if USE_GPU
-    std::vector<Transferable *> transferablePtrs() override;
+    ::std::vector<Transferable *> transferablePtrs() override;
 #endif
 
 protected:
-    std::vector<Tunable<BaseParam> *> tunableComponents() override;
+    ::std::vector<Tunable<BaseParam> *> tunableComponents() override;
 };
 
 class GRUBuilder {
@@ -49,7 +49,7 @@ public:
         return hiddens_.size();
     }
 
-    const std::vector<Node *> &hiddens() {
+    const ::std::vector<Node *> &hiddens() {
         return hiddens_;
     }
 
@@ -57,7 +57,7 @@ public:
             bool is_training);
 
 private:
-    std::vector<Node*> hiddens_;
+    ::std::vector<Node*> hiddens_;
 };
 
 }

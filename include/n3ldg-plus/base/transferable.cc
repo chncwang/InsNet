@@ -1,19 +1,21 @@
-#include "n3ldg-plus/base/serializable.h"
+#include "transferable.h"
 
 namespace n3ldg_plus {
+namespace cuda {
 
 #if USE_GPU
-void TransferableComponents::copyFromHostToDevice() override {
+void TransferableComponents::copyFromHostToDevice() {
     for (auto *t : transferablePtrs()) {
         t->copyFromHostToDevice();
     }
 }
 
-void TransferableComponents::copyFromDeviceToHost() override {
+void TransferableComponents::copyFromDeviceToHost() {
     for (auto *t : transferablePtrs()) {
         t->copyFromDeviceToHost();
     }
 }
 #endif
 
+}
 }

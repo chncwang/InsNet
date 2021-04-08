@@ -175,7 +175,7 @@ public:
         id_arr_.init(ids.data(), ids.size());
         col_arr_.init(cols.data(), count);
         int row = getRow();
-        n3ldg_cuda::LookupForward(id_arr_.value, param().val.value, count, row, col_arr_.value,
+        cuda::LookupForward(id_arr_.value, param().val().value, count, row, col_arr_.value,
                 max_col_, vals);
 
 #if TEST_CUDA
@@ -200,7 +200,7 @@ public:
             batch[idx]->backward();
         }
 
-        n3ldg_cuda::Assert(param().grad.verify("lookup backward grad"));
+        cuda::Assert(param().grad.verify("lookup backward grad"));
 #endif
     }
 
@@ -215,20 +215,20 @@ private:
         return dynamic_cast<LookupNode<ParamType> &>(*batch.front()).should_backward_;
     }
 
-    n3ldg_cuda::IntArray id_arr_, backward_switch_arr_, col_arr_;
+    cuda::IntArray id_arr_, backward_switch_arr_, col_arr_;
     int max_col_;
 };
 
 template<>
 void LookupExecutor<SparseParam>::genericBackward(vector<dtype*> &grads) {
-        n3ldg_cuda::LookupBackward(id_arr_.value, grads, batch.size(), getRow(), col_arr_.value,
-                max_col_, param().grad.value, param().dIndexers.value);
+        cuda::LookupBackward(id_arr_.value, grads, batch.size(), getRow(), col_arr_.value,
+                max_col_, param().grad().value, param().dIndexers.value);
 }
 
 template<>
 void LookupExecutor<Param>::genericBackward(vector<dtype*> &grads) {
-        n3ldg_cuda::LookupBackward(id_arr_.value, grads, batch.size(), getRow(), col_arr_.value,
-                max_col_, param().grad.value, nullptr);
+        cuda::LookupBackward(id_arr_.value, grads, batch.size(), getRow(), col_arr_.value,
+                max_col_, param().grad().value, nullptr);
 }
 
 #else

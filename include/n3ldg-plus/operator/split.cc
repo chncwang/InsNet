@@ -160,7 +160,7 @@ public:
             rows_.push_back(split.getDim() / col);
             in_rows_.push_back(split.getInput().getDim() / col);
         }
-        n3ldg_cuda::SplitForward(inputs, offsets_, count, rows_, in_rows_, cols_, results);
+        cuda::SplitForward(inputs, offsets_, count, rows_, in_rows_, cols_, results);
 #if TEST_CUDA
         testForward();
         cout << "split tested" << endl;
@@ -177,7 +177,7 @@ public:
             input_grads.push_back(split->getInput().getLoss().value);
         }
 
-        n3ldg_cuda::SplitBackward(grads, offsets_, batch.size(), rows_, in_rows_, cols_,
+        cuda::SplitBackward(grads, offsets_, batch.size(), rows_, in_rows_, cols_,
                 input_grads);
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {

@@ -166,7 +166,7 @@ class MaxPoolExecutor : public Executor
 {
 public:
     int dim;
-    n3ldg_cuda::IntArray hit_inputs;
+    cuda::IntArray hit_inputs;
     vector<int> in_counts;
     int max_in_count;
 
@@ -193,14 +193,14 @@ public:
                 in_vals.push_back(NULL);
             }
         }
-        n3ldg_cuda::PoolForward(n3ldg_cuda::PoolingEnum::MAX, in_vals, vals,
+        cuda::PoolForward(cuda::PoolingEnum::MAX, in_vals, vals,
                 count, in_counts, dim, hit_inputs.value);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
-            n3ldg_cuda::Assert(batch[idx]->val().verify("max pooling forward"));
+            cuda::Assert(batch[idx]->val().verify("max pooling forward"));
             MaxPoolNode *n = dynamic_cast<MaxPoolNode*>(batch[idx]);
-            if (!n3ldg_cuda::Verify(n->masks.data(),
+            if (!cuda::Verify(n->masks.data(),
                         hit_inputs.value + idx * dim, dim,
                         "max pooling forward mask")) {
                 abort();
@@ -226,7 +226,7 @@ public:
             }
         }
 
-        n3ldg_cuda::PoolBackward(losses, in_losses, in_counts,
+        cuda::PoolBackward(losses, in_losses, in_counts,
                 hit_inputs.value, count, dim);
 
 #if TEST_CUDA
@@ -236,7 +236,7 @@ public:
 
         for (int idx = 0; idx < count; idx++) {
             for (Node *n : dynamic_cast<MaxPoolNode*>(batch[idx])->ins) {
-                n3ldg_cuda::Assert(n->loss().verify("max pooling backward"));
+                cuda::Assert(n->loss().verify("max pooling backward"));
             }
         }
 #endif
@@ -371,7 +371,7 @@ public:
             }
         }
 
-        n3ldg_cuda::SumPoolForward(n3ldg_cuda::PoolingEnum::SUM, in_vals,
+        cuda::SumPoolForward(cuda::PoolingEnum::SUM, in_vals,
                 count, dim, in_counts, vals);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
@@ -379,7 +379,7 @@ public:
         }
 
         for (Node *n : batch) {
-            n3ldg_cuda::Assert(n->val().verify("sum pool forward"));
+            cuda::Assert(n->val().verify("sum pool forward"));
         }
 #endif
     }
@@ -400,7 +400,7 @@ public:
                 in_losses.push_back(NULL);
             }
         }
-        n3ldg_cuda::SumPoolBackward(n3ldg_cuda::PoolingEnum::SUM, losses,
+        cuda::SumPoolBackward(cuda::PoolingEnum::SUM, losses,
                 in_counts, count, dim, in_losses);
 #if TEST_CUDA
         for (Node *n : batch) {
@@ -409,7 +409,7 @@ public:
         for (Node *n : batch) {
             SumPoolNode *sum = dynamic_cast<SumPoolNode*>(n);
             for (Node *in : sum->ins) {
-                n3ldg_cuda::Assert(in->loss().verify("SumPoolExecutor backward"));
+                cuda::Assert(in->loss().verify("SumPoolExecutor backward"));
             }
         }
 #endif

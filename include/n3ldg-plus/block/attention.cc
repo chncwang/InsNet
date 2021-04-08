@@ -76,16 +76,6 @@ void AdditiveAttentionParams::init(int k_size, int q_size) {
     w3t.init(1, out, false);
 }
 
-#if USE_GPU
-vector<Transferable *> AdditiveAttentionParams::transferablePtrs() {
-    return {&k, &q, &w3t};
-}
-
-virtual string AdditiveAttentionParams::name() const {
-    return "AdditiveAttention";
-}
-#endif
-
 vector<Tunable<BaseParam> *> AdditiveAttentionParams::tunableComponents() {
     return {&k, &q, &w3t};
 }

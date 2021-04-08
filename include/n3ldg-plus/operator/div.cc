@@ -87,7 +87,7 @@ public:
             dims.push_back(node->getDim());
         }
 
-        n3ldg_cuda::FullDivForward(numerators, denominators, batch.size(), dims, results);
+        cuda::FullDivForward(numerators, denominators, batch.size(), dims, results);
 #if TEST_CUDA
         Executor::testForward();
         cout << "div tested" << endl;
@@ -107,7 +107,7 @@ public:
             denominator_losses.push_back(div->denominator_->getLoss().value);
         }
 
-        n3ldg_cuda::FullDivBackward(losses, denominators, numerators, batch.size(), dims,
+        cuda::FullDivBackward(losses, denominators, numerators, batch.size(), dims,
                 numerator_losses, denominator_losses);
 #if TEST_CUDA
         auto get_inputs = [](Node &node) {

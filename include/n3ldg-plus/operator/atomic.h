@@ -25,7 +25,7 @@ Node *scalarToVector(Graph &graph, Node &input, int row);
 
 BatchedNode *scalarToVector(Graph &graph, BatchedNode &input, int row);
 
-BatchedNode *scalarToVector(Graph &graph, BatchedNode &input, const std::vector<int> &rows);
+BatchedNode *scalarToVector(Graph &graph, BatchedNode &input, const ::std::vector<int> &rows);
 
 Node *vectorSum(Graph &graph, Node &input,  int input_col);
 
@@ -41,7 +41,7 @@ BatchedNode *dropout(Graph &graph, BatchedNode &input, dtype dropout, bool is_tr
 
 Node *scaled(Graph &graph, Node &input, dtype factor);
 
-BatchedNode *scaled(Graph &graph, BatchedNode &input, const std::vector<dtype> &factors);
+BatchedNode *scaled(Graph &graph, BatchedNode &input, const ::std::vector<dtype> &factors);
 
 BatchedNode *scaled(Graph &graph, BatchedNode &input, dtype factor);
 

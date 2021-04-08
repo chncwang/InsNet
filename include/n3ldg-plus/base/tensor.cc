@@ -259,34 +259,34 @@ void cpu::Tensor2D::norm2one(dtype norm) {
 
 #if USE_GPU
 
-n3ldg_cuda::Tensor1D::Tensor1D() = default;
+cuda::Tensor1D::Tensor1D() = default;
 
-n3ldg_cuda::Tensor1D::Tensor1D(Tensor1D &&) {
+cuda::Tensor1D::Tensor1D(Tensor1D &&) {
     abort();
 }
 
-string n3ldg_cuda::Tensor1D::name() const {
+string cuda::Tensor1D::name() const {
     return "Tensor1D";
 }
 
-n3ldg_cuda::Tensor1D& n3ldg_cuda::Tensor1D::operator=(const Tensor1D &tensor) {
+cuda::Tensor1D& cuda::Tensor1D::operator=(const Tensor1D &tensor) {
     cpu::Tensor1D::operator=(tensor);
     copyFromHostToDevice();
     return *this;
 }
 
-n3ldg_cuda::Tensor1D& n3ldg_cuda::Tensor1D::operator=(dtype v) {
+cuda::Tensor1D& cuda::Tensor1D::operator=(dtype v) {
     cpu::Tensor1D::operator=(v);
     copyFromHostToDevice();
     return *this;
 }
 
-void n3ldg_cuda::Tensor1D::random(dtype bound) {
+void cuda::Tensor1D::random(dtype bound) {
     cpu::Tensor1D::random(bound);
     copyFromHostToDevice();
 }
 
-bool n3ldg_cuda::Tensor1D::verify(const char *message) const {
+bool cuda::Tensor1D::verify(const char *message) const {
 #if TEST_CUDA
     return Verify(v, value, dim, message);
 #else
@@ -294,17 +294,17 @@ bool n3ldg_cuda::Tensor1D::verify(const char *message) const {
 #endif
 }
 
-n3ldg_cuda::Tensor2D::Tensor2D() = default;
+cuda::Tensor2D::Tensor2D() = default;
 
-n3ldg_cuda::Tensor2D::Tensor2D(Tensor2D &&) {
+cuda::Tensor2D::Tensor2D(Tensor2D &&) {
     abort();
 }
 
-string n3ldg_cuda::Tensor2D::name() const {
+string cuda::Tensor2D::name() const {
     return "Tensor2D";
 }
 
-void n3ldg_cuda::Tensor2D::zero() {
+void cuda::Tensor2D::zero() {
     assert(v != NULL);
     if (v == NULL) {
         cerr << "tensor2d v is null" << endl;
@@ -313,17 +313,17 @@ void n3ldg_cuda::Tensor2D::zero() {
     cpu::Tensor2D::zero();
 }
 
-void n3ldg_cuda::Tensor2D::random(dtype bound) {
+void cuda::Tensor2D::random(dtype bound) {
     cpu::Tensor2D::random(bound);
     copyFromHostToDevice();
 }
 
-void n3ldg_cuda::Tensor2D::randomNorm(dtype sd) {
+void cuda::Tensor2D::randomNorm(dtype sd) {
     cpu::Tensor2D::randomNorm(sd);
     copyFromHostToDevice();
 }
 
-bool n3ldg_cuda::Tensor2D::verify(const char* message) {
+bool cuda::Tensor2D::verify(const char* message) {
 #if TEST_CUDA
     return Verify(v, value, size, message);
 #else
@@ -331,7 +331,7 @@ bool n3ldg_cuda::Tensor2D::verify(const char* message) {
 #endif
 }
 
-void n3ldg_cuda::Tensor2D::assignAll(dtype a) {
+void cuda::Tensor2D::assignAll(dtype a) {
     cpu::Tensor2D::assignAll(a);
     copyFromHostToDevice();
 }

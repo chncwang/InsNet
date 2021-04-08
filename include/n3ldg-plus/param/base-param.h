@@ -6,7 +6,7 @@
 namespace n3ldg_plus {
 
 #if USE_GPU
-typedef n3ldg_cuda::Tensor2D Tensor2D;
+typedef cuda::Tensor2D Tensor2D;
 #else
 typedef cpu::Tensor2D Tensor2D;
 #endif
@@ -46,7 +46,7 @@ protected:
 
 class BaseParam : public TunableAtom<BaseParam>
 #if USE_GPU
-, public TransferableComponents
+, public cuda::TransferableComponents
 #endif
 {
 public:
@@ -75,8 +75,8 @@ public:
     virtual void rescaleGrad(dtype scale) = 0;
 
 #if USE_GPU
-    virtual std::vector<n3ldg_cuda::Transferable *> transferablePtrs() override {
-        return {&val};
+    virtual std::vector<cuda::Transferable *> transferablePtrs() override {
+        return {&val_};
     }
 #endif
 

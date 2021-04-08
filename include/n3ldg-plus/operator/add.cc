@@ -102,7 +102,7 @@ public:
                 PAddNode *padd = dynamic_cast<PAddNode*>(n);
                 ins.push_back(padd->ins_.at(i)->val().value);
 #if TEST_CUDA
-                n3ldg_cuda::Assert(padd->ins_.at(i)->val().verify("PAdd forward input"));
+                cuda::Assert(padd->ins_.at(i)->val().verify("PAdd forward input"));
 #endif
             }
         }
@@ -119,7 +119,7 @@ public:
             }
         }
         max_dim_ = *max_element(dims_.begin(), dims_.end());
-        n3ldg_cuda::PAddForward(in_vals, count, dims_, max_dim_, inCount(), outs, dim_arr_);
+        cuda::PAddForward(in_vals, count, dims_, max_dim_, inCount(), outs, dim_arr_);
 #if TEST_CUDA
         testForward();
 #endif
@@ -137,7 +137,7 @@ public:
                 in_grads.push_back(in->getLoss().value);
             }
         }
-        n3ldg_cuda::PAddBackward(out_grads, count, max_dim_, inCount(), in_grads, dim_arr_);
+        cuda::PAddBackward(out_grads, count, max_dim_, inCount(), in_grads, dim_arr_);
 
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
@@ -147,7 +147,7 @@ public:
         for (Node *n : batch) {
             PAddNode *add = dynamic_cast<PAddNode*>(n);
             for (Node *in : add->ins_) {
-                n3ldg_cuda::Assert(in->loss().verify("PAddExecutor backward"));
+                cuda::Assert(in->loss().verify("PAddExecutor backward"));
             }
         }
         cout << "PAddExecutor backward tested" << endl;
@@ -161,7 +161,7 @@ private:
 
     vector<int> dims_;
     int max_dim_;
-    n3ldg_cuda::IntArray dim_arr_;
+    cuda::IntArray dim_arr_;
 };
 #else
 class PAddExecutor : public Executor {
