@@ -1,4 +1,4 @@
-#include "N3LDG_cuda.h"
+#include "n3ldg_plus_cuda.h"
 #include <array>
 #include <cstdlib>
 #include <cstddef>
@@ -9,7 +9,6 @@
 #include <cstdio>
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include <helper_cuda.h>
 #include <cublas_v2.h>
 #include <curand.h>
 #include <curand_kernel.h>
@@ -23,9 +22,10 @@
 #include <numeric>
 #include <memory>
 #include "fmt/core.h"
-#include "Printf_cuda.cuh"
-#include "Printf_cuda.cu"
-#include "Memory_cuda.h"
+#include "n3ldg-plus/cuda/helper_cuda.h"
+#include "n3ldg-plus/cuda/print.cu"
+#include "n3ldg-plus/cuda/print.cuh"
+#include "n3ldg-plus/cuda/memory_pool.h"
 #include "n3ldg-plus/base/tensor.h"
 
 using n3ldg_plus::cuda::MemoryPool;

@@ -3,7 +3,7 @@
 
 #include "n3ldg-plus/param/base-param.h"
 #include "n3ldg-plus/util/nrmat.h"
-#include "n3ldg-plus/cuda/N3LDG_cuda.h"
+#include "n3ldg-plus/cuda/n3ldg_plus_cuda.h"
 
 namespace n3ldg_plus {
 

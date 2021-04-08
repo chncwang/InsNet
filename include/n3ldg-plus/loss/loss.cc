@@ -1,5 +1,4 @@
 #include "n3ldg-plus/loss/loss.h"
-#include "n3ldg-plus/cuda/N3LDG_cuda.h"
 
 using std::vector;
 using std::cerr;

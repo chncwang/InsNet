@@ -1,5 +1,5 @@
 #include "n3ldg-plus/param/param.h"
-#include "n3ldg-plus/cuda/N3LDG_cuda.h"
+#include "n3ldg-plus/cuda/n3ldg_plus_cuda.h"
 
 using std::function;
 using std::vector;

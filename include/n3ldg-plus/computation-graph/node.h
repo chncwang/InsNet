@@ -8,7 +8,7 @@
 #include <iostream>
 #include "fmt/core.h"
 #include "n3ldg-plus/base/tensor.h"
-#include "n3ldg-plus/cuda/N3LDG_cuda.h"
+#include "n3ldg-plus/cuda/n3ldg_plus_cuda.h"
 
 namespace n3ldg_plus {
 

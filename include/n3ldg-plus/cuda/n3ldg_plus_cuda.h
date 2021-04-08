@@ -4,7 +4,7 @@
 
 #include "n3ldg-plus/base/def.h"
 
-#include "Memory_cuda.h"
+#include "memory_pool.h"
 #include <iostream>
 #include <cassert>
 #include <vector>

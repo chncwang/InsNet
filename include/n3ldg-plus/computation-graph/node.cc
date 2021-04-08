@@ -1,5 +1,4 @@
 #include "n3ldg-plus/computation-graph/node.h"
-#include "n3ldg-plus/cuda/N3LDG_cuda.h"
 
 using std::string;
 using std::to_string;
