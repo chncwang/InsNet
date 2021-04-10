@@ -65,6 +65,7 @@ public:
 
     void init(const std::vector<std::string> &word_list);
 
+    [[deprecated]]
     void init(const std::unordered_map<std::string, int>& elem_stat, int cutOff = 0);
 
     // initial by a file (first column), always an embedding file
