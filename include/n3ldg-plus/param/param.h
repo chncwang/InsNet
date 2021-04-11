@@ -16,6 +16,8 @@ class Param : public BaseParam {
 public:
     Param(const std::string &name, bool is_bias = false) : BaseParam(name, is_bias) {}
 
+    Param(bool is_bias = false) : BaseParam(is_bias) {}
+
     virtual ~Param() = default;
 
     virtual void init(int outDim, int inDim) override {

@@ -1,28 +1,13 @@
-#ifndef _ALPHABET_
-#define _ALPHABET_
+#ifndef N3LDG_PLUS_VOCAB_H
+#define N3LDG_PLUS_VOCAB_H
 
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 namespace n3ldg_plus {
-/*
- please check to ensure that m_size not exceeds the upbound of int
- */
 
-/*
-  This class serializes feature from string to int.
-  Index starts from 0.
-*/
-
-/**
- * The basic class of quark class.
- *  @param  std::string        String class name to be used.
- *  @param  int         ID class name to be used.
- *  @author Naoaki Okazaki
- */
-class basic_quark {
-    static const  int max_capacity;
+class Vocab {
 public:
     typedef std::unordered_map<std::string, int> StringToId;
     typedef std::vector<std::string> IdToString;
@@ -79,7 +64,6 @@ public:
     }
 };
 
-typedef basic_quark Alphabet;
 }
 
 #endif

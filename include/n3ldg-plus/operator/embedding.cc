@@ -23,7 +23,7 @@ public:
         init(dim);
     }
 
-    void setParam(LookupTable<ParamType>& param) {
+    void setParam(Embedding<ParamType>& param) {
         param_ = param;
     }
 
@@ -94,7 +94,7 @@ Node *embedding(Graph &graph,ParamType &lookup, int id, bool should_backward = t
 }
 
 template <typename ParamType>
-Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, int dim,
+Node *embedding(Graph &graph, Embedding<ParamType> &lookup, int dim,
         const vector<string> &words,
         bool should_backward = true) {
     using namespace std;
@@ -121,7 +121,7 @@ Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, int dim,
 }
 
 template <typename ParamType>
-Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, int dim, const string &word,
+Node *embedding(Graph &graph, Embedding<ParamType> &lookup, int dim, const string &word,
         bool should_backward = true) {
     using namespace std;
     vector<string> words = {word};
@@ -129,14 +129,14 @@ Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, int dim, const str
 }
 
 template <typename ParamType>
-Node *embedding(Graph &graph, LookupTable<ParamType> &lookup,
+Node *embedding(Graph &graph, Embedding<ParamType> &lookup,
         const vector<string> &words,
         bool should_backward = true) {
     return embedding(graph, lookup, lookup.nDim, words, should_backward);
 }
 
 template <typename ParamType>
-Node *embedding(Graph &graph, LookupTable<ParamType> &lookup, const string &word,
+Node *embedding(Graph &graph, Embedding<ParamType> &lookup, const string &word,
         bool should_backward = true) {
     using namespace std;
     vector<string> words = {word};
@@ -258,23 +258,23 @@ Node *embedding(Graph &graph, Param &lookup, int id, bool should_backward) {
     return embedding<Param>(graph, lookup, id, should_backward);
 }
 
-Node *embedding(Graph &graph, LookupTable<Param> &lookup, const vector<string> &words,
+Node *embedding(Graph &graph, Embedding<Param> &lookup, const vector<string> &words,
         bool should_backward) {
     return embedding<Param>(graph, lookup, words, should_backward);
 }
 
-Node *embedding(Graph &graph, LookupTable<SparseParam> &lookup,
+Node *embedding(Graph &graph, Embedding<SparseParam> &lookup,
         const vector<string> &words,
         bool should_backward) {
     return embedding<SparseParam>(graph, lookup, words, should_backward);
 }
 
-Node *embedding(Graph &graph, LookupTable<Param> &lookup, const string &word,
+Node *embedding(Graph &graph, Embedding<Param> &lookup, const string &word,
         bool should_backward) {
     return embedding<Param>(graph, lookup, word, should_backward);
 }
 
-Node *embedding(Graph &graph, LookupTable<SparseParam> &lookup, const string &word,
+Node *embedding(Graph &graph, Embedding<SparseParam> &lookup, const string &word,
         bool should_backward) {
     return embedding<SparseParam>(graph, lookup, word, should_backward);
 }

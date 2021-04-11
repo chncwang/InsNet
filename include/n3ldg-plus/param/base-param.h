@@ -52,6 +52,8 @@ class BaseParam : public TunableAtom<BaseParam>
 public:
     BaseParam(const std::string &name, bool is_bias = false) : is_bias_(is_bias), name_(name) {}
 
+    BaseParam(bool is_bias = false) : is_bias_(is_bias) {}
+
     bool isBias() const {
         return is_bias_;
     }
@@ -93,6 +95,9 @@ protected:
     std::string name_;
     Tensor2D val_, grad_, aux_square_, aux_mean_;
 };
+
+typedef Tunable<BaseParam> TunableParam;
+typedef TunableCombination<BaseParam> TunableParamCollection;
 
 }
 

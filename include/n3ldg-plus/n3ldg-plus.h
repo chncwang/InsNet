@@ -3,7 +3,7 @@
 
 #include "n3ldg-plus/computation-graph/graph.h"
 #include "n3ldg-plus/computation-graph/node.h"
-#include "n3ldg-plus/nlp/alphabet.h"
+#include "n3ldg-plus/nlp/vocab.h"
 #include "n3ldg-plus/util/metric.h"
 #include "n3ldg-plus/util/check-grad.h"
 #include "n3ldg-plus/operator/add.h"
