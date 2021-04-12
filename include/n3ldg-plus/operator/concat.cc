@@ -41,14 +41,14 @@ public:
         ins_ = ins;
     }
 
-    void connect(Graph &cg, const vector<Node *> &x) {
+    void connect(const vector<Node *> &x) {
         if (x.empty()) {
             cerr << "empty inputs for concat" << endl;
             abort();
         }
 
         setInputs(x);
-        afterConnect(cg, x);
+        afterConnect(x);
     }
 
     Executor* generate() override;
@@ -181,29 +181,29 @@ Executor* ConcatNode::generate() {
 
 class BatchedConcatNode : public BatchedNodeImpl<ConcatNode> {
 public:
-    void init(Graph &graph, const vector<BatchedNode *> &ins) {
+    void init(const vector<BatchedNode *> &ins) {
         int dim = 0;
         for (BatchedNode *node : ins) {
             dim += node->getDim();
         }
         allocateBatch(dim, ins.front()->batch().size());
         setInputsPerNode(ins);
-        afterInit(graph, ins);
+        afterInit(ins);
     }
 };
 
-Node *concat(Graph &graph, const vector<Node*> &inputs, int col) {
+Node *concat(const vector<Node*> &inputs, int col) {
     int dim = 0;
     for (Node *in : inputs) {
         dim += in->getDim();
     }
     ConcatNode *concat = ConcatNode::newNode(dim);
     concat->setColumn(col);
-    concat->connect(graph, inputs);
+    concat->connect(inputs);
     return concat;
 }
 
-Node *concat(Graph &graph, BatchedNode &inputs, int col) {
+Node *concat(BatchedNode &inputs, int col) {
     int dim = 0;
     for (Node *in : inputs.batch()) {
         dim += in->getDim();
@@ -212,13 +212,14 @@ Node *concat(Graph &graph, BatchedNode &inputs, int col) {
     concat->setColumn(col);
     concat->setInputs(inputs.batch());
     inputs.addParent(concat);
-    graph.addNode(concat);
+    NodeContainer &container = inputs.getNodeContainer();
+    container.addNode(concat);
     return concat;
 }
 
-BatchedNode *concatInBatch(Graph &graph, const vector<BatchedNode *> &inputs) {
+BatchedNode *concatInBatch(const vector<BatchedNode *> &inputs) {
     BatchedConcatNode *node = new BatchedConcatNode;
-    node->init(graph, inputs);
+    node->init(inputs);
     return node;
 }
 

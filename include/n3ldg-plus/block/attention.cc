@@ -12,57 +12,49 @@ using std::max;
 
 namespace n3ldg_plus {
 
-pair<BatchedNode *, BatchedNode *> dotAttention(Graph &graph, Node& key_matrix,
+pair<BatchedNode *, BatchedNode *> dotAttention(Node& key_matrix,
         Node& value_matrix,
         BatchedNode& guide,
         const vector<int> *matrix_cols) {
-    BatchedNode *raw_weights = tranMatrixMulVector(graph, key_matrix, guide,
-            matrix_cols);
-    BatchedNode *scaled_weight = scaled(graph, *raw_weights,
-            1.0 / ::sqrt((dtype)guide.getDim()));
-    scaled_weight = softmax(graph, *scaled_weight);
+    BatchedNode *raw_weights = tranMatrixMulVector(key_matrix, guide, matrix_cols);
+    BatchedNode *scaled_weight = scaled(*raw_weights, 1.0 / ::sqrt((dtype)guide.getDim()));
+    scaled_weight = softmax(*scaled_weight);
     int dim = guide.getDim();
-    BatchedNode *hidden = matrixAndVectorMulti(graph, value_matrix, *scaled_weight,
+    BatchedNode *hidden = matrixAndVectorMulti(value_matrix, *scaled_weight,
             &dim);
     return make_pair(hidden, scaled_weight);
 }
 
-pair<BatchedNode *, BatchedNode *> dotAttention(Graph &graph, BatchedNode &key_matrix,
+pair<BatchedNode *, BatchedNode *> dotAttention(BatchedNode &key_matrix,
         BatchedNode &value_matrix,
         BatchedNode& guide,
         const vector<int> *matrix_cols) {
-    BatchedNode *raw_weights = tranMatrixMulVector(graph, key_matrix, guide,
-            matrix_cols);
-    BatchedNode *scaled_weight = scaled(graph, *raw_weights,
-            1.0 / ::sqrt((dtype)guide.getDim()));
-    scaled_weight = softmax(graph, *scaled_weight);
+    BatchedNode *raw_weights = tranMatrixMulVector(key_matrix, guide, matrix_cols);
+    BatchedNode *scaled_weight = scaled(*raw_weights, 1.0 / ::sqrt((dtype)guide.getDim()));
+    scaled_weight = softmax(*scaled_weight);
     int dim = guide.getDim();
-    BatchedNode *hidden = matrixAndVectorMulti(graph, value_matrix, *scaled_weight,
-            &dim);
+    BatchedNode *hidden = matrixAndVectorMulti(value_matrix, *scaled_weight, &dim);
     return make_pair(hidden, scaled_weight);
 }
 
-pair<BatchedNode *, BatchedNode *> dotAttention(Graph &graph, BatchedNode &key_matrix,
+pair<BatchedNode *, BatchedNode *> dotAttention(BatchedNode &key_matrix,
         BatchedNode &value_matrix,
         BatchedNode &query_matrix,
         int q_col,
         bool is_decoder) {
     int row = query_matrix.getDim() / q_col;
-    BatchedNode *raw_weights = tranMatrixMulMatrix(graph, key_matrix, query_matrix,
-            row, is_decoder);
-    BatchedNode *scaled_weight = scaled(graph, *raw_weights,
-            1.0 / ::sqrt((dtype)row));
-    scaled_weight = softmax(graph, *scaled_weight, q_col);
+    BatchedNode *raw_weights = tranMatrixMulMatrix(key_matrix, query_matrix, row, is_decoder);
+    BatchedNode *scaled_weight = scaled(*raw_weights, 1.0 / ::sqrt((dtype)row));
+    scaled_weight = softmax(*scaled_weight, q_col);
     int v_col = value_matrix.getDim() / row;
-    BatchedNode *hidden = matrixMulMatrix(graph, value_matrix, *scaled_weight, v_col);
+    BatchedNode *hidden = matrixMulMatrix(value_matrix, *scaled_weight, v_col);
     return make_pair(hidden, scaled_weight);
 }
 
-Node * dotAttentionWeights(Graph &cg, Node& key_matrix, Node& guide) {
-    Node *raw_weights = tranMatrixMulVector(cg, key_matrix, guide);
-    Node *scaled_weight = scaled(cg, *raw_weights,
-            1.0 / ::sqrt((dtype)guide.getDim()));
-    scaled_weight = softmax(cg, *scaled_weight, 1);
+Node * dotAttentionWeights(Node& key_matrix, Node& guide) {
+    Node *raw_weights = tranMatrixMulVector(key_matrix, guide);
+    Node *scaled_weight = scaled(*raw_weights, 1.0 / ::sqrt((dtype)guide.getDim()));
+    scaled_weight = softmax(*scaled_weight, 1);
     return scaled_weight;
 }
 

@@ -111,7 +111,7 @@ vector<Tunable<BaseParam>*> TransformerDecoderLayerParams::tunableComponents() {
         &ffn_inner_params_, &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_, &layer_norm_c_};
 }
 
-Node *dotAttention(Graph &graph, Node& k, Node& v, int v_col, Node& q, int q_col, int head_count,
+Node *dotAttention(Node& k, Node& v, int v_col, Node& q, int q_col, int head_count,
         LinearParam &fusion_param,
         dtype dropout_value,
         bool use_mask,
@@ -123,18 +123,18 @@ Node *dotAttention(Graph &graph, Node& k, Node& v, int v_col, Node& q, int q_col
         offsets.at(i) = i * head_dim;
     }
 
-    BatchedNode *split_q = split(graph, q, head_dim, offsets, q_col);
-    BatchedNode *split_k = split(graph, k, head_dim, offsets, v_col);
-    BatchedNode *split_v = split(graph, v, head_dim, offsets, v_col);
-    BatchedNode *split_attended = dotAttention(graph, *split_k, *split_v, *split_q,
-            q_col, use_mask).first;
-    Node *attended_matrix = concat(graph, *split_attended, q_col);
-    attended_matrix = linear(graph, *attended_matrix, fusion_param);
-    attended_matrix = dropout(graph, *attended_matrix, dropout_value, is_training);
+    BatchedNode *split_q = split(q, head_dim, offsets, q_col);
+    BatchedNode *split_k = split(k, head_dim, offsets, v_col);
+    BatchedNode *split_v = split(v, head_dim, offsets, v_col);
+    BatchedNode *split_attended = dotAttention(*split_k, *split_v, *split_q, q_col,
+            use_mask).first;
+    Node *attended_matrix = concat(*split_attended, q_col);
+    attended_matrix = linear(*attended_matrix, fusion_param);
+    attended_matrix = dropout(*attended_matrix, dropout_value, is_training);
     return attended_matrix;
 }
 
-Node *transformerEncoder(Graph &graph, TransformerEncoderParams &params, Node &inputs,
+Node *transformerEncoder(TransformerEncoderParams &params, Node &inputs,
         int sentence_len,
         dtype dropout_value,
         bool is_training) {
@@ -144,10 +144,11 @@ Node *transformerEncoder(Graph &graph, TransformerEncoderParams &params, Node &i
         pos_ids.push_back(i);
     }
 
+    Graph &graph = dynamic_cast<Graph &>(inputs.getNodeContainer());
     Node *pos_emb = embedding(graph, params.positionalEncodingParam(), pos_ids, false);
-    Node *scaled_input = scaled(graph, inputs, ::sqrt(inputs.getDim() / inputs.getColumn()));
-    Node *pos_encoded = add(graph, {pos_emb, scaled_input});
-    pos_encoded = dropout(graph, *pos_encoded, dropout_value, is_training);
+    Node *scaled_input = scaled(inputs, ::sqrt(inputs.getDim() / inputs.getColumn()));
+    Node *pos_encoded = add({pos_emb, scaled_input});
+    pos_encoded = dropout(*pos_encoded, dropout_value, is_training);
 
     int layer_count = params.layerCount();
 
@@ -155,34 +156,33 @@ Node *transformerEncoder(Graph &graph, TransformerEncoderParams &params, Node &i
     for (int i = 0; i < layer_count; ++i) {
         auto &layer_params = *params.layerParams().ptrs().at(i);
 
-        Node *normed = layerNormalization(graph, layer_params.layerNormA(), *last_layer,
+        Node *normed = layerNormalization(layer_params.layerNormA(), *last_layer,
                 sentence_len);
         auto &attention_head_params = layer_params.multiHeadAttentionParams();
-        Node *key = linear(graph, *normed, attention_head_params.k());
-        Node *value = linear(graph, *normed, attention_head_params.v());
-        Node *q = linear(graph, *normed, attention_head_params.q());
-        Node *attended = dotAttention(graph, *key, *value, sentence_len, *q, sentence_len,
+        Node *key = linear(*normed, attention_head_params.k());
+        Node *value = linear(*normed, attention_head_params.v());
+        Node *q = linear(*normed, attention_head_params.q());
+        Node *attended = dotAttention(*key, *value, sentence_len, *q, sentence_len,
                 params.headCount(), layer_params.headsFusionParams(), dropout_value, false,
                 is_training);
-        Node *added = add(graph, {attended, last_layer});
-        normed = layerNormalization(graph, layer_params.layerNormB(), *added, sentence_len);
-        Node *t = linear(graph, *normed, layer_params.ffnInnerParams());
-        t = relu(graph, *t);
-        t = linear(graph, *t, layer_params.ffnOutterParams());
-        t = dropout(graph, *t, dropout_value, is_training);
-        t = add(graph, {added, t});
+        Node *added = add({attended, last_layer});
+        normed = layerNormalization(layer_params.layerNormB(), *added, sentence_len);
+        Node *t = linear(*normed, layer_params.ffnInnerParams());
+        t = relu(*t);
+        t = linear(*t, layer_params.ffnOutterParams());
+        t = dropout(*t, dropout_value, is_training);
+        t = add({added, t});
         last_layer = t;
     }
 
     return last_layer;
 }
 
-TransformerDecoderBuilderAbs::TransformerDecoderBuilderAbs(Graph &graph,
-        TransformerDecoderParams &params,
+TransformerDecoderBuilderAbs::TransformerDecoderBuilderAbs(TransformerDecoderParams &params,
         Node &encoder_hiddens,
         int encoder_sentence_len,
         dtype dropout,
-        bool is_training) : graph_(&graph), params_(&params), encoder_hiddens_(&encoder_hiddens),
+        bool is_training) : params_(&params), encoder_hiddens_(&encoder_hiddens),
     encoder_sentence_len_(encoder_sentence_len), dropout_(dropout), is_training_(is_training) {}
 
 void TransformerDecoderBuilderAbs::prepare() {
@@ -193,8 +193,8 @@ void TransformerDecoderBuilderAbs::prepare() {
     for (int i = 0; i < layer_count; ++i) {
         auto &layer_params = *params_->layerParams().ptrs().at(i);
         auto &attention_head_params = layer_params.encoderAttention();
-        Node *k = linear(*graph_, *encoder_hiddens_, attention_head_params.k());
-        Node *v = linear(*graph_, *encoder_hiddens_, attention_head_params.v());
+        Node *k = linear(*encoder_hiddens_, attention_head_params.k());
+        Node *v = linear(*encoder_hiddens_, attention_head_params.v());
         encoder_key_matrices_.push_back(k);
         encoder_value_matrices_.push_back(v);
     }
@@ -202,12 +202,11 @@ void TransformerDecoderBuilderAbs::prepare() {
     prepared_ = true;
 }
 
-TransformerDecoderCellBuilder::TransformerDecoderCellBuilder(Graph &graph,
-        TransformerDecoderParams &params,
+TransformerDecoderCellBuilder::TransformerDecoderCellBuilder(TransformerDecoderParams &params,
         Node &encoder_hiddens,
         int encoder_sentence_len,
         dtype dropout,
-        bool is_training) : TransformerDecoderBuilderAbs(graph, params, encoder_hiddens,
+        bool is_training) : TransformerDecoderBuilderAbs(params, encoder_hiddens,
             encoder_sentence_len, dropout, is_training) {
     for (int i = 0; i < params.layerCount(); ++i) {
         key_matrix_layers_.push_back(nullptr);
@@ -233,12 +232,12 @@ void TransformerDecoderCellBuilder::step(Node &decoder_input) {
         cerr << "TransformerDecoderBuilder forward - not prepared" << endl;
         abort();
     }
-    Node *scaled_input = scaled(*graph_, decoder_input,
+    Node *scaled_input = scaled(decoder_input,
             std::sqrt(static_cast<dtype>(decoder_input.getDim())));
-    Node *emb = embedding(*graph_, params_->positionalEncodingParam(),
-            decoded_len_, false);
-    Node *pos_encoded = add(*graph_, {scaled_input, emb});
-    pos_encoded = dropout(*graph_, *pos_encoded, dropout_, is_training_);
+    Graph &graph = dynamic_cast<Graph &>(decoder_input.getNodeContainer());
+    Node *emb = embedding(graph, params_->positionalEncodingParam(), decoded_len_, false);
+    Node *pos_encoded = add({scaled_input, emb});
+    pos_encoded = dropout(*pos_encoded, dropout_, is_training_);
 
     int layer_count = params_->layerCount();
 
@@ -246,49 +245,48 @@ void TransformerDecoderCellBuilder::step(Node &decoder_input) {
     for (int i = 0; i < layer_count; ++i) {
         auto &layer_params = *params_->layerParams().ptrs().at(i);
         auto &attention_head_params = layer_params.selfAttention();
-        Node *normed = layerNormalization(*graph_, layer_params.layerNormA(),
+        Node *normed = layerNormalization(layer_params.layerNormA(),
                 *last_layer_node);
-        Node *k = linear(*graph_, *normed, attention_head_params.k());
-        Node *v = linear(*graph_, *normed, attention_head_params.v());
+        Node *k = linear(*normed, attention_head_params.k());
+        Node *v = linear(*normed, attention_head_params.v());
 
         Node *&key_matrix = key_matrix_layers_.at(i);
-        key_matrix = key_matrix == nullptr ? k : concat(*graph_, {key_matrix, k});
+        key_matrix = key_matrix == nullptr ? k : concat({key_matrix, k});
         Node *&value_matrix = value_matrix_layers_.at(i);
-        value_matrix = value_matrix == nullptr ? v : concat(*graph_, {value_matrix, v});
+        value_matrix = value_matrix == nullptr ? v : concat({value_matrix, v});
 
-        Node *q = linear(*graph_, *normed, attention_head_params.q());
-        Node *attended = dotAttention(*graph_, *key_matrix, *value_matrix, decoded_len_ + 1,
+        Node *q = linear(*normed, attention_head_params.q());
+        Node *attended = dotAttention(*key_matrix, *value_matrix, decoded_len_ + 1,
                 *q, 1, params_->headCount(), layer_params.selfFusion(), dropout_, false,
                 is_training_);
-        Node *added = add(*graph_, {attended, last_layer_node});
-        normed = layerNormalization(*graph_, layer_params.layerNormB(), *added);
+        Node *added = add({attended, last_layer_node});
+        normed = layerNormalization(layer_params.layerNormB(), *added);
 
         auto &attention_head_params_for_encoder = layer_params.encoderAttention();
-        q = linear(*graph_, *normed, attention_head_params_for_encoder.q());
-        attended = dotAttention(*graph_, *encoder_key_matrices_.at(i),
+        q = linear(*normed, attention_head_params_for_encoder.q());
+        attended = dotAttention(*encoder_key_matrices_.at(i),
                 *encoder_value_matrices_.at(i), encoder_sentence_len_, *q, 1,
                 params_->headCount(), layer_params.encoderFusion(), dropout_, false,
                 is_training_);
-        added = add(*graph_, {added, attended});
-        normed = layerNormalization(*graph_, layer_params.layerNormC(), *added);
+        added = add({added, attended});
+        normed = layerNormalization(layer_params.layerNormC(), *added);
 
-        Node *t = linear(*graph_, *normed, layer_params.ffnInnerParams());
-        t = relu(*graph_, *t);
-        t = linear(*graph_, *t, layer_params.ffnOutterParams());
-        t = dropout(*graph_, *t, dropout_, is_training_);
-        added = add(*graph_, {added, t});
+        Node *t = linear(*normed, layer_params.ffnInnerParams());
+        t = relu(*t);
+        t = linear(*t, layer_params.ffnOutterParams());
+        t = dropout(*t, dropout_, is_training_);
+        added = add({added, t});
         last_layer_node = added;
         hidden_layers_.at(i).push_back(last_layer_node);
     }
     decoded_len_++;
 }
 
-TransformerDecoderBuilder::TransformerDecoderBuilder(Graph &graph,
-        TransformerDecoderParams &params,
+TransformerDecoderBuilder::TransformerDecoderBuilder( TransformerDecoderParams &params,
         Node &encoder_hiddens,
         int encoder_sentence_len,
         dtype dropout,
-        bool is_training) : TransformerDecoderBuilderAbs(graph, params, encoder_hiddens,
+        bool is_training) : TransformerDecoderBuilderAbs(params, encoder_hiddens,
             encoder_sentence_len, dropout, is_training) {}
 
 void TransformerDecoderBuilder::connect(Node &inputs, int dec_sentence_len) {
@@ -302,11 +300,12 @@ void TransformerDecoderBuilder::connect(Node &inputs, int dec_sentence_len) {
         pos_ids.push_back(i);
     }
 
-    Node *pos_emb = embedding(*graph_, params_->positionalEncodingParam(), pos_ids, false);
+    Graph &graph = dynamic_cast<Graph &>(inputs.getNodeContainer());
+    Node *pos_emb = embedding(graph, params_->positionalEncodingParam(), pos_ids, false);
     int row = inputs.getDim() / dec_sentence_len;
-    Node *scaled_input = scaled(*graph_, inputs, ::sqrt(row));
-    Node *pos_encoded = add(*graph_, {pos_emb, scaled_input});
-    pos_encoded = dropout(*graph_, *pos_encoded, dropout_, is_training_);
+    Node *scaled_input = scaled(inputs, ::sqrt(row));
+    Node *pos_encoded = add({pos_emb, scaled_input});
+    pos_encoded = dropout(*pos_encoded, dropout_, is_training_);
 
     int layer_count = params_->layerCount();
     Node *last_layer = pos_encoded;
@@ -314,33 +313,33 @@ void TransformerDecoderBuilder::connect(Node &inputs, int dec_sentence_len) {
     for (int i = 0; i < layer_count; ++i) {
         auto &layer_params = *params_->layerParams().ptrs().at(i);
         auto &attention_head_params = layer_params.selfAttention();
-        Node *normed = layerNormalization(*graph_, layer_params.layerNormA(), *last_layer,
+        Node *normed = layerNormalization(layer_params.layerNormA(), *last_layer,
                 dec_sentence_len);
-        Node *k = linear(*graph_, *normed, attention_head_params.k());
-        Node *v = linear(*graph_, *normed, attention_head_params.v());
-        Node *q = linear(*graph_, *normed, attention_head_params.q());
-        Node *attended = dotAttention(*graph_, *k, *v, dec_sentence_len, *q,
+        Node *k = linear(*normed, attention_head_params.k());
+        Node *v = linear(*normed, attention_head_params.v());
+        Node *q = linear(*normed, attention_head_params.q());
+        Node *attended = dotAttention(*k, *v, dec_sentence_len, *q,
                 dec_sentence_len, params_->headCount(), layer_params.selfFusion(), dropout_,
                 true, is_training_);
-        Node *added = add(*graph_, {attended, last_layer});
-        normed = layerNormalization(*graph_, layer_params.layerNormB(), *added,
+        Node *added = add({attended, last_layer});
+        normed = layerNormalization(layer_params.layerNormB(), *added,
                 dec_sentence_len);
 
         auto &attention_head_params_for_encoder = layer_params.encoderAttention();
-        q = linear(*graph_, *normed, attention_head_params_for_encoder.q());
-        attended = dotAttention(*graph_, *encoder_key_matrices_.at(i),
+        q = linear(*normed, attention_head_params_for_encoder.q());
+        attended = dotAttention(*encoder_key_matrices_.at(i),
                 *encoder_value_matrices_.at(i), encoder_sentence_len_, *q, dec_sentence_len,
                 params_->headCount(), layer_params.encoderFusion(), dropout_, false,
                 is_training_);
-        added = add(*graph_, {added, attended});
-        normed = layerNormalization(*graph_, layer_params.layerNormC(), *added,
+        added = add({added, attended});
+        normed = layerNormalization(layer_params.layerNormC(), *added,
                 dec_sentence_len);
 
-        Node *t = linear(*graph_, *normed, layer_params.ffnInnerParams());
-        t = relu(*graph_, *t);
-        t = linear(*graph_, *t, layer_params.ffnOutterParams());
-        t = dropout(*graph_, *t, dropout_, is_training_);
-        added = add(*graph_, {added, t});
+        Node *t = linear(*normed, layer_params.ffnInnerParams());
+        t = relu(*t);
+        t = linear(*t, layer_params.ffnOutterParams());
+        t = dropout(*t, dropout_, is_training_);
+        added = add({added, t});
         last_layer = added; 
         hidden_layers_.push_back(last_layer);
     }

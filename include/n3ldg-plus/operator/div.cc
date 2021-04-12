@@ -32,10 +32,10 @@ public:
         denominator_ = inputs.at(1);
     }
 
-    void connect(Graph &graph, Node &numerator, Node &denominator) {
+    void connect(Node &numerator, Node &denominator) {
         vector<Node*> ins = {&numerator, &denominator};
         setInputs(ins);
-        afterConnect(graph, ins);
+        afterConnect(ins);
     }
 
     void compute() override {
@@ -58,11 +58,11 @@ private:
 
 class BatchedFullDivNode : public BatchedNodeImpl<FullDivNode> {
 public:
-    void init(Graph &graph, BatchedNode &numerator, BatchedNode &denominator) {
+    void init(BatchedNode &numerator, BatchedNode &denominator) {
         allocateBatch(numerator.getDims());
         auto ins = {&numerator, &denominator};
         setInputsPerNode(ins);
-        afterInit(graph, ins);
+        afterInit(ins);
     }
 };
 
@@ -134,15 +134,15 @@ Executor *FullDivNode::generate() {
     return new FullDivExecutor();
 }
 
-Node *fullDiv(Graph &graph, Node &numerator, Node &denominator) {
+Node *fullDiv(Node &numerator, Node &denominator) {
     FullDivNode *result = FullDivNode::newNode(numerator.getDim());
-    result->connect(graph, numerator, denominator);
+    result->connect(numerator, denominator);
     return result;
 }
 
-BatchedNode *fullDiv(Graph &graph, BatchedNode &numerator, BatchedNode &denominator) {
+BatchedNode *fullDiv(BatchedNode &numerator, BatchedNode &denominator) {
     BatchedFullDivNode *node = new BatchedFullDivNode;
-    node->init(graph, numerator, denominator);
+    node->init(numerator, denominator);
     return node;
 }
 

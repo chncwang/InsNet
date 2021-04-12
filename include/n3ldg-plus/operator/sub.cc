@@ -36,10 +36,10 @@ public:
         subtrahend_ = &subtrahend;
     }
 
-    void connect(Graph &graph, Node &minuend, Node &subtrahend) {
+    void connect(Node &minuend, Node &subtrahend) {
         vector<Node*> ins = {&minuend, &subtrahend};
         setInputs(ins);
-        afterConnect(graph, ins);
+        afterConnect(ins);
     }
 
     void compute() override {
@@ -63,22 +63,22 @@ private:
 
 class BatchedSubNode : public BatchedNodeImpl<SubNode> {
 public:
-    void init(Graph &graph, BatchedNode &minuend, BatchedNode &subtrahend) {
+    void init(BatchedNode &minuend, BatchedNode &subtrahend) {
         allocateBatch(minuend.getDims());
         setInputsPerNode({&minuend, &subtrahend});
-        afterInit(graph, {&minuend, &subtrahend});
+        afterInit({&minuend, &subtrahend});
     }
 };
 
-Node *sub(Graph &graph, Node &minuend, Node &subtrahend) {
+Node *sub(Node &minuend, Node &subtrahend) {
     SubNode *result = SubNode::newNode(minuend.getDim());
-    result->connect(graph, minuend, subtrahend);
+    result->connect(minuend, subtrahend);
     return result;
 }
 
-BatchedNode *sub(Graph &graph, BatchedNode &minuend, BatchedNode &subtrahend) {
+BatchedNode *sub(BatchedNode &minuend, BatchedNode &subtrahend) {
     BatchedSubNode *node = new BatchedSubNode;
-    node->init(graph, minuend, subtrahend);
+    node->init(minuend, subtrahend);
     return node;
 }
 

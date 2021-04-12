@@ -185,10 +185,10 @@ protected:
 
 class BatchedReluNode : public BatchedNodeImpl<ReluNode> {
 public:
-    void init(Graph &graph, BatchedNode &input) {
+    void init(BatchedNode &input) {
         allocateBatch(input.getDim(), input.batch().size());
         setInputsPerNode({&input});
-        afterInit(graph, {&input});
+        afterInit({&input});
     }
 };
 
@@ -228,10 +228,10 @@ protected:
 
 class BatchedSqrtNode : public BatchedNodeImpl<SqrtNode> {
 public:
-    void init(Graph &graph, BatchedNode &input) {
+    void init(BatchedNode &input) {
         allocateBatch(input.getDim(), input.batch().size());
         setInputsPerNode({&input});
-        afterInit(graph, {&input});
+        afterInit({&input});
     }
 };
 
@@ -336,7 +336,7 @@ private:
 
 class BatchedDropoutNode : public BatchedNodeImpl<DropoutNode> {
 public:
-    void init(Graph &graph, BatchedNode &input, dtype dropout, bool is_traning) {
+    void init(BatchedNode &input, dtype dropout, bool is_traning) {
         allocateBatch(input.getDim(), input.batch().size());
         for (Node *node : batch()) {
             DropoutNode *d = dynamic_cast<DropoutNode *>(node);
@@ -344,7 +344,7 @@ public:
             d->setDropValue(dropout);
         }
         setInputsPerNode({&input});
-        afterInit(graph, {&input});
+        afterInit({&input});
     }
 };
 
@@ -515,10 +515,10 @@ private:
 
 class BatchedMaxScalarNode : public BatchedNodeImpl<MaxScalarNode> {
 public:
-    void init(Graph &graph, BatchedNode &input, int input_col) {
+    void init(BatchedNode &input, int input_col) {
         allocateBatch(input_col, input.batch().size());
         setInputsPerNode({&input});
-        afterInit(graph, {&input});
+        afterInit({&input});
     }
 };
 
@@ -640,13 +640,13 @@ private:
 
 class BatchedScalarToVectorNode : public BatchedNodeImpl<ScalarToVectorNode> {
 public:
-    void init(Graph &graph, BatchedNode &input, int row) {
+    void init(BatchedNode &input, int row) {
         allocateBatch(input.getDim() * row, input.batch().size());
         setInputsPerNode({&input});
-        afterInit(graph, {&input});
+        afterInit({&input});
     }
 
-    void init(Graph &graph, BatchedNode &input, const vector<int> &rows) {
+    void init(BatchedNode &input, const vector<int> &rows) {
         vector<int> dims(rows.size());
         int i = 0;
         for (int row : rows) {
@@ -654,7 +654,7 @@ public:
         }
         allocateBatch(dims);
         setInputsPerNode({&input});
-        afterInit(graph, {&input});
+        afterInit({&input});
     }
 };
 
@@ -762,10 +762,10 @@ protected:
 
 class BatchedExpNode : public BatchedNodeImpl<ExpNode> {
 public:
-    void init(Graph &graph, BatchedNode &input) {
+    void init(BatchedNode &input) {
         allocateBatch(input.getDims());
         setInputsPerNode({&input});
-        afterInit(graph, {&input});
+        afterInit({&input});
     }
 };
 
@@ -818,10 +818,10 @@ private:
 
 class BatchedSumNode : public BatchedNodeImpl<SumNode> {
 public:
-    void init(Graph &graph, BatchedNode &input, dtype dim) {
+    void init(BatchedNode &input, dtype dim) {
         allocateBatch(dim, input.batch().size());
         setInputsPerNode({&input});
-        afterInit(graph, {&input});
+        afterInit({&input});
     }
 };
 
@@ -932,7 +932,7 @@ private:
 
 class BatchedScaledNode : public BatchedNodeImpl<ScaledNode> {
 public:
-    void init(Graph &graph, BatchedNode &input, const vector<dtype> &factors) {
+    void init(BatchedNode &input, const vector<dtype> &factors) {
         const auto &dims = input.getDims();
         allocateBatch(dims);
 
@@ -943,7 +943,7 @@ public:
         }
 
         setInputsPerNode({&input});
-        afterInit(graph, {&input});
+        afterInit({&input});
     }
 };
 
@@ -1001,130 +1001,130 @@ Executor *ScaledNode::generate() {
     return new ScaledExecutor;
 }
 
-Node *maxScalar(Graph &graph, Node &input, int input_col) {
+Node *maxScalar(Node &input, int input_col) {
     MaxScalarNode *node = MaxScalarNode::newNode(input_col);
-    node->connect(graph, input);
+    node->connect(input);
     return node;
 }
 
-BatchedNode *maxScalar(Graph &graph, BatchedNode &input, int input_col) {
+BatchedNode *maxScalar(BatchedNode &input, int input_col) {
     BatchedMaxScalarNode *node = new BatchedMaxScalarNode;
-    node->init(graph, input, input_col);
+    node->init(input, input_col);
     return node;
 };
 
-Node *tanh(Graph &graph, Node &input) {
+Node *tanh(Node &input) {
     TanhNode *result = TanhNode::newNode(input.getDim());
-    result->connect(graph, input);
+    result->connect(input);
     return result;
 }
 
-Node *sigmoid(Graph &graph, Node &input) {
+Node *sigmoid(Node &input) {
     SigmoidNode *result = SigmoidNode::newNode(input.getDim());
-    result->connect(graph, input);
+    result->connect(input);
     return result;
 }
 
-Node *relu(Graph &graph, Node &input) {
+Node *relu(Node &input) {
     ReluNode *result = ReluNode::newNode(input.getDim());
-    result->connect(graph, input);
+    result->connect(input);
     return result;
 }
 
-BatchedNode *relu(Graph &graph, BatchedNode &input) {
+BatchedNode *relu(BatchedNode &input) {
     BatchedReluNode *node = new BatchedReluNode;
-    node->init(graph, input);
+    node->init(input);
     return node;
 }
 
-Node *sqrt(Graph &graph, Node &input) {
+Node *sqrt(Node &input) {
     SqrtNode *result = SqrtNode::newNode(input.getDim());
-    result->connect(graph, input);
+    result->connect(input);
     return result;
 }
 
-BatchedNode *sqrt(Graph &graph, BatchedNode &input) {
+BatchedNode *sqrt(BatchedNode &input) {
     BatchedSqrtNode *node = new BatchedSqrtNode;
-    node->init(graph, input);
+    node->init(input);
     return node;
 }
 
-Node *scalarToVector(Graph &graph, Node &input, int row) {
+Node *scalarToVector(Node &input, int row) {
     ScalarToVectorNode *node = ScalarToVectorNode::newNode(row * input.getDim());
     node->setColumn(input.getDim());
-    node->connect(graph, input);
+    node->connect(input);
     return node;
 }
 
-BatchedNode *scalarToVector(Graph &graph, BatchedNode &input, int row) {
+BatchedNode *scalarToVector(BatchedNode &input, int row) {
     BatchedScalarToVectorNode *node = new BatchedScalarToVectorNode;
-    node->init(graph, input, row);
+    node->init(input, row);
     return node;
 }
 
-BatchedNode *scalarToVector(Graph &graph, BatchedNode &input, const vector<int> &rows) {
+BatchedNode *scalarToVector(BatchedNode &input, const vector<int> &rows) {
     BatchedScalarToVectorNode *node = new BatchedScalarToVectorNode;
-    node->init(graph, input, rows);
+    node->init(input, rows);
     return node;
 }
 
-Node *vectorSum(Graph &graph, Node &input,  int input_col) {
+Node *vectorSum(Node &input,  int input_col) {
     SumNode *sum = SumNode::newNode(input_col);
-    sum->connect(graph, input);
+    sum->connect(input);
     return sum;
 }
 
-BatchedNode *vectorSum(Graph &graph, BatchedNode &input,  int input_col) {
+BatchedNode *vectorSum(BatchedNode &input,  int input_col) {
     BatchedSumNode *node = new BatchedSumNode;
-    node->init(graph, input, input_col);
+    node->init(input, input_col);
     return node;
 }
 
-Node *exp(Graph &graph, Node &input) {
+Node *exp(Node &input) {
     ExpNode *node = ExpNode::newNode(input.getDim());
-    node->connect(graph, input);
+    node->connect(input);
     return node;
 }
 
-BatchedNode *exp(Graph &graph, BatchedNode &input) {
+BatchedNode *exp(BatchedNode &input) {
     BatchedExpNode *node = new BatchedExpNode;
-    node->init(graph, input);
+    node->init(input);
     return node;
 }
 
-Node *dropout(Graph &graph, Node &input, dtype dropout, bool is_training) {
+Node *dropout(Node &input, dtype dropout, bool is_training) {
     DropoutNode *node = DropoutNode::newNode(input.getDim());
     node->setIsTraining(is_training);
     node->setDropValue(dropout);
-    node->connect(graph, input);
+    node->connect(input);
     return node;
 }
 
-BatchedNode *dropout(Graph &graph, BatchedNode &input, dtype dropout, bool is_training) {
+BatchedNode *dropout(BatchedNode &input, dtype dropout, bool is_training) {
     BatchedDropoutNode *node = new BatchedDropoutNode;
-    node->init(graph, input, dropout, is_training);
+    node->init(input, dropout, is_training);
     return node;
 }
 
-Node *scaled(Graph &graph, Node &input, dtype factor) {
+Node *scaled(Node &input, dtype factor) {
     ScaledNode *node = ScaledNode::newNode(input.getDim());
     node->setFactor(factor);
-    node->connect(graph, input);
+    node->connect(input);
     return node;
 }
 
-BatchedNode *scaled(Graph &graph, BatchedNode &input, const vector<dtype> &factors) {
+BatchedNode *scaled(BatchedNode &input, const vector<dtype> &factors) {
     BatchedScaledNode *node = new BatchedScaledNode;
-    node->init(graph, input, factors);
+    node->init(input, factors);
     return node;
 }
 
-BatchedNode *scaled(Graph &graph, BatchedNode &input, dtype factor) {
+BatchedNode *scaled(BatchedNode &input, dtype factor) {
     vector<dtype> factors(input.batch().size());
     for (int i = 0; i < input.batch().size(); ++i) {
         factors.at(i) = factor;
     }
-    return scaled(graph, input, factors);
+    return scaled(input, factors);
 }
 
 }

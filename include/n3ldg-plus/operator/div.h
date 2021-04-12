@@ -5,9 +5,9 @@
 
 namespace n3ldg_plus {
 
-Node *fullDiv(Graph &graph, Node &numerator, Node &denominator);
+Node *fullDiv(Node &numerator, Node &denominator);
 
-BatchedNode *fullDiv(Graph &graph, BatchedNode &numerator, BatchedNode &denominator);
+BatchedNode *fullDiv(BatchedNode &numerator, BatchedNode &denominator);
 
 }
 

@@ -5,9 +5,9 @@
 
 namespace n3ldg_plus {
 
-Node* softmax(Graph &graph, Node &input, int input_col);
+Node* softmax(Node &input, int input_col);
 
-BatchedNode* softmax(Graph &graph, BatchedNode &input, int col = 1);
+BatchedNode* softmax(BatchedNode &input, int col = 1);
 
 }
 

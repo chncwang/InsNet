@@ -7,23 +7,22 @@
 
 namespace n3ldg_plus {
 
-::std::pair<BatchedNode *, BatchedNode *> dotAttention(Graph &graph, Node& key_matrix,
-        Node& value_matrix,
+std::pair<BatchedNode *, BatchedNode *> dotAttention(Node& key_matrix, Node& value_matrix,
         BatchedNode& guide,
-        const ::std::vector<int> *matrix_cols = nullptr);
+        const std::vector<int> *matrix_cols = nullptr);
 
-::std::pair<BatchedNode *, BatchedNode *> dotAttention(Graph &graph, BatchedNode &key_matrix,
+std::pair<BatchedNode *, BatchedNode *> dotAttention(BatchedNode &key_matrix,
         BatchedNode &value_matrix,
         BatchedNode& guide,
-        const ::std::vector<int> *matrix_cols = nullptr);
+        const std::vector<int> *matrix_cols = nullptr);
 
-::std::pair<BatchedNode *, BatchedNode *> dotAttention(Graph &graph, BatchedNode &key_matrix,
+std::pair<BatchedNode *, BatchedNode *> dotAttention(BatchedNode &key_matrix,
         BatchedNode &value_matrix,
         BatchedNode &query_matrix,
         int q_col,
         bool is_decoder);
 
-Node * dotAttentionWeights(Graph &cg, Node& key_matrix, Node& guide);
+Node * dotAttentionWeights(Node& key_matrix, Node& guide);
 
 struct AdditiveAttentionParams : TunableCombination<BaseParam>
 #if USE_GPU
@@ -32,7 +31,7 @@ struct AdditiveAttentionParams : TunableCombination<BaseParam>
 {
     LinearParam k, q, w3t;
 
-    AdditiveAttentionParams(const ::std::string &name);
+    AdditiveAttentionParams(const std::string &name);
 
     template<typename Archive>
     void serialize(Archive &ar) {
@@ -42,13 +41,13 @@ struct AdditiveAttentionParams : TunableCombination<BaseParam>
     void init(int k_size, int q_size);
 
 #if USE_GPU
-    ::std::vector<Transferable *> transferablePtrs() override {
+    std::vector<Transferable *> transferablePtrs() override {
         return {&k, &q, &w3t};
     }
 #endif
 
 protected:
-    ::std::vector<Tunable<BaseParam> *> tunableComponents() override;
+    std::vector<Tunable<BaseParam> *> tunableComponents() override;
 };
 
 }

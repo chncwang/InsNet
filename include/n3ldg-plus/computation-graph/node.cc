@@ -60,8 +60,13 @@ void Node::setColumn(int column) {
     column_ = column;
 }
 
-void Node::afterConnect(NodeContainer &container, const vector<Node*> &ins) {
+void Node::afterConnect(const vector<Node*> &ins) {
+    NodeContainer &container = ins.front()->getNodeContainer();
     for (Node *in : ins) {
+        if (&container != &in->getNodeContainer()) {
+            cerr << "Node afterConnect - inconsist containers found\\n";
+            abort();
+        }
         in->addParent(this);
     }
     container.addNode(this);
@@ -135,11 +140,16 @@ const vector<int> &BatchedNode::getDims() const {
     return *dims_;
 }
 
-void BatchedNode::afterInit(NodeContainer &graph, const vector<BatchedNode *> &ins) {
-    for (NodeAbs *x : ins) {
-        x->addParent(this);
+void BatchedNode::afterInit(const vector<BatchedNode *> &ins) {
+    NodeContainer &container = ins.front()->getNodeContainer();
+    for (NodeAbs *in : ins) {
+        if (&container != &in->getNodeContainer()) {
+            cerr << "Node afterConnect - inconsist containers found\\n";
+            abort();
+        }
+        in->addParent(this);
     }
-    graph.addNode(this);
+    container.addNode(this);
 }
 
 void BatchedNode::setInputsPerNode(const vector<BatchedNode *> &batched_inputs) {
@@ -168,14 +178,14 @@ string UniInputNode::typeSignature() const {
     return Node::typeSignature() + "-" + to_string(input_->getDim()) + "-";
 }
 
-void UniInputNode::connect(NodeContainer &container, Node &input) {
+void UniInputNode::connect(Node &input) {
     if (!isDimLegal(input)) {
         cerr << fmt::format("dim:%1% input dim:%2%\n", Node::getDim(), input.getDim());
         abort();
     }
     vector<Node*> ins = {&input};
     setInputs(ins);
-    Node::afterConnect(container, ins);
+    Node::afterConnect(ins);
 }
 
 #if USE_GPU

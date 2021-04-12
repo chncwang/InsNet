@@ -37,34 +37,35 @@ vector<Tunable<BaseParam> *> GRUParam::tunableComponents() {
         &candidate_hidden};
 }
 
-void GRUBuilder::step(Graph &graph, GRUParam &gru_params, Node &input, Node &h0, dtype dropout,
+void GRUBuilder::step(GRUParam &gru_params, Node &input, Node &h0, dtype dropout,
         bool is_training) {
     int len = hiddens_.size();
     Node *last_hidden = len == 0 ? &h0 : hiddens_.at(len - 1);
     using namespace n3ldg_plus;
 
-    Node *update_input = linear(graph, input, gru_params.update_input);
-    Node *update_hidden = linear(graph, *last_hidden, gru_params.update_hidden);
-    Node *update_gate = add(graph, {update_input, update_hidden});
-    update_gate = sigmoid(graph, *update_gate);
+    Node *update_input = linear(input, gru_params.update_input);
+    Node *update_hidden = linear(*last_hidden, gru_params.update_hidden);
+    Node *update_gate = add({update_input, update_hidden});
+    update_gate = sigmoid(*update_gate);
 
-    Node *reset_input = linear(graph, input, gru_params.reset_input);
-    Node *reset_hidden = linear(graph, *last_hidden, gru_params.reset_hidden);
-    Node *reset_gate = add(graph, {reset_input, reset_hidden});
-    reset_gate = sigmoid(graph, *reset_gate);
+    Node *reset_input = linear(input, gru_params.reset_input);
+    Node *reset_hidden = linear(*last_hidden, gru_params.reset_hidden);
+    Node *reset_gate = add({reset_input, reset_hidden});
+    reset_gate = sigmoid(*reset_gate);
 
-    Node *candidate_input = linear(graph, input, gru_params.candidate_input);
-    Node *updated_hidden = pointwiseMultiply(graph, *reset_gate, *last_hidden);
-    Node *candidate_hidden = linear(graph, *updated_hidden, gru_params.candidate_hidden);
-    Node *candidate = add(graph, {candidate_input, candidate_hidden});
-    candidate = tanh(graph, *candidate);
+    Node *candidate_input = linear(input, gru_params.candidate_input);
+    Node *updated_hidden = pointwiseMultiply(*reset_gate, *last_hidden);
+    Node *candidate_hidden = linear(*updated_hidden, gru_params.candidate_hidden);
+    Node *candidate = add({candidate_input, candidate_hidden});
+    candidate = tanh(*candidate);
 
     int hidden_dim = h0.getDim();
+    Graph &graph = dynamic_cast<Graph&>(input.getNodeContainer());
     Node *one = bucket(graph, hidden_dim, 1);
-    Node *reversal_update = sub(graph, *one, *update_gate);
-    Node *passed_last_hidden = pointwiseMultiply(graph, *reversal_update, *last_hidden);
-    Node *updated_candidate = pointwiseMultiply(graph, *update_gate, *candidate);
-    Node *h = add(graph, {passed_last_hidden, updated_candidate});
+    Node *reversal_update = sub(*one, *update_gate);
+    Node *passed_last_hidden = pointwiseMultiply(*reversal_update, *last_hidden);
+    Node *updated_candidate = pointwiseMultiply(*update_gate, *candidate);
+    Node *h = add({passed_last_hidden, updated_candidate});
     hiddens_.push_back(h);
 }
 

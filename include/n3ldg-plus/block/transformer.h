@@ -264,21 +264,19 @@ private:
 
 typedef TransformerParams<TransformerDecoderLayerParams> TransformerDecoderParams;
 
-Node *dotAttention(Graph &graph, Node& k, Node& v, int v_col, Node& q, int q_col, int head_count,
+Node *dotAttention(Node& k, Node& v, int v_col, Node& q, int q_col, int head_count,
         LinearParam &fusion_param,
         dtype dropout_value,
         bool use_mask,
         bool is_training);
 
-Node *transformerEncoder(Graph &graph, TransformerEncoderParams &params, Node &inputs,
-        int sentence_len,
+Node *transformerEncoder(TransformerEncoderParams &params, Node &inputs, int sentence_len,
         dtype dropout_value,
         bool is_training);
 
 class TransformerDecoderBuilderAbs {
 public:
-    TransformerDecoderBuilderAbs(Graph &graph, TransformerDecoderParams &params,
-            Node &encoder_hiddens,
+    TransformerDecoderBuilderAbs(TransformerDecoderParams &params, Node &encoder_hiddens,
             int encoder_sentence_len,
             dtype dropout,
             bool is_training);
@@ -305,8 +303,7 @@ protected:
 
 class TransformerDecoderCellBuilder : public TransformerDecoderBuilderAbs {
 public:
-    TransformerDecoderCellBuilder(Graph &graph, TransformerDecoderParams &params,
-            Node &encoder_hiddens,
+    TransformerDecoderCellBuilder(TransformerDecoderParams &params, Node &encoder_hiddens,
             int encoder_sentence_len,
             dtype dropout,
             bool is_training);
@@ -327,8 +324,7 @@ private:
 
 class TransformerDecoderBuilder : public TransformerDecoderBuilderAbs {
 public:
-    TransformerDecoderBuilder(Graph &graph, TransformerDecoderParams &params,
-            Node &encoder_hiddens,
+    TransformerDecoderBuilder(TransformerDecoderParams &params, Node &encoder_hiddens,
             int encoder_sentence_len,
             dtype dropout,
             bool is_training);

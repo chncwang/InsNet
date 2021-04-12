@@ -45,8 +45,7 @@ public:
         return hiddens_.size();
     }
 
-    void step(Graph &graph, LSTMParam &lstm_params, Node &input, Node &h0, Node &c0,
-            dtype dropout_value,
+    void step(LSTMParam &lstm_params, Node &input, Node &h0, Node &c0, dtype dropout_value,
             bool is_training);
 
     const ::std::vector<Node *> &cells() {

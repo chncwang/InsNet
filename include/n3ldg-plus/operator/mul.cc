@@ -22,9 +22,9 @@ public:
         init(dim);
     }
 
-    void connect(Graph &graph, Node &input1, Node &input2) {
+    void connect(Node &input1, Node &input2) {
         setInputs({&input1, &input2});
-        afterConnect(graph, {&input1, &input2});
+        afterConnect({&input1, &input2});
     }
 
     void setInputs(const vector<Node *> &inputs) override {
@@ -51,10 +51,10 @@ public:
 
 class BatchedPMultiNode : public BatchedNodeImpl<PMultiNode> {
 public:
-    void init(Graph &graph, BatchedNode &a, BatchedNode &b) {
+    void init(BatchedNode &a, BatchedNode &b) {
         allocateBatch(a.getDim(), a.batch().size());
         setInputsPerNode({&a, &b});
-        afterInit(graph, {&a, &b});
+        afterInit({&a, &b});
     }
 };
 
@@ -129,23 +129,23 @@ Executor * PMultiNode::generate() {
     return exec;
 };
 
-Node *pointwiseMultiply(Graph &graph, Node &a, Node &b) {
+Node *pointwiseMultiply(Node &a, Node &b) {
     if (a.getDim() != b.getDim()) {
         cerr << fmt::format("a dim:{} b dim:{}\n", a.getDim(), b.getDim());
         abort();
     }
     PMultiNode *node = PMultiNode::newNode(a.getDim());
-    node->connect(graph, a, b);
+    node->connect(a, b);
     return node;
 }
 
-BatchedNode *pointwiseMultiply(Graph &graph, BatchedNode &a, BatchedNode &b) {
+BatchedNode *pointwiseMultiply(BatchedNode &a, BatchedNode &b) {
     if (a.getDim() != b.getDim()) {
         cerr << fmt::format("a dim:{} b dim:{}", a.getDim(), b.getDim());
         abort();
     }
     BatchedPMultiNode *node = new BatchedPMultiNode;
-    node->init(graph, a, b);
+    node->init(a, b);
     return node;
 }
 

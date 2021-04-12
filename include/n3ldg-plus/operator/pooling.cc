@@ -28,11 +28,7 @@ public:
         }
     }
 
-    void forward(Graph &graph, vector<Node *> &x) {
-        forward(&graph, x);
-    }
-
-    void forward(Graph *cg, vector<Node *>& x) {
+    void connect(const vector<Node *> &x) {
         if (x.size() == 0) {
             cerr << "empty inputs for max|min|sum|avg pooling" << endl;
             abort();
@@ -46,11 +42,7 @@ public:
             ins.push_back(x[i]);
         }
 
-        for (int i = 0; i < nSize; i++) {
-            ins[i]->addParent(this);
-        }
-
-        cg->addNode(this);
+        afterConnect(x);
     }
 
     Executor *generate() override;
@@ -288,7 +280,7 @@ public:
         setDim(dim);
     }
 
-    void forward(Graph &cg, const vector<Node *>& x) {
+    void connect(const vector<Node *>& x) {
         if (x.size() == 0) {
             cerr << "empty inputs for add" << endl;
             abort();
@@ -303,12 +295,7 @@ public:
             }
         }
 
-        int nSize = ins.size();
-        for (int i = 0; i < nSize; ++i) {
-            ins[i]->addParent(this);
-        }
-
-        cg.addNode(this);
+        afterConnect(x);
     }
 
     void compute() override {
@@ -438,7 +425,7 @@ Executor * SumPoolNode::generate() {
     return exec;
 }
 
-Node *maxPool(Graph &graph, vector<Node *> &inputs) {
+Node *maxPool(vector<Node *> &inputs) {
     int dim = inputs.front()->getDim();
     for (int i = 1; i < inputs.size(); ++i) {
         if (dim != inputs.at(i)->getDim()) {
@@ -448,29 +435,29 @@ Node *maxPool(Graph &graph, vector<Node *> &inputs) {
     }
 
     MaxPoolNode *pool = MaxPoolNode::newNode(dim);
-    pool->forward(graph, inputs);
+    pool->connect(inputs);
     return pool;
 }
 
-Node *minPool(Graph &graph, vector<Node *> &inputs) {
+Node *minPool(vector<Node *> &inputs) {
     vector<Node *> negative;
     negative.reserve(inputs.size());
     for (Node *input : inputs) {
-        negative.push_back(scaled(graph, *input, -1));
+        negative.push_back(scaled(*input, -1));
     }
-    return scaled(graph, *maxPool(graph, negative), -1);
+    return scaled(*maxPool(negative), -1);
 }
 
-Node *sumPool(Graph &graph, vector<Node *> &inputs) {
+Node *sumPool(vector<Node *> &inputs) {
     int dim = inputs.front()->getDim();
     SumPoolNode *pool = SumPoolNode::newNode(dim);
-    pool->forward(graph, inputs);
+    pool->connect(inputs);
     return pool;
 }
 
-Node *averagePool(Graph &graph, vector<Node *> &inputs) {
-    Node *sum = sumPool(graph, inputs);
-    return scaled(graph, *sum, 1.0 / inputs.size());
+Node *averagePool(vector<Node *> &inputs) {
+    Node *sum = sumPool(inputs);
+    return scaled(*sum, 1.0 / inputs.size());
 }
 
 }

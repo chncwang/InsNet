@@ -17,7 +17,7 @@ struct GRUParam : public TunableCombination<BaseParam>
     LinearParam candidate_input;
     LinearParam candidate_hidden;
 
-    GRUParam(const ::std::string &name);
+    GRUParam(const std::string &name);
 
     template<typename Archive>
     void serialize(Archive &ar) {
@@ -36,11 +36,11 @@ struct GRUParam : public TunableCombination<BaseParam>
     }
 
 #if USE_GPU
-    ::std::vector<Transferable *> transferablePtrs() override;
+    std::vector<Transferable *> transferablePtrs() override;
 #endif
 
 protected:
-    ::std::vector<Tunable<BaseParam> *> tunableComponents() override;
+    std::vector<Tunable<BaseParam> *> tunableComponents() override;
 };
 
 class GRUBuilder {
@@ -49,15 +49,14 @@ public:
         return hiddens_.size();
     }
 
-    const ::std::vector<Node *> &hiddens() {
+    const std::vector<Node *> &hiddens() {
         return hiddens_;
     }
 
-    void step(Graph &graph, GRUParam &gru_params, Node &input, Node &h0, dtype dropout,
-            bool is_training);
+    void step(GRUParam &gru_params, Node &input, Node &h0, dtype dropout, bool is_training);
 
 private:
-    ::std::vector<Node*> hiddens_;
+    std::vector<Node*> hiddens_;
 };
 
 }

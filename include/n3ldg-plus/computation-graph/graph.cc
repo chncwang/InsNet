@@ -86,6 +86,7 @@ void Graph::addNode(NodeAbs *x) {
         cerr << "x is nullptr" << endl;
         abort();
     }
+    x->setNodeContainer(*this);
     if (x->getDegree() == 0) {
         Insert(x, free_nodes);
     }

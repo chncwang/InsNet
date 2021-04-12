@@ -5,11 +5,11 @@
 
 namespace n3ldg_plus {
 
-Node *concat(Graph &graph, const std::vector<Node*> &inputs, int col = 1);
+Node *concat(const std::vector<Node*> &inputs, int col = 1);
 
-Node *concat(Graph &graph, BatchedNode &inputs, int col = 1);
+Node *concat(BatchedNode &inputs, int col = 1);
 
-BatchedNode *concatInBatch(Graph &graph, const std::vector<BatchedNode *> &inputs);
+BatchedNode *concatInBatch(const std::vector<BatchedNode *> &inputs);
 
 }
 

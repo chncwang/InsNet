@@ -43,10 +43,10 @@ private:
 
 class BatchedStandardLayerNormNode : public BatchedNodeImpl<StandardLayerNormNode> {
 public:
-    void init(Graph &graph, BatchedNode &input) {
+    void init(BatchedNode &input) {
         allocateBatch(input.getDim(), input.batch().size());
         setInputsPerNode({&input});
-        afterInit(graph, {&input});
+        afterInit({&input});
     }
 };
 
@@ -277,20 +277,20 @@ private:
 
     friend class BatchedPointwiseLinearNode;
     friend class PointwiseLinearExecutor;
-    friend Node *layerNormalization(Graph &graph, LayerNormalizationParams &params,
+    friend Node *layerNormalization(LayerNormalizationParams &params,
             Node &input_layer, int col);
 };
 
 class BatchedPointwiseLinearNode : public BatchedNodeImpl<PointwiseLinearNode> {
 public:
-    void init(Graph &graph, BatchedNode &input, LayerNormalizationParams &params) {
+    void init(BatchedNode &input, LayerNormalizationParams &params) {
         allocateBatch(input.getDim(), input.batch().size());
         setInputsPerNode({&input});
         for (Node *node : batch()) {
             PointwiseLinearNode &p = dynamic_cast<PointwiseLinearNode &>(*node);
             p.params_ = &params;
         }
-        afterInit(graph, {&input});
+        afterInit({&input});
     }
 };
 
@@ -385,36 +385,36 @@ Executor *PointwiseLinearNode::generate() {
     return new PointwiseLinearExecutor;
 }
 
-Node *layerNormalization(Graph &graph, LayerNormalizationParams &params, Node &input_layer,
+Node *layerNormalization(LayerNormalizationParams &params, Node &input_layer,
         int col) {
     using namespace n3ldg_plus;
     bool pool = col == 1;
     StandardLayerNormNode *a = StandardLayerNormNode::newNode(input_layer.getDim(), pool);
     a->setColumn(col);
-    a->connect(graph, input_layer);
+    a->connect(input_layer);
     PointwiseLinearNode *b = PointwiseLinearNode::newNode(input_layer.getDim());
     b->setColumn(col);
     b->params_ = &params;
-    b->connect(graph, *a);
+    b->connect(*a);
     return b;
 }
 
-BatchedNode *layerNormalization(Graph &graph, LayerNormalizationParams &params,
+BatchedNode *layerNormalization(LayerNormalizationParams &params,
         BatchedNode &input_layer) {
     using namespace n3ldg_plus;
     BatchedStandardLayerNormNode *a = new BatchedStandardLayerNormNode;
-    a->init(graph, input_layer);
+    a->init(input_layer);
     BatchedPointwiseLinearNode *b = new BatchedPointwiseLinearNode;
-    b->init(graph, *a, params);
+    b->init(*a, params);
     return b;
 }
 
-vector<Node *> layerNormalization(Graph &graph, LayerNormalizationParams &params,
+vector<Node *> layerNormalization(LayerNormalizationParams &params,
         const vector<Node *> &input_layer) {
     vector<Node *> results;
     results.reserve(input_layer.size());
     for (Node *x : input_layer) {
-        results.push_back(layerNormalization(graph, params, *x));
+        results.push_back(layerNormalization(params, *x));
     }
     return results;
 }

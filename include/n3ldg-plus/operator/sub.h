@@ -5,9 +5,9 @@
 
 namespace n3ldg_plus {
 
-Node *sub(Graph &graph, Node &minuend, Node &subtrahend);
+Node *sub(Node &minuend, Node &subtrahend);
 
-BatchedNode *sub(Graph &graph, BatchedNode &minuend, BatchedNode &subtrahend);
+BatchedNode *sub(BatchedNode &minuend, BatchedNode &subtrahend);
 
 }
 

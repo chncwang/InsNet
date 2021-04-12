@@ -426,14 +426,14 @@ private:
 
 class BatchedBiasNode : public BatchedNodeImpl<BiasNode> {
 public:
-    void init(Graph &graph, BatchedNode &input, BiasParam &param) {
+    void init(BatchedNode &input, BiasParam &param) {
         allocateBatch(input.getDim(), input.batch().size());
         for (Node *node : batch()) {
             BiasNode *b = dynamic_cast<BiasNode *>(node);
             b->setParam(param);
         }
         setInputsPerNode({&input});
-        afterInit(graph, {&input});
+        afterInit({&input});
     }
 };
 
@@ -490,7 +490,7 @@ Executor *BiasNode::generate() {
     return new BiasExecutor;
 }
 
-Node *linear(Graph &graph, Node &input, LinearParam &params) {
+Node *linear(Node &input, LinearParam &params) {
     if (input.getDim() % params.W().outDim() != 0) {
         cerr << fmt::format("linear input dim:{} W col:{} W col:{}\n", input.getDim(),
             input.getColumn(), params.W().inDim());
@@ -501,11 +501,11 @@ Node *linear(Graph &graph, Node &input, LinearParam &params) {
     LinearNode *uni = LinearNode::newNode(dim * col);
     uni->setColumn(col);
     uni->setParam(params);
-    uni->connect(graph, input);
+    uni->connect(input);
     return uni;
 }
 
-Node *linear(Graph &graph, Node &input, Param &param) {
+Node *linear(Node &input, Param &param) {
     if (input.getDim() % param.outDim() != 0) {
         cerr << fmt::format("linear input dim:%1% W col:%2% W col:%3%\n", input.getDim(),
             input.getColumn(), param.inDim());
@@ -529,21 +529,21 @@ Node *linear(Graph &graph, Node &input, Param &param) {
     LinearNode *uni = LinearNode::newNode(dim * col, pool);
     uni->setColumn(col);
     uni->setParam(*uni_params);
-    uni->connect(graph, input);
+    uni->connect(input);
     return uni;
 }
 
-Node *bias(Graph &graph, Node &input, BiasParam &param) {
+Node *bias(Node &input, BiasParam &param) {
     int dim = input.getDim();
     BiasNode *node = BiasNode::newNode(dim);
     node->setParam(param);
-    node->connect(graph, input);
+    node->connect(input);
     return node;
 }
 
-BatchedNode *bias(Graph &graph, BatchedNode &input, BiasParam &param) {
+BatchedNode *bias(BatchedNode &input, BiasParam &param) {
     BatchedBiasNode *node = new BatchedBiasNode;
-    node->init(graph, input, param);
+    node->init(input, param);
     return node;
 }
 

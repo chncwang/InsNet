@@ -5,45 +5,45 @@
 
 namespace n3ldg_plus {
 
-Node *maxScalar(Graph &graph, Node &input, int input_col);
+Node *maxScalar(Node &input, int input_col);
 
-BatchedNode *maxScalar(Graph &graph, BatchedNode &input, int input_col);
+BatchedNode *maxScalar(BatchedNode &input, int input_col);
 
-Node *tanh(Graph &graph, Node &input);
+Node *tanh(Node &input);
 
-Node *sigmoid(Graph &graph, Node &input);
+Node *sigmoid(Node &input);
 
-Node *relu(Graph &graph, Node &input);
+Node *relu(Node &input);
 
-BatchedNode *relu(Graph &graph, BatchedNode &input);
+BatchedNode *relu(BatchedNode &input);
 
-Node *sqrt(Graph &graph, Node &input);
+Node *sqrt(Node &input);
 
-BatchedNode *sqrt(Graph &graph, BatchedNode &input);
+BatchedNode *sqrt(BatchedNode &input);
 
-Node *scalarToVector(Graph &graph, Node &input, int row);
+Node *scalarToVector(Node &input, int row);
 
-BatchedNode *scalarToVector(Graph &graph, BatchedNode &input, int row);
+BatchedNode *scalarToVector(BatchedNode &input, int row);
 
-BatchedNode *scalarToVector(Graph &graph, BatchedNode &input, const ::std::vector<int> &rows);
+BatchedNode *scalarToVector(BatchedNode &input, const ::std::vector<int> &rows);
 
-Node *vectorSum(Graph &graph, Node &input,  int input_col);
+Node *vectorSum(Node &input,  int input_col);
 
-BatchedNode *vectorSum(Graph &graph, BatchedNode &input,  int input_col);
+BatchedNode *vectorSum(BatchedNode &input,  int input_col);
 
-Node *exp(Graph &graph, Node &input);
+Node *exp(Node &input);
 
-BatchedNode *exp(Graph &graph, BatchedNode &input);
+BatchedNode *exp(BatchedNode &input);
 
-Node *dropout(Graph &graph, Node &input, dtype dropout, bool is_training);
+Node *dropout(Node &input, dtype dropout, bool is_training);
 
-BatchedNode *dropout(Graph &graph, BatchedNode &input, dtype dropout, bool is_training);
+BatchedNode *dropout(BatchedNode &input, dtype dropout, bool is_training);
 
-Node *scaled(Graph &graph, Node &input, dtype factor);
+Node *scaled(Node &input, dtype factor);
 
-BatchedNode *scaled(Graph &graph, BatchedNode &input, const ::std::vector<dtype> &factors);
+BatchedNode *scaled(BatchedNode &input, const ::std::vector<dtype> &factors);
 
-BatchedNode *scaled(Graph &graph, BatchedNode &input, dtype factor);
+BatchedNode *scaled(BatchedNode &input, dtype factor);
 
 }
 

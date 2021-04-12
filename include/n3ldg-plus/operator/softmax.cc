@@ -60,13 +60,13 @@ protected:
 
 class BatchedSoftmaxNode : public BatchedNodeImpl<SoftmaxNode> {
 public:
-    void init(Graph &graph, BatchedNode &input, int col) {
+    void init(BatchedNode &input, int col) {
         allocateBatch(input.getDims());
         setInputsPerNode({&input});
         for (Node *node : batch()) {
             node->setColumn(col);
         }
-        afterInit(graph, {&input});
+        afterInit({&input});
     }
 };
 
@@ -155,19 +155,19 @@ Executor *SoftmaxNode::generate() {
     return new SoftmaxExecutor;
 }
 
-Node* softmax(Graph &graph, Node &input, int input_col) {
+Node* softmax(Node &input, int input_col) {
     using namespace n3ldg_plus;
     bool pool = input_col == 1;
     SoftmaxNode *node = SoftmaxNode::newNode(input.getDim(), pool);
     node->setColumn(input_col);
-    node->connect(graph, input);
+    node->connect(input);
     return node;
 }
 
-BatchedNode* softmax(Graph &graph, BatchedNode &input, int col) {
+BatchedNode* softmax(BatchedNode &input, int col) {
     using namespace n3ldg_plus;
     BatchedSoftmaxNode *node = new BatchedSoftmaxNode;
-    node->init(graph, input, col);
+    node->init(input, col);
     return node;
 }
 

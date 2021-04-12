@@ -71,13 +71,13 @@ public:
     }
 };
 
-Node *linear(Graph &graph, Node &input, LinearParam &params);
+Node *linear(Node &input, LinearParam &params);
 
-Node *linear(Graph &graph, Node &input, Param &param);
+Node *linear(Node &input, Param &param);
 
-Node *bias(Graph &graph, Node &input, BiasParam &param);
+Node *bias(Node &input, BiasParam &param);
 
-BatchedNode *bias(Graph &graph, BatchedNode &input, BiasParam &param);
+BatchedNode *bias(BatchedNode &input, BiasParam &param);
 
 }
 
