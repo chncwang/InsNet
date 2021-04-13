@@ -34,8 +34,9 @@ int Size(const NodeMap &map) {
 
 }
 
-Graph::Graph(bool eager, bool calculate_flops, bool calculate_activations) : eager_(eager),
-    calculate_flops_(calculate_flops), calculate_activations_(calculate_activations) {}
+Graph::Graph(ModelStage stage, bool eager, bool calculate_flops, bool calculate_activations) :
+    NodeContainer(stage), eager_(eager), calculate_flops_(calculate_flops),
+    calculate_activations_(calculate_activations) {}
 
 Graph::~Graph() {
     int count = execs.size();

@@ -236,11 +236,7 @@ void cpu::Tensor2D::randomNorm(dtype sd) {
     normal_distribution<> d(0, sd);
     for (int i = 0; i < size; i++) {
         v[i] = d(eng);
-        if (i < 100) {
-            cout << v[i] << " ";
-        }
     }
-    cout << endl;
 }
 
 void cpu::Tensor2D::norm2one(dtype norm) {

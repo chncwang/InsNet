@@ -267,19 +267,16 @@ typedef TransformerParams<TransformerDecoderLayerParams> TransformerDecoderParam
 Node *dotAttention(Node& k, Node& v, int v_col, Node& q, int q_col, int head_count,
         LinearParam &fusion_param,
         dtype dropout_value,
-        bool use_mask,
-        bool is_training);
+        bool use_mask);
 
-Node *transformerEncoder(TransformerEncoderParams &params, Node &inputs, int sentence_len,
-        dtype dropout_value,
-        bool is_training);
+Node *transformerEncoder(Node &inputs, int sentence_len, TransformerEncoderParams &params,
+        dtype dropout_value);
 
 class TransformerDecoderBuilderAbs {
 public:
     TransformerDecoderBuilderAbs(TransformerDecoderParams &params, Node &encoder_hiddens,
             int encoder_sentence_len,
-            dtype dropout,
-            bool is_training);
+            dtype dropout);
 
     virtual ~TransformerDecoderBuilderAbs() = default;
 
@@ -296,7 +293,6 @@ protected:
 
     int encoder_sentence_len_;
     dtype dropout_;
-    bool is_training_;
 
     bool prepared_ = false;
 };
@@ -305,8 +301,7 @@ class TransformerDecoderCellBuilder : public TransformerDecoderBuilderAbs {
 public:
     TransformerDecoderCellBuilder(TransformerDecoderParams &params, Node &encoder_hiddens,
             int encoder_sentence_len,
-            dtype dropout,
-            bool is_training);
+            dtype dropout);
 
     const std::vector<std::vector<Node *>> &hiddenLayers() {
         return hidden_layers_;
@@ -326,8 +321,7 @@ class TransformerDecoderBuilder : public TransformerDecoderBuilderAbs {
 public:
     TransformerDecoderBuilder(TransformerDecoderParams &params, Node &encoder_hiddens,
             int encoder_sentence_len,
-            dtype dropout,
-            bool is_training);
+            dtype dropout);
 
     void connect(Node &inputs, int dec_sentence_len);
 

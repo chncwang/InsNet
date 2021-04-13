@@ -15,9 +15,23 @@ namespace n3ldg_plus {
 class Executor;
 class NodeAbs;
 
+enum ModelStage {
+    TRAINING = 0,
+    INFERENCE = 1
+};
+
 class NodeContainer {
 public:
+    NodeContainer(ModelStage model_stage = ModelStage::TRAINING) : model_stage_(model_stage) {}
+
     virtual void addNode(NodeAbs *node) = 0;
+
+    ModelStage getModelStage() const {
+        return model_stage_;
+    }
+
+private:
+    ModelStage model_stage_;
 };
 
 std::string addressToString(const void* p);

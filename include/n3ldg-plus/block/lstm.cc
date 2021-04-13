@@ -39,8 +39,7 @@ vector<Tunable<BaseParam> *> LSTMParam::tunableComponents() {
 }
 
 void LSTMBuilder::step(LSTMParam &lstm_params, Node &input, Node &h0, Node &c0,
-        dtype dropout_value,
-        bool is_training) {
+        dtype dropout_value) {
     Node *last_hidden, *last_cell;
     int len = hiddens_.size();
     if (len == 0) {
@@ -76,7 +75,7 @@ void LSTMBuilder::step(LSTMParam &lstm_params, Node &input, Node &h0, Node &c0,
     Node *cell = add({inputfilter, forgetfilter});
     Node *halfhidden = tanh(*cell);
     Node *hidden = pointwiseMultiply(*halfhidden, *outputgate);
-    hidden = dropout(*hidden, dropout_value, is_training);
+    hidden = dropout(*hidden, dropout_value);
     hiddens_.push_back(hidden);
     cells_.push_back(cell);
 }

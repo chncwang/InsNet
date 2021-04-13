@@ -35,9 +35,9 @@ Node *exp(Node &input);
 
 BatchedNode *exp(BatchedNode &input);
 
-Node *dropout(Node &input, dtype dropout, bool is_training);
+Node *dropout(Node &input, dtype dropout);
 
-BatchedNode *dropout(BatchedNode &input, dtype dropout, bool is_training);
+BatchedNode *dropout(BatchedNode &input, dtype dropout);
 
 Node *scaled(Node &input, dtype factor);
 

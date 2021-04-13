@@ -208,22 +208,22 @@ public:
     }
 };
 
-Node *embedding(Graph &graph, Param &lookup, const std::vector<int> &ids,
+Node *embedding(Graph &graph, const std::vector<int> &ids, Param &lookup,
         bool should_backward = true);
 
-Node *embedding(Graph &graph, Param &lookup, int id, bool should_backward = true);
+Node *embedding(Graph &graph, int id, Param &lookup, bool should_backward = true);
 
-Node *embedding(Graph &graph, Embedding<Param> &lookup, const std::vector<std::string> &words,
+Node *embedding(Graph &graph, const std::vector<std::string> &words, Embedding<Param> &lookup,
         bool should_backward = true);
 
-Node *embedding(Graph &graph, Embedding<SparseParam> &lookup,
-        const std::vector<std::string> &words,
+Node *embedding(Graph &graph, const std::vector<std::string> &words,
+        Embedding<SparseParam> &lookup,
         bool should_backward = true);
 
-Node *embedding(Graph &graph, Embedding<Param> &lookup, const std::string &word,
+Node *embedding(Graph &graph, const std::string &word, Embedding<Param> &lookup,
         bool should_backward = true);
 
-Node *embedding(Graph &graph, Embedding<SparseParam> &lookup, const std::string &word,
+Node *embedding(Graph &graph, const std::string &word, Embedding<SparseParam> &lookup,
         bool should_backward = true);
 
 }

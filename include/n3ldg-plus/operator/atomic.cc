@@ -6,6 +6,7 @@ using std::string;
 using std::to_string;
 using std::vector;
 using std::cerr;
+using std::cout;
 
 namespace n3ldg_plus {
 
@@ -270,7 +271,7 @@ public:
 
 #if !USE_GPU || TEST_CUDA
     void compute() override {
-        if (is_training_) {
+        if (isTraining()) {
 #if !TEST_CUDA
             generate_dropmask();
 #endif
@@ -300,7 +301,7 @@ public:
     Executor *generate() override;
 
     bool isTraining() {
-        return is_training_;
+        return getNodeContainer().getModelStage() == ModelStage::TRAINING;
     }
 
 #if !USE_GPU || TEST_CUDA
@@ -308,10 +309,6 @@ public:
         return drop_mask_;
     }
 #endif
-
-    void setIsTraining(bool is_training) {
-        is_training_ = is_training;
-    }
 
     void setDropValue(dtype drop_value) {
         drop_value_ = drop_value;
@@ -331,16 +328,14 @@ private:
     Tensor1D drop_mask_;
 #endif
     dtype drop_value_ = 0.0f;
-    bool is_training_ = true;
 };
 
 class BatchedDropoutNode : public BatchedNodeImpl<DropoutNode> {
 public:
-    void init(BatchedNode &input, dtype dropout, bool is_traning) {
+    void init(BatchedNode &input, dtype dropout) {
         allocateBatch(input.getDim(), input.batch().size());
         for (Node *node : batch()) {
             DropoutNode *d = dynamic_cast<DropoutNode *>(node);
-            d->setIsTraining(is_traning);
             d->setDropValue(dropout);
         }
         setInputsPerNode({&input});
@@ -1092,17 +1087,16 @@ BatchedNode *exp(BatchedNode &input) {
     return node;
 }
 
-Node *dropout(Node &input, dtype dropout, bool is_training) {
+Node *dropout(Node &input, dtype dropout) {
     DropoutNode *node = DropoutNode::newNode(input.getDim());
-    node->setIsTraining(is_training);
     node->setDropValue(dropout);
     node->connect(input);
     return node;
 }
 
-BatchedNode *dropout(BatchedNode &input, dtype dropout, bool is_training) {
+BatchedNode *dropout(BatchedNode &input, dtype dropout) {
     BatchedDropoutNode *node = new BatchedDropoutNode;
-    node->init(input, dropout, is_training);
+    node->init(input, dropout);
     return node;
 }
 

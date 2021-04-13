@@ -37,8 +37,7 @@ vector<Tunable<BaseParam> *> GRUParam::tunableComponents() {
         &candidate_hidden};
 }
 
-void GRUBuilder::step(GRUParam &gru_params, Node &input, Node &h0, dtype dropout,
-        bool is_training) {
+void GRUBuilder::step(GRUParam &gru_params, Node &input, Node &h0, dtype dropout) {
     int len = hiddens_.size();
     Node *last_hidden = len == 0 ? &h0 : hiddens_.at(len - 1);
     using namespace n3ldg_plus;

@@ -53,7 +53,7 @@ public:
         return hiddens_;
     }
 
-    void step(GRUParam &gru_params, Node &input, Node &h0, dtype dropout, bool is_training);
+    void step(GRUParam &gru_params, Node &input, Node &h0, dtype dropout);
 
 private:
     std::vector<Node*> hiddens_;
