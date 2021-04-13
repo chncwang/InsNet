@@ -3,7 +3,7 @@ Getting Started
 
 In this topic, we will demonstrate how to train a model using N3LDG++ from scratch, taking the conversation model as an example.
 
-Before getting started, note that N3LDG++ uses procedural style computation APIs, so unlike PyTorch there is no concept of "module", and parameters are decoupled from models, making it straightforward when reusing the same parameters in different layers or places of the neural network.
+Before getting started, note that N3LDG++ uses procedural style computation APIs. Thus Unlike PyTorch, there is no concept of "module" and parameters are decoupled from models, making it straightforward when reusing the same parameters in different layers or places of the neural network.
 
 Firstly, we define model parameters as follows:
 
@@ -74,6 +74,8 @@ Supposing that we have already loaded and randomly shuffled training instances, 
 
     int tgt_len_sum = 0;
 
+    // In this loop, we only build the computation graph, but do not execute any forward
+    // computation.
     for (const auto &ins : minibatch) {
         // ins.src can be either of type std::vector<std::string> or std::vector<int>, i.e.,
         // it means words or word ids in a source sentence. Suppose we use std::vector<int>
@@ -106,3 +108,7 @@ Supposing that we have already loaded and randomly shuffled training instances, 
     graph.backward();
 
     optimizer->step();
+
+The above codes show that we need not merge inputs from a mini-batch into a tensor nor append paddings.
+
+For the current version, the Transformer's layer number is determined by its parameters' layer number. But we can easily change it to support dynamic networks with an early exiting mechanism, and in that case, N3LDG++ will only execute activated layers in batch.
