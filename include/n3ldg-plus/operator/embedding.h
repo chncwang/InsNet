@@ -31,6 +31,10 @@ public:
         bFineTune = false;
     }
 
+    int size() const {
+        return nVSize;
+    }
+
 #if USE_GPU
     std::vector<cuda::Transferable *> transferablePtrs() override {
         return {&E};
