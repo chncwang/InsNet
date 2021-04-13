@@ -9,7 +9,7 @@ N3LDG++ documentation
 `N3LDG++ <http://github.com/chncwang/n3ldg-plus>`_  is a powerful neural network library aiming at building flexible NLP models, especially those with dynamic computation graphs for different instances. It is designed to run dynamic models on the fly and allow users to focus on building the graph for a single instance, leaving batching (both mini-batch and instance level) to the library's lazy execution. This design has at least three advantages as follows:
 
 1. It makes it super easy to build NLP models with instance-dependent computation graphs, such as tree-LSTM or hierarchical transformers.
-2. It reduces users' intellectual burden of manual batching, as N3LDG++ can efficiently take over all batching works. As such, users even need not know the concept of tensors, but only matrices (such as K, V, and Q in transformers) and vectors (which are one-column matrices), neither the concept of paddings.
+2. It reduces users' intellectual burden of manual batching, as N3LDG++ can efficiently take over all batching works. As such, users even need not know the concept of tensors, but only matrices and vectors (which are one-column matrices), neither the concept of paddings.
 3. It reduces memory allocation since no padding is needed.
 
 Besides, N3LDG++ has the following features:
@@ -40,9 +40,19 @@ N3LDG++ uses MIT licence which means you can use it almost any way you like. But
 N3LDG++ can be installed according to the instructions below:
 
 .. toctree::
-   :maxdepth: 2
+    :maxdepth: 2
 
-   install
+    install
+
+N3LDG++'s tutorials are as below:
+
+.. toctree::
+    :maxdepth: 2
+
+    getting_started
+..    Training a Conversation Model
+..    Transformer Implementation & Automatic Batching
+..    Saving and Loading Models
 
 .. toctree::
    :maxdepth: 2
