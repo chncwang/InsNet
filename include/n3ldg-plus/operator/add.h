@@ -5,9 +5,9 @@
 
 namespace n3ldg_plus {
 
-Node *add(Graph &graph, const ::std::vector<Node*> &inputs);
+Node *add(const ::std::vector<Node*> &inputs);
 
-BatchedNode *addInBatch(Graph &graph, const ::std::vector<BatchedNode *> &inputs);
+BatchedNode *addInBatch(const ::std::vector<BatchedNode *> &inputs);
 
 }
 

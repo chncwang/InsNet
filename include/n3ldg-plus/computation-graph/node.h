@@ -15,34 +15,48 @@ namespace n3ldg_plus {
 class Executor;
 class NodeAbs;
 
-class NodeContainer {
-public:
-    virtual void addNode(NodeAbs *node) = 0;
+enum ModelStage {
+    TRAINING = 0,
+    INFERENCE = 1
 };
 
-::std::string addressToString(const void* p);
+class NodeContainer {
+public:
+    NodeContainer(ModelStage model_stage = ModelStage::TRAINING) : model_stage_(model_stage) {}
+
+    virtual void addNode(NodeAbs *node) = 0;
+
+    ModelStage getModelStage() const {
+        return model_stage_;
+    }
+
+private:
+    ModelStage model_stage_;
+};
+
+std::string addressToString(const void* p);
 
 class Node;
 
 class NodeAbs {
 public:
-    NodeAbs(const ::std::string &node_type) : node_type_(node_type) {}
+    NodeAbs(const std::string &node_type) : node_type_(node_type) {}
     virtual ~NodeAbs() = default;
 
     virtual Executor* generate() = 0;
-    virtual ::std::string typeSignature() const = 0;
+    virtual std::string typeSignature() const = 0;
     virtual int getDim() const = 0;
 
-    virtual ::std::string getNodeType() const {
+    virtual std::string getNodeType() const {
         return node_type_;
     }
 
-    ::std::string cachedTypeSig() const;
+    std::string cachedTypeSig() const;
 
     virtual void clear();
 
-    virtual ::std::vector<Node *> &batch() {
-        ::std::cerr << "NodeAbs unsupported op" << ::std::endl;
+    virtual std::vector<Node *> &batch() {
+        std::cerr << "NodeAbs unsupported op" << std::endl;
         abort();
     }
 
@@ -60,7 +74,7 @@ public:
 
     virtual void addParent(NodeAbs* parent);
 
-    const ::std::vector<NodeAbs *> getParents() const {
+    const std::vector<NodeAbs *> getParents() const {
         return parents_;
     }
 
@@ -70,16 +84,25 @@ public:
 
     virtual NodeAbs &topologicalNode() = 0;
 
-    ::std::string toString() const {
+    std::string toString() const {
         return fmt::format("node_type;");
     }
 
+    void setNodeContainer(NodeContainer &container) {
+        node_container_ = &container;
+    }
+
+    NodeContainer &getNodeContainer() const {
+        return *node_container_;
+    }
+
 private:
-    ::std::string node_type_;
+    std::string node_type_;
     int degree_ = 0;
     int depth_ = 0;
-    ::std::vector<NodeAbs *> parents_;
-    mutable ::std::string type_sig_;
+    std::vector<NodeAbs *> parents_;
+    mutable std::string type_sig_;
+    NodeContainer *node_container_ = nullptr;
 };
 
 #if USE_GPU
@@ -95,7 +118,7 @@ public:
     virtual void compute() = 0;
     virtual void backward() = 0;
 
-    virtual ::std::string typeSignature() const override;
+    virtual std::string typeSignature() const override;
 
     const Tensor1D &getVal() const {
         return val_;
@@ -161,14 +184,14 @@ public:
         is_pooled_ = is_pooled;
     }
 
-    virtual void setInputs(const ::std::vector<Node*> &inputs) {}
+    virtual void setInputs(const std::vector<Node*> &inputs) {}
 
 protected:
-    void afterConnect(NodeContainer &container, const ::std::vector<Node*> &ins);
+    void afterConnect(const std::vector<Node*> &ins);
 
-    ::std::string isVectorSig() const;
+    std::string isVectorSig() const;
 
-    Node(const ::std::string &node_type, int dim = 0);
+    Node(const std::string &node_type, int dim = 0);
 
     virtual void setDim(int dim) {
         dim_ = dim;
@@ -187,7 +210,7 @@ private:
 
 class BatchedNode : public NodeAbs {
 public:
-    virtual ::std::string typeSignature() const override;
+    virtual std::string typeSignature() const override;
 
     bool isBatched() const override {
         return true;
@@ -211,15 +234,15 @@ public:
 
     virtual ~BatchedNode();
 
-    ::std::string shape() const;
+    std::string shape() const;
 
-    virtual ::std::string getNodeType() const override;
+    virtual std::string getNodeType() const override;
 
-    ::std::vector<Node *> &batch() override {
+    std::vector<Node *> &batch() override {
         return batch_;
     }
 
-    const ::std::vector<Node *> &batch() const {
+    const std::vector<Node *> &batch() const {
         return batch_;
     }
 
@@ -227,16 +250,16 @@ public:
         return batch_.front()->generate();
     }
 
-    const ::std::vector<int> &getDims() const;
+    const std::vector<int> &getDims() const;
 
 protected:
-    void afterInit(NodeContainer &graph, const ::std::vector<BatchedNode *> &ins);
+    void afterInit(const std::vector<BatchedNode *> &ins);
 
-    void setInputsPerNode(const ::std::vector<BatchedNode *> &batched_inputs);
+    void setInputsPerNode(const std::vector<BatchedNode *> &batched_inputs);
 
 private:
-    ::std::vector<Node *> batch_;
-    mutable ::std::vector<int> *dims_ = nullptr;
+    std::vector<Node *> batch_;
+    mutable std::vector<int> *dims_ = nullptr;
 };
 
 template<typename NodeType>
@@ -247,7 +270,7 @@ public:
 protected:
     void allocateBatch(int dim, int size, bool pool = true) {
         if (!batch().empty()) {
-            ::std::cerr << "batch not empty" << ::std::endl;
+            std::cerr << "batch not empty" << std::endl;
             abort();
         }
         auto v = NodeType::newNodeVector(dim, size, pool);
@@ -258,9 +281,9 @@ protected:
         }
     }
 
-    void allocateBatch(const ::std::vector<int> &dims, bool pool = true) {
+    void allocateBatch(const std::vector<int> &dims, bool pool = true) {
         if (!batch().empty()) {
-            ::std::cerr << "batch not empty" << ::std::endl;
+            std::cerr << "batch not empty" << std::endl;
             abort();
         }
 
@@ -275,8 +298,8 @@ protected:
 };
 
 
-inline ::std::set<::std::pair<::std::vector<Node *>, int> *>& globalPoolReferences() {
-    static ::std::set<::std::pair<::std::vector<Node *>, int> *> o;
+inline std::set<std::pair<std::vector<Node *>, int> *>& globalPoolReferences() {
+    static std::set<std::pair<std::vector<Node *>, int> *> o;
     return o;
 }
 
@@ -303,12 +326,12 @@ constexpr int BIG_VECTOR_SIZE = 1024 * 16;
 template <typename T>
 class Poolable {
 public:
-    static ::std::vector<T *> newNodeVector(int key, int size, bool pool = true) {
+    static std::vector<T *> newNodeVector(int key, int size, bool pool = true) {
         if (key <= 0) {
-            ::std::cerr << "newNode key:" << key << ::std::endl;
+            std::cerr << "newNode key:" << key << std::endl;
             abort();
         }
-        ::std::vector<T *> results(size);
+        std::vector<T *> results(size);
         if (!globalPoolEnabled() || (!pool && key >= BIG_VECTOR_SIZE)) {
             for (int i = 0; i < size; ++i) {
                 T *node = new T;
@@ -326,12 +349,12 @@ public:
 
         auto it = pool_.find(key);
         if (it == pool_.end()) {
-            pool_.insert(make_pair(key, make_pair(::std::vector<Node *>(), 0)));
+            pool_.insert(make_pair(key, make_pair(std::vector<Node *>(), 0)));
             it = pool_.find(key);
             globalPoolReferences().insert(&it->second);
         }
         auto &p = it->second;
-        ::std::vector<Node *> &v = p.first;
+        std::vector<Node *> &v = p.first;
         if (p.second > v.size()) {
             abort();
         } else if (v.size() < p.second + size) {
@@ -343,7 +366,7 @@ public:
             }
         }
 
-        ::std::vector<T *> nodes(size);
+        std::vector<T *> nodes(size);
         nodes.reserve(size);
         for (int i = 0; i < size; ++i) {
             T *node = dynamic_cast<T*>(v.at(p.second + i));
@@ -359,7 +382,7 @@ public:
 
     static T *newNode(int key, bool pool = true) {
         if (key <= 0) {
-            ::std::cerr << "newNode key:" << key << ::std::endl;
+            std::cerr << "newNode key:" << key << std::endl;
             abort();
         }
         if (!globalPoolEnabled() || (!pool && key >= BIG_VECTOR_SIZE)) {
@@ -375,13 +398,13 @@ public:
             key = NextTwoIntegerPowerNumber(key);
         }
 
-        ::std::map<int, ::std::pair<::std::vector<Node *>, int>>::iterator it;
+        std::map<int, std::pair<std::vector<Node *>, int>>::iterator it;
         if (last_key_ == key) {
             it = last_it_;
         } else {
             it = pool_.find(key);
             if (it == pool_.end()) {
-                pool_.insert(make_pair(key, make_pair(::std::vector<Node *>(), 0)));
+                pool_.insert(make_pair(key, make_pair(std::vector<Node *>(), 0)));
                 it = pool_.find(key);
                 globalPoolReferences().insert(&it->second);
             }
@@ -389,7 +412,7 @@ public:
             last_key_ = key;
         }
         auto &p = it->second;
-        ::std::vector<Node *> &v = p.first;
+        std::vector<Node *> &v = p.first;
         T *node;
         if (p.second > v.size()) {
             abort();
@@ -414,31 +437,31 @@ public:
     virtual void setNodeDim(int dim) = 0;
 
 private:
-    static ::std::map<int, ::std::pair<::std::vector<Node *>, int>> pool_;
-    static ::std::map<int, ::std::pair<::std::vector<Node *>, int>>::iterator last_it_;
+    static std::map<int, std::pair<std::vector<Node *>, int>> pool_;
+    static std::map<int, std::pair<std::vector<Node *>, int>>::iterator last_it_;
     static int last_key_;
 };
 
 template<typename T>
-::std::map<int, ::std::pair<::std::vector<Node *>, int>> Poolable<T>::pool_;
+std::map<int, std::pair<std::vector<Node *>, int>> Poolable<T>::pool_;
 template<typename T>
-::std::map<int, ::std::pair<::std::vector<Node *>, int>>::iterator Poolable<T>::last_it_;
+std::map<int, std::pair<std::vector<Node *>, int>>::iterator Poolable<T>::last_it_;
 template<typename T>
 int Poolable<T>::last_key_;
 
-void validateEqualNodeDims(const ::std::vector<Node *> &nodes);
+void validateEqualNodeDims(const std::vector<Node *> &nodes);
 
 class UniInputNode : public Node {
 public:
-    UniInputNode(const ::std::string &node_type) : Node(node_type) {}
+    UniInputNode(const std::string &node_type) : Node(node_type) {}
 
-    virtual ::std::string typeSignature() const override;
+    virtual std::string typeSignature() const override;
 
-    virtual void setInputs(const ::std::vector<Node *> &ins) override {
+    virtual void setInputs(const std::vector<Node *> &ins) override {
         input_ = ins.front();
     }
 
-    void connect(NodeContainer &container, Node &input);
+    void connect(Node &input);
 
     Node &getInput() const {
         return *input_;
@@ -453,8 +476,8 @@ private:
 };
 
 template<typename T>
-::std::vector<Node*> toNodePointers(const ::std::vector<T *> &vec) {
-    ::std::vector<Node *> results(vec.size());
+std::vector<Node*> toNodePointers(const std::vector<T *> &vec) {
+    std::vector<Node *> results(vec.size());
     int i = 0;
     for (T *p : vec) {
         results.at(i++) = p;
@@ -463,19 +486,19 @@ template<typename T>
 }
 
 #if USE_GPU
-void clearNodes(::std::vector<Node*> &nodes);
+void clearNodes(std::vector<Node*> &nodes);
 #endif
 
 class Executor {
 public:
-    ::std::vector<Node *> batch;
-    ::std::vector<NodeAbs *> topo_nodes;
+    std::vector<Node *> batch;
+    std::vector<NodeAbs *> topo_nodes;
     virtual ~Executor() = default;
 
 #if USE_GPU
-    ::std::vector<dtype *> getVals();
+    std::vector<dtype *> getVals();
 
-    ::std::vector<dtype *> getGrads();
+    std::vector<dtype *> getGrads();
 #else
     virtual int calculateFLOPs() = 0;
 
@@ -491,11 +514,11 @@ public:
         return node.getDim() / node.getColumn();
     }
 
-    ::std::string getNodeType() const {
+    std::string getNodeType() const {
         return batch.front()->getNodeType();
     }
 
-    ::std::string getSignature() const {
+    std::string getSignature() const {
         return batch.front()->typeSignature();
     }
 

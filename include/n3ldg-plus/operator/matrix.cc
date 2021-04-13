@@ -37,20 +37,18 @@ public:
 
     MatrixConcatNode(): Node("matrix-concat") {}
 
-    void connect(Graph &graph, const vector<Node *> &inputs) {
+    void connect(const vector<Node *> &inputs) {
         setInputs(inputs);
-        for (Node *in : inputs) {
-            in->addParent(this);
-        }
         setColumn(inputs.size());
-        graph.addNode(this);
+        afterConnect(inputs);
     }
 
-    void connect(Graph &graph, NodeAbs &topo_input, const vector<Node *> &inputs) {
+    [[deprecated]]
+    void connect(NodeAbs &topo_input, const vector<Node *> &inputs) {
         setInputs(inputs);
         topo_input.addParent(this);
         setColumn(inputs.size());
-        graph.addNode(this);
+        topo_input.getNodeContainer().addNode(this);
     }
 
     void setInputs(const vector<Node *> &inputs) override {
@@ -100,7 +98,7 @@ private:
 
 class BatchedMatrixConcatNode : public BatchedNodeImpl<MatrixConcatNode> {
 public:
-    void init(Graph &graph, BatchedNode &input, int group) {
+    void init(BatchedNode &input, int group) {
         if (input.batch().size() % group != 0) {
             cerr << fmt::format("input batch size:{} group:{}\n", input.batch().size(),
                     group);
@@ -121,8 +119,7 @@ public:
             m->setColumn(input_count);
         }
 
-        input.addParent(this);
-        graph.addNode(this);
+        afterInit({&input});
     }
 };
 
@@ -232,9 +229,9 @@ public:
         vector_ = ins.at(1);
     }
 
-    void connect(Graph &graph, Node &matrix, Node &vec) {
+    void connect(Node &matrix, Node &vec) {
         setInputs({&matrix, &vec});
-        afterConnect(graph, {&matrix, &vec});
+        afterConnect({&matrix, &vec});
     }
 
     void compute() override {
@@ -266,7 +263,7 @@ private:
 
 class BatchedMatrixAndVectorMultiNode: public BatchedNodeImpl<MatrixAndVectorMultiNode> {
 public:
-    void init(Graph &graph, Node &matrix, BatchedNode &vec, int *dim = nullptr) {
+    void init(Node &matrix, BatchedNode &vec, int *dim = nullptr) {
         if (dim == nullptr) {
             int dim = matrix.getDim() / vec.getDim();
             allocateBatch(dim, vec.batch().size());
@@ -281,10 +278,10 @@ public:
 
         matrix.addParent(this);
         vec.addParent(this);
-        graph.addNode(this);
+        matrix.getNodeContainer().addNode(this);
     }
 
-    void init(Graph &graph, BatchedNode &matrix, BatchedNode &vec, int *dim = nullptr) {
+    void init(BatchedNode &matrix, BatchedNode &vec, int *dim = nullptr) {
         int group = matrix.batch().size();
         if (vec.batch().size() % group != 0) {
             cerr << fmt::format("BatchedTranMatrixMulVectorNode init vec size:{} group:{}\n",
@@ -307,9 +304,7 @@ public:
             }
         }
 
-        matrix.addParent(this);
-        vec.addParent(this);
-        graph.addNode(this);
+        afterInit({&matrix, &vec});
     }
 };
 
@@ -415,9 +410,9 @@ public:
         ins_.at(1) = ins.at(1);
     }
 
-    void connect(Graph &graph, Node &a, Node &b) {
+    void connect(Node &a, Node &b) {
         setInputs({&a, &b});
-        afterConnect(graph, {&a, &b});
+        afterConnect({&a, &b});
     }
 
     void compute() override {
@@ -452,7 +447,7 @@ private:
 
 class BatchedMatrixMulMatrixNode : public BatchedNodeImpl<MatrixMulMatrixNode> {
 public:
-    void init(Graph &graph, BatchedNode &a, BatchedNode &b, int k) {
+    void init(BatchedNode &a, BatchedNode &b, int k) {
         int a_row = a.getDim() / k;
         int b_col = b.getDim() / k;
         allocateBatch(a_row * b_col, a.batch().size());
@@ -461,7 +456,7 @@ public:
             m.k_ = k;
         }
         setInputsPerNode({&a, &b});
-        afterInit(graph, {&a, &b});
+        afterInit({&a, &b});
     }
 };
 
@@ -575,9 +570,9 @@ public:
         }
     }
 
-    void connect(Graph &graph, Node &matrix, Node &vec) {
+    void connect(Node &matrix, Node &vec) {
         setInputs({&matrix, &vec});
-        afterConnect(graph, {&matrix, &vec});
+        afterConnect({&matrix, &vec});
     }
 
     void compute() override {
@@ -607,8 +602,7 @@ private:
 
 class BatchedTranMatrixMulVectorNode : public BatchedNodeImpl<TranMatrixMulVectorNode> {
 public:
-    void init(Graph &graph, Node &matrix, BatchedNode &vec,
-            const vector<int> *dims = nullptr) {
+    void init(Node &matrix, BatchedNode &vec, const vector<int> *dims = nullptr) {
         if (dims == nullptr) {
             int dim = matrix.getDim() / vec.getDim();
             allocateBatch(dim, vec.batch().size());
@@ -621,11 +615,10 @@ public:
         }
         matrix.addParent(this);
         vec.addParent(this);
-        graph.addNode(this);
+        matrix.getNodeContainer().addNode(this);
     }
 
-    void init(Graph &graph, BatchedNode &matrix, BatchedNode &vec,
-            const vector<int> *dims = nullptr) {
+    void init(BatchedNode &matrix, BatchedNode &vec, const vector<int> *dims = nullptr) {
         int group = matrix.batch().size();
         if (vec.batch().size() % group != 0) {
             cerr << fmt::format("BatchedTranMatrixMulVectorNode init vec size:{} group:{}\n",
@@ -656,9 +649,7 @@ public:
             }
         }
 
-        matrix.addParent(this);
-        vec.addParent(this);
-        graph.addNode(this);
+        afterInit({&matrix, &vec});
     }
 };
 
@@ -749,10 +740,10 @@ public:
         ins_ = {ins.at(0), ins.at(1)};
     }
 
-    void connect(Graph &graph, Node &a, Node &b) {
+    void connect(Node &a, Node &b) {
         vector<Node *> inputs = {&a, &b};
         setInputs(inputs);
-        afterConnect(graph, inputs);
+        afterConnect(inputs);
     }
 
     void compute() override {
@@ -799,7 +790,7 @@ private:
 
 class BatchedTranMatrixMulMatrixNode : public BatchedNodeImpl<TranMatrixMulMatrixNode> {
 public:
-    void init(Graph &graph, BatchedNode &a, BatchedNode &b, int input_row,
+    void init(BatchedNode &a, BatchedNode &b, int input_row,
             bool use_lower_triangle_mask = false) {
         int a_col = a.getDim() / input_row;
         int b_col = b.getDim() / input_row;
@@ -815,7 +806,7 @@ public:
             t.use_lower_triangle_mask_ = use_lower_triangle_mask;
             t.input_row_ = input_row;
         }
-        afterInit(graph, {&a, &b});
+        afterInit({&a, &b});
     }
 };
 
@@ -896,28 +887,28 @@ Executor* TranMatrixMulMatrixNode::generate() {
     return new TranMatrixMulMatrixExecutor;
 }
 
-Node *concatToMatrix(Graph &graph, const vector<Node *> &inputs) {
+Node *concatToMatrix(const vector<Node *> &inputs) {
     int input_dim = inputs.front()->getDim();
     MatrixConcatNode *node = MatrixConcatNode::newNode(inputs.size() * input_dim);
-    node->connect(graph, inputs);
+    node->connect(inputs);
     return node;
 }
 
-Node *concatToMatrix(Graph &graph, BatchedNode &input) {
+Node *concatToMatrix(BatchedNode &input) {
     const auto &inputs = input.batch();
     int input_dim = inputs.front()->getDim();
     MatrixConcatNode *node = MatrixConcatNode::newNode(inputs.size() * input_dim);
-    node->connect(graph, input, inputs);
+    node->connect(input, inputs);
     return node;
 }
 
-BatchedNode *concatToMatrix(Graph &graph, BatchedNode &input, int group) {
+BatchedNode *concatToMatrix(BatchedNode &input, int group) {
     BatchedMatrixConcatNode *node = new BatchedMatrixConcatNode;
-    node->init(graph, input, group);
+    node->init(input, group);
     return node;
 }
 
-Node *matrixAndVectorMulti(Graph &graph, Node &matrix, Node &vec) {
+Node *matrixAndVectorMulti(Node &matrix, Node &vec) {
     int dim = matrix.getDim() / vec.getDim();
     if (matrix.getDim() % vec.getDim() != 0) {
         cerr << fmt::format("vec dim:%1% matrix dim:%2%", vec.getDim(), matrix.getDim()) <<
@@ -925,62 +916,62 @@ Node *matrixAndVectorMulti(Graph &graph, Node &matrix, Node &vec) {
         abort();
     }
     MatrixAndVectorMultiNode *node = MatrixAndVectorMultiNode::newNode(dim);
-    node->connect(graph, matrix, vec);
+    node->connect(matrix, vec);
     return node;
 }
 
-BatchedNode *matrixAndVectorMulti(Graph &graph, Node &matrix, BatchedNode &vec, int *dim) {
+BatchedNode *matrixAndVectorMulti(Node &matrix, BatchedNode &vec, int *dim) {
     if (matrix.getDim() % vec.getDim() != 0) {
         cerr << fmt::format("vec dim:{} matrix dim:{}\n", vec.getDim(), matrix.getDim());
         abort();
     }
 
     BatchedMatrixAndVectorMultiNode *node = new BatchedMatrixAndVectorMultiNode;
-    node->init(graph, matrix, vec, dim);
+    node->init(matrix, vec, dim);
     return node;
 }
 
-BatchedNode *matrixAndVectorMulti(Graph &graph, BatchedNode &matrix, BatchedNode &vec, int *dim) {
+BatchedNode *matrixAndVectorMulti(BatchedNode &matrix, BatchedNode &vec, int *dim) {
     BatchedMatrixAndVectorMultiNode *node = new BatchedMatrixAndVectorMultiNode;
-    node->init(graph, matrix, vec, dim);
+    node->init(matrix, vec, dim);
     return node;
 }
 
-Node *tranMatrixMulVector(Graph &graph, Node &matrix, Node &vec, int dim) {
+Node *tranMatrixMulVector(Node &matrix, Node &vec, int dim) {
     TranMatrixMulVectorNode *node = TranMatrixMulVectorNode::newNode(dim);
-    node->connect(graph, matrix, vec);
+    node->connect(matrix, vec);
     return node;
 }
 
-Node *tranMatrixMulVector(Graph &graph, Node &matrix, Node &vec) {
+Node *tranMatrixMulVector(Node &matrix, Node &vec) {
     int dim = matrix.getDim() / vec.getDim();
-    return tranMatrixMulVector(graph, matrix, vec, dim);
+    return tranMatrixMulVector(matrix, vec, dim);
 }
 
-BatchedNode *tranMatrixMulVector(Graph &graph, Node &matrix, BatchedNode &vec,
+BatchedNode *tranMatrixMulVector(Node &matrix, BatchedNode &vec,
         const vector<int> *dims) {
     BatchedTranMatrixMulVectorNode *node = new BatchedTranMatrixMulVectorNode;
-    node->init(graph, matrix, vec, dims);
+    node->init(matrix, vec, dims);
     return node;
 }
 
-BatchedNode *tranMatrixMulVector(Graph &graph, BatchedNode &matrix, BatchedNode &vec,
+BatchedNode *tranMatrixMulVector(BatchedNode &matrix, BatchedNode &vec,
         const vector<int> *dims) {
     BatchedTranMatrixMulVectorNode *node = new BatchedTranMatrixMulVectorNode;
-    node->init(graph, matrix, vec, dims);
+    node->init(matrix, vec, dims);
     return node;
 }
 
-BatchedNode *tranMatrixMulMatrix(Graph &graph, BatchedNode &a, BatchedNode &b, int input_row,
+BatchedNode *tranMatrixMulMatrix(BatchedNode &a, BatchedNode &b, int input_row,
         bool use_lower_triangle_mask) {
     BatchedTranMatrixMulMatrixNode *node = new BatchedTranMatrixMulMatrixNode;
-    node->init(graph, a, b, input_row, use_lower_triangle_mask);
+    node->init(a, b, input_row, use_lower_triangle_mask);
     return node;
 }
 
-BatchedNode *matrixMulMatrix(Graph &graph, BatchedNode &a, BatchedNode &b, int k) {
+BatchedNode *matrixMulMatrix(BatchedNode &a, BatchedNode &b, int k) {
     BatchedMatrixMulMatrixNode *node = new BatchedMatrixMulMatrixNode;
-    node->init(graph, a, b, k);
+    node->init(a, b, k);
     return node;
 }
 

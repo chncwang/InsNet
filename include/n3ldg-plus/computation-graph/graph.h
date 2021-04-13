@@ -10,7 +10,9 @@ typedef ::std::unordered_map<::std::string, ::std::vector<NodeAbs *>> NodeMap;
 
 class Graph : public NodeContainer {
 public:
-    Graph(bool eager = false, bool calculate_flops = false, bool calculate_activations = false);
+    Graph(ModelStage stage = ModelStage::TRAINING, bool eager = false,
+            bool calculate_flops = false,
+            bool calculate_activations = false);
 
     Graph (const Graph &graph) = delete;
 

@@ -38,9 +38,8 @@ vector<Tunable<BaseParam> *> LSTMParam::tunableComponents() {
         &forget_input, &cell_hidden, &cell_input};
 }
 
-void LSTMBuilder::step(Graph &graph, LSTMParam &lstm_params, Node &input, Node &h0, Node &c0,
-        dtype dropout_value,
-        bool is_training) {
+void LSTMBuilder::step(LSTMParam &lstm_params, Node &input, Node &h0, Node &c0,
+        dtype dropout_value) {
     Node *last_hidden, *last_cell;
     int len = hiddens_.size();
     if (len == 0) {
@@ -52,31 +51,31 @@ void LSTMBuilder::step(Graph &graph, LSTMParam &lstm_params, Node &input, Node &
     }
 
     using namespace n3ldg_plus;
-    Node *inputgate_hidden = linear(graph, *last_hidden, lstm_params.input_hidden);
-    Node *inputgate_input = linear(graph, input, lstm_params.input_input);
-    Node *inputgate_add = add(graph, {inputgate_hidden, inputgate_input});
-    Node *inputgate = sigmoid(graph, *inputgate_add);
+    Node *inputgate_hidden = linear(*last_hidden, lstm_params.input_hidden);
+    Node *inputgate_input = linear(input, lstm_params.input_input);
+    Node *inputgate_add = add({inputgate_hidden, inputgate_input});
+    Node *inputgate = sigmoid(*inputgate_add);
 
-    Node *forgetgate_hidden = linear(graph, *last_hidden, lstm_params.forget_hidden);
-    Node *forgetgate_input = linear(graph, input, lstm_params.forget_input);
-    Node *forgetgate_add = add(graph, {forgetgate_hidden, forgetgate_input});
-    Node *forgetgate = sigmoid(graph, *forgetgate_add);
+    Node *forgetgate_hidden = linear(*last_hidden, lstm_params.forget_hidden);
+    Node *forgetgate_input = linear(input, lstm_params.forget_input);
+    Node *forgetgate_add = add({forgetgate_hidden, forgetgate_input});
+    Node *forgetgate = sigmoid(*forgetgate_add);
 
-    Node *outputgate_hidden = linear(graph, *last_hidden, lstm_params.output_hidden);
-    Node *outputgate_input = linear(graph, input, lstm_params.output_input);
-    Node *outputgate_add = add(graph, {outputgate_hidden, outputgate_input});
-    Node *outputgate = sigmoid(graph, *outputgate_add);
+    Node *outputgate_hidden = linear(*last_hidden, lstm_params.output_hidden);
+    Node *outputgate_input = linear(input, lstm_params.output_input);
+    Node *outputgate_add = add({outputgate_hidden, outputgate_input});
+    Node *outputgate = sigmoid(*outputgate_add);
 
-    Node *halfcell_hidden = linear(graph, *last_hidden, lstm_params.cell_hidden);
-    Node *halfcell_input = linear(graph, input, lstm_params.cell_input);
-    Node *halfcell_add = add(graph, {halfcell_hidden, halfcell_input});
-    Node *halfcell = tanh(graph, *halfcell_add);
-    Node *inputfilter = pointwiseMultiply(graph, *inputgate, *halfcell);
-    Node *forgetfilter = pointwiseMultiply(graph, *last_cell, *forgetgate);
-    Node *cell = add(graph, {inputfilter, forgetfilter});
-    Node *halfhidden = tanh(graph, *cell);
-    Node *hidden = pointwiseMultiply(graph, *halfhidden, *outputgate);
-    hidden = dropout(graph, *hidden, dropout_value, is_training);
+    Node *halfcell_hidden = linear(*last_hidden, lstm_params.cell_hidden);
+    Node *halfcell_input = linear(input, lstm_params.cell_input);
+    Node *halfcell_add = add({halfcell_hidden, halfcell_input});
+    Node *halfcell = tanh(*halfcell_add);
+    Node *inputfilter = pointwiseMultiply(*inputgate, *halfcell);
+    Node *forgetfilter = pointwiseMultiply(*last_cell, *forgetgate);
+    Node *cell = add({inputfilter, forgetfilter});
+    Node *halfhidden = tanh(*cell);
+    Node *hidden = pointwiseMultiply(*halfhidden, *outputgate);
+    hidden = dropout(*hidden, dropout_value);
     hiddens_.push_back(hidden);
     cells_.push_back(cell);
 }

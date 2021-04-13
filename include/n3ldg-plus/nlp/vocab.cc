@@ -1,4 +1,4 @@
-#include "n3ldg-plus/nlp/alphabet.h"
+#include "n3ldg-plus/nlp/vocab.h"
 #include <iostream>
 #include "n3ldg-plus/base/def.h"
 #include "n3ldg-plus/util/util.h"
@@ -15,7 +15,7 @@ using std::pair;
 
 namespace n3ldg_plus {
 
-int basic_quark::operator[](const string& str) {
+int Vocab::operator[](const string& str) {
     StringToId::const_iterator it = m_string_to_id.find(str);
     if (it != m_string_to_id.end()) {
         return it->second;
@@ -25,7 +25,7 @@ int basic_quark::operator[](const string& str) {
     }
 }
 
-const string& basic_quark::from_id(const int& qid) const {
+const string& Vocab::from_id(const int& qid) const {
     if (qid < 0 || m_size <= qid) {
         cerr << "qid:" << qid << endl;
         abort();
@@ -34,7 +34,7 @@ const string& basic_quark::from_id(const int& qid) const {
     }
 }
 
-int basic_quark::insert_string(const string& str) {
+int Vocab::insert_string(const string& str) {
     StringToId::const_iterator it = m_string_to_id.find(str);
     if (it != m_string_to_id.end()) {
         return it->second;
@@ -47,7 +47,7 @@ int basic_quark::insert_string(const string& str) {
     }
 }
 
-int basic_quark::from_string(const string& str) const {
+int Vocab::from_string(const string& str) const {
     StringToId::const_iterator it = m_string_to_id.find(str);
     if (it != m_string_to_id.end()) {
         return it->second;
@@ -59,7 +59,7 @@ int basic_quark::from_string(const string& str) const {
     }
 }
 
-void basic_quark::read(ifstream &inf) {
+void Vocab::read(ifstream &inf) {
     string featKey;
     int featId;
     inf >> m_size;
@@ -68,20 +68,20 @@ void basic_quark::read(ifstream &inf) {
         m_string_to_id[featKey] = i;
         m_id_to_string.push_back(featKey);
         if (featId != i) {
-            cerr << fmt::format("basic_quark read - featId:{} i:{}\n", featId, i);
+            cerr << fmt::format("Vocab read - featId:{} i:{}\n", featId, i);
             abort();
         }
     }
 }
 
-void basic_quark::write(ofstream &outf) const {
+void Vocab::write(ofstream &outf) const {
     outf << m_size << endl;
     for (int i = 0; i < m_size; i++) {
         outf << m_id_to_string[i] << " " << i << endl;
     }
 }
 
-void basic_quark::init(const vector<string> &word_list) {
+void Vocab::init(const vector<string> &word_list) {
     m_size = word_list.size();
     m_id_to_string = word_list;
     int i = 0;
@@ -90,7 +90,7 @@ void basic_quark::init(const vector<string> &word_list) {
     }
 }
 
-void basic_quark::init(const unordered_map<string, int>& elem_stat, int cutOff) {
+void Vocab::init(const unordered_map<string, int>& elem_stat, int cutOff) {
     unordered_map<string, int>::const_iterator elem_iter;
     for (elem_iter = elem_stat.begin(); elem_iter != elem_stat.end(); elem_iter++) {
         if (elem_iter->second > cutOff) {
@@ -99,7 +99,7 @@ void basic_quark::init(const unordered_map<string, int>& elem_stat, int cutOff) 
     }
 }
 
-void basic_quark::init(const string& inFile, bool bUseUnknown) {
+void Vocab::init(const string& inFile, bool bUseUnknown) {
     ifstream inf;
     inf.open(inFile.c_str());
 

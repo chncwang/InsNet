@@ -5,34 +5,32 @@
 
 namespace n3ldg_plus {
 
-Node *concatToMatrix(Graph &graph, const ::std::vector<Node *> &inputs);
+Node *concatToMatrix(const ::std::vector<Node *> &inputs);
 
-Node *concatToMatrix(Graph &graph, BatchedNode &input);
+Node *concatToMatrix(BatchedNode &input);
 
-BatchedNode *concatToMatrix(Graph &graph, BatchedNode &input, int group);
+BatchedNode *concatToMatrix(BatchedNode &input, int group);
 
-Node *matrixAndVectorMulti(Graph &graph, Node &matrix, Node &vec);
+Node *matrixAndVectorMulti(Node &matrix, Node &vec);
 
-BatchedNode *matrixAndVectorMulti(Graph &graph, Node &matrix, BatchedNode &vec,
-        int *dim = nullptr);
+BatchedNode *matrixAndVectorMulti(Node &matrix, BatchedNode &vec, int *dim = nullptr);
 
-BatchedNode *matrixAndVectorMulti(Graph &graph, BatchedNode &matrix, BatchedNode &vec,
-        int *dim = nullptr);
+BatchedNode *matrixAndVectorMulti(BatchedNode &matrix, BatchedNode &vec, int *dim = nullptr);
 
-Node *tranMatrixMulVector(Graph &graph, Node &matrix, Node &vec, int dim);
+Node *tranMatrixMulVector(Node &matrix, Node &vec, int dim);
 
-Node *tranMatrixMulVector(Graph &graph, Node &matrix, Node &vec);
+Node *tranMatrixMulVector(Node &matrix, Node &vec);
 
-BatchedNode *tranMatrixMulVector(Graph &graph, Node &matrix, BatchedNode &vec,
+BatchedNode *tranMatrixMulVector(Node &matrix, BatchedNode &vec,
         const ::std::vector<int> *dims = nullptr);
 
-BatchedNode *tranMatrixMulVector(Graph &graph, BatchedNode &matrix, BatchedNode &vec,
+BatchedNode *tranMatrixMulVector(BatchedNode &matrix, BatchedNode &vec,
         const ::std::vector<int> *dims = nullptr);
 
-BatchedNode *tranMatrixMulMatrix(Graph &graph, BatchedNode &a, BatchedNode &b, int input_row,
+BatchedNode *tranMatrixMulMatrix(BatchedNode &a, BatchedNode &b, int input_row,
         bool use_lower_triangle_mask = false);
 
-BatchedNode *matrixMulMatrix(Graph &graph, BatchedNode &a, BatchedNode &b, int k);
+BatchedNode *matrixMulMatrix(BatchedNode &a, BatchedNode &b, int k);
 
 }
 #endif

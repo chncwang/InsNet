@@ -24,7 +24,7 @@ public:
         this->ins_ = ins;
     }
 
-    void connect(Graph &cg, const vector<Node *>& x) {
+    void connect(const vector<Node *> &x) {
         if (x.empty()) {
             cerr << "empty inputs for add" << endl;
             abort();
@@ -37,7 +37,7 @@ public:
             }
         }
         setInputs(x);
-        afterConnect(cg, x);
+        afterConnect(x);
     }
 
     void compute() override {
@@ -74,7 +74,7 @@ private:
 
 class BatchedPAddNode : public BatchedNodeImpl<PAddNode> {
 public:
-    void init(Graph &graph, const vector<BatchedNode *> &inputs) {
+    void init(const vector<BatchedNode *> &inputs) {
         allocateBatch(inputs.front()->getDim(), inputs.front()->batch().size());
 
         for (BatchedNode *in : inputs) {
@@ -85,7 +85,7 @@ public:
         }
 
         setInputsPerNode(inputs);
-        afterInit(graph, inputs);
+        afterInit( inputs);
     }
 };
 
@@ -181,16 +181,16 @@ Executor *PAddNode::generate() {
     return new PAddExecutor();
 }
 
-Node *add(Graph &graph, const vector<Node*> &inputs) {
+Node *add(const vector<Node*> &inputs) {
     int dim = inputs.front()->getDim();
     PAddNode *result = PAddNode::newNode(dim);
-    result->connect(graph, inputs);
+    result->connect(inputs);
     return result;
 }
 
-BatchedNode *addInBatch(Graph &graph, const vector<BatchedNode *> &inputs) {
+BatchedNode *addInBatch(const vector<BatchedNode *> &inputs) {
     BatchedPAddNode *node = new BatchedPAddNode;
-    node->init(graph, inputs);
+    node->init(inputs);
     return node;
 }
 

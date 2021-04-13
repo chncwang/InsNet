@@ -5,13 +5,13 @@
 
 namespace n3ldg_plus {
 
-Node *maxPool(Graph &graph, std::vector<Node *> &inputs);
+Node *maxPool(std::vector<Node *> &inputs);
 
-Node *minPool(Graph &graph, std::vector<Node *> &inputs);
+Node *minPool(std::vector<Node *> &inputs);
 
-Node *sumPool(Graph &graph, std::vector<Node *> &inputs);
+Node *sumPool(std::vector<Node *> &inputs);
 
-Node *averagePool(Graph &graph, std::vector<Node *> &inputs);
+Node *averagePool(std::vector<Node *> &inputs);
 
 }
 

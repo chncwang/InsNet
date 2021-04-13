@@ -22,7 +22,7 @@ public:
         return getNodeType();
     }
 
-    void connect(Graph &graph, Node &input, int offset) {
+    void connect(Node &input, int offset) {
         if (input.getDim() < offset + getDim()) {
             cerr << fmt::format("input dim:{} offset:{} this dim:{}\n", input.getDim(),
                 offset, getDim());
@@ -30,7 +30,7 @@ public:
         }
 
         offset_ = offset;
-        UniInputNode::connect(graph, input);
+        UniInputNode::connect(input);
     }
 
     Executor *generate() override;
@@ -64,17 +64,17 @@ private:
 
 class BatchedSplitNode : public BatchedNodeImpl<SplitNode> {
 public:
-    void init(Graph &graph, BatchedNode &input, int dim, int offset) {
+    void init(BatchedNode &input, int dim, int offset) {
         allocateBatch(dim, input.batch().size());
         for (Node *node : batch()) {
             SplitNode *s = dynamic_cast<SplitNode *>(node);
             s->offset_ = offset;
         }
         setInputsPerNode({&input});
-        afterInit(graph, {&input});
+        afterInit({&input});
     }
 
-    void init(Graph &graph, BatchedNode &input, int dim, const vector<int> &offsets) {
+    void init(BatchedNode &input, int dim, const vector<int> &offsets) {
         allocateBatch(dim, input.batch().size() * offsets.size());
         int i = 0;
         for (int offset : offsets) {
@@ -90,11 +90,10 @@ public:
             }
         }
 
-        input.addParent(this);
-        graph.addNode(this);
+        afterInit({&input});
     }
 
-    void init(Graph &graph, Node &input, int row, const vector<int> &offsets, int col = 1) {
+    void init(Node &input, int row, const vector<int> &offsets, int col = 1) {
         bool pool = col == 1;
         allocateBatch(row * col, offsets.size(), pool);
         int i = 0;
@@ -106,6 +105,7 @@ public:
         }
 
         input.addParent(this);
+        NodeContainer &graph = input.getNodeContainer();
         graph.addNode(this);
     }
 };
@@ -113,25 +113,25 @@ public:
 Node* split(Graph &graph, Node &input, int dim, int offset, int col) {
     SplitNode *split = SplitNode::newNode(dim * col);
     split->setColumn(col);
-    split->connect(graph, input, offset);
+    split->connect(input, offset);
     return split;
 }
 
-BatchedNode* split(Graph &graph, BatchedNode &input, int dim, int offset) {
+BatchedNode* split(BatchedNode &input, int dim, int offset) {
     BatchedSplitNode *node = new BatchedSplitNode;
-    node->init(graph, input, dim, offset);
+    node->init(input, dim, offset);
     return node;
 }
 
-BatchedNode *split(Graph &graph, BatchedNode &input, int dim, const vector<int> &offsets) {
+BatchedNode *split(BatchedNode &input, int dim, const vector<int> &offsets) {
     BatchedSplitNode *node = new BatchedSplitNode;
-    node->init(graph, input, dim, offsets);
+    node->init(input, dim, offsets);
     return node;
 }
 
-BatchedNode *split(Graph &graph, Node &input, int row, const vector<int> &offsets, int col) {
+BatchedNode *split(Node &input, int row, const vector<int> &offsets, int col) {
     BatchedSplitNode *node = new BatchedSplitNode;
-    node->init(graph, input, row, offsets, col);
+    node->init(input, row, offsets, col);
     return node;
 }
 

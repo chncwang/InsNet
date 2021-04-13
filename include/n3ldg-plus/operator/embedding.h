@@ -3,20 +3,20 @@
 
 #include "n3ldg-plus/param/sparse-param.h"
 #include "n3ldg-plus/param/param.h"
-#include "n3ldg-plus/nlp/alphabet.h"
+#include "n3ldg-plus/nlp/vocab.h"
 #include "n3ldg-plus/computation-graph/graph.h"
 #include "n3ldg-plus/util/util.h"
 
 namespace n3ldg_plus {
 
 template<typename ParamType>
-class LookupTable : public TunableCombination<BaseParam>
+class Embedding : public TunableCombination<BaseParam>
 #if USE_GPU
 , public cuda::TransferableComponents
 #endif
 {
 public:
-    Alphabet elems;
+    Vocab elems;
     ParamType E;
     bool bFineTune;
     int nDim;
@@ -24,7 +24,7 @@ public:
     int nUNKId;
     bool inited = false;
 
-    LookupTable(const std::string &name = "embedding") : E(name) {
+    Embedding(const std::string &name = "embedding") : E(name) {
         nVSize = 0;
         nDim = 0;
         nUNKId = -1;
@@ -35,13 +35,9 @@ public:
     std::vector<cuda::Transferable *> transferablePtrs() override {
         return {&E};
     }
-
-    virtual std::string name() const {
-        return "LookupTable";
-    }
 #endif
 
-    void init(const Alphabet &alpha, int dim, bool fineTune = true) {
+    void init(const Vocab &alpha, int dim, bool fineTune = true) {
         if (!inited) {
             elems = alpha;
             nVSize = elems.size();
@@ -51,7 +47,7 @@ public:
         }
     }
 
-    void init(const Alphabet &alpha, const std::string& inFile, bool fineTune = true,
+    void init(const Vocab &alpha, const std::string& inFile, bool fineTune = true,
             dtype norm = -1) {
         elems = alpha;
         nVSize = elems.size();
@@ -61,7 +57,7 @@ public:
 
     void initWeights(int dim, bool tune) {
         if (dim <=0 || nVSize == 0 || (nVSize == 1 && nUNKId >= 0)) {
-            std::cerr << fmt::format("LookupTable initWeights - dim:{} size:{}\n", dim, nVSize);
+            std::cerr << fmt::format("Embedding initWeights - dim:{} size:{}\n", dim, nVSize);
             std::cerr << "please check the alphabet" << std::endl;
             abort();
         }
@@ -212,22 +208,22 @@ public:
     }
 };
 
-Node *embedding(Graph &graph, Param &lookup, const std::vector<int> &ids,
+Node *embedding(Graph &graph, const std::vector<int> &ids, Param &lookup,
         bool should_backward = true);
 
-Node *embedding(Graph &graph, Param &lookup, int id, bool should_backward = true);
+Node *embedding(Graph &graph, int id, Param &lookup, bool should_backward = true);
 
-Node *embedding(Graph &graph, LookupTable<Param> &lookup, const std::vector<std::string> &words,
+Node *embedding(Graph &graph, const std::vector<std::string> &words, Embedding<Param> &lookup,
         bool should_backward = true);
 
-Node *embedding(Graph &graph, LookupTable<SparseParam> &lookup,
-        const std::vector<std::string> &words,
+Node *embedding(Graph &graph, const std::vector<std::string> &words,
+        Embedding<SparseParam> &lookup,
         bool should_backward = true);
 
-Node *embedding(Graph &graph, LookupTable<Param> &lookup, const std::string &word,
+Node *embedding(Graph &graph, const std::string &word, Embedding<Param> &lookup,
         bool should_backward = true);
 
-Node *embedding(Graph &graph, LookupTable<SparseParam> &lookup, const std::string &word,
+Node *embedding(Graph &graph, const std::string &word, Embedding<SparseParam> &lookup,
         bool should_backward = true);
 
 }
