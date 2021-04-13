@@ -269,7 +269,8 @@ Node *dotAttention(Node& k, Node& v, int v_col, Node& q, int q_col, int head_cou
         dtype dropout_value,
         bool use_mask);
 
-Node *transformerEncoder(Node &inputs, int sentence_len, TransformerEncoderParams &params,
+std::vector<Node *> transformerEncoder(Node &inputs, int sentence_len,
+        TransformerEncoderParams &params,
         dtype dropout_value);
 
 class TransformerDecoderBuilderAbs {
@@ -332,6 +333,11 @@ public:
 private:
     std::vector<Node *> hidden_layers_;
 };
+
+std::vector<Node *> transformerDecoder(Node &encoder, int encoder_sentence_len, Node &input,
+        int decoder_sentence_len,
+        TransformerDecoderParams &params,
+        dtype dropout_value);
 
 }
 

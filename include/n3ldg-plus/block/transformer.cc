@@ -133,7 +133,7 @@ Node *dotAttention(Node& k, Node& v, int v_col, Node& q, int q_col, int head_cou
     return attended_matrix;
 }
 
-Node *transformerEncoder(Node &inputs, int sentence_len, TransformerEncoderParams &params,
+vector<Node *> transformerEncoder(Node &inputs, int sentence_len, TransformerEncoderParams &params,
         dtype dropout_value) {
     vector<int> pos_ids;
     pos_ids.reserve(sentence_len);
@@ -150,6 +150,8 @@ Node *transformerEncoder(Node &inputs, int sentence_len, TransformerEncoderParam
     int layer_count = params.layerCount();
 
     Node *last_layer = pos_encoded;
+    vector<Node *> hiddens;
+    hiddens.reserve(layer_count);
     for (int i = 0; i < layer_count; ++i) {
         auto &layer_params = *params.layerParams().ptrs().at(i);
 
@@ -169,9 +171,10 @@ Node *transformerEncoder(Node &inputs, int sentence_len, TransformerEncoderParam
         t = dropout(*t, dropout_value);
         t = add({added, t});
         last_layer = t;
+        hiddens.push_back(last_layer);
     }
 
-    return last_layer;
+    return hiddens;
 }
 
 TransformerDecoderBuilderAbs::TransformerDecoderBuilderAbs(TransformerDecoderParams &params,
@@ -274,7 +277,7 @@ void TransformerDecoderCellBuilder::step(Node &decoder_input) {
     decoded_len_++;
 }
 
-TransformerDecoderBuilder::TransformerDecoderBuilder( TransformerDecoderParams &params,
+TransformerDecoderBuilder::TransformerDecoderBuilder(TransformerDecoderParams &params,
         Node &encoder_hiddens,
         int encoder_sentence_len,
         dtype dropout) : TransformerDecoderBuilderAbs(params, encoder_hiddens,
@@ -331,6 +334,16 @@ void TransformerDecoderBuilder::connect(Node &inputs, int dec_sentence_len) {
         last_layer = added; 
         hidden_layers_.push_back(last_layer);
     }
+}
+
+vector<Node *> transformerDecoder(Node &encoder, int encoder_sentence_len, Node &input,
+        int decoder_sentence_len,
+        TransformerDecoderParams &params,
+        dtype dropout_value) {
+    TransformerDecoderBuilder builder(params, encoder, encoder_sentence_len, dropout_value);
+    builder.prepare();
+    builder.connect(input, decoder_sentence_len);
+    return builder.hiddenLayers();
 }
 
 }

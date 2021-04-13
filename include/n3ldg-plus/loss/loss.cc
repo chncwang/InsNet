@@ -89,7 +89,7 @@ dtype cpuLikelihoodLoss(vector<Node *> &nodes, int row, const vector<vector<int>
 
 }
 
-dtype likelihoodLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers,
+dtype NLLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers,
         dtype factor) {
     if (nodes.size() != answers.size()) {
         cerr << fmt::format("crossEntropyLoss - node size is {}, but answer size is {}\n",

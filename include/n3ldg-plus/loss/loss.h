@@ -7,7 +7,7 @@ namespace n3ldg_plus {
 
 ::std::vector<::std::vector<int>> predict(const ::std::vector<Node *> &nodes, int row);
 
-dtype likelihoodLoss(::std::vector<Node *> &nodes, int row,
+dtype NLLoss(::std::vector<Node *> &nodes, int row,
         const ::std::vector<::std::vector<int>> &answers,
         dtype factor);
 
