@@ -44,15 +44,19 @@ N3LDG++ can be installed according to the instructions below:
 
     install
 
-N3LDG++'s tutorials are as below:
+See the following tutorial to get started.
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
 
     getting_started
-..    Training a Conversation Model
-..    Transformer Implementation & Automatic Batching
-..    Saving and Loading Models
+
+We illustrate the automatic batching mechanism of N3LDG++ as below:
+
+.. toctree::
+    :maxdepth: 1
+
+    auto_batch
 
 .. toctree::
    :maxdepth: 2

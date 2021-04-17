@@ -66,6 +66,7 @@ Supposing that we have already loaded and randomly shuffled training instances, 
 
     Graph graph; // Declare the computation graph.
 
+    using n3ldg_plus::Node;
     std::vector<Node *> outputs;
     outputs.reserve(minibatch.size());
 
