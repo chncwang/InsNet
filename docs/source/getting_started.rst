@@ -94,9 +94,9 @@ Supposing that we have already loaded and randomly shuffled training instances, 
         tgt_len_sum += ins.tgt.size();
     }
 
-    // The computation graph will automatically execute forward computations above in batches.
+    // The computation graph will automatically execute forward computations above in batch.
     // Note that matrices' shapes are not aligned in the mini-batch, but N3LDG++ can properly
-    // compute them in batches.
+    // compute them in batch.
     graph.forward();
 
     // 1.0f means sum reduction, and pass (1.0f / tgt_len_sum) if you want average reduction.

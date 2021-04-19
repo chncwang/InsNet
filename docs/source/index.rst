@@ -17,7 +17,7 @@ Besides, N3LDG++ has the following features:
 1. It is written in C++ 14 and is built as a static library.
 2. For GPU computation, we write almost all CUDA kernels by hand, allowing efficient parallel computation for matrices of unaligned shapes.
 3. Both lazy and eager execution is supported, with the former allowing for automatic batching and the latter facilitating users' debugging.
-4. For the moment, it provides more than twenty operations with GPU and CPU implementations, supporting building modern NLP models for sentence classification, sequence tagging, and language generation. It furthermore provides NLP modules such as attention blocks, RNNs, and transformers, built with the aforementioned operations.
+4. For the moment, it provides more than twenty operators with GPU and CPU implementations, supporting building modern NLP models for sentence classification, sequence tagging, and language generation. It furthermore provides NLP modules such as attention blocks, RNNs, and transformers, built with the aforementioned operators.
 
 Researches using N3LDG++ are listed as follows, and we are looking forward to enriching this list:
 

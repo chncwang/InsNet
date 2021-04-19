@@ -1,26 +1,26 @@
 Automatic Batching
 ==================
 
-In this topic, we will discuss the automatic batching mechanism of N3LDG++ using Transformers' self-attention's forward pass as an example. To simplify the illustration, it will not cover multi-head attention, but the method we will discuss can generalize to any operation. 
+In this topic, we will discuss the automatic batching mechanism of N3LDG++ using Transformers' self-attention's forward pass as an example. To simplify the illustration, it will not cover multi-head attention, but the method we will discuss can generalize to any operator. 
 
 The Self-attention's Forward Pass Example
 -----------------------------------------
 
-Given a mini-batch containing matrices :math:`\{X_i\}_{i=1}^b` satisfying :math:`row(X_i) = d` (but :math:`col(X_i)` are commonly not equal), where :math:`row(X_i)` and :math:`col(X_i)` returns the row and column number of :math:`X_i`, respectively. We can pass them to self-attention as follows:
+Given a mini-batch containing matrices :math:`\{X_i\}_{i=1}^b` satisfying :math:`row(X_i) = d` (but :math:`col(X_i)` **are commonly not equal** since we do not use paddings to align shapes), where :math:`row(X_i)` and :math:`col(X_i)` returns the row and column number of :math:`X_i`, respectively. We can pass them to self-attention as follows:
 
 .. math::
 
     \begin{align}
         Q_i = W_Q X_i\tag{1}\\
         K_i = W_K X_i\tag{2}\\
-        V_i = W_V X_i\tag{2}\\
-        S_i = {K_i}^T Q_i\tag{3}\\
-        {S_i}'= \frac{1}{\sqrt{d}} S_i\tag{4}\\
-        A_i = softmax({S_i}')\tag{5}\\
-        Y_i = A_i V_i\tag{6}
+        V_i = W_V X_i\tag{3}\\
+        S_i = {K_i}^T Q_i\tag{4}\\
+        {S_i}'= \frac{1}{\sqrt{d}} S_i\tag{5}\\
+        A_i = softmax({S_i}')\tag{6}\\
+        Y_i = A_i V_i\tag{7}
     \end{align}
 
-Executing the same formula in batch can generally speed up computation, especially on the GPU. To this end, following DyNet, N3LDG++ maps every operation into a signature, where operations with the same signature mean that they should be computed in batch. In the following, we will discuss how N3LDG++ executes the above formulas one by one.
+Executing the same formula in batch can generally speed up computation, especially on the GPU. To this end, following DyNet, N3LDG++ maps every operator into a signature, where operators with the same signature mean that they should be computed in batch. In the following, we will discuss how N3LDG++ executes the above formulas one by one.
 
 Linear Transformation
 ---------------------
@@ -29,5 +29,9 @@ Formula (1) ~ (3) are all linear transformations,  and taking Formular (1) as th
 
 From the above computation process, we find that linear transformations with the same parameter can be executed in batch. Thus we set the signature to :code:`"linear-" + addr(W)`.
 
-Matrix Multiplication after Transposing the Former
+:math:`S_i = {K_i}^T Q_i`
 --------------------------------------------------
+
+One way to implement formula (4) is to divide it into two operators, i.e., matrix transposition and matrix multiplication, which would help keep public APIs fine-grained and orthogonal. However, considering the additional data transfer of the former matrix it would cause, we still implement it as one operator.
+
+Then we need to determine that when the input matrices meet what condition, the operators can be executed in batch. Still taking formula (4) as the example, obviously, the condition should not be that the shapes of :math:`\{K_i\}_{i=1}^b` and :math:`\{Q_i\}_{i=1}^b` are equal, respectively, for :math:`col(Q_i)` and :math:`col(K_i)` are not equal in a mini-batch. Neither should all this kind of operators be executed in batch. To understand this, suppose that a model has two parallel Transformers with different hidden layer dimensions, so that it would not be GPU efficient to execute this kind of operators with different :math:`row(Q_i)` and :math:`row(K_i)` in batch (if you understand CUDA, you will better understand this). For the above reasons, we set the signature to :code:`"transpose-mul-" + to_string(row(input_a))`
