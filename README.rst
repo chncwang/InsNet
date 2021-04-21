@@ -6,18 +6,19 @@
 N3LDG++ documentation
 ===================================
 
-`N3LDG++ <https://github.com/chncwang/n3ldg-plus>`_  is a powerful neural network library aiming at building flexible NLP models, especially those with dynamic computation graphs for different instances. It is designed to run dynamic models on the fly and allow users to focus on building the graph for a single instance, leaving batching (both mini-batch and instance level) to the library's lazy execution. This design has at least three advantages as follows:
+`N3LDG++ <https://github.com/chncwang/n3ldg-plus>`_  is a powerful neural network library aiming at building flexible NLP models, especially those with dynamic computation graphs for different instances. It is designed to run dynamic models on the fly and allow users to focus on building the graph for a single instance, leaving batching (both mini-batch and instance level) to the library's lazy execution. This design has at least four advantages as follows:
 
-1. It makes it super easy to build NLP models with instance-dependent computation graphs, such as tree-LSTM or `dynamic networks <https://arxiv.org/pdf/2102.04906.pdf>`_.
-2. It reduces users' intellectual burden of manual batching, as N3LDG++ can efficiently take over all batching works. As such, users even need not know the concept of tensors, but only matrices and vectors (which are one-column matrices), neither the concept of paddings.
-3. It reduces memory allocation since no padding is needed.
+1. It can batch not only operators in a mini-batch but also operators in the same instance. For instance, it can batch two parallel transformers from the same instance.
+2. It makes it super easy to build NLP models with instance-dependent computation graphs, such as tree-LSTM or `dynamic networks <https://arxiv.org/pdf/2102.04906.pdf>`_.
+3. It reduces users' intellectual burden of manual batching, as N3LDG++ can efficiently take over all batching works. As such, users even need not know the concept of tensors, but only matrices and vectors (which are one-column matrices), neither the concept of paddings.
+4. It reduces memory allocation since no padding is needed.
 
 Besides, N3LDG++ has the following features:
 
 1. It is written in C++ 14 and is built as a static library.
 2. For GPU computation, we write almost all CUDA kernels by hand, allowing efficient parallel computation for matrices of unaligned shapes.
 3. Both lazy and eager execution is supported, with the former allowing for automatic batching and the latter facilitating users' debugging.
-4. For the moment, it provides more than twenty operators with GPU and CPU implementations, supporting building modern NLP models for sentence classification, sequence tagging, and language generation. It furthermore provides NLP modules such as attention blocks, RNNs, and transformers, built with the aforementioned operators.
+4. For the moment, it provides more than twenty operators with GPU and CPU implementations, supporting building modern NLP models for sentence classification, sequence tagging, and language generation. It furthermore provides NLP modules such as attention blocks, RNNs, and Transformers, built with the aforementioned operators.
 
 Researches using N3LDG++ are listed as follows, and we are looking forward to enriching this list:
 

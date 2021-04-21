@@ -115,8 +115,6 @@ Supposing that we have already loaded and randomly shuffled training instances, 
 
 The above codes show that we need not merge inputs from a mini-batch into a tensor nor append paddings.
 
-For the current version, the Transformer's layer number is determined by its parameters' layer number. But we can easily change it to support dynamic networks with an early exiting mechanism, and in that case, N3LDG++ will only execute activated layers in batch.
-
 Enabling CUDA
 ---------------
 To enable CUDA, you need specify the device id (required) and pre-allocated memory in GB (optinal) at the beginning of the program as bellow:
