@@ -34,7 +34,7 @@ From the above computation process, we find that linear transformations with the
 
 One way to implement formula (4) is to divide it into two operators, i.e., matrix transposition and matrix multiplication, which would help keep public APIs fine-grained and orthogonal. However, considering the additional data transfer of the former matrix it would cause, we still implement it as one operator.
 
-Then we need to determine that when the input matrices meet what condition, the operators can be executed in batch. Still taking formula (4) as the example, obviously, the condition should not be that the shapes of :math:`\{K_i\}_{i=1}^b` and :math:`\{Q_i\}_{i=1}^b` are equal, respectively, for :math:`col(Q_i)` and :math:`col(K_i)` are not equal in a mini-batch. Neither should all this type of operators be executed in batch. To understand this, suppose that a model has two parallel Transformers with different hidden layer dimensions, so that it would not be GPU efficient to execute this type of operators with different :math:`row(Q_i)` and :math:`row(K_i)` in batch (if you understand CUDA, you will better understand this). For the above reasons, we set the signature to :code:`"transpose-mul-" + to_string(row(A))`
+Then we need to determine that when the input matrices meet what condition, the operators can be executed in batch. Still taking formula (4) as the example, obviously, the condition should not be that the shapes of :math:`\{K_i\}_{i=1}^b` and :math:`\{Q_i\}_{i=1}^b` are equal, respectively, for :math:`col(Q_i)` and :math:`col(K_i)` are not equal in a mini-batch. Thus we set the signature to :code:`"transpose-mul-" + to_string(row(A))`
 
 :math:`Y = \alpha X`
 --------------------------------------
@@ -46,9 +46,16 @@ More generally, N3LDG++ executes all single-input operators :math:`Y = F(X)` sat
 :math:`Y = softmax(X)`
 --------------------------
 
-Similarly, we define softmax's signature as "softmax", which means N3LDG++ executes all softmax operators in batch.
+Similarly, we define softmax's signature as :code:`"softmax"`, which means N3LDG++ executes all softmax operators in batch.
 
 :math:`Y = A B`
 ------------------
 
 To properly execute formula (7) in batch, we define the matrix multiplication's signature as :code:`"mul-" + row(A)`
+
+The Necessity of Exploiting Model Design Bias
+------------------------------------------------
+
+One may concern that shall we define these general-purpose operators' signatures to adapt self-attention? More generally, shall we exploit model design bias?
+
+Our answer is "Yes" because the automatic batching problem is only tractable when exploiting model design bias. For example, recall how N3LDG++ batch :math:`Y = W X` and we can realize that the efficiency of :math:`\bigl[ \begin{smallmatrix}Y_1 & Y_2 & ... & Y_b\end{smallmatrix} \bigr] = W \bigl[ \begin{smallmatrix}X_1 & X_2 & ... & X_b\end{smallmatrix} \bigr]` is based on the assumption that :math:`W` is shared in a mini-batch. Otherwise, why not try :math:`Y = \bigl[ \begin{smallmatrix}W_1 W_2 & ... & W_N\end{smallmatrix} \bigr]^T X`?
