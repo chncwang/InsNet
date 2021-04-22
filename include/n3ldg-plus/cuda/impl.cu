@@ -500,7 +500,7 @@ void PrintInts(int* p, int len) {
     CheckCudaError();
 }
 
-void InitCuda(int device_id, float memory_in_gb) {
+void initCuda(int device_id, float memory_in_gb) {
     cout << "device_id:" << device_id << endl;
     CallCuda(cudaSetDeviceFlags(cudaDeviceMapHost));
 
