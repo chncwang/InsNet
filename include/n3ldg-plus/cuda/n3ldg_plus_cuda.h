@@ -152,7 +152,7 @@ void BatchMemset(::std::vector<dtype*> &vec, int count, ::std::vector<int> &dims
 void PrintNums(dtype* p, int len);
 void PrintInts(int* p, int len);
 
-void InitCuda(int device_id = 0, float memory_in_gb = 0.0f);
+void initCuda(int device_id = 0, float memory_in_gb = 0.0f);
 
 void CopyFromMultiVectorsToOneVector(::std::vector<dtype*> &src, dtype *dest, int count,
         int len);
