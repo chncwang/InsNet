@@ -18,14 +18,14 @@ Besides, N3LDG++ has the following features:
 1. It is written in C++ 14 and is built as a static library.
 2. For GPU computation, we write almost all CUDA kernels by hand, allowing efficient parallel computation for matrices of unaligned shapes.
 3. Both lazy and eager execution is supported, with the former allowing for automatic batching and the latter facilitating users' debugging.
-4. For the moment, it provides more than twenty operators with GPU and CPU implementations, supporting building modern NLP models for sentence classification, sequence tagging, and language generation. It furthermore provides NLP modules such as attention blocks, RNNs, and transformers, built with the aforementioned operators.
+4. For the moment, it provides more than twenty operators with GPU and CPU implementations, supporting building modern NLP models for sentence classification, sequence tagging, and language generation. It furthermore provides NLP modules such as attention blocks, RNNs, and Transformers, built with the aforementioned operators.
 
 Researches using N3LDG++ are listed as follows, and we are looking forward to enriching this list:
 
 - `Unseen Target Stance Detection with Adversarial Domain Generalization <https://arxiv.org/pdf/2010.05471.pdf>`_
 - `Cue-word Driven Neural Response Generation with a Shrinking Vocabulary <https://arxiv.org/pdf/2010.04927.pdf>`_
 
-N3LDG++ uses Apache 2.0 licence allowing you to use it in any project. But if you use N3LDG++ for research, please cite this paper as follows, since the paper of N3LDG++ is not completed yet::
+N3LDG++ uses MIT licence which means you can use it almost any way you like. But if you use N3LDG++ for research, please cite this paper as follows, since the paper of N3LDG++ is not completed yet::
 
   @article{wang2019n3ldg,
   title={N3LDG: A Lightweight Neural Network Library for Natural Language Processing},
@@ -38,36 +38,4 @@ N3LDG++ uses Apache 2.0 licence allowing you to use it in any project. But if yo
   publisher={Acta Scientiarum Naturalium Universitatis Pekinenis}
   }
 
-N3LDG++ can be installed according to the instructions below:
-
-.. toctree::
-    :maxdepth: 2
-
-    install
-
-See the following tutorial to get started.
-
-.. toctree::
-    :maxdepth: 1
-
-    getting_started
-
-We illustrate the automatic batching mechanism of N3LDG++ as below:
-
-.. toctree::
-    :maxdepth: 1
-
-    auto_batch
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+See the `documentation <https://n3ldg-plus.readthedocs.io/en/latest>`_ for more details.
