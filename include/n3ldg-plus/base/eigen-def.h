@@ -13,8 +13,8 @@ typedef Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::C
 typedef Eigen::MatrixXf MatrixXdtype;
 #else
 typedef Eigen::TensorMap<Eigen::Tensor<double, 1>>  Vec;
-typedef Eigen::Map<Matrix<double, Dynamic, Dynamic, ColMajor> > Mat;
-typedef Matrix<double, Dynamic, Dynamic> MatrixXdtype;
+typedef Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor> > Mat;
+typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXdtype;
 #endif
 
 }

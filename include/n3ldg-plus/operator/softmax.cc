@@ -1,7 +1,7 @@
 #include "n3ldg-plus/operator/softmax.h"
 
-using ::std::string;
-using ::std::vector;
+using std::string;
+using std::vector;
 
 namespace n3ldg_plus {
 

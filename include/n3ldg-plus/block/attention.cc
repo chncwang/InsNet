@@ -1,6 +1,8 @@
 #include "n3ldg-plus/block/attention.h"
 
+#include "n3ldg-plus/operator/add.h"
 #include "n3ldg-plus/operator/atomic.h"
+#include "n3ldg-plus/operator/broadcast.h"
 #include "n3ldg-plus/operator/matrix.h"
 #include "n3ldg-plus/operator/softmax.h"
 
@@ -8,7 +10,7 @@ using std::vector;
 using std::string;
 using std::pair;
 using std::make_pair;
-using std::max;
+using std::min;
 
 namespace n3ldg_plus {
 
@@ -20,8 +22,7 @@ pair<BatchedNode *, BatchedNode *> dotAttention(Node& key_matrix,
     BatchedNode *scaled_weight = scaled(*raw_weights, 1.0 / ::sqrt((dtype)guide.getDim()));
     scaled_weight = softmax(*scaled_weight);
     int dim = guide.getDim();
-    BatchedNode *hidden = matrixAndVectorMulti(value_matrix, *scaled_weight,
-            &dim);
+    BatchedNode *hidden = matrixAndVectorMulti(value_matrix, *scaled_weight, &dim);
     return make_pair(hidden, scaled_weight);
 }
 
@@ -59,17 +60,30 @@ Node * dotAttentionWeights(Node& key_matrix, Node& guide) {
 }
 
 AdditiveAttentionParams::AdditiveAttentionParams(const string &name) : k(name + "-k"),
-    q(name + "-q"), w3t(name + "-w3t") {}
+    q(name + "-q"), vt(name + "-vt") {}
 
 void AdditiveAttentionParams::init(int k_size, int q_size) {
-    int out = max(k_size, q_size);
+    int out = min(k_size, q_size);
     k.init(out, k_size, false);
     q.init(out, q_size, false);
-    w3t.init(1, out, false);
+    vt.init(1, out, false);
 }
 
 vector<Tunable<BaseParam> *> AdditiveAttentionParams::tunableComponents() {
-    return {&k, &q, &w3t};
+    return {&k, &q, &vt};
+}
+
+pair<Node *, Node *> additiveAttention(Node &guide, Node &value, int value_col,
+        AdditiveAttentionParams &params) {
+    Node *value_matrix = linear(value, params.k);
+    Node *q = linear(guide, params.q);
+    q = broadcast(*q, value_col);
+    Node *sum = add({q, value_matrix});
+    sum = tanh(*sum);
+    Node *score = linear(*sum, params.vt);
+    Node *weight = softmax(*score, 1);
+    Node *result = matrixMulMatrix(value, *weight, weight->getDim());
+    return make_pair(result, weight);
 }
 
 }

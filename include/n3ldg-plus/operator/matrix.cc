@@ -435,9 +435,10 @@ public:
         return Node::getNodeType() + to_string(ins_.at(0)->getDim() / k_);
     }
 
+    int k_ = 0;
+
 private:
     array<Node *, 2> ins_;
-    int k_ = 0;
     int a_row_;
     int b_col_;
     
@@ -967,6 +968,16 @@ BatchedNode *tranMatrixMulMatrix(BatchedNode &a, BatchedNode &b, int input_row,
     BatchedTranMatrixMulMatrixNode *node = new BatchedTranMatrixMulMatrixNode;
     node->init(a, b, input_row, use_lower_triangle_mask);
     return node;
+}
+
+Node *matrixMulMatrix(Node &a, Node &b, int k) {
+    int a_row = a.getDim() / k;
+    int b_col = b.getDim() / k;
+    MatrixMulMatrixNode *result = MatrixMulMatrixNode::newNode(a_row * b_col);
+    result->setColumn(b_col);
+    result->k_ = k;
+    result->connect(a, b);
+    return result;
 }
 
 BatchedNode *matrixMulMatrix(BatchedNode &a, BatchedNode &b, int k) {

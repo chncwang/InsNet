@@ -29,26 +29,29 @@ struct AdditiveAttentionParams : TunableCombination<BaseParam>
 , public cuda::TransferableComponents
 #endif
 {
-    LinearParam k, q, w3t;
+    LinearParam k, q, vt;
 
     AdditiveAttentionParams(const std::string &name);
 
     template<typename Archive>
     void serialize(Archive &ar) {
-        ar(k, q, w3t);
+        ar(k, q, vt);
     }
 
     void init(int k_size, int q_size);
 
 #if USE_GPU
     std::vector<Transferable *> transferablePtrs() override {
-        return {&k, &q, &w3t};
+        return {&k, &q, &vt};
     }
 #endif
 
 protected:
     std::vector<Tunable<BaseParam> *> tunableComponents() override;
 };
+
+std::pair<Node *, Node *> additiveAttention(Node &guide, Node &value, int value_col,
+        AdditiveAttentionParams &params);
 
 }
 

@@ -492,8 +492,8 @@ Executor *BiasNode::generate() {
 
 Node *linear(Node &input, LinearParam &params) {
     if (input.getDim() % params.W().outDim() != 0) {
-        cerr << fmt::format("linear input dim:{} W col:{} W col:{}\n", input.getDim(),
-            input.getColumn(), params.W().inDim());
+        cerr << fmt::format("linear input dim:{} input col:{} W row:{} W col:{}\n", input.getDim(),
+            input.getColumn(), params.W().outDim(), params.W().inDim());
         abort();
     }
     int col = input.getDim() / params.W().outDim();

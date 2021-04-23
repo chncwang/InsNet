@@ -5,7 +5,7 @@
 
 namespace n3ldg_plus {
 
-struct LSTMParam : TunableCombination<BaseParam>
+struct LSTMParams : TunableCombination<BaseParam>
 #if USE_GPU
 , public cuda::TransferableComponents
 #endif
@@ -19,9 +19,15 @@ struct LSTMParam : TunableCombination<BaseParam>
     LinearParam cell_hidden;
     LinearParam cell_input;
 
-    LSTMParam(const ::std::string &name);
+    LSTMParams(const std::string &name);
 
-    void init(int nOSize, int nISize);
+    void init(int out_dim, int in_dim);
+
+    template<typename Archive>
+    void serialize(Archive &ar) {
+        ar(input_hidden, input_input, output_hidden, output_input, forget_hidden, forget_input,
+                cell_hidden, cell_input);
+    }
 
     int inDim() {
         return input_input.W().outDim();
@@ -32,33 +38,23 @@ struct LSTMParam : TunableCombination<BaseParam>
     }
 
 #if USE_GPU
-    ::std::vector<Transferable *> transferablePtrs() override;
+    std::vector<Transferable *> transferablePtrs() override;
 #endif
 
 protected:
-    ::std::vector<Tunable<BaseParam> *> tunableComponents() override;
+    std::vector<Tunable<BaseParam> *> tunableComponents() override;
 };
 
-class LSTMBuilder {
-public:
-    int size() const {
-        return hiddens_.size();
-    }
-
-    void step(LSTMParam &lstm_params, Node &input, Node &h0, Node &c0, dtype dropout_value);
-
-    const ::std::vector<Node *> &cells() {
-        return cells_;
-    }
-
-    const ::std::vector<Node *> &hiddens() {
-        return hiddens_;
-    }
-
-private:
-    ::std::vector<Node*> cells_;
-    ::std::vector<Node*> hiddens_;
+struct LSTMState {
+    Node *hidden;
+    Node *cell;
 };
+
+LSTMState lstm(LSTMState &last_state, Node &input, LSTMParams &params, dtype dropout);
+
+std::vector<Node *> lstm(LSTMState &initial_state, const std::vector<Node *> &inputs,
+        LSTMParams &params,
+        dtype dropout);
 
 }
 

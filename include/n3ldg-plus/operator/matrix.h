@@ -30,6 +30,8 @@ BatchedNode *tranMatrixMulVector(BatchedNode &matrix, BatchedNode &vec,
 BatchedNode *tranMatrixMulMatrix(BatchedNode &a, BatchedNode &b, int input_row,
         bool use_lower_triangle_mask = false);
 
+Node *matrixMulMatrix(Node &a, Node &b, int k);
+
 BatchedNode *matrixMulMatrix(BatchedNode &a, BatchedNode &b, int k);
 
 }
