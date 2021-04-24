@@ -116,7 +116,7 @@ dtype NLLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers,
     transform(nodes.begin(), nodes.end(), back_inserter(losses), gpu_get_node_loss);
     dtype loss = cuda::CrossEntropyLoss(vals, answers, nodes.size(), row, factor, losses);
 #if TEST_CUDA
-    dtype cpu_loss = cpuCrossEntropyLoss(nodes, row, answers, factor);
+    dtype cpu_loss = cpuLikelihoodLoss(nodes, row, answers, factor);
     for (Node *node : nodes) {
         if (!node->loss().verify("crossEntropyLoss")) {
             node->loss().print();
@@ -124,7 +124,7 @@ dtype NLLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers,
             abort();
         }
     }
-    cout << boost::format("cpu loss:%1% gpu:%2%") % cpu_loss % loss << endl;
+    cout << fmt::format("cpu loss:{} gpu:{}\n", cpu_loss, loss);
 #endif
     return loss;
 #else
@@ -188,7 +188,7 @@ pair<float, vector<int>> KLDivergenceLoss(vector<Node *> &nodes,
             const_cast<vector<shared_ptr<vector<dtype>>>&>(answers),
             nodes.size(), nodes.front()->getDim(), factor, losses);
 #if TEST_CUDA
-    dtype cpu_loss = cpuKLLoss(nodes, answers, factor);
+    dtype cpu_loss = cpuKLDivergenceLoss(nodes, answers, factor);
     cout << "KLLoss - gpu loss:" << gpu_loss << " cpu_loss:" << cpu_loss << endl;
     for (Node *node : nodes) {
         cuda::Assert(node->getLoss().verify("multiCrossEntropyLoss"));

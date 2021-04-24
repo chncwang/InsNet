@@ -3,9 +3,12 @@
 using std::array;
 using std::vector;
 using std::cerr;
+using std::cout;
 using std::endl;
 using std::string;
 using std::to_string;
+using std::make_pair;
+using std::pair;
 
 namespace n3ldg_plus {
 

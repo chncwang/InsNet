@@ -1,9 +1,12 @@
 #include "n3ldg-plus/param/param.h"
 #include "n3ldg-plus/cuda/n3ldg_plus_cuda.h"
+#include "n3ldg-plus/util/util.h"
 
 using std::function;
 using std::vector;
 using std::cerr;
+using std::cout;
+using std::endl;
 
 namespace n3ldg_plus {
 
@@ -42,8 +45,8 @@ void Param::clearGrad() {
 #if USE_GPU
         cuda::Memset(grad_.value, grad_.size, 0.0f);
 #if TEST_CUDA
-        grad.zero();
-        n3ldg_cuda::Assert(grad.verify("Param clearGrad"));
+        grad_.zero();
+        cuda::Assert(grad_.verify("Param clearGrad"));
 #endif
 #else
         grad_.zero();
@@ -53,8 +56,8 @@ void Param::rescaleGrad(dtype scale) {
 #if USE_GPU
         cuda::Rescale(grad_.value, grad_.size, scale);
 #if TEST_CUDA
-        grad.vec() = grad.vec() * scale;
-        n3ldg_cuda::Assert(grad.verify("Param rescaleGrad"));
+        grad_.vec() = grad_.vec() * scale;
+        cuda::Assert(grad_.verify("Param rescaleGrad"));
 #endif
 #else
         grad_.vec() = grad_.vec() * scale;
@@ -66,10 +69,10 @@ void Param::adagrad(dtype alpha, dtype reg, dtype eps) {
     cuda::UpdateAdagrad(val_.value, grad_.value, val_.row, val_.col,
             aux_square_.value, alpha, reg, eps);
 #if TEST_CUDA
-    if (!isBias()) grad.vec() = grad.vec() + val.vec() * reg;
-    aux_square.vec() = aux_square.vec() + grad.vec().square();
-    val.vec() = val.vec() - grad.vec() * alpha / (aux_square.vec() + eps).sqrt();
-    n3ldg_cuda::Assert(val.verify("Param adagrad"));
+    if (!isBias()) grad_.vec() = grad_.vec() + val_.vec() * reg;
+    aux_square_.vec() = aux_square_.vec() + grad_.vec().square();
+    val_.vec() = val_.vec() - grad_.vec() * alpha / (aux_square_.vec() + eps).sqrt();
+    cuda::Assert(val_.verify("Param adagrad"));
 #endif
 #else
     if (!isBias()) grad_.vec() = grad_.vec() + val_.vec() * reg;
@@ -81,10 +84,10 @@ void Param::adagrad(dtype alpha, dtype reg, dtype eps) {
 void Param::adam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) {
 #if USE_GPU
 #if TEST_CUDA
-    n3ldg_cuda::Assert(val.verify("Param adam begin val"));
-    n3ldg_cuda::Assert(grad.verify("Param adam begin grad"));
-    n3ldg_cuda::Assert(aux_mean.verify("Param adam begin aux_mean"));
-    n3ldg_cuda::Assert(aux_square.verify("Param adam begin aux_square"));
+    cuda::Assert(val_.verify("Param adam begin val"));
+    cuda::Assert(grad_.verify("Param adam begin grad"));
+    cuda::Assert(aux_mean_.verify("Param adam begin aux_mean"));
+    cuda::Assert(aux_square_.verify("Param adam begin aux_square"));
 #endif
     cuda::UpdateAdam(val_.value, grad_.value, val_.row, val_.col, isBias(),
             aux_mean_.value,
@@ -96,12 +99,12 @@ void Param::adam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) 
             reg,
             eps);
 #if TEST_CUDA
-    if (!isBias()) grad.vec() = grad.vec() + val.vec() * reg;
-    aux_mean.vec() = belta1 * aux_mean.vec() + (1 - belta1) * grad.vec();
-    aux_square.vec() = belta2 * aux_square.vec() + (1 - belta2) * grad.vec().square();
-    dtype lr_t = alpha * sqrt(1 - pow(belta2, iter + 1)) / (1 - pow(belta1, iter + 1));
-    val.vec() = val.vec() - aux_mean.vec() * lr_t / (aux_square.vec() + eps).sqrt();
-    n3ldg_cuda::Assert(val.verify("Param adam"));
+    if (!isBias()) grad_.vec() = grad_.vec() + val_.vec() * reg;
+    aux_mean_.vec() = belta1 * aux_mean_.vec() + (1 - belta1) * grad_.vec();
+    aux_square_.vec() = belta2 * aux_square_.vec() + (1 - belta2) * grad_.vec().square();
+    dtype lr_t = alpha * sqrt(1 - pow(belta2, iter_ + 1)) / (1 - pow(belta1, iter_ + 1));
+    val_.vec() = val_.vec() - aux_mean_.vec() * lr_t / (aux_square_.vec() + eps).sqrt();
+    cuda::Assert(val_.verify("Param adam"));
 #endif
 #else
     if (!isBias()) grad_.vec() = grad_.vec() + val_.vec() * reg;
@@ -116,20 +119,20 @@ void Param::adam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) 
 void Param::adamW(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) {
 #if USE_GPU
 #if TEST_CUDA
-    n3ldg_cuda::Assert(val.verify("Param adam begin val"));
-    n3ldg_cuda::Assert(grad.verify("Param adam begin grad"));
-    n3ldg_cuda::Assert(aux_mean.verify("Param adam begin aux_mean"));
-    n3ldg_cuda::Assert(aux_square.verify("Param adam begin aux_square"));
+    cuda::Assert(val_.verify("Param adam begin val"));
+    cuda::Assert(grad_.verify("Param adam begin grad"));
+    cuda::Assert(aux_mean_.verify("Param adam begin aux_mean"));
+    cuda::Assert(aux_square_.verify("Param adam begin aux_square"));
 #endif
     cuda::UpdateAdamW(val_.value, grad_.value, val_.row, val_.col, isBias(), aux_mean_.value,
             aux_square_.value, iter_, belta1, belta2, alpha, reg, eps);
 #if TEST_CUDA
-    aux_mean.vec() = belta1 * aux_mean.vec() + (1 - belta1) * grad.vec();
-    aux_square.vec() = belta2 * aux_square.vec() + (1 - belta2) * grad.vec().square();
-    dtype lr_t = alpha * sqrt(1 - pow(belta2, iter + 1)) / (1 - pow(belta1, iter + 1));
-    val.vec() = (1 - (isBias() ? 0.0f : reg)) * val.vec() -
-        aux_mean.vec() * lr_t / (aux_square.vec() + eps).sqrt();
-    n3ldg_cuda::Assert(val.verify("Param adam"));
+    aux_mean_.vec() = belta1 * aux_mean_.vec() + (1 - belta1) * grad_.vec();
+    aux_square_.vec() = belta2 * aux_square_.vec() + (1 - belta2) * grad_.vec().square();
+    dtype lr_t = alpha * sqrt(1 - pow(belta2, iter_ + 1)) / (1 - pow(belta1, iter_ + 1));
+    val_.vec() = (1 - (isBias() ? 0.0f : reg)) * val_.vec() -
+        aux_mean_.vec() * lr_t / (aux_square_.vec() + eps).sqrt();
+    cuda::Assert(val_.verify("Param adam"));
 #endif
 #else
     aux_mean_.vec() = belta1 * aux_mean_.vec() + (1 - belta1) * grad_.vec();
@@ -160,11 +163,11 @@ dtype Param::gradSquareSum() {
     return cuda::SquareSum(grad_.value, grad_.size);
 #elif USE_GPU && TEST_CUDA
     cout << "squareGradNorm - param name:" << this->getParamName() << endl;
-    n3ldg_cuda::Assert(grad.verify("squareGradNorm grad"));
-    dtype cuda = n3ldg_cuda::SquareSum(grad.value, grad.size);
+    cuda::Assert(grad_.verify("squareGradNorm grad"));
+    dtype cuda = cuda::SquareSum(grad_.value, grad_.size);
     dtype sumNorm = 0.0;
-    for (int i = 0; i < grad.size; i++) {
-        sumNorm += grad.v[i] * grad.v[i];
+    for (int i = 0; i < grad_.size; i++) {
+        sumNorm += grad_.v[i] * grad_.v[i];
     }
     if (!isEqual(sumNorm, cuda)) {
         cout << "cpu:" << sumNorm << " cuda:" << cuda << endl;

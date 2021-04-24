@@ -544,15 +544,19 @@ protected:
 
     void verifyForward();
 
-    void testForwardInpputs(const function<vector<Node*>(Node &node)> &get_inputs);
+    void testForwardInpputs(const std::function<std::vector<Node*>(Node &node)> &get_inputs);
 
-    void testForwardInpputs(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs);
+    void testForwardInpputs(const std::function<std::vector<std::pair<Node*,
+            std::string>>(Node &node)> &get_inputs);
 
-    void verifyBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs);
+    void verifyBackward(const std::function<std::vector<std::pair<Node*,
+            std::string>>(Node &node)> &get_inputs);
 
-    void testBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs);
+    void testBackward(const std::function<std::vector<std::pair<Node*,
+            std::string>>(Node &node)> &get_inputs);
 
-    void testBeforeBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs);
+    void testBeforeBackward(const std::function<std::vector<std::pair<Node*,
+            std::string>>(Node &node)> &get_inputs);
 #endif
 };
 

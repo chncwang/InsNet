@@ -2,6 +2,9 @@
 
 using std::string;
 using std::vector;
+using std::cout;
+using std::cerr;
+using std::endl;
 
 namespace n3ldg_plus {
 
@@ -106,8 +109,7 @@ public:
             cerr << "input val:" << s.getInput().getVal().toString() << endl;
             cerr << "gpu:" << endl;
             s.getInput().getVal().print();
-            cout << boost::format("count:%1% dim:%2% col:%3%") % count % s.getDim() %
-                s.getColumn() << endl;
+            cout << fmt::format("count:{} dim:{} col:{}\n", count, s.getDim(), s.getColumn());
             abort();
         }
 #endif

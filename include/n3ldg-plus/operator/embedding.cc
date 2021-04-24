@@ -198,7 +198,7 @@ public:
             batch[idx]->backward();
         }
 
-        cuda::Assert(param().grad.verify("lookup backward grad"));
+        cuda::Assert(param().grad().verify("lookup backward grad"));
 #endif
     }
 

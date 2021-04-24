@@ -357,8 +357,8 @@ public:
 
 #if TEST_CUDA
         testBackward();
-        params().g().grad.verify("PointwiseLinearExecutor backward g");
-        params().b().grad.verify("PointwiseLinearExecutor backward bias");
+        params().g().grad().verify("PointwiseLinearExecutor backward g");
+        params().b().grad().verify("PointwiseLinearExecutor backward bias");
 #endif
     }
 

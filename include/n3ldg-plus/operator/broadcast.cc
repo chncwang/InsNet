@@ -45,9 +45,11 @@ protected:
 
 class BroadcastExecutor : public UniInputExecutor {
 public:
+#if !USE_GPU
     int calculateFLOPs() override {
         return 0; // TODO
     }
+#endif
 };
 
 Executor *BroadcastNode::generate() {

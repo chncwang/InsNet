@@ -3763,8 +3763,8 @@ void Max(dtype **v, int count, int dim, int *max_indexes, dtype *max_vals) {
             MyCudaMemcpyKind::DEVICE_TO_HOST);
     for (int i = 0; i < count; ++i) {
         if (max_indexer_target.at(i) != max_indexer_gold.at(i)) {
-            cerr << format("max_indexer_target:%1% max_indexer_gold:%2%") % max_indexer_target.at(i)
-                % max_indexer_gold.at(i) << endl;
+            cerr << fmt::format("max_indexer_target:{} max_indexer_gold:{}\n",
+                    max_indexer_target.at(i), max_indexer_gold.at(i));
             PrintNums(v, i, dim);
             abort();
         }

@@ -3,6 +3,7 @@
 using std::vector;
 using std::cerr;
 using std::endl;
+using std::cout;
 using std::string;
 using std::to_string;
 

@@ -7,6 +7,7 @@ using std::vector;
 using std::string;
 using std::map;
 using std::make_pair;
+using std::cout;
 
 namespace n3ldg_plus {
 

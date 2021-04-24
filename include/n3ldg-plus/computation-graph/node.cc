@@ -1,11 +1,17 @@
 #include "n3ldg-plus/computation-graph/node.h"
+#include <functional>
 
 using std::string;
 using std::to_string;
 using std::stringstream;
 using std::max;
 using std::cerr;
+using std::cout;
+using std::endl;
 using std::vector;
+using std::function;
+using std::pair;
+using std::make_pair;
 
 namespace n3ldg_plus {
 
@@ -279,10 +285,10 @@ void Executor::verifyForward() {
         Node *x = dynamic_cast<Node *>(node);
         if(!x->getVal().verify((getNodeType() + " forward").c_str())) {
             cout << "cpu:" << endl;
-            cout << x->getVal().toJson();
+            cout << x->getVal().toString();
             cout << "gpu:" << endl;
             x->getVal().print();
-            throw n3ldg_cuda::CudaVerificationException(i);
+            throw cuda::CudaVerificationException(i);
         }
         ++i;
     }
@@ -293,7 +299,7 @@ void Executor::testForwardInpputs(const function<vector<Node*>(Node &node)> &get
         Node *x = dynamic_cast<Node *>(node);
         vector<Node*> inputs = get_inputs(*x);
         for (Node *input : inputs) {
-            n3ldg_cuda::Assert(input->getVal().verify((getNodeType() +
+            cuda::Assert(input->getVal().verify((getNodeType() +
                             " forward input").c_str()));
         }
     }
@@ -305,7 +311,7 @@ void Executor::testForwardInpputs(const function<vector<pair<Node*,
         Node *x = dynamic_cast<Node *>(node);
         auto inputs = get_inputs(*x);
         for (auto &input : inputs) {
-            n3ldg_cuda::Assert(input.first->getVal().verify((getNodeType() +
+            cuda::Assert(input.first->getVal().verify((getNodeType() +
                             " forward input").c_str()));
         }
     }
@@ -341,7 +347,7 @@ void Executor::testBeforeBackward(
         Node *x = dynamic_cast<Node *>(node);
         auto inputs = get_inputs(*x);
         for (pair<Node*, string> &input : inputs) {
-            n3ldg_cuda::Assert(input.first->getLoss().verify((getNodeType() + " backward " +
+            cuda::Assert(input.first->getLoss().verify((getNodeType() + " backward " +
                             input.second).c_str()));
         }
     }
@@ -351,10 +357,10 @@ void Executor::testBeforeBackward(
 #if TEST_CUDA
 void UniInputExecutor::testForwardInpputs() {
     for (NodeAbs *node : batch) {
-        Node *x = dynamic_cast<Node *>(node);
-        vector<Node*> inputs = get_inputs(*x);
+        UniInputNode &x = dynamic_cast<UniInputNode &>(*node);
+        vector<Node*> inputs = {&x.getInput()};
         for (Node *input : inputs) {
-            n3ldg_cuda::Assert(input->getVal().verify((getNodeType() + " forward input").c_str()));
+            cuda::Assert(input->getVal().verify((getNodeType() + " forward input").c_str()));
         }
     }
 }
