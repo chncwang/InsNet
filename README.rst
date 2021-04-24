@@ -39,3 +39,7 @@ N3LDG++ uses Apache 2.0 licence allowing you to use it in any project. But if yo
   }
 
 See the `documentation <https://n3ldg-plus.readthedocs.io/en/latest>`_ for more details.
+
+Author List:
+
+Wang Qiansheng, Zhang Meishan, Wang Zhen, Han Zijia

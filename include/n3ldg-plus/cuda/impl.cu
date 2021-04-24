@@ -90,7 +90,6 @@ void CallCuda(cudaError_t status) {
 }
 
 void CheckCudaError() {
-    //cudaDeviceSynchronize();
     cudaError_t error = cudaGetLastError();
     if (error != cudaSuccess) {
         cerr << "cuda error:" << cudaGetErrorName(error) << endl;
@@ -599,8 +598,8 @@ __global__ void KernelActivationForward(ActivatedEnum activated, dtype **xs,
         int max_dim,
         dtype **ys) {
     int i = DeviceDefaultIndex();
-    if (i < max_dim * count) {
-        int count_i = i / max_dim;
+    int count_i = i / max_dim;
+    if (count_i < count) {
         int dim_i = i % max_dim;
         if (dim_i < dims[count_i]) {
             if (activated == ActivatedEnum::TANH) {
@@ -1517,8 +1516,7 @@ __global__ void KernelAddLtyToParamBiasAndAddLxToInputLossesForUniBackward(
             if (threadIdx.x == 0) {
                 block_sums[gridDim.y * blockIdx.x + blockIdx.y] =
                     shared_arr[0];
-                if (atomicAdd(global_block_count + dim_i, 1) ==
-                        gridDim.y - 1) {
+                if (atomicAdd(global_block_count + dim_i, 1) == gridDim.y - 1) {
                     dtype sum = 0.0;
                     for (int i = 0; i < gridDim.y; ++i) {
                         sum += block_sums[gridDim.y * blockIdx.x + i];
@@ -2004,15 +2002,13 @@ __global__ void KernelPoolForward(PoolingEnum pooling, dtype **ins, int *in_coun
     __shared__ volatile extern dtype pool_shared_arr[];
     volatile dtype* shared_indexers = pool_shared_arr + blockDim.x;
     int batch_i = blockIdx.y;
-    int in_count = in_counts[batch_i];
-    int in_count_i = threadIdx.x;
     int dim_i = blockIdx.x;
+    int in_count_i = threadIdx.x;
+    int in_count = in_counts[batch_i];
     if (in_count_i < in_count) {
-        pool_shared_arr[threadIdx.x] = ins[batch_i * max_in_count +
-            in_count_i][dim_i];
+        pool_shared_arr[threadIdx.x] = ins[batch_i * max_in_count + in_count_i][dim_i];
     } else {
-        pool_shared_arr[threadIdx.x] = pooling == PoolingEnum::MAX ?
-            -1e10 : 1e10;
+        pool_shared_arr[threadIdx.x] = pooling == PoolingEnum::MAX ?  -1e10 : 1e10;
     }
     shared_indexers[threadIdx.x] = threadIdx.x;
     __syncthreads();
@@ -2114,14 +2110,13 @@ __global__ void KernelSumPoolForward(PoolingEnum pooling, dtype **in_vals, int c
     int in_count_i = threadIdx.x;
     int dim_i = blockIdx.x;
     if (in_count_i < in_count) {
-        pool_shared_arr[threadIdx.x] = in_vals[batch_i * max_in_count +
-            in_count_i][dim_i];
+        pool_shared_arr[threadIdx.x] = in_vals[batch_i * max_in_count + in_count_i][dim_i];
     } else {
         pool_shared_arr[threadIdx.x] = 0.0f;
     }
     __syncthreads();
 
-    for (int i = (blockDim.x >> 1); i > 0;i >>=1) {
+    for (int i = (blockDim.x >> 1); i > 0;i >>= 1) {
         if (threadIdx.x < i) {
             int plus_i = threadIdx.x + i;
             pool_shared_arr[threadIdx.x] += pool_shared_arr[plus_i];
@@ -5089,6 +5084,68 @@ void PointwiseLinearBackward(dtype **grads, dtype **in_vals, dtype *g_vals, int 
 
     KernelPointwiseLinearBackwardForInput<<<block_count, TPB>>>(grads, g_vals, count, row, cols,
             max_col, in_grads);
+    CheckCudaError();
+}
+
+__global__ void KernelBroadcastForward(dtype **in_vals, int count, int in_dim, int *ns, int max_n,
+        dtype **vals) {
+    int i = DeviceDefaultIndex();
+    int m = max_n * in_dim;
+    int count_i = i / m;
+    if (count_i < count) {
+        int x = i % m;
+        int n = ns[count_i];
+        int in_dim_i = x / n;
+        if (in_dim_i < in_dim) {
+            int n_i = x % n;
+            vals[count_i][n_i * in_dim + in_dim_i] = in_vals[count_i][in_dim_i];
+        }
+    }
+}
+
+void BroadcastForward(dtype **in_vals, int count, int in_dim, int *ns, int max_n, dtype **vals) {
+    int block_count = DefaultBlockCountWithoutLimit(count * max_n * in_dim);
+    KernelBroadcastForward<<<block_count, TPB>>>(in_vals, count, in_dim, ns, max_n, vals);
+    CheckCudaError();
+}
+
+__global__ void KernelBroadcastBackward(dtype **grads, int count, int in_dim, int *ns, int max_n,
+        dtype **in_grads) {
+    __shared__ volatile extern dtype accumulated_shared_arr[];
+    int count_i = blockIdx.y;
+    int n = ns[count_i];
+    int n_i = threadIdx.x;
+    int dim_i = blockIdx.x;
+    if (n_i < n) {
+        accumulated_shared_arr[threadIdx.x] = grads[count_i][in_dim * n_i + dim_i];
+    } else {
+        accumulated_shared_arr[threadIdx.x] = 0.0f;
+    }
+    __syncthreads();
+
+    for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
+        if (threadIdx.x < i) {
+            int j = threadIdx.x + i;
+            accumulated_shared_arr[threadIdx.x] += accumulated_shared_arr[j];
+        }
+        __syncthreads();
+    }
+
+    if (threadIdx.x == 0) {
+        dtype *in_grad = in_grads[count_i];
+        DeviceAtomicAdd(in_grad + dim_i, accumulated_shared_arr[0]);
+    }
+}
+
+void BroadcastBackward(dtype **grads, int count, int in_dim, int *ns, int max_n,
+    dtype **in_grads) {
+    int thread_count = 8;
+    while (max_n > thread_count) {
+        thread_count <<= 1;
+    }
+    dim3 block_dim(in_dim, count, 1);
+    KernelBroadcastBackward<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(grads,
+            count, in_dim, ns, max_n, in_grads);
     CheckCudaError();
 }
 
