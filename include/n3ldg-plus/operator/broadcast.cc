@@ -61,7 +61,7 @@ public:
             in_vals.push_back(b.getInput().getVal().value);
             vals.push_back(b.getVal().value);
             ns.push_back(b.getColumn());
-            in_dim_ = b.getColumn();
+            in_dim_ = b.getDim() /  b.getColumn();
         }
         cuda::NumberPointerArray in_val_arr, val_arr;
         in_val_arr.init(in_vals.data(), count);
@@ -70,6 +70,9 @@ public:
         max_n_ = *max_element(ns.begin(), ns.end());
         cuda::BroadcastForward(in_val_arr.value, count, in_dim_, ns_arr_.value, max_n_,
                 val_arr.value);
+#if TEST_CUDA
+        UniInputExecutor::testForward();
+#endif
     }
 
     void backward() override {
@@ -88,6 +91,9 @@ public:
         in_grad_arr.init(in_grads.data(), count);
         cuda::BroadcastBackward(grad_arr.value, count, in_dim_, ns_arr_.value, max_n_,
                 in_grad_arr.value);
+#if TEST_CUDA
+        UniInputExecutor::testBackward();
+#endif
     }
 
 private:

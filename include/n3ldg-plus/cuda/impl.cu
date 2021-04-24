@@ -3684,7 +3684,7 @@ __global__ void KernelMax(dtype **v, int count, int dim, volatile dtype *block_m
 
     if (is_last_block) {
         dtype max = -1e10;
-        int max_i = 100000;
+        int max_i = 100000000;
         for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
             int offset = blockIdx.x * gridDim.y + i;
             if (block_maxes[offset] > max) {
