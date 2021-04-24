@@ -1,8 +1,10 @@
 #include "n3ldg-plus/operator/layer_normalization.h"
 
-using ::std::string;
-using ::std::to_string;
-using ::std::vector;
+using std::string;
+using std::to_string;
+using std::vector;
+using std::cout;
+using std::endl;
 
 namespace n3ldg_plus {
 
