@@ -6,6 +6,7 @@ using std::make_pair;
 using std::string;
 using std::vector;
 using std::cerr;
+using std::cout;
 using std::endl;
 
 namespace n3ldg_plus {
@@ -152,7 +153,7 @@ void Graph::forward() {
 #if USE_GPU
         clearNodes(cur_exec->batch);
 #endif
-        //            cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl << endl;
+//        cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl;
 
         cur_exec->forwardFully();
         if (eager_) {

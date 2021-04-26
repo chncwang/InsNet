@@ -1292,7 +1292,7 @@ bool Verify(int *host, int *device, int len, const char* message) {
     return success;
 }
 
-constexpr int MAX_BLOCK_POWER = 100;
+constexpr int MAX_BLOCK_POWER = 40;
 
 MemoryPool& MemoryPool::Ins() {
     static MemoryPool *p;
