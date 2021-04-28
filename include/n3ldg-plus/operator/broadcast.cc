@@ -23,14 +23,14 @@ public:
     void compute() override {
         int row = getDim() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
-            Vec(val().v + row * i, row) = getInput().getVal().vec();
+            Vec(val().v + row * i, row) = inputVal().vec();
         }
     }
 
     void backward() override {
         int row = getDim() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
-            getInput().loss().vec() += Vec(loss().v + row * i, row);
+            inputGrad().vec() += Vec(loss().v + row * i, row);
         }
     }
 
@@ -41,6 +41,14 @@ public:
 protected:
     virtual bool isDimLegal(const Node &input) const override {
         return getColumn() * input.getDim() == getDim();
+    }
+
+    bool isInputValForwardOnly() const override {
+        return true;
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
     }
 };
 
@@ -58,7 +66,7 @@ public:
 
         for (Node *node : batch) {
             BroadcastNode &b = dynamic_cast<BroadcastNode &>(*node);
-            in_vals.push_back(b.getInput().getVal().value);
+            in_vals.push_back(b.inputVal().value);
             vals.push_back(b.getVal().value);
             ns.push_back(b.getColumn());
             in_dim_ = b.getDim() /  b.getColumn();
@@ -83,7 +91,7 @@ public:
         for (Node *node : batch) {
             BroadcastNode &b = dynamic_cast<BroadcastNode &>(*node);
             grads.push_back(b.getLoss().value);
-            in_grads.push_back(b.getInput().getLoss().value);
+            in_grads.push_back(b.inputGrad().value);
         }
 
         cuda::NumberPointerArray grad_arr, in_grad_arr;

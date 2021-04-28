@@ -106,6 +106,14 @@ protected:
         return true;
     }
 
+    bool isInputValForwardOnly() const override {
+        return true;
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
+    }
+
 private:
     LinearParam* param_ = nullptr;
 };
@@ -152,22 +160,23 @@ public:
         b_.init(outDim(), col_sum_);
 #endif
         vector<dtype*> ys;
-        in_vals_.reserve(batch.size());
+        vector<dtype*> in_vals;
+        in_vals.reserve(batch.size());
         ys.reserve(batch.size());
         cols_.reserve(batch.size());
 
         for (int i = 0; i < batch.size(); ++i) {
             LinearNode *n = dynamic_cast<LinearNode*>(batch.at(i));
 
-            in_vals_.push_back(n->getInput().val().value);
+            in_vals.push_back(n->inputVal().value);
             ys.push_back(n->val().value);
             cols_.push_back(n->getColumn());
 #if TEST_CUDA
             n->getInput().val().copyFromDeviceToHost();
 #endif
         }
-        cuda::LinearForward(in_vals_, count, cols_, inDim(), outDim(), W().val().value, 
-                b() == nullptr ? nullptr : b()->val().value, ys);
+        cuda::LinearForward(in_vals, count, cols_, inDim(), outDim(), W().val().value, 
+                b() == nullptr ? nullptr : b()->val().value, ys, concated_in_val_);
 
 #if TEST_CUDA
         int col_offset = 0;
@@ -228,11 +237,12 @@ public:
         for (int i = 0; i < count; ++i) {
             LinearNode* ptr = (LinearNode*)batch[i];
             grads.push_back(ptr->loss().value);
-            in_grads.push_back(ptr->getInput().loss().value);
+            in_grads.push_back(ptr->inputGrad().value);
         }
 
-        cuda::LinearBackward(grads, count, cols_, inDim(), outDim(), W().val().value, in_vals_,
-                b() == nullptr ? nullptr : b()->grad().value, in_grads, W().grad().value);
+        cuda::LinearBackward(grads, count, cols_, inDim(), outDim(), W().val().value,
+                concated_in_val_.value, b() == nullptr ? nullptr : b()->grad().value, in_grads,
+                W().grad().value);
 #if TEST_CUDA
         Tensor2D lx, ly;
         lx.init(inDim(), col_sum_);
@@ -276,11 +286,12 @@ public:
 
 private:
 #if TEST_CUDA
-    Tensor2D x_, y_, b_;
+    Tensor2D y_, b_;
+    Tensor2D x_;
 #endif
+    cuda::NumberArray concated_in_val_;
     int col_sum_ = 0;
     vector<int> cols_;
-    vector<dtype *> in_vals_;
 };
 #else
 class LinearExecutor : public LinearExecutorBase {
@@ -294,12 +305,13 @@ public:
     }
 
     void  forward() override {
+        Tensor2D y;
         int count = batch.size();
         for (Node *node : batch) {
             col_sum_ += node->getColumn();
         }
         x_.init(inDim(), col_sum_);
-        y_.init(outDim(), col_sum_);
+        y.init(outDim(), col_sum_);
         b_.init(outDim(), col_sum_);
 
         int col_offset = 0;
@@ -316,16 +328,16 @@ public:
             }
         }
 
-        y_.mat() = W().val().mat().transpose() * x_.mat();
+        y.mat() = W().val().mat().transpose() * x_.mat();
 
         if (b() != nullptr) {
-            y_.vec() += b_.vec();
+            y.vec() += b_.vec();
         }
 
         col_offset = 0;
         for (int i = 0; i < count; i++) {
             LinearNode &l = dynamic_cast<LinearNode &>(*batch.at(i));
-            l.val().vec() = Vec(y_.v + col_offset * outDim(), l.getDim());
+            l.val().vec() = Vec(y.v + col_offset * outDim(), l.getDim());
             col_offset += l.getColumn();
         }
     }
@@ -363,7 +375,7 @@ public:
 
 private:
     int col_sum_ = 0;
-    Tensor2D x_, y_, b_;
+    Tensor2D x_, b_;
 };
 #endif
 
@@ -392,16 +404,12 @@ public:
     }
 
     void compute() override {
-        for (int i = 0; i < getDim(); ++i) {
-            val()[i] = getInput().getVal()[i] + bias_param_->val()[0][i];
-        }
+        val().vec() = inputVal().vec() + bias_param_->val().vec();
     }
 
     void backward() override {
-        getInput().loss().vec() += loss().vec();
-        for (int i = 0; i < getDim(); ++i) {
-            bias_param_->grad()[0][i] += getLoss()[i];
-        }
+        inputGrad().vec() += loss().vec();
+        bias_param_->grad().vec() += getLoss().vec();
     }
 
     Executor *generate() override;
@@ -418,6 +426,14 @@ public:
 protected:
     virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
+    }
+
+    bool isInputValForwardOnly() const override {
+        return true;
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
     }
 
 private:
@@ -446,7 +462,7 @@ public:
         vector<dtype*> inputs, vals;
         for (Node *node : batch) {
             BiasNode *bias_node = dynamic_cast<BiasNode *>(node);
-            inputs.push_back(bias_node->getInput().getVal().value);
+            inputs.push_back(bias_node->inputVal().value);
             vals.push_back(bias_node->getVal().value);
         }
         cuda::BiasForward(inputs, bias, batch.size(), getDim(), vals);
@@ -462,7 +478,7 @@ public:
         for (Node *node : batch) {
             BiasNode *bias_node = dynamic_cast<BiasNode *>(node);
             losses.push_back(bias_node->getLoss().value);
-            in_losses.push_back(bias_node->getInput().getLoss().value);
+            in_losses.push_back(bias_node->inputGrad().value);
         }
         cuda::BiasBackward(losses, batch.size(), getDim(), bias, in_losses);
 #if TEST_CUDA

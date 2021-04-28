@@ -7,12 +7,7 @@ namespace n3ldg_plus {
 
 class PMultiNode : public Node, public Poolable<PMultiNode> {
 public:
-    Node *in1, *in2;
-
-    PMultiNode() : Node("point-multiply") {
-        in1 = nullptr;
-        in2 = nullptr;
-    }
+    PMultiNode() : Node("point-multiply") {}
 
     void setNodeDim(int dim) override {
         setDim(dim);
@@ -28,8 +23,9 @@ public:
     }
 
     void setInputs(const vector<Node *> &inputs) override {
-        in1 = inputs.at(0);
-        in2 = inputs.at(1);
+        Node::setInputs(inputs);
+        Node *in1 = inputs.at(0);
+        Node *in2 = inputs.at(1);
         if (in1->getDim() != getDim() || in2->getDim() != getDim()) {
             cerr << fmt::format("PMultiNode setInputs dim error a:{} b:{} self:{}\n",
                 in1->getDim(), in2->getDim(), getDim());
@@ -38,15 +34,27 @@ public:
     }
 
     void compute() override {
-        val().vec() = in1->val().vec() * in2->val().vec();
+        val().vec() = input_vals_.at(0)->vec() * input_vals_.at(1)->vec();
     }
 
     void backward() override {
-        in1->loss().vec() += loss().vec() * in2->val().vec();
-        in2->loss().vec() += loss().vec() * in1->val().vec();
+        input_grads_.at(0)->vec() += loss().vec() * input_vals_.at(1)->vec();
+        input_grads_.at(1)->vec() += loss().vec() * input_vals_.at(0)->vec();
     }
 
     Executor * generate() override;
+
+protected:
+    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
+        return {};
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
+    }
+
+private:
+    friend class PMultiExecutor;
 };
 
 class BatchedPMultiNode : public BatchedNodeImpl<PMultiNode> {
@@ -78,8 +86,8 @@ public:
         int count = batch.size();
         for (Node *n : batch) {
             PMultiNode *pmulti = dynamic_cast<PMultiNode*>(n);
-            in_vals1.push_back(pmulti->in1->val().value);
-            in_vals2.push_back(pmulti->in2->val().value);
+            in_vals1.push_back(pmulti->input_vals_.at(0)->value);
+            in_vals2.push_back(pmulti->input_vals_.at(1)->value);
             vals.push_back(pmulti->val().value);
         }
         cuda::PMultiForward(in_vals1, in_vals2, count, getDim(), vals);
@@ -93,21 +101,21 @@ public:
 
     void backward() {
         int count = batch.size();
-        vector<dtype*> losses, vals1, vals2, losses1, losses2;
-        losses.reserve(count);
+        vector<dtype*> grads, vals1, vals2, grads1, grads2;
+        grads.reserve(count);
         vals1.reserve(count);
         vals2.reserve(count);
-        losses1.reserve(count);
-        losses2.reserve(count);
+        grads1.reserve(count);
+        grads2.reserve(count);
         for (Node *n : batch) {
             PMultiNode *pmulti = dynamic_cast<PMultiNode*>(n);
-            losses.push_back(pmulti->loss().value);
-            vals1.push_back(pmulti->in1->val().value);
-            vals2.push_back(pmulti->in2->val().value);
-            losses1.push_back(pmulti->in1->loss().value);
-            losses2.push_back(pmulti->in2->loss().value);
+            grads.push_back(pmulti->loss().value);
+            vals1.push_back(pmulti->input_vals_.at(0)->value);
+            vals2.push_back(pmulti->input_vals_.at(1)->value);
+            grads1.push_back(pmulti->input_grads_.at(0)->value);
+            grads2.push_back(pmulti->input_grads_.at(1)->value);
         }
-        cuda::PMultiBackward(losses, vals1, vals2, count, getDim(), losses1, losses2);
+        cuda::PMultiBackward(grads, vals1, vals2, count, getDim(), grads1, grads2);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward();

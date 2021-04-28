@@ -898,7 +898,8 @@ void LinearForward(vector<dtype *> &in_vals, int count, vector<int> &cols, int i
         int out_row,
         dtype *W,
         dtype *bias,
-        vector<dtype *> &vals) {
+        vector<dtype *> &vals,
+        NumberArray &concated_in_val) {
     int col_sum = 0;
     vector<int> in_offsets, out_offsets, in_dims, out_dims;
     in_offsets.reserve(count);
@@ -913,7 +914,7 @@ void LinearForward(vector<dtype *> &in_vals, int count, vector<int> &cols, int i
         out_dims.push_back(out_row * col);
     }
 
-    NumberArray y, concated_in_val;
+    NumberArray y;
     concated_in_val.init(col_sum * in_row);
     y.init(col_sum * out_row);
 
@@ -1019,7 +1020,7 @@ __global__ void KernelLinearBackwardForBias(dtype *grad, int col, int row, dtype
 
 void LinearBackward(vector<dtype *> &grads, int count, vector<int> &cols, int in_row, int out_row,
         dtype *W_val,
-        vector<dtype *> &in_vals,
+        dtype *concated_in_val,
         dtype *bias_grad,
         vector<dtype *> &in_grads,
         dtype *W_grad) {
@@ -1037,15 +1038,13 @@ void LinearBackward(vector<dtype *> &grads, int count, vector<int> &cols, int in
         out_dims.push_back(out_row * col);
     }
 
-    NumberArray concated_grad, concated_in_grad, concated_in_val;
+    NumberArray concated_grad, concated_in_grad;
     concated_grad.init(col_sum * out_row);
     concated_in_grad.init(col_sum * in_row);
-    concated_in_val.init(col_sum * in_row);
 
     NumberPointerArray in_grad_arr, grad_arr, in_val_arr;
     in_grad_arr.init(in_grads.data(), count);
     grad_arr.init(grads.data(), count);
-    in_val_arr.init(in_vals.data(), count);
 
     IntArray in_dim_arr, in_offset_arr, out_dim_arr, out_offset_arr;
     in_dim_arr.init(in_dims.data(), count);
@@ -1063,15 +1062,12 @@ void LinearBackward(vector<dtype *> &grads, int count, vector<int> &cols, int in
 
     int max_in_dim = max_col * in_row;
     block_count = DefaultBlockCountWithoutLimit(count * max_col * in_row);
-    KernelConcat<<<block_count, TPB>>>(in_val_arr.value, count, in_dim_arr.value, max_in_dim,
-            in_offset_arr.value, concated_in_val.value);
-    CheckCudaError();
 
     KernelConcat<<<block_count, TPB>>>(in_grad_arr.value, count, in_dim_arr.value, max_in_dim,
             in_offset_arr.value, concated_in_grad.value);
     CheckCudaError();
 
-    MatrixMultiplyMatrix(concated_in_val.value, concated_grad.value, W_grad, in_row, col_sum,
+    MatrixMultiplyMatrix(concated_in_val, concated_grad.value, W_grad, in_row, col_sum,
             out_row, true, true, false);
     MatrixMultiplyMatrix(W_val, concated_grad.value, concated_in_grad.value, in_row, out_row,
             col_sum, false, false, false);

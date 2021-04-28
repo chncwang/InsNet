@@ -216,11 +216,12 @@ void LinearForward(std::vector<dtype *> &in_vals, int count, std::vector<int> &i
         int out_row,
         dtype *W,
         dtype *bias,
-        std::vector<dtype *> &vals);
+        std::vector<dtype *> &vals,
+        NumberArray &concated_in_val);
 void LinearBackward(std::vector<dtype *> &grads, int count, std::vector<int> &cols, int in_row,
         int out_row,
         dtype *W_val,
-        std::vector<dtype *> &in_vals,
+        dtype *concated_in_val,
         dtype *bias_grad,
         std::vector<dtype *> &in_grads,
         dtype *W_grad);

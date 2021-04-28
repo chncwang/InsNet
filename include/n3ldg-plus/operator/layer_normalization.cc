@@ -39,6 +39,14 @@ protected:
         return input.getDim() == getDim();
     }
 
+    bool isInputValForwardOnly() const override {
+        return true;
+    }
+
+    bool isValForwardOnly() const override {
+        return false;
+    }
+
 private:
     friend class LayerNormExecutor;
 };
@@ -62,7 +70,7 @@ public:
         int i = 0;
         for (Node *node : batch) {
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
-            in_vals.at(i) = s.getInput().getVal().value;
+            in_vals.at(i) = s.getInputVal().value;
             cols.at(i) = s.getColumn();
             vals.at(i++) = s.getVal().value;
         }
@@ -76,7 +84,6 @@ public:
 
         cuda::StandardLayerNormForward(in_val_arr.value, count, getRow(), col_arr_.value,
                 max_col_, val_arr_.value, sds_.value);
-        vals_ = move(vals);
 #if TEST_CUDA
         i = 0;
         for (Node *node : batch) {
@@ -120,7 +127,7 @@ public:
             col_offsets.at(i) = col_sum;
             dim_offsets.at(i) = col_sum * row;
             dims.at(i) = s.getDim();
-            in_grads.at(i) = s.getInput().getLoss().value;
+            in_grads.at(i) = s.inputGrad().value;
             grads.at(i++) = s.getLoss().value;
             col_sum += s.getColumn();
         }
@@ -163,7 +170,6 @@ public:
 
 private:
     Tensor1D sds_;
-    vector<dtype *> vals_;
     cuda::NumberPointerArray val_arr_;
     cuda::IntArray col_arr_;
     int max_col_;
@@ -247,7 +253,7 @@ public:
     void compute() override {
         int row = getDim() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
-            Vec(val().v + i * row, row) = Vec(getInput().getVal().v + i * row, row) *
+            Vec(val().v + i * row, row) = Vec(getInputVal().v + i * row, row) *
                 params_->g().val().vec() + params_->b().val().vec();
         }
     }
@@ -255,10 +261,10 @@ public:
     void backward() override {
         int row = getDim() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
-            Vec(getInput().loss().v + i * row, row) += Vec(getLoss().v + i * row, row) *
+            Vec(inputGrad().v + i * row, row) += Vec(getLoss().v + i * row, row) *
                 params_->g().val().vec();
             params_->g().grad().vec() += Vec(getLoss().v + i * row, row) *
-                Vec(getInput().getVal().v + i * row, row);
+                Vec(getInputVal().v + i * row, row);
             params_->b().grad().vec() += Vec(getLoss().v + i * row, row);
         }
     }
@@ -272,6 +278,14 @@ public:
 protected:
     virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();;
+    }
+
+    bool isInputValForwardOnly() const override {
+        return false;
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
     }
 
 private:
@@ -311,7 +325,7 @@ public:
         int i = 0;
         for (Node *node : batch)  {
             PointwiseLinearNode &p = dynamic_cast<PointwiseLinearNode &>(*node);
-            in_vals_.push_back(p.getInput().getVal().value);
+            in_vals_.push_back(p.getInputVal().value);
             vals.at(i++) = p.getVal().value;
             cols.push_back(p.getColumn());
         }
@@ -342,7 +356,7 @@ public:
             grads.at(i) = p.getLoss().value;
             dims.at(i) = p.getDim();
             dim_offsets.at(i) = col_sum * row;
-            in_grads.at(i++) = p.getInput().getLoss().value;
+            in_grads.at(i++) = p.inputGrad().value;
             col_sum += p.getColumn();
         }
         cuda::NumberPointerArray grad_arr, in_grad_arr;

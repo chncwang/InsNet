@@ -5,10 +5,13 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <memory>
 #include <iostream>
 #include "fmt/core.h"
 #include "n3ldg-plus/base/tensor.h"
 #include "n3ldg-plus/cuda/n3ldg_plus_cuda.h"
+
+using std::shared_ptr;
 
 namespace n3ldg_plus {
 
@@ -121,11 +124,11 @@ public:
     virtual std::string typeSignature() const override;
 
     const Tensor1D &getVal() const {
-        return val_;
+        return *val_;
     }
 
     Tensor1D &val() {
-        return val_;
+        return *val_;
     }
 
     const Tensor1D &getLoss() const {
@@ -184,7 +187,19 @@ public:
         is_pooled_ = is_pooled;
     }
 
-    virtual void setInputs(const std::vector<Node*> &inputs) {}
+    virtual void setInputs(const std::vector<Node*> &inputs);
+
+    std::shared_ptr<Tensor1D> &sharedVal() {
+        return val_;
+    }
+
+    void clearInputVals(bool force);
+
+    void clearVal(bool force);
+
+    int inputSize() const {
+        return input_dims_.size();
+    }
 
 protected:
     void afterConnect(const std::vector<Node*> &ins);
@@ -199,8 +214,16 @@ protected:
 
     virtual void init(int ndim);
 
+    virtual bool isValForwardOnly() const = 0;
+
+    virtual std::vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() = 0;
+
+    std::vector<std::shared_ptr<Tensor1D>> input_vals_;
+    std::vector<Tensor1D *> input_grads_;
+    std::vector<int> input_dims_;
+
 private:
-    Tensor1D val_;
+    std::shared_ptr<Tensor1D> val_;
     Tensor1D loss_;
     int dim_;
     int column_ = 1;
@@ -457,21 +480,32 @@ public:
 
     virtual std::string typeSignature() const override;
 
-    virtual void setInputs(const std::vector<Node *> &ins) override {
-        input_ = ins.front();
-    }
-
     void connect(Node &input);
 
-    Node &getInput() const {
-        return *input_;
+    Tensor1D &inputVal() {
+        return *input_vals_.front();
+    }
+
+    Tensor1D &getInputVal() const {
+        return *input_vals_.front();
+    }
+
+    Tensor1D &inputGrad() {
+        return *input_grads_.front();
+    }
+
+    int inputDim() const {
+        return input_dims_.front();
     }
 
 protected:
     virtual bool isDimLegal(const Node &input) const = 0;
 
+    virtual bool isInputValForwardOnly() const = 0;
+
+    virtual std::vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override;
+
 private:
-    Node *input_;
     friend class UniInputExecutor;
 };
 
@@ -528,9 +562,7 @@ public:
 
     void forwardFully();
 
-    void backwardFully() {
-        backward();
-    }
+    void backwardFully();
 
     virtual void backward();
 

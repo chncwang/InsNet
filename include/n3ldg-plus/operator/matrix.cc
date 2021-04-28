@@ -1,4 +1,5 @@
 #include "n3ldg-plus/operator/matrix.h"
+#include "n3ldg-plus/util/util.h"
 
 using std::array;
 using std::vector;
@@ -46,14 +47,6 @@ public:
         afterConnect(inputs);
     }
 
-    [[deprecated]]
-    void connect(NodeAbs &topo_input, const vector<Node *> &inputs) {
-        setInputs(inputs);
-        topo_input.addParent(this);
-        setColumn(inputs.size());
-        topo_input.getNodeContainer().addNode(this);
-    }
-
     void setInputs(const vector<Node *> &inputs) override {
         int input_dim = inputs.front()->getDim();
         for (auto it = inputs.begin() + 1; it != inputs.end(); ++it) {
@@ -63,23 +56,23 @@ public:
             }
         }
 
-        in_nodes = inputs;
+        Node::setInputs(inputs);
     }
 
     void compute() override {
-        for (int i = 0; i < in_nodes.size(); ++i) {
+        for (int i = 0; i < inputSize(); ++i) {
             int offset = i * getRow();
             for (int j = 0; j < getRow(); ++j) {
-                val().v[offset + j] = in_nodes.at(i)->getVal().v[j];
+                val().v[offset + j] = input_vals_.at(i)->v[j];
             }
         }
     }
 
     void backward() override {
-        for (int i = 0; i < in_nodes.size(); ++i) {
+        for (int i = 0; i < inputSize(); ++i) {
             int offset = i * getRow();
             for (int j = 0; j < getRow(); ++j) {
-                in_nodes.at(i)->loss()[j] += loss()[offset + j];
+                (*input_grads_.at(i))[j] += loss()[offset + j];
             }
         }
     }
@@ -90,40 +83,18 @@ public:
 
     Executor* generate() override;
 
-    const vector<Node *> &getInputs() const {
-        return in_nodes;
+protected:
+    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
+        return toPointers(input_vals_);
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
     }
 
 private:
-    vector<Node *> in_nodes;
     friend class BatchedMatrixConcatNode;
-};
-
-class BatchedMatrixConcatNode : public BatchedNodeImpl<MatrixConcatNode> {
-public:
-    void init(BatchedNode &input, int group) {
-        if (input.batch().size() % group != 0) {
-            cerr << fmt::format("input batch size:{} group:{}\n", input.batch().size(),
-                    group);
-        }
-        int input_count = input.batch().size() / group;
-        allocateBatch(input.getDim() * input_count, group);
-
-        int group_i = 0;
-        for (Node *node : batch()) {
-            MatrixConcatNode *m = dynamic_cast<MatrixConcatNode *>(node);
-            vector<Node *> in_nodes;
-            in_nodes.reserve(input_count);
-            for (int i = 0; i < input_count; ++i) {
-                in_nodes.push_back(input.batch().at(group_i * input_count + i));
-            }
-            ++group_i;
-            m->in_nodes = move(in_nodes);
-            m->setColumn(input_count);
-        }
-
-        afterInit({&input});
-    }
+    friend class MatrixConcatExecutor;
 };
 
 #if USE_GPU
@@ -153,8 +124,8 @@ public:
             MatrixConcatNode *concat = dynamic_cast<MatrixConcatNode*>(node);
             vals.push_back(concat->getVal().value);
             for (int i = 0; i < max_in_count; ++i) {
-                in_vals.push_back(i < in_counts.at(node_i) ?
-                        concat->getInputs().at(i)->getVal().value : nullptr);
+                in_vals.push_back(i < in_counts.at(node_i) ? concat->input_vals_.at(i)->value :
+                        nullptr);
             }
         }
         cuda::MatrixConcatForward(in_vals, getCount(), getRow(), in_counts, vals);
@@ -175,7 +146,7 @@ public:
             grads.push_back(concat->getLoss().value);
             for (int i = 0; i < max_in_count; ++i) {
                 in_grads.push_back(i < in_counts.at(node_i) ?
-                        concat->getInputs().at(i)->getLoss().value : nullptr);
+                        concat->input_grads_.at(i)->value : nullptr);
             }
         }
         cuda::MatrixConcatBackward(grads, getCount(), getRow(), in_counts, in_grads);
@@ -213,184 +184,6 @@ Executor* MatrixConcatNode::generate() {
     return new MatrixConcatExecutor;
 }
 
-class MatrixAndVectorMultiExecutor;
-
-class MatrixAndVectorMultiNode : public Node, public Poolable<MatrixAndVectorMultiNode> {
-public:
-    MatrixAndVectorMultiNode() : Node("MatrixAndVectorMulti") {}
-
-    void setNodeDim(int dim) override {
-        setDim(dim);
-    }
-
-    void initNode(int dim) override {
-        init(dim);
-    }
-
-    void setInputs(const vector<Node *> &ins) override {
-        matrix_ = ins.at(0);
-        vector_ = ins.at(1);
-    }
-
-    void connect(Node &matrix, Node &vec) {
-        setInputs({&matrix, &vec});
-        afterConnect({&matrix, &vec});
-    }
-
-    void compute() override {
-        int col = vector_->getDim();
-        int row = getDim();
-        val().mat() = Mat(matrix_->getVal().v, row, col) * vector_->getVal().mat();
-    }
-
-    void backward() override {
-        int col = vector_->getDim();
-        int row = getDim();
-        Mat(matrix_->loss().v, row, col) += getLoss().mat() *
-            vector_->getVal().mat().transpose();
-        vector_->loss().mat() += Mat(matrix_->getVal().v, row, col).transpose() * getLoss().mat();
-    }
-
-    Executor * generate() override;
-
-    string typeSignature() const override {
-        return Node::typeSignature();
-    }
-
-private:
-    Node *vector_ = nullptr;
-    Node *matrix_ = nullptr;
-    friend class MatrixAndVectorMultiExecutor;
-    friend class BatchedMatrixAndVectorMultiNode;
-};
-
-class BatchedMatrixAndVectorMultiNode: public BatchedNodeImpl<MatrixAndVectorMultiNode> {
-public:
-    void init(Node &matrix, BatchedNode &vec, int *dim = nullptr) {
-        if (dim == nullptr) {
-            int dim = matrix.getDim() / vec.getDim();
-            allocateBatch(dim, vec.batch().size());
-        } else {
-            allocateBatch(*dim, vec.batch().size());
-        }
-        int i = 0;
-        for (Node *node : batch()) {
-            MatrixAndVectorMultiNode *m = dynamic_cast<MatrixAndVectorMultiNode *>(node);
-            m->setInputs({&matrix, vec.batch().at(+i++)});
-        }
-
-        matrix.addParent(this);
-        vec.addParent(this);
-        matrix.getNodeContainer().addNode(this);
-    }
-
-    void init(BatchedNode &matrix, BatchedNode &vec, int *dim = nullptr) {
-        int group = matrix.batch().size();
-        if (vec.batch().size() % group != 0) {
-            cerr << fmt::format("BatchedTranMatrixMulVectorNode init vec size:{} group:{}\n",
-                vec.batch().size(), group);
-            abort();
-        }
-        if (dim == nullptr) {
-            int dim = matrix.getDim() / vec.getDim();
-            allocateBatch(dim, vec.batch().size());
-        } else {
-            allocateBatch(*dim, vec.batch().size());
-        }
-
-        int node_i = 0;
-        for (Node *matrix_node : matrix.batch()) {
-            int vec_count = vec.batch().size() / group;
-            for (int i = 0; i < vec_count; ++i) {
-                Node *node = batch().at(node_i);
-                node->setInputs({matrix_node, vec.batch().at(node_i++)});
-            }
-        }
-
-        afterInit({&matrix, &vec});
-    }
-};
-
-#if USE_GPU
-class MatrixAndVectorMultiExecutor : public Executor {
-public:
-    void forward() override {
-#if TEST_CUDA
-        auto get_inputs = [&](Node &node)->vector<Node *> {
-            MatrixAndVectorMultiNode &multi = dynamic_cast<MatrixAndVectorMultiNode&>(node);
-            vector<Node *> inputs = {multi.matrix_, multi.vector_};
-            return inputs;
-        };
-        testForwardInpputs(get_inputs);
-        for (Node *node : batch) {
-            MatrixAndVectorMultiNode *multi = dynamic_cast<MatrixAndVectorMultiNode *>(node);
-            multi->matrix_->val().copyFromHostToDevice();
-            multi->vector_->val().copyFromHostToDevice();
-        }
-#endif
-        auto vals = getVals();
-        matrix_vals_.reserve(batch.size());
-        vector_vals_.reserve(batch.size());
-        cols_.reserve(batch.size());
-        for (Node *node : batch) {
-            MatrixAndVectorMultiNode *multi = dynamic_cast<MatrixAndVectorMultiNode *>(node);
-            matrix_vals_.push_back(multi->matrix_->getVal().value);
-            vector_vals_.push_back(multi->vector_->getVal().value);
-            cols_.push_back(multi->vector_->getDim());
-        }
-        MatrixAndVectorMultiNode *x = dynamic_cast<MatrixAndVectorMultiNode *>(batch.front());
-        row_ = x->getDim();
-        cuda::MatrixAndVectorMultiForward(matrix_vals_, vector_vals_, batch.size(), row_,
-                cols_, vals);
-#if TEST_CUDA
-        testForward();
-        cout << "MatrixAndVectorMultiExecutor forward tested" << endl;
-#endif
-    }
-
-    void backward() override {
-        auto grads = getGrads();
-
-        vector<dtype *> matrix_grads, vector_grads;
-        matrix_grads.reserve(batch.size());
-        vector_grads.reserve(batch.size());
-        for (Node *node : batch) {
-            MatrixAndVectorMultiNode *multi = dynamic_cast<MatrixAndVectorMultiNode *>(node);
-            matrix_grads.push_back(multi->matrix_->getLoss().value);
-            vector_grads.push_back(multi->vector_->getLoss().value);
-        }
-        cuda::MatrixAndVectorMultiBackward(grads, matrix_vals_, vector_vals_, batch.size(),
-                row_, cols_, matrix_grads, vector_grads);
-#if TEST_CUDA
-        auto get_inputs = [&](Node &node) {
-            MatrixAndVectorMultiNode &multi = dynamic_cast<MatrixAndVectorMultiNode&>(node);
-            vector<pair<Node *, string>> inputs = {make_pair(multi.matrix_, "matrix"),
-            make_pair(multi.vector_, "vector")};
-            return inputs;
-        };
-        testBackward(get_inputs);
-        cout << "MatrixAndVectorMultiExecutor backward tested" << endl;
-#endif
-    }
-
-private:
-    int row_;
-    vector<int> cols_;
-    vector<dtype *> matrix_vals_, vector_vals_;
-};
-#else
-class MatrixAndVectorMultiExecutor : public Executor {
-public:
-    int calculateFLOPs() override {
-        return 0; // TODO
-    }
-};
-#endif
-
-Executor * MatrixAndVectorMultiNode::generate() {
-    return new MatrixAndVectorMultiExecutor;
-}
-
 class MatrixMulMatrixNode : public Node, public Poolable<MatrixMulMatrixNode> {
 public:
     MatrixMulMatrixNode() : Node("MatrixMulMatrixNode") {}
@@ -409,8 +202,7 @@ public:
             cerr << fmt::format("MatrixMulMatrixNode setInputs a_size:{} k:{}\n", a_size, k_);
             abort();
         }
-        ins_.at(0) = ins.at(0);
-        ins_.at(1) = ins.at(1);
+        Node::setInputs(ins);
     }
 
     void connect(Node &a, Node &b) {
@@ -419,29 +211,37 @@ public:
     }
 
     void compute() override {
-        a_row_ = ins_.at(0)->getDim() / k_;
-        b_col_ = ins_.at(1)->getDim() / k_;
-        Mat(getVal().v, a_row_, b_col_) = Mat(ins_.at(0)->getVal().v, a_row_, k_) *
-            Mat(ins_.at(1)->getVal().v, k_, b_col_);
+        a_row_ = input_dims_.at(0) / k_;
+        b_col_ = input_dims_.at(1) / k_;
+        Mat(getVal().v, a_row_, b_col_) = Mat(input_vals_.at(0)->v, a_row_, k_) *
+            Mat(input_vals_.at(1)->v, k_, b_col_);
     }
 
     void backward() override {
-        Mat(ins_.at(0)->loss().v, a_row_, k_) += Mat(getLoss().v, a_row_, b_col_) *
-            Mat(ins_.at(1)->getVal().v, k_, b_col_).transpose();
-        Mat(ins_.at(1)->loss().v, k_, b_col_) +=
-            Mat(ins_.at(0)->getVal().v, a_row_, k_).transpose() * Mat(getLoss().v, a_row_, b_col_);
+        Mat(input_grads_.at(0)->v, a_row_, k_) += Mat(getLoss().v, a_row_, b_col_) *
+            Mat(input_vals_.at(1)->v, k_, b_col_).transpose();
+        Mat(input_grads_.at(1)->v, k_, b_col_) +=
+            Mat(input_vals_.at(0)->v, a_row_, k_).transpose() * Mat(getLoss().v, a_row_, b_col_);
     }
 
     Executor * generate() override;
 
     string typeSignature() const override {
-        return Node::getNodeType() + to_string(ins_.at(0)->getDim() / k_);
+        return Node::getNodeType() + to_string(input_dims_.at(0) / k_);
     }
 
     int k_ = 0;
 
+protected:
+    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
+        return {};
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
+    }
+
 private:
-    array<Node *, 2> ins_;
     int a_row_;
     int b_col_;
     
@@ -477,14 +277,14 @@ public:
         b_cols_.reserve(count);
         for (Node *node : batch) {
             MatrixMulMatrixNode &m = dynamic_cast<MatrixMulMatrixNode &>(*node);
-            a_vals_.push_back(m.ins_.at(0)->getVal().value);
-            b_vals_.push_back(m.ins_.at(1)->getVal().value);
+            a_vals_.push_back(m.input_vals_.at(0)->value);
+            b_vals_.push_back(m.input_vals_.at(1)->value);
             vals.push_back(m.getVal().value);
             ks_.push_back(m.k_);
-            b_cols_.push_back(m.ins_.at(1)->getDim() / m.k_);
+            b_cols_.push_back(m.input_dims_.at(1) / m.k_);
         }
         MatrixMulMatrixNode &first = dynamic_cast<MatrixMulMatrixNode &>(*batch.front());
-        row_ = first.ins_.at(0)->getDim() / first.k_;
+        row_ = first.input_dims_.at(0) / first.k_;
 #if TEST_CUDA
         auto get_inputs = [&](Node &node) {
             MatrixMulMatrixNode &t = dynamic_cast<MatrixMulMatrixNode&>(node);
@@ -513,8 +313,8 @@ public:
         for (Node *node : batch) {
             MatrixMulMatrixNode &m = dynamic_cast<MatrixMulMatrixNode &>(*node);
             grads.push_back(m.getLoss().value);
-            a_grads.push_back(m.ins_.at(0)->getLoss().value);
-            b_grads.push_back(m.ins_.at(1)->getLoss().value);
+            a_grads.push_back(m.input_grads_.at(0)->value);
+            b_grads.push_back(m.input_grads_.at(1)->value);
         }
 
         cuda::MatrixMulMatrixBackward(grads, a_vals_, b_vals_, count, ks_, b_cols_, row_,
@@ -551,183 +351,6 @@ Executor *MatrixMulMatrixNode::generate() {
     return new MatrixMulMatrixExecutor;
 }
 
-class TranMatrixMulVectorNode : public Node, public Poolable<TranMatrixMulVectorNode> {
-public:
-    TranMatrixMulVectorNode() : Node("TranMatrixMulVectorNode") {}
-
-    void setNodeDim(int dim) override {
-        setDim(dim);
-    }
-
-    void initNode(int dim) override {
-        init(dim);
-    }
-
-    void setInputs(const vector<Node *> &ins) override {
-        matrix_ = ins.at(0);
-        vector_ = ins.at(1);
-        int max_col = matrix_->getDim() / vector_->getDim();
-        if (getDim() > max_col) {
-            cerr << fmt::format("TranMatrixMulVectorNode setInputs dim:{} max_col:{}\n",
-                getDim(), max_col);
-            abort();
-        }
-    }
-
-    void connect(Node &matrix, Node &vec) {
-        setInputs({&matrix, &vec});
-        afterConnect({&matrix, &vec});
-    }
-
-    void compute() override {
-        val().mat() = Mat(matrix_->getVal().v, vector_->getDim(), getDim()).transpose() *
-            vector_->getVal().mat();
-    }
-
-    void backward() override {
-        Mat(matrix_->loss().v, vector_->getDim(), getDim()) += vector_->getVal().mat() *
-            getLoss().mat().transpose();
-        vector_->loss().mat() += Mat(matrix_->val().v, vector_->getDim(), getDim()) *
-            getLoss().mat();
-    }
-
-    Executor * generate() override;
-
-    string typeSignature() const override {
-        return Node::getNodeType() + to_string(vector_->getDim());
-    }
-
-private:
-    Node *matrix_ = nullptr;
-    Node *vector_ = nullptr;
-    friend class BatchedTranMatrixMulVectorNode;
-    friend class TranMatrixMulVectorExecutor;
-};
-
-class BatchedTranMatrixMulVectorNode : public BatchedNodeImpl<TranMatrixMulVectorNode> {
-public:
-    void init(Node &matrix, BatchedNode &vec, const vector<int> *dims = nullptr) {
-        if (dims == nullptr) {
-            int dim = matrix.getDim() / vec.getDim();
-            allocateBatch(dim, vec.batch().size());
-        } else {
-            allocateBatch(*dims);
-        }
-        int i = 0;
-        for (Node *node : batch()) {
-            node->setInputs({&matrix, vec.batch().at(i++)});
-        }
-        matrix.addParent(this);
-        vec.addParent(this);
-        matrix.getNodeContainer().addNode(this);
-    }
-
-    void init(BatchedNode &matrix, BatchedNode &vec, const vector<int> *dims = nullptr) {
-        int group = matrix.batch().size();
-        if (vec.batch().size() % group != 0) {
-            cerr << fmt::format("BatchedTranMatrixMulVectorNode init vec size:{} group:{}\n",
-                vec.batch().size(), group);
-            abort();
-        }
-
-        if (dims == nullptr) {
-            int dim = matrix.getDim() / vec.getDim();
-            allocateBatch(dim, vec.batch().size());
-        } else {
-            vector<int> overall_dims;
-            overall_dims.reserve(group * dims->size());
-            for (int i = 0; i < group; ++i) {
-                for (int dim : *dims) {
-                    overall_dims.push_back(dim);
-                }
-            }
-            allocateBatch(overall_dims);
-        }
-
-        int node_i = 0;
-        for (Node *matrix_node : matrix.batch()) {
-            int vec_count = vec.batch().size() / group;
-            for (int i = 0; i < vec_count; ++i) {
-                Node *node = batch().at(node_i);
-                node->setInputs({matrix_node, vec.batch().at(node_i++)});
-            }
-        }
-
-        afterInit({&matrix, &vec});
-    }
-};
-
-#if USE_GPU
-class TranMatrixMulVectorExecutor : public Executor {
-public:
-    void forward() override {
-        cols_.reserve(batch.size());
-        matrices_.reserve(batch.size());
-        vectors_.reserve(batch.size());
-        vals_.reserve(batch.size());
-        for (Node *node : batch) {
-            TranMatrixMulVectorNode *t = dynamic_cast<TranMatrixMulVectorNode *>(node);
-            cols_.push_back(t->getDim());
-            matrices_.push_back(t->matrix_->getVal().value);
-            vectors_.push_back(t->vector_->getVal().value);
-            vals_.push_back(t->getVal().value);
-        }
-        cuda::TranMatrixMulVectorForward(matrices_, vectors_, batch.size(), cols_, row(),
-                vals_);
-#if TEST_CUDA
-        testForward();
-#endif
-    }
-
-    void backward() override {
-#if TEST_CUDA
-        auto get_inputs = [&](Node &node) {
-            TranMatrixMulVectorNode &t = dynamic_cast<TranMatrixMulVectorNode&>(node);
-            vector<pair<Node*, string>> pairs = {
-                make_pair(t.matrix_, "matrix"),
-                make_pair(t.vector_, "vector")
-            };
-            return pairs;
-        };
-#endif
-        vector<dtype *> matrix_grads, vector_grads, grads;
-        matrix_grads.reserve(batch.size());
-        vector_grads.reserve(batch.size());
-        grads.reserve(batch.size());
-        for (Node *node : batch) {
-            TranMatrixMulVectorNode *t = dynamic_cast<TranMatrixMulVectorNode *>(node);
-            grads.push_back(t->getLoss().value);
-            matrix_grads.push_back(t->matrix_->getLoss().value);
-            vector_grads.push_back(t->vector_->getLoss().value);
-        }
-        cuda::TranMatrixMulVectorBackward(grads, matrices_, vectors_, batch.size(),
-                cols_, row(), matrix_grads, vector_grads);
-#if TEST_CUDA
-        testBackward(get_inputs);
-#endif
-    }
-
-private:
-    int row() const {
-        TranMatrixMulVectorNode *t = dynamic_cast<TranMatrixMulVectorNode *>(batch.front());
-        return t->vector_->getDim();
-    }
-
-    vector<int> cols_;
-    vector<dtype *> matrices_, vectors_, vals_;
-};
-#else
-class TranMatrixMulVectorExecutor : public Executor {
-    int calculateFLOPs() override {
-        abort();
-    }
-};
-#endif
-
-Executor *TranMatrixMulVectorNode::generate() {
-    return new TranMatrixMulVectorExecutor;
-}
-
 class TranMatrixMulMatrixNode : public Node, public Poolable<TranMatrixMulMatrixNode> {
 public:
     TranMatrixMulMatrixNode() : Node("TranMatrixMulMatrixNode") {}
@@ -740,10 +363,6 @@ public:
         init(dim);
     }
 
-    void setInputs(const vector<Node *> &ins) override {
-        ins_ = {ins.at(0), ins.at(1)};
-    }
-
     void connect(Node &a, Node &b) {
         vector<Node *> inputs = {&a, &b};
         setInputs(inputs);
@@ -751,10 +370,10 @@ public:
     }
 
     void compute() override {
-        a_col_ = ins_.at(0)->getDim() / input_row_;
-        b_col_ = ins_.at(1)->getDim() / input_row_;
-        Mat(val().v, a_col_, b_col_) = Mat(ins_.at(0)->getVal().v, input_row_, a_col_).transpose()
-            * Mat(ins_.at(1)->getVal().v, input_row_, b_col_);
+        a_col_ = input_dims_.at(0) / input_row_;
+        b_col_ = input_dims_.at(1) / input_row_;
+        Mat(val().v, a_col_, b_col_) = Mat(input_vals_.at(0)->v, input_row_, a_col_).transpose()
+            * Mat(input_vals_.at(1)->v, input_row_, b_col_);
         if (use_lower_triangle_mask_) {
             if (a_col_ != b_col_) {
                 cerr << fmt::format("a_col_:{} b_col_:{}\n", a_col_, b_col_);
@@ -769,12 +388,11 @@ public:
     }
 
     void backward() override {
-        Mat(ins_.at(0)->loss().v, input_row_, a_col_) +=
-            Mat(ins_.at(1)->getVal().v, input_row_, b_col_) *
+        Mat(input_grads_.at(0)->v, input_row_, a_col_) +=
+            Mat(input_vals_.at(1)->v, input_row_, b_col_) *
             Mat(getLoss().v, a_col_, b_col_).transpose();
-        Mat(ins_.at(1)->loss().v, input_row_, b_col_) +=
-            Mat(ins_.at(0)->getVal().v, input_row_, a_col_) *
-            Mat(getLoss().v, a_col_, b_col_);
+        Mat(input_grads_.at(1)->v, input_row_, b_col_) +=
+            Mat(input_vals_.at(0)->v, input_row_, a_col_) * Mat(getLoss().v, a_col_, b_col_);
     }
 
     Executor * generate() override;
@@ -784,8 +402,16 @@ public:
             (use_lower_triangle_mask_ ? "-mask" : "-no-mask");
     }
 
+protected:
+    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
+        return {};
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
+    }
+
 private:
-    array<Node *, 2> ins_;
     int a_col_, b_col_, input_row_;
     bool use_lower_triangle_mask_ = false;
     friend class TranMatrixMulMatrixExecutor;
@@ -831,15 +457,15 @@ public:
             dynamic_cast<TranMatrixMulMatrixNode &>(*batch.front()).use_lower_triangle_mask_;
         for (Node *node : batch) {
             TranMatrixMulMatrixNode &t = dynamic_cast<TranMatrixMulMatrixNode &>(*node);
-            a_vals_.push_back(t.ins_.at(0)->getVal().value);
-            b_vals_.push_back(t.ins_.at(1)->getVal().value);
+            a_vals_.push_back(t.input_vals_.at(0)->value);
+            b_vals_.push_back(t.input_vals_.at(1)->value);
             vals.push_back(t.getVal().value);
-            a_cols_.push_back(t.ins_.at(0)->getDim() / input_row_);
-            b_cols_.push_back(t.ins_.at(1)->getDim() / input_row_);
+            a_cols_.push_back(t.input_dims_.at(0) / input_row_);
+            b_cols_.push_back(t.input_dims_.at(1) / input_row_);
         }
 
-        cuda::TranMatrixMulMatrixForward(a_vals_, b_vals_, count, a_cols_, b_cols_,
-                input_row_, use_lower_triangle_mask_, vals);
+        cuda::TranMatrixMulMatrixForward(a_vals_, b_vals_, count, a_cols_, b_cols_, input_row_,
+                use_lower_triangle_mask_, vals);
 
 #if TEST_CUDA
         testForward();
@@ -853,8 +479,8 @@ public:
         b_grads.reserve(count);
         for (Node *node : batch) {
             TranMatrixMulMatrixNode &t = dynamic_cast<TranMatrixMulMatrixNode &>(*node);
-            a_grads.push_back(t.ins_.at(0)->getLoss().value);
-            b_grads.push_back(t.ins_.at(1)->getLoss().value);
+            a_grads.push_back(t.input_grads_.at(0)->value);
+            b_grads.push_back(t.input_grads_.at(1)->value);
             grads.push_back(t.getLoss().value);
         }
         cuda::TranMatrixMulMatrixBackward(grads, a_vals_, b_vals_, count, a_cols_, b_cols_,
@@ -895,74 +521,6 @@ Node *concatToMatrix(const vector<Node *> &inputs) {
     int input_dim = inputs.front()->getDim();
     MatrixConcatNode *node = MatrixConcatNode::newNode(inputs.size() * input_dim);
     node->connect(inputs);
-    return node;
-}
-
-Node *concatToMatrix(BatchedNode &input) {
-    const auto &inputs = input.batch();
-    int input_dim = inputs.front()->getDim();
-    MatrixConcatNode *node = MatrixConcatNode::newNode(inputs.size() * input_dim);
-    node->connect(input, inputs);
-    return node;
-}
-
-BatchedNode *concatToMatrix(BatchedNode &input, int group) {
-    BatchedMatrixConcatNode *node = new BatchedMatrixConcatNode;
-    node->init(input, group);
-    return node;
-}
-
-Node *matrixAndVectorMulti(Node &matrix, Node &vec) {
-    int dim = matrix.getDim() / vec.getDim();
-    if (matrix.getDim() % vec.getDim() != 0) {
-        cerr << fmt::format("vec dim:%1% matrix dim:%2%", vec.getDim(), matrix.getDim()) <<
-            endl;
-        abort();
-    }
-    MatrixAndVectorMultiNode *node = MatrixAndVectorMultiNode::newNode(dim);
-    node->connect(matrix, vec);
-    return node;
-}
-
-BatchedNode *matrixAndVectorMulti(Node &matrix, BatchedNode &vec, int *dim) {
-    if (matrix.getDim() % vec.getDim() != 0) {
-        cerr << fmt::format("vec dim:{} matrix dim:{}\n", vec.getDim(), matrix.getDim());
-        abort();
-    }
-
-    BatchedMatrixAndVectorMultiNode *node = new BatchedMatrixAndVectorMultiNode;
-    node->init(matrix, vec, dim);
-    return node;
-}
-
-BatchedNode *matrixAndVectorMulti(BatchedNode &matrix, BatchedNode &vec, int *dim) {
-    BatchedMatrixAndVectorMultiNode *node = new BatchedMatrixAndVectorMultiNode;
-    node->init(matrix, vec, dim);
-    return node;
-}
-
-Node *tranMatrixMulVector(Node &matrix, Node &vec, int dim) {
-    TranMatrixMulVectorNode *node = TranMatrixMulVectorNode::newNode(dim);
-    node->connect(matrix, vec);
-    return node;
-}
-
-Node *tranMatrixMulVector(Node &matrix, Node &vec) {
-    int dim = matrix.getDim() / vec.getDim();
-    return tranMatrixMulVector(matrix, vec, dim);
-}
-
-BatchedNode *tranMatrixMulVector(Node &matrix, BatchedNode &vec,
-        const vector<int> *dims) {
-    BatchedTranMatrixMulVectorNode *node = new BatchedTranMatrixMulVectorNode;
-    node->init(matrix, vec, dims);
-    return node;
-}
-
-BatchedNode *tranMatrixMulVector(BatchedNode &matrix, BatchedNode &vec,
-        const vector<int> *dims) {
-    BatchedTranMatrixMulVectorNode *node = new BatchedTranMatrixMulVectorNode;
-    node->init(matrix, vec, dims);
     return node;
 }
 

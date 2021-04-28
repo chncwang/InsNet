@@ -10,6 +10,13 @@ using std::make_pair;
 
 namespace n3ldg_plus {
 
+namespace {
+
+const int NUMERATOR = 0;
+const int DENOMINATOR = 1;
+
+}
+
 class FullDivNode : public Node, public Poolable<FullDivNode>  {
 public:
     FullDivNode() : Node("full_div") {}
@@ -32,8 +39,8 @@ public:
                 inputs.at(0)->getDim(), inputs.at(1)->getDim());
             abort();
         }
-        numerator_ = inputs.at(0);
-        denominator_ = inputs.at(1);
+
+        Node::setInputs(inputs);
     }
 
     void connect(Node &numerator, Node &denominator) {
@@ -43,20 +50,27 @@ public:
     }
 
     void compute() override {
-        val().vec() = numerator_->getVal().vec() / denominator_->getVal().vec();
+        val().vec() = input_vals_.at(NUMERATOR)->vec() / input_vals_.at(DENOMINATOR)->vec();
     }
 
     void backward() override {
-        numerator_->loss().vec() += getLoss().vec() / denominator_->getVal().vec();
-        denominator_->loss().vec() -= getLoss().vec() * numerator_->getVal().vec() /
-            denominator_->getVal().vec().square();
+        input_grads_.at(NUMERATOR)->vec() += getLoss().vec() / input_vals_.at(DENOMINATOR)->vec();
+        input_grads_.at(DENOMINATOR)->vec() -= getLoss().vec() * input_vals_.at(NUMERATOR)->vec() /
+            input_vals_.at(DENOMINATOR)->vec().square();
     }
 
     Executor* generate() override;
 
+protected:
+    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
+        return {};
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
+    }
+
 private:
-    Node *numerator_;
-    Node *denominator_;
     friend class FullDivExecutor;
 };
 
@@ -73,10 +87,6 @@ public:
 #if USE_GPU
 class FullDivExecutor : public Executor {
 public:
-    vector<dtype*> numerators;
-    vector<dtype*> denominators;
-    vector<int> dims;
-
     void forward() override {
         vector<dtype*> results;
         results.reserve(batch.size());
@@ -85,8 +95,8 @@ public:
         dims.reserve(batch.size());
         for (Node *node : batch) {
             FullDivNode *div = dynamic_cast<FullDivNode*>(node);
-            numerators.push_back(div->numerator_->getVal().value);
-            denominators.push_back(div->denominator_->getVal().value);
+            numerators.push_back(div->input_vals_.at(NUMERATOR)->value);
+            denominators.push_back(div->input_vals_.at(DENOMINATOR)->value);
             results.push_back(div->getVal().value);
             dims.push_back(node->getDim());
         }
@@ -107,8 +117,8 @@ public:
         for (Node *node : batch) {
             FullDivNode *div = dynamic_cast<FullDivNode*>(node);
             losses.push_back(node->getLoss().value);
-            numerator_losses.push_back(div->numerator_->getLoss().value);
-            denominator_losses.push_back(div->denominator_->getLoss().value);
+            numerator_losses.push_back(div->input_grads_.at(NUMERATOR)->value);
+            denominator_losses.push_back(div->input_grads_.at(DENOMINATOR)->value);
         }
 
         cuda::FullDivBackward(losses, denominators, numerators, batch.size(), dims,
@@ -124,6 +134,11 @@ public:
         cout << "div backward tested" << endl;
 #endif
     }
+
+private:
+    vector<dtype*> numerators;
+    vector<dtype*> denominators;
+    vector<int> dims;
 };
 #else
 class FullDivExecutor : public Executor {

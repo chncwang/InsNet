@@ -66,6 +66,15 @@ public:
         should_backward_ = should_backward;
     }
 
+protected:
+    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
+        return {};
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
+    }
+
 private:
     ParamType* param_ = nullptr;
     vector<int> ids_;

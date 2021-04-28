@@ -21,10 +21,6 @@ public:
         setDim(dim);
     }
 
-    void setInputs(const vector<Node *> &ins) override {
-        this->ins_ = ins;
-    }
-
     void connect(const vector<Node *> &x) {
         if (x.empty()) {
             cerr << "empty inputs for add" << endl;
@@ -42,33 +38,35 @@ public:
     }
 
     void compute() override {
-        int nSize = ins_.size();
+        int size = input_vals_.size();
         val().zero();
-        for (int i = 0; i < nSize; ++i) {
-            for (int idx = 0; idx < getDim(); idx++) {
-                val()[idx] += ins_.at(i)->val()[idx];
-            }
+        for (int i = 0; i < size; ++i) {
+            val().vec() += input_vals_.at(i)->vec();
         }
     }
 
     void backward() override {
-        int nSize = ins_.size();
-        for (int i = 0; i < nSize; ++i) {
-            for (int idx = 0; idx < getDim(); idx++) {
-                ins_.at(i)->loss()[idx] += loss()[idx];
-            }
+        int size = input_grads_.size();
+        for (int i = 0; i < size; ++i) {
+            input_grads_.at(i)->vec() += loss().vec();
         }
     }
 
     Executor *generate() override;
 
     string typeSignature() const override {
-        return Node::getNodeType() + "-" + to_string(ins_.size());
+        return Node::getNodeType() + "-" + to_string(input_vals_.size());
+    }
+
+    virtual bool isValForwardOnly() const override {
+        return true;
+    }
+
+    virtual std::vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
+        return {&input_vals_.at(0), &input_vals_.at(1)};
     }
 
 private:
-    vector<Node *> ins_;
-
     friend class BatchedPAddNode;
     friend class PAddExecutor;
 };
@@ -101,7 +99,7 @@ public:
             ins.reserve(count);
             for (Node * n : batch) {
                 PAddNode *padd = dynamic_cast<PAddNode*>(n);
-                ins.push_back(padd->ins_.at(i)->val().value);
+                ins.push_back(padd->input_vals_.at(i)->value);
 #if TEST_CUDA
                 cuda::Assert(padd->ins_.at(i)->val().verify("PAdd forward input"));
 #endif
@@ -115,8 +113,8 @@ public:
             PAddNode &padd = dynamic_cast<PAddNode&>(*n);
             outs.push_back(padd.val().value);
             dims_.push_back(padd.getDim());
-            for (Node *in : padd.ins_) {
-                in_vals.push_back(in->getVal().value);
+            for (auto &in_val : padd.input_vals_) {
+                in_vals.push_back(in_val->value);
             }
         }
         max_dim_ = *max_element(dims_.begin(), dims_.end());
@@ -134,8 +132,8 @@ public:
         for (Node *n : batch) {
             PAddNode &padd = dynamic_cast<PAddNode&>(*n);
             out_grads.push_back(padd.getLoss().value);
-            for (Node *in : padd.ins_) {
-                in_grads.push_back(in->getLoss().value);
+            for (auto &in_grad : padd.input_grads_) {
+                in_grads.push_back(in_grad->value);
             }
         }
         cuda::PAddBackward(out_grads, count, max_dim_, inCount(), in_grads, dim_arr_);
@@ -157,7 +155,7 @@ public:
 
 private:
     int inCount() {
-        return dynamic_cast<PAddNode &>(*batch.front()).ins_.size();
+        return dynamic_cast<PAddNode &>(*batch.front()).input_vals_.size();
     }
 
     vector<int> dims_;

@@ -41,6 +41,15 @@ public:
         input_ = vals;
     }
 
+protected:
+    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
+        return {};
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
+    }
+
 private:
     vector<dtype> input_;
     friend class BucketExecutor;

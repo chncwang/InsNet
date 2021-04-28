@@ -28,6 +28,15 @@ std::vector<S *> toPointers(std::vector<T> &v) {
     return toPointers<T, S>(v, v.size());
 }
 
+template <typename T>
+std::vector<T *> toPointers(std::vector<T> &v) {
+    std::vector<T *> pointers;
+    for (int i = 0; i < v.size(); ++i) {
+        pointers.push_back(&v.at(i));
+    }
+    return pointers;
+}
+
 bool isEqual(dtype a, dtype b);
 
 inline size_t typeSignature(void *p) {

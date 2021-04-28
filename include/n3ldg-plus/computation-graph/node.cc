@@ -12,6 +12,7 @@ using std::vector;
 using std::function;
 using std::pair;
 using std::make_pair;
+using std::make_shared;
 
 namespace n3ldg_plus {
 
@@ -82,17 +83,57 @@ string Node::isVectorSig() const {
     return column_ == 1 ? "-vector-" : "-matrix-";
 }
 
-Node::Node(const string &node_type, int dim) : NodeAbs(node_type), dim_(dim) {}
+Node::Node(const string &node_type, int dim) : NodeAbs(node_type),
+    val_(make_shared<Tensor1D>()), dim_(dim) {}
 
-void Node::init(int ndim) {
-    if (ndim <= 0) {
-        cerr << fmt::format("Node init - dim is less than 0:{} type:{}\n", ndim,
-                getNodeType());
+void Node::init(int dim) {
+    if (dim <= 0) {
+        cerr << fmt::format("Node init - dim is less than 0:{} type:{}\n", dim, getNodeType());
         abort();
     }
-    dim_ = ndim;
-    val_.init(dim_);
+    dim_ = dim;
     loss_.init(dim_);
+}
+
+void Node::setInputs(const std::vector<Node*> &inputs) {
+    if (!input_vals_.empty() || !input_grads_.empty() || !input_dims_.empty()) {
+        cerr << fmt::format("Node::setInputs input_vals_ size:{} input_grads_ size:{} input_dims_ size:{}\n",
+                input_vals_.size(), input_grads_.size(), input_dims_.size());
+        abort();
+    }
+
+    int size = inputs.size();
+    input_vals_.reserve(size);
+    input_grads_.reserve(size);
+    input_dims_.reserve(size);
+
+    for (Node * input : inputs) {
+        input_vals_.push_back(input->sharedVal());
+        input_grads_.push_back(&input->loss());
+        input_dims_.push_back(input->getDim());
+    }
+}
+
+void Node::clearInputVals(bool force) {
+    if (force) {
+        for (auto &p : input_vals_) {
+            p.reset();
+        }
+    } else {
+        for (auto *p : forwardOnlyInputVals()) {
+            if (p == nullptr) {
+                cerr << "Node::clearInputVals p cannot be nullptr!\n";
+                abort();
+            }
+            p->reset();
+        }
+    }
+}
+
+void Node::clearVal(bool force) {
+    if (force || isValForwardOnly()) {
+        val_.reset();
+    }
 }
 
 string BatchedNode::typeSignature() const {
@@ -181,7 +222,8 @@ void validateEqualNodeDims(const vector<Node *> &nodes) {
 }
 
 string UniInputNode::typeSignature() const {
-    return Node::typeSignature() + "-" + to_string(input_->getDim()) + "-";
+    int input_dim = input_vals_.front()->dim;
+    return Node::typeSignature() + "-" + to_string(input_dim) + "-";
 }
 
 void UniInputNode::connect(Node &input) {
@@ -192,6 +234,15 @@ void UniInputNode::connect(Node &input) {
     vector<Node*> ins = {&input};
     setInputs(ins);
     Node::afterConnect(ins);
+}
+
+vector<shared_ptr<Tensor1D> *> UniInputNode::forwardOnlyInputVals() {
+    if (isInputValForwardOnly()) {
+        vector<shared_ptr<Tensor1D> *> val = {&input_vals_.front()};
+        return val;
+    } else {
+        return {};
+    }
 }
 
 #if USE_GPU
@@ -243,10 +294,30 @@ int Executor::calculateActivations() {
 #endif
 
 void Executor::forwardFully() {
+    for (Node *node : batch) {
+        node->val().init(node->getDim());
+    }
+
     forward();
 
     for (NodeAbs *node : topo_nodes) {
         node->setDegree(-1);
+    }
+
+    for (Node *node : batch) {
+        if (!node->topologicalNode().getParents().empty()) {
+            node->clearVal(false);
+        }
+        node->clearInputVals(false);
+    }
+}
+
+void Executor::backwardFully() {
+    backward();
+
+    for (Node *node : batch) {
+        node->clearVal(true);
+        node->clearInputVals(true);
     }
 }
 

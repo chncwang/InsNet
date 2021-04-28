@@ -8,6 +8,7 @@ using std::vector;
 using std::cerr;
 using std::cout;
 using std::endl;
+using std::shared_ptr;
 
 namespace n3ldg_plus {
 
@@ -24,7 +25,7 @@ public:
         int i = 0;
         for (Node *node : batch) {
             UniInputNode *expnode = dynamic_cast<UniInputNode*>(node);
-            inputs.at(i++) = expnode->getInput().getVal().value;
+            inputs.at(i++) = expnode->inputVal().value;
             vals.push_back(expnode->getVal().value);
             dims_.push_back(node->getDim());
         }
@@ -43,7 +44,7 @@ public:
         for (Node *node : batch) {
             node->loss().copyFromHostToDevice();
             UniInputNode *i = dynamic_cast<UniInputNode *>(node);
-            i->getInput().loss().copyFromHostToDevice();
+            i->inputGrad().copyFromHostToDevice();
             i->val().copyFromHostToDevice();
         }
 #endif
@@ -52,7 +53,7 @@ public:
         for (Node *node : batch) {
             UniInputNode *exp = dynamic_cast<UniInputNode*>(node);
             losses.at(i) = exp->getLoss().value;
-            input_losses.at(i++) = exp->getInput().getLoss().value;
+            input_losses.at(i++) = exp->inputGrad().value;
         }
 
         cuda::ActivationBackward(activation, losses, vals, batch.size(), dims_,
@@ -90,12 +91,11 @@ public:
     }
 
     void compute() override {
-        val().vec() = getInput().val().vec().unaryExpr(ptr_fun(ftanh));
+        val().vec() = inputVal().vec().tanh();
     }
 
     void backward() override {
-        getInput().loss().vec() += loss().vec() * getInput().val().vec().binaryExpr(val().vec(),
-                ptr_fun(dtanh));
+        inputGrad().vec() += loss().vec() * getVal().vec().unaryExpr(ptr_fun(dtanh));
     }
 
     Executor *generate() override;
@@ -107,6 +107,14 @@ public:
 protected:
     virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
+    }
+
+    bool isInputValForwardOnly() const override {
+        return true;
+    }
+
+    bool isValForwardOnly() const override {
+        return false;
     }
 };
 
@@ -128,12 +136,11 @@ public:
     }
 
     void compute() override {
-        val().vec() = getInput().val().vec().unaryExpr(ptr_fun(fsigmoid));
+        val().vec() = inputVal().vec().unaryExpr(ptr_fun(fsigmoid));
     }
 
     void backward() override {
-        getInput().loss().vec() += loss().vec() * getInput().val().vec().binaryExpr(val().vec(),
-                ptr_fun(dsigmoid));
+        inputGrad().vec() += loss().vec() * getVal().vec().unaryExpr(ptr_fun(dsigmoid));
     }
 
     Executor *generate() override {
@@ -147,6 +154,14 @@ public:
 protected:
     virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
+    }
+
+    bool isInputValForwardOnly() const override {
+        return true;
+    }
+
+    bool isValForwardOnly() const override {
+        return false;
     }
 };
 
@@ -163,12 +178,11 @@ public:
     }
 
     void compute() override {
-        val().vec() = getInput().val().vec().unaryExpr(ptr_fun(frelu));
+        val().vec() = inputVal().vec().unaryExpr(ptr_fun(frelu));
     }
 
     void backward() override {
-        getInput().loss().vec() += loss().vec() * getInput().val().vec().binaryExpr(val().vec(),
-                ptr_fun(drelu));
+        inputGrad().vec() += loss().vec() * inputVal().vec().unaryExpr(ptr_fun(drelu));
     }
 
     Executor *generate() override {
@@ -182,6 +196,14 @@ public:
 protected:
     virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
+    }
+
+    bool isInputValForwardOnly() const override {
+        return true;
+    }
+
+    bool isValForwardOnly() const override {
+        return false;
     }
 };
 
@@ -207,11 +229,11 @@ public:
     }
 
     void compute() override {
-        val().vec() = getInput().val().vec().unaryExpr(ptr_fun(fsqrt));
+        val().vec() = inputVal().vec().unaryExpr(ptr_fun(fsqrt));
     }
 
     void backward() override {
-        getInput().loss().vec() += loss().vec() * val().vec().unaryExpr(ptr_fun(dsqrt));
+        inputGrad().vec() += loss().vec() * val().vec().unaryExpr(ptr_fun(dsqrt));
     }
 
     string typeSignature() const override {
@@ -225,6 +247,14 @@ public:
 protected:
     virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
+    }
+
+    bool isInputValForwardOnly() const override {
+        return true;
+    }
+
+    bool isValForwardOnly() const override {
+        return false;
     }
 };
 
@@ -279,11 +309,11 @@ public:
         } else {
             drop_mask_ = 1 - drop_value_;
         }
-        val().vec() = getInput().val().vec() * drop_mask_.vec();
+        val().vec() = inputVal().vec() * drop_mask_.vec();
     }
 
     void backward() override {
-        getInput().loss().vec() += loss().vec() * drop_mask_.vec();
+        inputGrad().vec() += loss().vec() * drop_mask_.vec();
     }
 #else
     void compute() override {
@@ -322,6 +352,14 @@ public:
 protected:
     virtual bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();;
+    }
+
+    bool isInputValForwardOnly() const override {
+        return true;
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
     }
 
 private:
@@ -381,9 +419,9 @@ public:
         for (Node *n : batch) {
             DropoutNode *dropout_node = dynamic_cast<DropoutNode*>(n);
 #if TEST_CUDA
-            dropout_node->getInput().val().copyFromHostToDevice();
+            dropout_node->inputVal().copyFromHostToDevice();
 #endif
-            xs.at(i) = dropout_node->getInput().getVal().value;
+            xs.at(i) = dropout_node->inputVal().value;
             ys.at(i++) = dropout_node->getVal().value;
         }
 
@@ -419,10 +457,10 @@ public:
             DropoutNode *dropout_node = dynamic_cast<DropoutNode*>(n);
 #if TEST_CUDA
             dropout_node->loss().copyFromHostToDevice();
-            dropout_node->getInput().loss().copyFromHostToDevice();
+            dropout_node->inputGrad().copyFromHostToDevice();
 #endif
             losses.at(i) = dropout_node->loss().value;
-            in_losses.at(i++) = dropout_node->getInput().loss().value;
+            in_losses.at(i++) = dropout_node->inputGrad().value;
         }
         cuda::DropoutBackward(losses, count, dims_, max_dim_, offsets_, isTraining(),
                 drop_mask.value, dropoutValue(), in_losses);
@@ -432,7 +470,7 @@ public:
         }
         for (Node *n : batch) {
             DropoutNode *dropout_node = dynamic_cast<DropoutNode*>(n);
-            cuda::Assert(dropout_node->getInput().loss().verify("DropoutExecutor backward"));
+            cuda::Assert(dropout_node->inputGrad().verify("DropoutExecutor backward"));
         }
 #endif
     }
@@ -475,13 +513,13 @@ public:
     }
 
     void compute() override {
-        int input_row = getInput().getDim() / getDim();
+        int input_row = inputDim() / getDim();
         for (int i = 0; i < getDim(); ++i) {
-            float max = getInput().getVal()[input_row * i];
+            float max = inputVal()[input_row * i];
             int max_i = 0;
             for (int j = 1; j < input_row; ++j) {
-                if (getInput().getVal()[input_row * i + j] > max) {
-                    max = getInput().getVal()[input_row * i + j];
+                if (inputVal()[input_row * i + j] > max) {
+                    max = inputVal()[input_row * i + j];
                     max_i = j;
                 }
             }
@@ -491,9 +529,9 @@ public:
     }
 
     void backward() override {
-        int input_row = getInput().getDim() / getDim();
+        int input_row = inputGrad().dim / getDim();
         for (int i = 0; i < getDim(); ++i) {
-            getInput().loss()[i * input_row + max_indexes_.at(i)] += getLoss()[i];
+            inputGrad()[i * input_row + max_indexes_.at(i)] += getLoss()[i];
         }
     }
 
@@ -502,6 +540,14 @@ public:
 protected:
     bool isDimLegal(const Node &input) const override {
         return input.getDim() % getDim() == 0;
+    }
+
+    bool isInputValForwardOnly() const override {
+        return true;
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
     }
 
 private:
@@ -526,7 +572,7 @@ public:
         testForwardInpputs();
         for (Node *node : batch) {
             MaxScalarNode *m = dynamic_cast<MaxScalarNode *>(node);
-            m->getInput().val().copyFromHostToDevice();
+            m->inputVal().copyFromHostToDevice();
         }
 #endif
         vector<dtype*> inputs(batch.size());
@@ -536,12 +582,12 @@ public:
         int dim = Executor::getDim();
         for (int i = 0; i < batch.size(); ++i) {
             MaxScalarNode *node = dynamic_cast<MaxScalarNode*>(batch.at(i));
-            inputs.at(i) = node->getInput().getVal().value;
+            inputs.at(i) = node->inputVal().value;
             results.at(i) = node->getVal().value;
-            int head_dim = node->getInput().getDim() / dim;
-            if (head_dim * dim != node->getInput().getDim()) {
+            int head_dim = node->inputDim() / dim;
+            if (head_dim * dim != node->inputDim()) {
                 cerr << fmt::format("MaxScalarExecutor forward head_dim:{} dim:{} input dim:{}\n",
-                        head_dim, dim, node->getInput().getDim());
+                        head_dim, dim, node->inputDim());
                 abort();
             }
             head_dims.at(i) = head_dim;
@@ -562,7 +608,7 @@ public:
         for (Node *node : batch) {
             MaxScalarNode *max_scalar = dynamic_cast<MaxScalarNode*>(node);
             losses.at(i) = max_scalar->getLoss().value;
-            input_losses.at(i++) = max_scalar->getInput().getLoss().value;
+            input_losses.at(i++) = max_scalar->inputGrad().value;
         }
 
         cuda::MaxScalarBackward(losses, max_indexes, batch.size(), input_losses);
@@ -601,13 +647,13 @@ public:
     }
 
     string typeSignature() const override {
-        return getNodeType() + to_string(getInput().getDim());
+        return getNodeType() + to_string(getInputVal().dim);
     }
 
     void compute() override {
         for (int i = 0; i < getColumn(); ++i) {
             for (int j = 0; j < getRow(); ++j) {
-                val()[i * getRow() + j] = getInput().getVal()[i];
+                val()[i * getRow() + j] = inputVal()[i];
             }
         }
     }
@@ -619,7 +665,7 @@ public:
             for (int j = 0; j < row; ++j) {
                 sum += getLoss()[i * row + j];
             }
-            getInput().loss()[i] += sum;
+            inputGrad()[i] += sum;
         }
     }
 
@@ -627,6 +673,14 @@ public:
 
 protected:
     bool isDimLegal(const Node &input) const override {
+        return true;
+    }
+
+    bool isInputValForwardOnly() const override {
+        return true;
+    }
+
+    bool isValForwardOnly() const override {
         return true;
     }
 
@@ -665,13 +719,14 @@ public:
         vector<dtype*> results(batch.size());
         dims_.reserve(batch.size());
         int i = 0;
+        int dim;
         for (Node *node : batch) {
             ScalarToVectorNode *n = dynamic_cast<ScalarToVectorNode*>(node);
-            inputs.at(i) = n->getInput().getVal().value;
+            inputs.at(i) = n->inputVal().value;
             results.at(i++) = n->getVal().value;
-            dims_.push_back(n->getDim() / n->getInput().getDim());
+            dims_.push_back(n->getDim() / n->getInputVal().dim);
+            dim = n->getInputVal().dim;
         }
-        int dim = dynamic_cast<ScalarToVectorNode *>(batch.front())->getInput().getDim();
         cuda::ScalarToVectorForward(inputs, batch.size(), dim, dims_, results);
 #if TEST_CUDA
         Executor::testForward();
@@ -686,18 +741,19 @@ public:
         for (Node *node : batch) {
             ScalarToVectorNode * n = dynamic_cast<ScalarToVectorNode*>(node);
             n->loss().copyFromHostToDevice();
-            n->getInput().loss().copyFromHostToDevice();
+            n->inputGrad().copyFromHostToDevice();
         }
 #endif
         vector<dtype*> losses(batch.size());
         vector<dtype*> input_losses(batch.size());
         int i = 0;
+        int dim;
         for (Node *node : batch) {
             ScalarToVectorNode * n = dynamic_cast<ScalarToVectorNode*>(node);
             losses.at(i) = n->getLoss().value;
-            input_losses.at(i++) = n->getInput().getLoss().value;
+            input_losses.at(i++) = n->inputGrad().value;
+            dim = n->inputGrad().dim;
         }
-        int dim = dynamic_cast<ScalarToVectorNode *>(batch.front())->getInput().getDim();
         cuda::ScalarToVectorBackward(losses, batch.size(), dim, dims_, input_losses);
 #if TEST_CUDA
         cout << "scalarToVector test backward..." << endl;
@@ -743,16 +799,24 @@ public:
     }
 
     void compute() override {
-        val().vec() = getInput().getVal().vec().exp();
+        val().vec() = getInputVal().vec().exp();
     }
 
     void backward() override {
-        getInput().loss().vec() += getLoss().vec() * getVal().vec();
+        inputGrad().vec() += getLoss().vec() * getVal().vec();
     }
 
 protected:
     bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
+    }
+
+    bool isInputValForwardOnly() const override {
+        return true;
+    }
+
+    bool isValForwardOnly() const override {
+        return false;
     }
 };
 
@@ -786,9 +850,9 @@ public:
     void compute() override {
         for (int i = 0; i < getDim(); ++i) {
             dtype sum = 0;
-            int input_row = getInput().getDim() / getDim();
+            int input_row = getInputVal().dim / getDim();
             for (int j = 0; j < input_row; ++j) {
-                sum += getInput().getVal()[i * input_row + j];
+                sum += getInputVal()[i * input_row + j];
             }
             val()[i] = sum;
         }
@@ -796,9 +860,9 @@ public:
 
     void backward() override {
         for (int i = 0; i < getDim(); ++i) {
-            int input_row = getInput().getDim() / getDim();
+            int input_row = inputGrad().dim / getDim();
             for (int j = 0; j < input_row; ++j) {
-                getInput().loss()[i * input_row + j] += getLoss()[i];
+                inputGrad()[i * input_row + j] += getLoss()[i];
             }
         }
     }
@@ -806,6 +870,14 @@ public:
 protected:
     bool isDimLegal(const Node &input) const override {
         return input.getDim() % getDim() == 0;
+    }
+
+    bool isInputValForwardOnly() const override {
+        return true;
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
     }
 
 private:
@@ -830,12 +902,12 @@ class SumExecutor : public UniInputExecutor {
         int i = 0;
         for (Node *node : batch) {
             SumNode *sum = dynamic_cast<SumNode*>(node);
-            inputs.at(i) = sum->getInput().getVal().value;
+            inputs.at(i) = sum->inputVal().value;
             results.at(i++) = sum->getVal().value;
-            int row = sum->getInput().getDim()/ getDim();
-            if (row * getDim() != sum->getInput().getDim()) {
+            int row = sum->getInputVal().dim / getDim();
+            if (row * getDim() != sum->getInputVal().dim) {
                 cerr << fmt::format("SumExecutor forward row:{} dim:{} input dim:{}\n", row,
-                        getDim(), sum->getInput().getDim());
+                        getDim(), sum->getInputVal().dim);
                 abort();
             }
             dims_.push_back(row);
@@ -858,7 +930,7 @@ class SumExecutor : public UniInputExecutor {
 #endif
             losses.at(i) = node->getLoss().value;
             SumNode *sum = dynamic_cast<SumNode*>(node);
-            input_losses.at(i++) = sum->getInput().getLoss().value;
+            input_losses.at(i++) = sum->inputGrad().value;
         }
 
         cuda::VectorSumBackward(losses, batch.size(), getDim(), dims_, input_losses);
@@ -903,11 +975,11 @@ public:
     }
 
     void compute() override {
-        val().vec() = factor_ * getInput().getVal().vec();
+        val().vec() = factor_ * inputVal().vec();
     }
 
     void backward() override {
-        getInput().loss().vec() += factor_ * getLoss().vec();
+        inputGrad().vec() += factor_ * getLoss().vec();
     }
 
     Executor* generate() override;
@@ -919,6 +991,14 @@ public:
 protected:
     bool isDimLegal(const Node &input) const override {
         return input.getDim() == getDim();
+    }
+
+    bool isInputValForwardOnly() const override {
+        return true;
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
     }
 
 private:
@@ -953,7 +1033,7 @@ public:
         int i = 0;
         for (Node *node : batch) {
             ScaledNode *scaled = dynamic_cast<ScaledNode *>(node);
-            in_vals.at(i++) = scaled->getInput().getVal().value;
+            in_vals.at(i++) = scaled->inputVal().value;
             dims.push_back(scaled->getDim());
             factors.push_back(scaled->factor_);
         }
@@ -970,7 +1050,7 @@ public:
         int i = 0;
         for (Node *node : batch) {
             ScaledNode *scaled = dynamic_cast<ScaledNode *>(node);
-            in_grads.at(i++) = scaled->getInput().getLoss().value;
+            in_grads.at(i++) = scaled->inputGrad().value;
         }
         auto grads = getGrads();
         cuda::ScaledBackward(grads, batch.size(), dims, factors, in_grads);

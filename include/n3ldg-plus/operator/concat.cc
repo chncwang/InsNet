@@ -1,4 +1,5 @@
 #include "n3ldg-plus/operator/concat.h"
+#include "n3ldg-plus/util/util.h"
 
 using std::vector;
 using std::string;
@@ -23,7 +24,6 @@ public:
 
     void clear() override {
         in_rows_.clear();
-        ins_.clear();
         Node::clear();
     }
 
@@ -39,7 +39,8 @@ public:
             cerr << "input dim size not match" << cur_dim << "\t" << getDim() << endl;
             abort();
         }
-        ins_ = ins;
+
+        Node::setInputs(ins);
     }
 
     void connect(const vector<Node *> &x) {
@@ -63,34 +64,42 @@ public:
     }
 
     void compute() override {
-        int in_size = ins_.size();
+        int in_size = input_vals_.size();
         int row = getDim() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
             int offset = 0;
             for (int j = 0; j < in_size; ++j) {
                 Vec(val().v + i * row + offset, in_rows_.at(j)) =
-                    Vec(ins_.at(j)->val().v + i * in_rows_.at(j), in_rows_.at(j));
+                    Vec(input_vals_.at(j)->v + i * in_rows_.at(j), in_rows_.at(j));
                 offset += in_rows_[j];
             }
         }
     }
 
     void backward() override {
-        int in_size = ins_.size();
+        int in_size = input_vals_.size();
         int row = getDim() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
             int offset = 0;
             for (int j = 0; j < in_size; ++j) {
-                Vec(ins_[j]->loss().v + i * in_rows_.at(j), in_rows_.at(j)) +=
+                Vec(input_grads_.at(j)->v + i * in_rows_.at(j), in_rows_.at(j)) +=
                     Vec(getLoss().v + i * row + offset, in_rows_.at(j));
                 offset += in_rows_[j];
             }
         }
     }
 
+protected:
+    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
+        return toPointers(input_vals_);
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
+    }
+
 private:
     vector<int> in_rows_;
-    vector<Node *> ins_;
 
     friend class ConcatExecutor;
 };
@@ -107,8 +116,8 @@ public:
         cols_.reserve(count);
         for (Node *node : batch) {
             ConcatNode *concat = dynamic_cast<ConcatNode*>(node);
-            for (Node *in : concat->ins_) {
-                in_vals.push_back(in->val().value);
+            for (auto &p : concat->input_vals_) {
+                in_vals.push_back(p->value);
             }
             vals.push_back(node->getVal().value);
             cols_.push_back(concat->getColumn());
@@ -134,8 +143,8 @@ public:
         losses.reserve(count);
         for (Node *node : batch) {
             ConcatNode *concat = dynamic_cast<ConcatNode*>(node);
-            for (Node *in : concat->ins_) {
-                in_losses.push_back(in->loss().value);
+            for (auto &p : concat->input_grads_) {
+                in_losses.push_back(p->value);
             }
             losses.push_back(node->loss().value);
         }
@@ -157,7 +166,7 @@ public:
 
 private:
     int inCount() {
-        return dynamic_cast<ConcatNode *>(batch.front())->ins_.size();
+        return dynamic_cast<ConcatNode *>(batch.front())->input_vals_.size();
     }
 
     vector<int> cols_;

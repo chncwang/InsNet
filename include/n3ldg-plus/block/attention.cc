@@ -14,30 +14,6 @@ using std::min;
 
 namespace n3ldg_plus {
 
-pair<BatchedNode *, BatchedNode *> dotAttention(Node& key_matrix,
-        Node& value_matrix,
-        BatchedNode& guide,
-        const vector<int> *matrix_cols) {
-    BatchedNode *raw_weights = tranMatrixMulVector(key_matrix, guide, matrix_cols);
-    BatchedNode *scaled_weight = scaled(*raw_weights, 1.0 / ::sqrt((dtype)guide.getDim()));
-    scaled_weight = softmax(*scaled_weight);
-    int dim = guide.getDim();
-    BatchedNode *hidden = matrixAndVectorMulti(value_matrix, *scaled_weight, &dim);
-    return make_pair(hidden, scaled_weight);
-}
-
-pair<BatchedNode *, BatchedNode *> dotAttention(BatchedNode &key_matrix,
-        BatchedNode &value_matrix,
-        BatchedNode& guide,
-        const vector<int> *matrix_cols) {
-    BatchedNode *raw_weights = tranMatrixMulVector(key_matrix, guide, matrix_cols);
-    BatchedNode *scaled_weight = scaled(*raw_weights, 1.0 / ::sqrt((dtype)guide.getDim()));
-    scaled_weight = softmax(*scaled_weight);
-    int dim = guide.getDim();
-    BatchedNode *hidden = matrixAndVectorMulti(value_matrix, *scaled_weight, &dim);
-    return make_pair(hidden, scaled_weight);
-}
-
 pair<BatchedNode *, BatchedNode *> dotAttention(BatchedNode &key_matrix,
         BatchedNode &value_matrix,
         BatchedNode &query_matrix,
@@ -50,13 +26,6 @@ pair<BatchedNode *, BatchedNode *> dotAttention(BatchedNode &key_matrix,
     int v_col = value_matrix.getDim() / row;
     BatchedNode *hidden = matrixMulMatrix(value_matrix, *scaled_weight, v_col);
     return make_pair(hidden, scaled_weight);
-}
-
-Node * dotAttentionWeights(Node& key_matrix, Node& guide) {
-    Node *raw_weights = tranMatrixMulVector(key_matrix, guide);
-    Node *scaled_weight = scaled(*raw_weights, 1.0 / ::sqrt((dtype)guide.getDim()));
-    scaled_weight = softmax(*scaled_weight, 1);
-    return scaled_weight;
 }
 
 AdditiveAttentionParams::AdditiveAttentionParams(const string &name) : k(name + "-k"),

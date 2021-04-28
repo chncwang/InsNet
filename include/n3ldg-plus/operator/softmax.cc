@@ -25,11 +25,11 @@ public:
     void compute() override {
         int row = getDim() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
-            dtype max = Mat(getInput().getVal().v + row * i, row, 1).maxCoeff();
+            dtype max = Mat(inputVal().v + row * i, row, 1).maxCoeff();
             Tensor1D x_exp, x;
             x.init(row);
             x_exp.init(row);
-            x.vec() = Vec(getInput().getVal().v + row * i, row) - max;
+            x.vec() = Vec(inputVal().v + row * i, row) - max;
             x_exp.vec() = x.vec().exp();
             dtype sum = x_exp.mat().sum();
             Vec(val().v + row * i, row) = x_exp.vec() / sum;
@@ -46,7 +46,7 @@ public:
             Tensor1D b;
             b.init(row);
             b.vec() = z - a.vec();
-            Vec(getInput().loss().v + i * row, row) += Vec(getVal().v + i * row, row) *
+            Vec(inputGrad().v + i * row, row) += Vec(getVal().v + i * row, row) *
                 ((1 - Vec(getVal().v + i * row, row)) * Vec(getLoss().v + i * row, row) - b.vec());
         }
     }
@@ -58,6 +58,14 @@ public:
 protected:
     virtual bool isDimLegal(const Node &input) const override {
         return true;
+    }
+
+    bool isInputValForwardOnly() const override {
+        return true;
+    }
+
+    bool isValForwardOnly() const override {
+        return false;
     }
 };
 
@@ -91,7 +99,7 @@ public:
             vals_.push_back(s.getVal().value);
             rows_.push_back(s.getDim() / s.getColumn());
             cols_.push_back(s.getColumn());
-            in_vals.at(i++) = s.getInput().getVal().value;
+            in_vals.at(i++) = s.inputVal().value;
         }
         row_arr_.init(rows_.data(), count);
         col_arr_.init(cols_.data(), count);
@@ -126,7 +134,7 @@ public:
             offsets.at(i) = dim_sum;
             dim_sum += s.getDim();
             grads.at(i) = s.getLoss().value;
-            in_grads.at(i++) = s.getInput().getLoss().value;
+            in_grads.at(i++) = s.inputGrad().value;
         }
         cuda::IntArray offset_arr;
         offset_arr.init(offsets.data(), count);

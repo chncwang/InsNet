@@ -10,6 +10,9 @@ using std::make_pair;
 
 namespace n3ldg_plus {
 
+constexpr int MINUEND = 0;
+constexpr int SUBTRAHEND = 1;
+
 class SubNode : public Node, public Poolable<SubNode> {
 public:
     SubNode() : Node("sub") {}
@@ -27,15 +30,14 @@ public:
     }
 
     void setInputs(const vector<Node *> &inputs) override {
-        Node &minuend = *inputs.at(0);
-        Node &subtrahend = *inputs.at(1);
+        Node &minuend = *inputs.at(MINUEND);
+        Node &subtrahend = *inputs.at(SUBTRAHEND);
         if (getDim() != minuend.getDim() || getDim() != subtrahend.getDim()) {
             cerr << fmt::format("dim:{} minuend:{} subtrahend:{}\n", getDim(),
                 minuend.getDim(), subtrahend.getDim());
             abort();
         }
-        minuend_ = &minuend;
-        subtrahend_ = &subtrahend;
+        Node::setInputs(inputs);
     }
 
     void connect(Node &minuend, Node &subtrahend) {
@@ -45,20 +47,26 @@ public:
     }
 
     void compute() override {
-        val().vec() = minuend_->getVal().vec() - subtrahend_->getVal().vec();
+        val().vec() = input_vals_.at(MINUEND)->vec() - input_vals_.at(SUBTRAHEND)->vec();
     }
 
     void backward() override {
-        minuend_->loss().vec() += loss().vec();
-        subtrahend_->loss().vec() -= loss().vec();
+        input_grads_.at(MINUEND)->vec() += loss().vec();
+        input_grads_.at(SUBTRAHEND)->vec() -= loss().vec();
     }
 
     Executor *generate() override;
 
-private:
-    Node *minuend_;
-    Node *subtrahend_;
+protected:
+    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
+        return {};
+    }
 
+    bool isValForwardOnly() const override {
+        return true;
+    }
+
+private:
     friend class SubExecutor;
     friend vector<pair<Node *, string>> getInput(Node &node);
 };
@@ -84,13 +92,6 @@ BatchedNode *sub(BatchedNode &minuend, BatchedNode &subtrahend) {
     return node;
 }
 
-vector<pair<Node *, string>> getInput(Node &node) {
-    SubNode &sub = dynamic_cast<SubNode&>(node);
-    vector<pair<Node*, string>> inputs = {make_pair(sub.minuend_, "minuend"),
-        make_pair(sub.subtrahend_, "subtrahend")};
-    return inputs;
-}
-
 #if USE_GPU
 class SubExecutor : public Executor {
     void forward() override {
@@ -107,8 +108,8 @@ class SubExecutor : public Executor {
 
         for (Node *node : batch) {
             SubNode *sub = static_cast<SubNode*>(node);
-            minuend.push_back(sub->minuend_->getVal().value);
-            subtrahend.push_back(sub->subtrahend_->getVal().value);
+            minuend.push_back(sub->input_vals_.at(MINUEND)->value);
+            subtrahend.push_back(sub->input_vals_.at(SUBTRAHEND)->value);
             results.push_back(sub->getVal().value);
             dims_.push_back(node->getDim());
         }
@@ -126,8 +127,8 @@ class SubExecutor : public Executor {
         for (Node *n : batch) {
             SubNode *sub = static_cast<SubNode*>(n);
             losses.push_back(sub->loss().value);
-            minuend_losses.push_back(sub->minuend_->loss().value);
-            subtrahend_losses.push_back(sub->subtrahend_->loss().value);
+            minuend_losses.push_back(sub->input_grads_.at(MINUEND)->value);
+            subtrahend_losses.push_back(sub->input_grads_.at(SUBTRAHEND)->value);
         }
 #if TEST_CUDA
         cout << "test before sub backward..." << endl;
