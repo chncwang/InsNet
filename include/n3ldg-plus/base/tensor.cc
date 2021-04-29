@@ -15,19 +15,49 @@ using std::normal_distribution;
 namespace n3ldg_plus {
 
 cpu::Tensor1D::~Tensor1D() {
-    if (v) {
-        delete[] v;
-    }
+    releaseMemory();
 }
 
 void cpu::Tensor1D::init(int ndim) {
+    if (v != nullptr) {
+        cerr << fmt::format("Tensor1D::init v is not null\n");
+        abort();
+    }
     dim = ndim;
     v = new dtype[dim];
     zero();
+    ++ref_count_;
+}
+
+void cpu::Tensor1D::retain() {
+    if (ref_count_ < 0) {
+        cerr << fmt::format("Tensor1D::retain ref_count_:{}\n", ref_count_);
+        abort();
+    }
+    ++ref_count_;
+}
+
+void cpu::Tensor1D::release() {
+    if (ref_count_ < 0) {
+        cerr << fmt::format("Tensor1D::release ref_count_:{}\n", ref_count_);
+        abort();
+    }
+    if (ref_count_ == 0) {
+        return;
+    }
+    if (--ref_count_ == 0) {
+        releaseMemory();
+    }
+}
+
+void cpu::Tensor1D::releaseMemory() {
+    if (v != nullptr) {
+        delete[] v;
+        v = nullptr;
+    }
 }
 
 void cpu::Tensor1D::zero() {
-    assert(v != NULL);
     for (int i = 0; i < dim; ++i) {
         v[i] = 0;
     }

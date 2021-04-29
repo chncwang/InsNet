@@ -108,12 +108,12 @@ public:
 #if TEST_CUDA
         for (Node *node : batch) {
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
-            s.loss().verify("standard layernorm before backward grad");
-            s.loss().copyFromHostToDevice();
+            s.grad().verify("standard layernorm before backward grad");
+            s.grad().copyFromHostToDevice();
             s.val().verify("standard layernorm before backward val");
             s.val().copyFromHostToDevice();
-            s.getInput().loss().verify("standard layernorm before backward input grad");
-            s.getInput().loss().copyFromHostToDevice();
+            s.getInput().grad().verify("standard layernorm before backward input grad");
+            s.getInput().grad().copyFromHostToDevice();
         }
 #endif
         int count = batch.size();
@@ -128,7 +128,7 @@ public:
             dim_offsets.at(i) = col_sum * row;
             dims.at(i) = s.getDim();
             in_grads.at(i) = s.inputGrad().value;
-            grads.at(i++) = s.getLoss().value;
+            grads.at(i++) = s.getGrad().value;
             col_sum += s.getColumn();
         }
         cuda::NumberPointerArray grad_arr, in_grad_arr;
@@ -153,14 +153,14 @@ public:
                 y2.vec() = Vec(s.getVal().v + j * n, n).square();
                 Tensor1D m;
                 m.init(n);
-                m.vec() = Vec(s.getLoss().v + j * n, n) * Vec(s.getVal().v + j * n, n);
+                m.vec() = Vec(s.getGrad().v + j * n, n) * Vec(s.getVal().v + j * n, n);
                 Tensor1D x;
                 x.init(n);
                 x.vec() = c * ((-y2.vec() +
-                            static_cast<dtype>(n -1)) * Vec(s.getLoss().v + j * n, n) -
+                            static_cast<dtype>(n -1)) * Vec(s.getGrad().v + j * n, n) -
                         ((m.mat().sum() - m.vec()) * Vec(s.getVal().v + j * n, n) +
-                         Mat(s.getLoss().v + j * n, n, 1).sum() - Vec(s.getLoss().v + j * n, n)));
-                Vec(s.getInput().loss().v + j * n, n) += x.vec();
+                         Mat(s.getGrad().v + j * n, n, 1).sum() - Vec(s.getGrad().v + j * n, n)));
+                Vec(s.getInput().grad().v + j * n, n) += x.vec();
                 ++i;
             }
         }
@@ -185,7 +185,7 @@ public:
         int i = 0;
         for (Node *node : batch) {
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
-            auto &input = s.getInput().getVal();
+            auto &input = s.inputVal();
             for (int j = 0; j < s.getColumn(); ++j) {
                 int row = getRow();
                 dtype mean = Mat(input.v + row * j, row, 1).sum() / row;
@@ -211,14 +211,14 @@ public:
                 y2.vec() = Vec(s.getVal().v + j * n, n).square();
                 Tensor1D m;
                 m.init(n);
-                m.vec() = Vec(s.getLoss().v + j * n, n) * Vec(s.getVal().v + j * n, n);
+                m.vec() = Vec(s.getGrad().v + j * n, n) * Vec(s.getVal().v + j * n, n);
                 Tensor1D x;
                 x.init(n);
                 x.vec() = c * ((-y2.vec() +
-                            static_cast<dtype>(n -1)) * Vec(s.getLoss().v + j * n, n) -
+                            static_cast<dtype>(n -1)) * Vec(s.getGrad().v + j * n, n) -
                         ((m.mat().sum() - m.vec()) * Vec(s.getVal().v + j * n, n) +
-                         Mat(s.getLoss().v + j * n, n, 1).sum() - Vec(s.getLoss().v + j * n, n)));
-                Vec(s.getInput().loss().v + j * n, n) += x.vec();
+                         Mat(s.getGrad().v + j * n, n, 1).sum() - Vec(s.getGrad().v + j * n, n)));
+                Vec(s.inputGrad().v + j * n, n) += x.vec();
                 ++i;
             }
         }
@@ -261,11 +261,11 @@ public:
     void backward() override {
         int row = getDim() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
-            Vec(inputGrad().v + i * row, row) += Vec(getLoss().v + i * row, row) *
+            Vec(inputGrad().v + i * row, row) += Vec(getGrad().v + i * row, row) *
                 params_->g().val().vec();
-            params_->g().grad().vec() += Vec(getLoss().v + i * row, row) *
+            params_->g().grad().vec() += Vec(getGrad().v + i * row, row) *
                 Vec(getInputVal().v + i * row, row);
-            params_->b().grad().vec() += Vec(getLoss().v + i * row, row);
+            params_->b().grad().vec() += Vec(getGrad().v + i * row, row);
         }
     }
 
@@ -353,7 +353,7 @@ public:
         int row = getRow();
         for (Node *node : batch)  {
             PointwiseLinearNode &p = dynamic_cast<PointwiseLinearNode &>(*node);
-            grads.at(i) = p.getLoss().value;
+            grads.at(i) = p.getGrad().value;
             dims.at(i) = p.getDim();
             dim_offsets.at(i) = col_sum * row;
             in_grads.at(i++) = p.inputGrad().value;

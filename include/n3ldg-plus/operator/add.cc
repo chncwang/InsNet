@@ -48,7 +48,7 @@ public:
     void backward() override {
         int size = input_grads_.size();
         for (int i = 0; i < size; ++i) {
-            input_grads_.at(i)->vec() += loss().vec();
+            input_grads_.at(i)->vec() += grad().vec();
         }
     }
 
@@ -62,8 +62,8 @@ public:
         return true;
     }
 
-    virtual std::vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
-        return {&input_vals_.at(0), &input_vals_.at(1)};
+    virtual int forwardOnlyInputValSize() override {
+        return inputSize();
     }
 
 private:
@@ -131,7 +131,7 @@ public:
         in_grads.reserve(count * inCount());
         for (Node *n : batch) {
             PAddNode &padd = dynamic_cast<PAddNode&>(*n);
-            out_grads.push_back(padd.getLoss().value);
+            out_grads.push_back(padd.getGrad().value);
             for (auto &in_grad : padd.input_grads_) {
                 in_grads.push_back(in_grad->value);
             }
@@ -169,7 +169,7 @@ public:
         int sum = 0;
         for (Node *node : batch) {
             PAddNode *add = dynamic_cast<PAddNode*>(node);
-            sum += add->getDim() * add->ins_.size();
+            sum += add->getDim() * add->inputSize();
         }
         return sum;
     }

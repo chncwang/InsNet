@@ -51,7 +51,7 @@ public:
         int row = getDim() / getColumn();
         int in_row = inputDim() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
-            Vec(inputGrad().v + i * in_row + offset_, row) += Vec(getLoss().v + i * row, row);
+            Vec(inputGrad().v + i * in_row + offset_, row) += Vec(getGrad().v + i * row, row);
         }
     }
 
@@ -185,7 +185,7 @@ public:
 
         for (Node *node : batch) {
             SplitNode *split = static_cast<SplitNode*>(node);
-            grads.push_back(split->getLoss().value);
+            grads.push_back(split->getGrad().value);
             input_grads.push_back(split->inputGrad().value);
         }
 

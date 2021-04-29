@@ -42,8 +42,8 @@ public:
     }
 
 protected:
-    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
-        return {};
+    int forwardOnlyInputValSize() override {
+        return 0;
     }
 
     bool isValForwardOnly() const override {

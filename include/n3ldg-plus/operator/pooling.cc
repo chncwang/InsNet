@@ -59,7 +59,7 @@ public:
     void backward() override {
         for(int i = 0; i < getDim(); i++) {
             int mask_i = masks.at(i);
-            (*input_grads_.at(mask_i))[i] += loss()[i];
+            (*input_grads_.at(mask_i))[i] += grad()[i];
         }
     }
 };
@@ -123,8 +123,8 @@ public:
     Executor * generate() override;
 
 protected:
-    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
-        return toPointers(input_vals_);
+    int forwardOnlyInputValSize() override {
+        return inputSize();
     }
 
     bool isValForwardOnly() const override {
@@ -148,19 +148,27 @@ public:
     }
 
     void setMask() override {
-        int nSize = ins.size();
+        int size = inputSize();
 
         for (int idx = 0; idx < getDim(); idx++) {
-            int maxIndex = -1;
-            for (int i = 0; i < nSize; ++i) {
-                if (maxIndex == -1 || ins[i]->val()[idx] > ins[maxIndex]->val()[idx]) {
-                    maxIndex = i;
+            int max_i = -1;
+            for (int i = 0; i < size; ++i) {
+                if (max_i == -1 || (*input_vals_.at(i))[idx] > (*input_vals_.at(i))[idx]) {
+                    max_i = i;
                 }
             }
-            masks[idx] = maxIndex;
+            masks[idx] = max_i;
         }
     }
 
+protected:
+    int forwardOnlyInputValSize() override {
+        return inputSize();
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
+    }
 };
 #endif
 
@@ -191,8 +199,8 @@ public:
                 in_vals.push_back(NULL);
             }
         }
-        cuda::PoolForward(cuda::PoolingEnum::MAX, in_vals, vals,
-                count, in_counts, getDim(), hit_inputs.value);
+        cuda::PoolForward(cuda::PoolingEnum::MAX, in_vals, vals, count, in_counts, getDim(),
+                hit_inputs.value);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -215,7 +223,7 @@ public:
         grades.reserve(count);
         for (Node *n : batch) {
             MaxPoolNode *m = dynamic_cast<MaxPoolNode*>(n);
-            grades.push_back(m->loss().value);
+            grades.push_back(m->grad().value);
             for (auto &in : m->input_grads_) {
                 in_grades.push_back(in->value);
             }
@@ -233,7 +241,7 @@ public:
 
         for (int idx = 0; idx < count; idx++) {
             for (Node *n : dynamic_cast<MaxPoolNode*>(batch[idx])->ins) {
-                cuda::Assert(n->loss().verify("max pooling backward"));
+                cuda::Assert(n->grad().verify("max pooling backward"));
             }
         }
 #endif
@@ -311,18 +319,18 @@ public:
 
     void backward() override {
         for (int i = 0; i < inputSize(); ++i) {
-            input_grads_.at(i)->vec() += loss().vec();
+            input_grads_.at(i)->vec() += grad().vec();
         }
     }
 
     Executor * generate() override;
 
 protected:
-    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
-        return {};
+    int forwardOnlyInputValSize() override {
+        return inputSize();
     }
 
-    bool isValForwardOnly() const override {
+    virtual bool isValForwardOnly() const override {
         return true;
     }
 
@@ -389,7 +397,7 @@ public:
         in_losses.reserve(max_in_count * count);
         for (Node *n : batch) {
             SumPoolNode *sum = dynamic_cast<SumPoolNode*>(n);
-            losses.push_back(n->loss().value);
+            losses.push_back(n->grad().value);
             for (auto &in : sum->input_grads_) {
                 in_losses.push_back(in->value);
             }
@@ -406,7 +414,7 @@ public:
         for (Node *n : batch) {
             SumPoolNode *sum = dynamic_cast<SumPoolNode*>(n);
             for (Node *in : sum->ins) {
-                cuda::Assert(in->loss().verify("SumPoolExecutor backward"));
+                cuda::Assert(in->grad().verify("SumPoolExecutor backward"));
             }
         }
 #endif
@@ -419,7 +427,7 @@ public:
         int sum = 0;
         for (Node *node : batch) {
             SumPoolNode *s = dynamic_cast<SumPoolNode*>(node);
-            sum += s->getDim() * s->ins.size();
+            sum += s->getDim() * s->inputSize();
         }
         return sum;
     }

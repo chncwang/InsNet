@@ -83,15 +83,15 @@ public:
             int offset = 0;
             for (int j = 0; j < in_size; ++j) {
                 Vec(input_grads_.at(j)->v + i * in_rows_.at(j), in_rows_.at(j)) +=
-                    Vec(getLoss().v + i * row + offset, in_rows_.at(j));
+                    Vec(getGrad().v + i * row + offset, in_rows_.at(j));
                 offset += in_rows_[j];
             }
         }
     }
 
 protected:
-    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
-        return toPointers(input_vals_);
+    int forwardOnlyInputValSize() override {
+        return inputSize();
     }
 
     bool isValForwardOnly() const override {
@@ -146,7 +146,7 @@ public:
             for (auto &p : concat->input_grads_) {
                 in_losses.push_back(p->value);
             }
-            losses.push_back(node->loss().value);
+            losses.push_back(node->grad().value);
         }
 
         cuda::ConcatBackward(in_losses, dynamic_cast<ConcatNode*>(batch.at(0))->in_rows_,
@@ -158,7 +158,7 @@ public:
         for (int idx = 0; idx < count; idx++) {
             for (int j = 0; j < inCount(); ++j) {
                 cuda::Assert(dynamic_cast<ConcatNode *>(batch[idx])->
-                        ins_.at(j)->loss().verify("concat backward"));
+                        ins_.at(j)->grad().verify("concat backward"));
             }
         }
 #endif

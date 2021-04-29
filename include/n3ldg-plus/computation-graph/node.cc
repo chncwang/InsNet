@@ -51,10 +51,13 @@ string Node::typeSignature() const {
 
 void Node::clear() {
 #if !USE_GPU || TEST_CUDA
-    loss_.zero();
+    grad_.zero();
 #endif
     batched_node_ = this;
     column_ = 1;
+    input_dims_.clear();
+    input_vals_.clear();
+    input_grads_.clear();
     NodeAbs::clear();
 }
 
@@ -83,8 +86,7 @@ string Node::isVectorSig() const {
     return column_ == 1 ? "-vector-" : "-matrix-";
 }
 
-Node::Node(const string &node_type, int dim) : NodeAbs(node_type),
-    val_(make_shared<Tensor1D>()), dim_(dim) {}
+Node::Node(const string &node_type, int dim) : NodeAbs(node_type), dim_(dim) {}
 
 void Node::init(int dim) {
     if (dim <= 0) {
@@ -92,7 +94,7 @@ void Node::init(int dim) {
         abort();
     }
     dim_ = dim;
-    loss_.init(dim_);
+    grad_.init(dim_);
 }
 
 void Node::setInputs(const std::vector<Node*> &inputs) {
@@ -107,32 +109,25 @@ void Node::setInputs(const std::vector<Node*> &inputs) {
     input_grads_.reserve(size);
     input_dims_.reserve(size);
 
-    for (Node * input : inputs) {
-        input_vals_.push_back(input->sharedVal());
-        input_grads_.push_back(&input->loss());
-        input_dims_.push_back(input->getDim());
+    for (Node *input : inputs) {
+        input->val_.retain();
+        input_vals_.push_back(&input->val_);
+        input_grads_.push_back(&input->grad_);
+        input_dims_.push_back(input->dim_);
     }
 }
 
 void Node::clearInputVals(bool force) {
-    if (force) {
-        for (auto &p : input_vals_) {
-            p.reset();
-        }
-    } else {
-        for (auto *p : forwardOnlyInputVals()) {
-            if (p == nullptr) {
-                cerr << "Node::clearInputVals p cannot be nullptr!\n";
-                abort();
-            }
-            p->reset();
-        }
+    int begin = force ? forwardOnlyInputValSize() : 0;
+    int end = force ? inputSize() : forwardOnlyInputValSize();
+    for (int i = begin; i < end; ++i) {
+        input_vals_.at(i)->release();
     }
 }
 
 void Node::clearVal(bool force) {
     if (force || isValForwardOnly()) {
-        val_.reset();
+        val_.release();
     }
 }
 
@@ -236,13 +231,8 @@ void UniInputNode::connect(Node &input) {
     Node::afterConnect(ins);
 }
 
-vector<shared_ptr<Tensor1D> *> UniInputNode::forwardOnlyInputVals() {
-    if (isInputValForwardOnly()) {
-        vector<shared_ptr<Tensor1D> *> val = {&input_vals_.front()};
-        return val;
-    } else {
-        return {};
-    }
+int UniInputNode::forwardOnlyInputValSize() {
+    return isInputValForwardOnly() ? 1 : 0;
 }
 
 #if USE_GPU
@@ -251,7 +241,7 @@ void clearNodes(vector<Node*> &nodes) {
     vector<int> dims(nodes.size());
     int i = 0;
     for (Node *n : nodes) {
-        grads.at(i) = n->getLoss().value;
+        grads.at(i) = n->getGrad().value;
         dims.at(i++) = n->getDim();
     }
     cuda::BatchMemset(grads, grads.size(), dims, 0.0f);
@@ -279,7 +269,7 @@ vector<dtype *> Executor::getGrads() {
     int i = 0;
     for (NodeAbs *node : batch) {
         Node *x = dynamic_cast<Node *>(node);
-        grads.at(i++) = x->getLoss().value;
+        grads.at(i++) = x->getGrad().value;
     }
     return grads;
 }
@@ -394,11 +384,11 @@ void Executor::verifyBackward(
         Node *x = dynamic_cast<Node *>(node);
         auto inputs = get_inputs(*x);
         for (pair<Node*, string> &input : inputs) {
-            if (!input.first->getLoss().verify((getNodeType() +
+            if (!input.first->getGrad().verify((getNodeType() +
                             " backward " + input.second).c_str())) {
-                cout << "cpu:" << endl << input.first->getLoss().toString() << endl;;
+                cout << "cpu:" << endl << input.first->getGrad().toString() << endl;;
                 cerr << "gpu:" << endl;
-                input.first->getLoss().print();
+                input.first->getGrad().print();
                 cerr << input.second << endl;
                 abort();
             }
@@ -418,7 +408,7 @@ void Executor::testBeforeBackward(
         Node *x = dynamic_cast<Node *>(node);
         auto inputs = get_inputs(*x);
         for (pair<Node*, string> &input : inputs) {
-            cuda::Assert(input.first->getLoss().verify((getNodeType() + " backward " +
+            cuda::Assert(input.first->getGrad().verify((getNodeType() + " backward " +
                             input.second).c_str()));
         }
     }

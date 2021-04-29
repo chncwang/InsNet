@@ -72,7 +72,7 @@ public:
         for (int i = 0; i < inputSize(); ++i) {
             int offset = i * getRow();
             for (int j = 0; j < getRow(); ++j) {
-                (*input_grads_.at(i))[j] += loss()[offset + j];
+                (*input_grads_.at(i))[j] += grad()[offset + j];
             }
         }
     }
@@ -84,8 +84,8 @@ public:
     Executor* generate() override;
 
 protected:
-    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
-        return toPointers(input_vals_);
+    int forwardOnlyInputValSize() override {
+        return inputSize();
     }
 
     bool isValForwardOnly() const override {
@@ -143,7 +143,7 @@ public:
         for (Node *node : batch) {
             ++node_i;
             MatrixConcatNode *concat = dynamic_cast<MatrixConcatNode*>(node);
-            grads.push_back(concat->getLoss().value);
+            grads.push_back(concat->getGrad().value);
             for (int i = 0; i < max_in_count; ++i) {
                 in_grads.push_back(i < in_counts.at(node_i) ?
                         concat->input_grads_.at(i)->value : nullptr);
@@ -218,10 +218,10 @@ public:
     }
 
     void backward() override {
-        Mat(input_grads_.at(0)->v, a_row_, k_) += Mat(getLoss().v, a_row_, b_col_) *
+        Mat(input_grads_.at(0)->v, a_row_, k_) += Mat(getGrad().v, a_row_, b_col_) *
             Mat(input_vals_.at(1)->v, k_, b_col_).transpose();
         Mat(input_grads_.at(1)->v, k_, b_col_) +=
-            Mat(input_vals_.at(0)->v, a_row_, k_).transpose() * Mat(getLoss().v, a_row_, b_col_);
+            Mat(input_vals_.at(0)->v, a_row_, k_).transpose() * Mat(getGrad().v, a_row_, b_col_);
     }
 
     Executor * generate() override;
@@ -233,8 +233,8 @@ public:
     int k_ = 0;
 
 protected:
-    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
-        return {};
+    int forwardOnlyInputValSize() override {
+        return 0;
     }
 
     bool isValForwardOnly() const override {
@@ -312,7 +312,7 @@ public:
 
         for (Node *node : batch) {
             MatrixMulMatrixNode &m = dynamic_cast<MatrixMulMatrixNode &>(*node);
-            grads.push_back(m.getLoss().value);
+            grads.push_back(m.getGrad().value);
             a_grads.push_back(m.input_grads_.at(0)->value);
             b_grads.push_back(m.input_grads_.at(1)->value);
         }
@@ -390,9 +390,9 @@ public:
     void backward() override {
         Mat(input_grads_.at(0)->v, input_row_, a_col_) +=
             Mat(input_vals_.at(1)->v, input_row_, b_col_) *
-            Mat(getLoss().v, a_col_, b_col_).transpose();
+            Mat(getGrad().v, a_col_, b_col_).transpose();
         Mat(input_grads_.at(1)->v, input_row_, b_col_) +=
-            Mat(input_vals_.at(0)->v, input_row_, a_col_) * Mat(getLoss().v, a_col_, b_col_);
+            Mat(input_vals_.at(0)->v, input_row_, a_col_) * Mat(getGrad().v, a_col_, b_col_);
     }
 
     Executor * generate() override;
@@ -403,8 +403,8 @@ public:
     }
 
 protected:
-    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
-        return {};
+    int forwardOnlyInputValSize() override {
+        return 0;
     }
 
     bool isValForwardOnly() const override {
@@ -481,7 +481,7 @@ public:
             TranMatrixMulMatrixNode &t = dynamic_cast<TranMatrixMulMatrixNode &>(*node);
             a_grads.push_back(t.input_grads_.at(0)->value);
             b_grads.push_back(t.input_grads_.at(1)->value);
-            grads.push_back(t.getLoss().value);
+            grads.push_back(t.getGrad().value);
         }
         cuda::TranMatrixMulMatrixBackward(grads, a_vals_, b_vals_, count, a_cols_, b_cols_,
                 input_row_, a_grads, b_grads);

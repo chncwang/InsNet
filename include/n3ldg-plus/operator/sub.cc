@@ -51,15 +51,15 @@ public:
     }
 
     void backward() override {
-        input_grads_.at(MINUEND)->vec() += loss().vec();
-        input_grads_.at(SUBTRAHEND)->vec() -= loss().vec();
+        input_grads_.at(MINUEND)->vec() += grad().vec();
+        input_grads_.at(SUBTRAHEND)->vec() -= grad().vec();
     }
 
     Executor *generate() override;
 
 protected:
-    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
-        return {};
+    int forwardOnlyInputValSize() override {
+        return 0;
     }
 
     bool isValForwardOnly() const override {
@@ -126,7 +126,7 @@ class SubExecutor : public Executor {
         std::vector<dtype*> minuend_losses, subtrahend_losses;
         for (Node *n : batch) {
             SubNode *sub = static_cast<SubNode*>(n);
-            losses.push_back(sub->loss().value);
+            losses.push_back(sub->grad().value);
             minuend_losses.push_back(sub->input_grads_.at(MINUEND)->value);
             subtrahend_losses.push_back(sub->input_grads_.at(SUBTRAHEND)->value);
         }

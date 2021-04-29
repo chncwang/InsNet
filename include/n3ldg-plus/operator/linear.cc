@@ -222,12 +222,12 @@ public:
         W().grad().copyFromDeviceToHost();
         for (int i = 0; i < count; ++i) {
             LinearNode* ptr = (LinearNode*)batch[i];
-            cuda::Assert(ptr->loss().verify("before linear backward grad"));
-            ptr->loss().copyFromDeviceToHost();
+            cuda::Assert(ptr->grad().verify("before linear backward grad"));
+            ptr->grad().copyFromDeviceToHost();
             cuda::Assert(ptr->val().verify("before linear val"));
             ptr->val().copyFromDeviceToHost();
-            cuda::Assert(ptr->getInput().loss().verify("before linear backward in grad"));
-            ptr->getInput().loss().copyFromDeviceToHost();
+            cuda::Assert(ptr->getInput().grad().verify("before linear backward in grad"));
+            ptr->getInput().grad().copyFromDeviceToHost();
         }
 #endif
 
@@ -236,7 +236,7 @@ public:
         in_grads.reserve(count);
         for (int i = 0; i < count; ++i) {
             LinearNode* ptr = (LinearNode*)batch[i];
-            grads.push_back(ptr->loss().value);
+            grads.push_back(ptr->grad().value);
             in_grads.push_back(ptr->inputGrad().value);
         }
 
@@ -251,7 +251,7 @@ public:
         int col_offset = 0;
         for (int i = 0; i < count; i++) {
             LinearNode &l = dynamic_cast<LinearNode &>(*batch.at(i));
-            Vec(ly.v + col_offset * outDim(), l.getDim()) = l.getLoss().vec();
+            Vec(ly.v + col_offset * outDim(), l.getDim()) = l.getGrad().vec();
             col_offset += l.getColumn();
         }
 
@@ -268,7 +268,7 @@ public:
         col_offset = 0;
         for (int i = 0; i < count; i++) {
             LinearNode& l = (LinearNode &)(*batch.at(i));
-            l.getInput().loss().vec() += Vec(lx.v + col_offset * inDim(), inDim());
+            l.getInput().grad().vec() += Vec(lx.v + col_offset * inDim(), l.inputDim());
             col_offset += l.getColumn();
         }
 
@@ -278,7 +278,7 @@ public:
         }
         for (Node * n : batch) {
             LinearNode *ptr = dynamic_cast<LinearNode *>(n);
-            cuda::Assert(ptr->getInput().loss().verify("backward loss"));
+            cuda::Assert(ptr->getInput().grad().verify("backward loss"));
         }
         cout << "linear backward tested" << endl;
 #endif
@@ -317,7 +317,7 @@ public:
         int col_offset = 0;
         for (int i = 0; i < count; i++) {
             LinearNode& l = dynamic_cast<LinearNode &>(*batch.at(i));
-            Vec(x_.v + col_offset * inDim(), l.getInput().getDim()) = l.getInput().getVal().vec();
+            Vec(x_.v + col_offset * inDim(), l.inputDim()) = l.getInputVal().vec();
 
             col_offset += l.getColumn();
         }
@@ -351,7 +351,7 @@ public:
         int col_offset = 0;
         for (int i = 0; i < count; i++) {
             LinearNode &l = dynamic_cast<LinearNode &>(*batch.at(i));
-            Vec(ly.v + col_offset * outDim(), l.getDim()) = l.getLoss().vec();
+            Vec(ly.v + col_offset * outDim(), l.getDim()) = l.getGrad().vec();
             col_offset += l.getColumn();
         }
 
@@ -368,7 +368,7 @@ public:
         col_offset = 0;
         for (int i = 0; i < count; i++) {
             LinearNode& l = (LinearNode &)(*batch.at(i));
-            l.getInput().loss().vec() += Vec(lx.v + col_offset * inDim(), inDim());
+            l.inputGrad().vec() += Vec(lx.v + col_offset * inDim(), l.inputDim());
             col_offset += l.getColumn();
         }
     }
@@ -408,8 +408,8 @@ public:
     }
 
     void backward() override {
-        inputGrad().vec() += loss().vec();
-        bias_param_->grad().vec() += getLoss().vec();
+        inputGrad().vec() += grad().vec();
+        bias_param_->grad().vec() += getGrad().vec();
     }
 
     Executor *generate() override;
@@ -477,7 +477,7 @@ public:
         vector<dtype *> losses, in_losses;
         for (Node *node : batch) {
             BiasNode *bias_node = dynamic_cast<BiasNode *>(node);
-            losses.push_back(bias_node->getLoss().value);
+            losses.push_back(bias_node->getGrad().value);
             in_losses.push_back(bias_node->inputGrad().value);
         }
         cuda::BiasBackward(losses, batch.size(), getDim(), bias, in_losses);

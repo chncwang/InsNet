@@ -30,7 +30,7 @@ public:
     void backward() override {
         int row = getDim() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
-            inputGrad().vec() += Vec(loss().v + row * i, row);
+            inputGrad().vec() += Vec(getGrad().v + row * i, row);
         }
     }
 
@@ -90,7 +90,7 @@ public:
         in_grads.reserve(count);
         for (Node *node : batch) {
             BroadcastNode &b = dynamic_cast<BroadcastNode &>(*node);
-            grads.push_back(b.getLoss().value);
+            grads.push_back(b.getGrad().value);
             in_grads.push_back(b.inputGrad().value);
         }
 

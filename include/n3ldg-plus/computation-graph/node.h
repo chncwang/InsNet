@@ -11,8 +11,6 @@
 #include "n3ldg-plus/base/tensor.h"
 #include "n3ldg-plus/cuda/n3ldg_plus_cuda.h"
 
-using std::shared_ptr;
-
 namespace n3ldg_plus {
 
 class Executor;
@@ -124,19 +122,19 @@ public:
     virtual std::string typeSignature() const override;
 
     const Tensor1D &getVal() const {
-        return *val_;
+        return val_;
     }
 
     Tensor1D &val() {
-        return *val_;
+        return val_;
     }
 
-    const Tensor1D &getLoss() const {
-        return loss_;
+    const Tensor1D &getGrad() const {
+        return grad_;
     }
 
-    Tensor1D &loss() {
-        return loss_;
+    Tensor1D &grad() {
+        return grad_;
     }
 
     int getDim() const override {
@@ -158,11 +156,11 @@ public:
     }
 
     Mat valMat() {
-        return Mat(val().v, getRow(), column_);
+        return Mat(val_.v, getRow(), column_);
     }
 
     Mat gradMat() {
-        return Mat(loss().v, getRow(), column_);
+        return Mat(grad_.v, getRow(), column_);
     }
 
     void setColumn(int column);
@@ -189,10 +187,6 @@ public:
 
     virtual void setInputs(const std::vector<Node*> &inputs);
 
-    std::shared_ptr<Tensor1D> &sharedVal() {
-        return val_;
-    }
-
     void clearInputVals(bool force);
 
     void clearVal(bool force);
@@ -216,15 +210,15 @@ protected:
 
     virtual bool isValForwardOnly() const = 0;
 
-    virtual std::vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() = 0;
+    virtual int forwardOnlyInputValSize() = 0;
 
-    std::vector<std::shared_ptr<Tensor1D>> input_vals_;
+    std::vector<Tensor1D *> input_vals_;
     std::vector<Tensor1D *> input_grads_;
     std::vector<int> input_dims_;
 
 private:
-    std::shared_ptr<Tensor1D> val_;
-    Tensor1D loss_;
+    Tensor1D val_;
+    Tensor1D grad_;
     int dim_;
     int column_ = 1;
     NodeAbs *batched_node_;
@@ -503,7 +497,7 @@ protected:
 
     virtual bool isInputValForwardOnly() const = 0;
 
-    virtual std::vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override;
+    virtual int forwardOnlyInputValSize() override;
 
 private:
     friend class UniInputExecutor;

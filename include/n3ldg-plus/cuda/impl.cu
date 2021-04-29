@@ -199,6 +199,7 @@ DeviceNumber::~DeviceNumber() {
 
 void Tensor1D::init(int dim) {
     initOnDevice(dim);
+    ++ref_count_;
 #if TEST_CUDA
     v = new dtype[dim];
     zero();
@@ -235,8 +236,13 @@ std::vector<dtype> Tensor1D::toCpu() const {
 }
 
 Tensor1D::~Tensor1D() {
-    if (value != NULL) {
+    releaseMemory();
+}
+
+void Tensor1D::releaseMemory() {
+    if (value != nullptr) {
         MemoryPool::Ins().Free(value);
+        value = nullptr;
     }
 }
 

@@ -57,7 +57,7 @@ public:
             int dim = getDim() / ids_.size();
             int i = 0;
             for (int id : ids_) {
-                Vec(param_->grad()[id], dim) += Vec(loss().v + i++ * dim, dim);
+                Vec(param_->grad()[id], dim) += Vec(grad().v + i++ * dim, dim);
             }
         }
     }
@@ -67,7 +67,7 @@ public:
     }
 
 protected:
-    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
+    int forwardOnlyInputValSize() override {
         return {};
     }
 
@@ -199,7 +199,7 @@ public:
         vector<dtype*> grads;
         grads.reserve(count);
         for (Node *n : batch) {
-            grads.push_back(n->loss().value);
+            grads.push_back(n->grad().value);
         }
         genericBackward(grads);
 #if TEST_CUDA

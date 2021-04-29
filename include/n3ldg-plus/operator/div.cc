@@ -54,16 +54,16 @@ public:
     }
 
     void backward() override {
-        input_grads_.at(NUMERATOR)->vec() += getLoss().vec() / input_vals_.at(DENOMINATOR)->vec();
-        input_grads_.at(DENOMINATOR)->vec() -= getLoss().vec() * input_vals_.at(NUMERATOR)->vec() /
+        input_grads_.at(NUMERATOR)->vec() += getGrad().vec() / input_vals_.at(DENOMINATOR)->vec();
+        input_grads_.at(DENOMINATOR)->vec() -= getGrad().vec() * input_vals_.at(NUMERATOR)->vec() /
             input_vals_.at(DENOMINATOR)->vec().square();
     }
 
     Executor* generate() override;
 
 protected:
-    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
-        return {};
+    int forwardOnlyInputValSize() override {
+        return 0;
     }
 
     bool isValForwardOnly() const override {
@@ -116,7 +116,7 @@ public:
         denominator_losses.reserve(batch.size());
         for (Node *node : batch) {
             FullDivNode *div = dynamic_cast<FullDivNode*>(node);
-            losses.push_back(node->getLoss().value);
+            losses.push_back(node->getGrad().value);
             numerator_losses.push_back(div->input_grads_.at(NUMERATOR)->value);
             denominator_losses.push_back(div->input_grads_.at(DENOMINATOR)->value);
         }

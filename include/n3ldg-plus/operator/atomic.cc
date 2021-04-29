@@ -42,7 +42,7 @@ public:
 #if TEST_CUDA
         UniInputExecutor::testBeforeBackward();
         for (Node *node : batch) {
-            node->loss().copyFromHostToDevice();
+            node->grad().copyFromHostToDevice();
             UniInputNode *i = dynamic_cast<UniInputNode *>(node);
             i->inputGrad().copyFromHostToDevice();
             i->val().copyFromHostToDevice();
@@ -52,7 +52,7 @@ public:
         int i = 0;
         for (Node *node : batch) {
             UniInputNode *exp = dynamic_cast<UniInputNode*>(node);
-            losses.at(i) = exp->getLoss().value;
+            losses.at(i) = exp->getGrad().value;
             input_losses.at(i++) = exp->inputGrad().value;
         }
 
@@ -95,7 +95,7 @@ public:
     }
 
     void backward() override {
-        inputGrad().vec() += loss().vec() * getVal().vec().unaryExpr(ptr_fun(dtanh));
+        inputGrad().vec() += grad().vec() * getVal().vec().unaryExpr(ptr_fun(dtanh));
     }
 
     Executor *generate() override;
@@ -140,7 +140,7 @@ public:
     }
 
     void backward() override {
-        inputGrad().vec() += loss().vec() * getVal().vec().unaryExpr(ptr_fun(dsigmoid));
+        inputGrad().vec() += grad().vec() * getVal().vec().unaryExpr(ptr_fun(dsigmoid));
     }
 
     Executor *generate() override {
@@ -182,7 +182,7 @@ public:
     }
 
     void backward() override {
-        inputGrad().vec() += loss().vec() * inputVal().vec().unaryExpr(ptr_fun(drelu));
+        inputGrad().vec() += grad().vec() * inputVal().vec().unaryExpr(ptr_fun(drelu));
     }
 
     Executor *generate() override {
@@ -233,7 +233,7 @@ public:
     }
 
     void backward() override {
-        inputGrad().vec() += loss().vec() * val().vec().unaryExpr(ptr_fun(dsqrt));
+        inputGrad().vec() += grad().vec() * val().vec().unaryExpr(ptr_fun(dsqrt));
     }
 
     string typeSignature() const override {
@@ -313,7 +313,7 @@ public:
     }
 
     void backward() override {
-        inputGrad().vec() += loss().vec() * drop_mask_.vec();
+        inputGrad().vec() += grad().vec() * drop_mask_.vec();
     }
 #else
     void compute() override {
@@ -456,10 +456,10 @@ public:
         for (Node *n : batch) {
             DropoutNode *dropout_node = dynamic_cast<DropoutNode*>(n);
 #if TEST_CUDA
-            dropout_node->loss().copyFromHostToDevice();
+            dropout_node->grad().copyFromHostToDevice();
             dropout_node->inputGrad().copyFromHostToDevice();
 #endif
-            losses.at(i) = dropout_node->loss().value;
+            losses.at(i) = dropout_node->grad().value;
             in_losses.at(i++) = dropout_node->inputGrad().value;
         }
         cuda::DropoutBackward(losses, count, dims_, max_dim_, offsets_, isTraining(),
@@ -531,7 +531,7 @@ public:
     void backward() override {
         int input_row = inputGrad().dim / getDim();
         for (int i = 0; i < getDim(); ++i) {
-            inputGrad()[i * input_row + max_indexes_.at(i)] += getLoss()[i];
+            inputGrad()[i * input_row + max_indexes_.at(i)] += getGrad()[i];
         }
     }
 
@@ -607,7 +607,7 @@ public:
         int i = 0;
         for (Node *node : batch) {
             MaxScalarNode *max_scalar = dynamic_cast<MaxScalarNode*>(node);
-            losses.at(i) = max_scalar->getLoss().value;
+            losses.at(i) = max_scalar->getGrad().value;
             input_losses.at(i++) = max_scalar->inputGrad().value;
         }
 
@@ -663,7 +663,7 @@ public:
         for (int i = 0; i < getColumn(); ++i) {
             dtype sum = 0;
             for (int j = 0; j < row; ++j) {
-                sum += getLoss()[i * row + j];
+                sum += getGrad()[i * row + j];
             }
             inputGrad()[i] += sum;
         }
@@ -740,7 +740,7 @@ public:
         UniInputExecutor::testBeforeBackward();
         for (Node *node : batch) {
             ScalarToVectorNode * n = dynamic_cast<ScalarToVectorNode*>(node);
-            n->loss().copyFromHostToDevice();
+            n->grad().copyFromHostToDevice();
             n->inputGrad().copyFromHostToDevice();
         }
 #endif
@@ -750,7 +750,7 @@ public:
         int dim;
         for (Node *node : batch) {
             ScalarToVectorNode * n = dynamic_cast<ScalarToVectorNode*>(node);
-            losses.at(i) = n->getLoss().value;
+            losses.at(i) = n->getGrad().value;
             input_losses.at(i++) = n->inputGrad().value;
             dim = n->inputGrad().dim;
         }
@@ -803,7 +803,7 @@ public:
     }
 
     void backward() override {
-        inputGrad().vec() += getLoss().vec() * getVal().vec();
+        inputGrad().vec() += getGrad().vec() * getVal().vec();
     }
 
 protected:
@@ -862,7 +862,7 @@ public:
         for (int i = 0; i < getDim(); ++i) {
             int input_row = inputGrad().dim / getDim();
             for (int j = 0; j < input_row; ++j) {
-                inputGrad()[i * input_row + j] += getLoss()[i];
+                inputGrad()[i * input_row + j] += getGrad()[i];
             }
         }
     }
@@ -925,10 +925,10 @@ class SumExecutor : public UniInputExecutor {
         int i = 0;
         for (Node *node : batch) {
 #if TEST_CUDA
-            cuda::Assert(node->loss().verify("input loss"));
-            node->loss().copyFromDeviceToHost();
+            cuda::Assert(node->grad().verify("input loss"));
+            node->grad().copyFromDeviceToHost();
 #endif
-            losses.at(i) = node->getLoss().value;
+            losses.at(i) = node->getGrad().value;
             SumNode *sum = dynamic_cast<SumNode*>(node);
             input_losses.at(i++) = sum->inputGrad().value;
         }
@@ -979,7 +979,7 @@ public:
     }
 
     void backward() override {
-        inputGrad().vec() += factor_ * getLoss().vec();
+        inputGrad().vec() += factor_ * getGrad().vec();
     }
 
     Executor* generate() override;

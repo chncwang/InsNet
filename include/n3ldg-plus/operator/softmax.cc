@@ -41,13 +41,13 @@ public:
         for (int i = 0; i < getColumn(); ++i) {
             Tensor1D a;
             a.init(row);
-            a.vec() = Vec(getLoss().v + i * row, row) * Vec(getVal().v + i * row, row);
+            a.vec() = Vec(getGrad().v + i * row, row) * Vec(getVal().v + i * row, row);
             dtype z = a.mat().sum();
             Tensor1D b;
             b.init(row);
             b.vec() = z - a.vec();
             Vec(inputGrad().v + i * row, row) += Vec(getVal().v + i * row, row) *
-                ((1 - Vec(getVal().v + i * row, row)) * Vec(getLoss().v + i * row, row) - b.vec());
+                ((1 - Vec(getVal().v + i * row, row)) * Vec(getGrad().v + i * row, row) - b.vec());
         }
     }
 
@@ -133,7 +133,7 @@ public:
             SoftmaxNode &s = dynamic_cast<SoftmaxNode &>(*node);
             offsets.at(i) = dim_sum;
             dim_sum += s.getDim();
-            grads.at(i) = s.getLoss().value;
+            grads.at(i) = s.getGrad().value;
             in_grads.at(i++) = s.inputGrad().value;
         }
         cuda::IntArray offset_arr;

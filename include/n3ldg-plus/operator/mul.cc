@@ -38,15 +38,15 @@ public:
     }
 
     void backward() override {
-        input_grads_.at(0)->vec() += loss().vec() * input_vals_.at(1)->vec();
-        input_grads_.at(1)->vec() += loss().vec() * input_vals_.at(0)->vec();
+        input_grads_.at(0)->vec() += grad().vec() * input_vals_.at(1)->vec();
+        input_grads_.at(1)->vec() += grad().vec() * input_vals_.at(0)->vec();
     }
 
     Executor * generate() override;
 
 protected:
-    vector<shared_ptr<Tensor1D> *> forwardOnlyInputVals() override {
-        return {};
+    int forwardOnlyInputValSize() override {
+        return 0;
     }
 
     bool isValForwardOnly() const override {
@@ -109,7 +109,7 @@ public:
         grads2.reserve(count);
         for (Node *n : batch) {
             PMultiNode *pmulti = dynamic_cast<PMultiNode*>(n);
-            grads.push_back(pmulti->loss().value);
+            grads.push_back(pmulti->grad().value);
             vals1.push_back(pmulti->input_vals_.at(0)->value);
             vals2.push_back(pmulti->input_vals_.at(1)->value);
             grads1.push_back(pmulti->input_grads_.at(0)->value);
@@ -122,9 +122,9 @@ public:
         }
         for (Node *n : batch) {
             PMultiNode *pmulti = dynamic_cast<PMultiNode*>(n);
-            cuda::Assert(pmulti->in1->loss().verify(
+            cuda::Assert(pmulti->in1->grad().verify(
                         "PMultiExecutor backward in1 loss"));
-            cuda::Assert(pmulti->in2->loss().verify(
+            cuda::Assert(pmulti->in2->grad().verify(
                         "PMultiExecutor backward in2 loss"));
         }
 #endif

@@ -39,7 +39,7 @@ auto gpu_get_node_val = [](Node *node) {
 };
 
 auto gpu_get_node_loss = [](Node *node) {
-    return node->loss().value;
+    return node->grad().value;
 };
 
 vector<vector<int>> gpuPredict(const vector<Node *> &nodes, int row) {
@@ -79,7 +79,7 @@ dtype cpuLikelihoodLoss(vector<Node *> &nodes, int row, const vector<vector<int>
         }
         for (int j = 0; j < col; ++j) {
             int answer = answers.at(j);
-            nodes.at(i)->loss()[row * j + answer] -=
+            nodes.at(i)->grad()[row * j + answer] -=
                 1 / nodes.at(i)->getVal()[row * j + answer] * factor;
             loss -= log(nodes.at(i)->getVal()[row * j + answer]);
         }
@@ -99,9 +99,9 @@ dtype NLLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers,
 #if USE_GPU
 #if TEST_CUDA
     for (Node *node : nodes) {
-        if (!node->loss().verify("crossEntropyLoss grad")) {
-            node->loss().print();
-            cout << node->loss().toString() << endl;
+        if (!node->grad().verify("crossEntropyLoss grad")) {
+            node->grad().print();
+            cout << node->grad().toString() << endl;
             abort();
         }
         if (!node->val().verify("crossEntropyLoss val")) {
@@ -118,9 +118,9 @@ dtype NLLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers,
 #if TEST_CUDA
     dtype cpu_loss = cpuLikelihoodLoss(nodes, row, answers, factor);
     for (Node *node : nodes) {
-        if (!node->loss().verify("crossEntropyLoss")) {
-            node->loss().print();
-            cout << node->loss().toString() << endl;
+        if (!node->grad().verify("crossEntropyLoss")) {
+            node->grad().print();
+            cout << node->grad().toString() << endl;
             abort();
         }
     }
@@ -142,7 +142,7 @@ float cpuBinaryLikelihoodLoss(vector<Node *> &nodes, const vector<vector<int>> &
         const auto &answer = answers.at(i);
         for (int j = 0; j < node.getDim(); ++j) {
             dtype val = node.getVal()[j];
-            node.loss()[j] += (answer.at(j) ?  -1 / val : 1 / (1 - val)) * factor;
+            node.grad()[j] += (answer.at(j) ?  -1 / val : 1 / (1 - val)) * factor;
             loss += (answer.at(j) ? -log(val): -log(1 - val));
         }
     }
@@ -163,7 +163,7 @@ float cpuKLDivergenceLoss(vector<Node *> &nodes,
         }
         for (int j = 0; j < answer->size(); ++j) {
             loss -= answer->at(j) * log(node->getVal()[j]);
-            node->loss()[j] -= factor * answer->at(j) / node->getVal()[j];
+            node->grad()[j] -= factor * answer->at(j) / node->getVal()[j];
         }
     }
 
