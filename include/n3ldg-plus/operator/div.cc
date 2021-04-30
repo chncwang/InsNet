@@ -124,13 +124,7 @@ public:
         cuda::FullDivBackward(losses, denominators, numerators, batch.size(), dims,
                 numerator_losses, denominator_losses);
 #if TEST_CUDA
-        auto get_inputs = [](Node &node) {
-            FullDivNode &div = dynamic_cast<FullDivNode&>(node);
-            vector<pair<Node*, string>> results = {make_pair(div.denominator_, "denominator"),
-                    make_pair(div.numerator_, "numerator")};
-            return results;
-        };
-        Executor::testBackward(get_inputs);
+        Executor::testBackward();
         cout << "div backward tested" << endl;
 #endif
     }

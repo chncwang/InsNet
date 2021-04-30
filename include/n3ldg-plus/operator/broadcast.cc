@@ -54,7 +54,7 @@ protected:
 
 #if USE_GPU
 
-class BroadcastExecutor : public UniInputExecutor {
+class BroadcastExecutor : public Executor {
 public:
     void forward() override {
         vector<dtype *> in_vals, vals;
@@ -79,7 +79,7 @@ public:
         cuda::BroadcastForward(in_val_arr.value, count, in_dim_, ns_arr_.value, max_n_,
                 val_arr.value);
 #if TEST_CUDA
-        UniInputExecutor::testForward();
+        Executor::testForward();
 #endif
     }
 
@@ -100,7 +100,7 @@ public:
         cuda::BroadcastBackward(grad_arr.value, count, in_dim_, ns_arr_.value, max_n_,
                 in_grad_arr.value);
 #if TEST_CUDA
-        UniInputExecutor::testBackward();
+        Executor::testBackward();
 #endif
     }
 
@@ -112,7 +112,7 @@ private:
 
 #else
 
-class BroadcastExecutor : public UniInputExecutor {
+class BroadcastExecutor : public Executor {
 public:
     int calculateFLOPs() override {
         return 0; // TODO

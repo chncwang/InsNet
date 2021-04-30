@@ -55,6 +55,7 @@ void cpu::Tensor1D::releaseMemory() {
         delete[] v;
         v = nullptr;
     }
+    ref_count_ = 0;
 }
 
 void cpu::Tensor1D::zero() {

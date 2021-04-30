@@ -172,7 +172,7 @@ public:
             ys.push_back(n->val().value);
             cols_.push_back(n->getColumn());
 #if TEST_CUDA
-            n->getInput().val().copyFromDeviceToHost();
+            n->getInputVal().copyFromDeviceToHost();
 #endif
         }
         cuda::LinearForward(in_vals, count, cols_, inDim(), outDim(), W().val().value, 
@@ -182,7 +182,7 @@ public:
         int col_offset = 0;
         for (int i = 0; i < count; i++) {
             LinearNode& l = dynamic_cast<LinearNode &>(*batch.at(i));
-            Vec(x_.v + col_offset * inDim(), l.getInput().getDim()) = l.getInput().getVal().vec();
+            Vec(x_.v + col_offset * inDim(), l.inputDim()) = l.inputVal().vec();
 
             col_offset += l.getColumn();
         }
@@ -224,10 +224,8 @@ public:
             LinearNode* ptr = (LinearNode*)batch[i];
             cuda::Assert(ptr->grad().verify("before linear backward grad"));
             ptr->grad().copyFromDeviceToHost();
-            cuda::Assert(ptr->val().verify("before linear val"));
-            ptr->val().copyFromDeviceToHost();
-            cuda::Assert(ptr->getInput().grad().verify("before linear backward in grad"));
-            ptr->getInput().grad().copyFromDeviceToHost();
+            cuda::Assert(ptr->inputGrad().verify("before linear backward in grad"));
+            ptr->inputGrad().copyFromDeviceToHost();
         }
 #endif
 
@@ -268,7 +266,7 @@ public:
         col_offset = 0;
         for (int i = 0; i < count; i++) {
             LinearNode& l = (LinearNode &)(*batch.at(i));
-            l.getInput().grad().vec() += Vec(lx.v + col_offset * inDim(), l.inputDim());
+            l.inputGrad().vec() += Vec(lx.v + col_offset * inDim(), l.inputDim());
             col_offset += l.getColumn();
         }
 
@@ -278,7 +276,7 @@ public:
         }
         for (Node * n : batch) {
             LinearNode *ptr = dynamic_cast<LinearNode *>(n);
-            cuda::Assert(ptr->getInput().grad().verify("backward loss"));
+            cuda::Assert(ptr->inputGrad().verify("backward loss"));
         }
         cout << "linear backward tested" << endl;
 #endif
@@ -455,7 +453,7 @@ public:
 };
 
 #if USE_GPU
-class BiasExecutor : public UniInputExecutor {
+class BiasExecutor : public Executor {
 public:
     void forward() override {
         dtype *bias = param()->val().value;
@@ -482,7 +480,7 @@ public:
         }
         cuda::BiasBackward(losses, batch.size(), getDim(), bias, in_losses);
 #if TEST_CUDA
-        UniInputExecutor::testBackward();
+        Executor::testBackward();
         cout << "count:" << batch.size() << endl;
         cuda::Assert(param()->grad().verify("bias backward bias grad"));
         cout << "Bias backward tested" << endl;

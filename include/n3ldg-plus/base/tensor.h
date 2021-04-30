@@ -69,7 +69,7 @@ struct Tensor1D {
 
     virtual void checkIsNumber() const;
 
-    int ref_count_ = 0;
+    int ref_count_ = 1;
 };
 
 struct Tensor2D {
@@ -142,7 +142,7 @@ struct Tensor1D : public n3ldg_plus::cpu::Tensor1D, public Transferable {
     void init(int len) override;
     void initOnMemoryAndDevice(int len);
     void initOnMemory(int len);
-    void releaseMemory();
+    void releaseMemory() override;
     ~Tensor1D();
 
     virtual std::string name() const;

@@ -13,6 +13,7 @@ using std::function;
 using std::pair;
 using std::make_pair;
 using std::make_shared;
+using std::to_string;
 
 namespace n3ldg_plus {
 
@@ -53,6 +54,7 @@ void Node::clear() {
 #if !USE_GPU || TEST_CUDA
     grad_.zero();
 #endif
+    val_.ref_count_ = 1;
     batched_node_ = this;
     column_ = 1;
     input_dims_.clear();
@@ -247,7 +249,7 @@ void clearNodes(vector<Node*> &nodes) {
     cuda::BatchMemset(grads, grads.size(), dims, 0.0f);
 #if TEST_CUDA
     for (Node *node : nodes) {
-        node->loss().verify("clearNodes");
+        node->grad().verify("clearNodes");
     }
 #endif
 }
@@ -355,102 +357,45 @@ void Executor::verifyForward() {
     }
 }
 
-void Executor::testForwardInpputs(const function<vector<Node*>(Node &node)> &get_inputs) {
+void Executor::testForwardInpputs() {
     for (NodeAbs *node : batch) {
         Node *x = dynamic_cast<Node *>(node);
-        vector<Node*> inputs = get_inputs(*x);
-        for (Node *input : inputs) {
-            cuda::Assert(input->getVal().verify((getNodeType() +
-                            " forward input").c_str()));
+        for (Tensor1D *input : x->input_vals_) {
+            cuda::Assert(input->verify((getNodeType() + " forward input").c_str()));
         }
     }
 }
 
-void Executor::testForwardInpputs(const function<vector<pair<Node*,
-        string>>(Node &node)> &get_inputs) {
+void Executor::verifyBackward() {
     for (NodeAbs *node : batch) {
         Node *x = dynamic_cast<Node *>(node);
-        auto inputs = get_inputs(*x);
-        for (auto &input : inputs) {
-            cuda::Assert(input.first->getVal().verify((getNodeType() +
-                            " forward input").c_str()));
-        }
-    }
-}
-
-void Executor::verifyBackward(
-        const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
-    for (NodeAbs *node : batch) {
-        Node *x = dynamic_cast<Node *>(node);
-        auto inputs = get_inputs(*x);
-        for (pair<Node*, string> &input : inputs) {
-            if (!input.first->getGrad().verify((getNodeType() +
-                            " backward " + input.second).c_str())) {
-                cout << "cpu:" << endl << input.first->getGrad().toString() << endl;;
+        int i = 0;
+        for (Tensor1D *input_grad : x->input_grads_) {
+            if (!input_grad->verify((getNodeType() + " backward " + to_string(i++)).c_str())) {
+                cout << "cpu:" << endl << input_grad->toString() << endl;;
                 cerr << "gpu:" << endl;
-                input.first->getGrad().print();
-                cerr << input.second << endl;
+                input_grad->print();
                 abort();
             }
         }
     }
 }
 
-void Executor::testBackward(const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
+void Executor::testBackward() {
     Executor::backward();
-    verifyBackward(get_inputs);
+    verifyBackward();
     cout << batch.front()->cachedTypeSig() << " backward tested" << endl;
 }
 
-void Executor::testBeforeBackward(
-        const function<vector<pair<Node*, string>>(Node &node)> &get_inputs) {
+void Executor::testBeforeBackward() {
     for (NodeAbs *node : batch) {
         Node *x = dynamic_cast<Node *>(node);
-        auto inputs = get_inputs(*x);
-        for (pair<Node*, string> &input : inputs) {
-            cuda::Assert(input.first->getGrad().verify((getNodeType() + " backward " +
-                            input.second).c_str()));
+        int i = 0;
+        for (Tensor1D *input_grad : x->input_grads_) {
+            string msg = fmt::format("{} backward {}", getNodeType(), i++);
+            cuda::Assert(input_grad->verify(msg.c_str()));
         }
     }
-}
-#endif
-
-#if TEST_CUDA
-void UniInputExecutor::testForwardInpputs() {
-    for (NodeAbs *node : batch) {
-        UniInputNode &x = dynamic_cast<UniInputNode &>(*node);
-        vector<Node*> inputs = {&x.getInput()};
-        for (Node *input : inputs) {
-            cuda::Assert(input->getVal().verify((getNodeType() + " forward input").c_str()));
-        }
-    }
-}
-
-void UniInputExecutor::testBeforeBackward() {
-    auto get_inputs = [](Node &node) {
-        UniInputNode &uni_input = static_cast<UniInputNode&>(node);
-        vector<pair<Node*, string>> inputs = {make_pair(uni_input.input_, "input")};
-        return inputs;
-    };
-    Executor::testBeforeBackward(get_inputs);
-}
-
-void UniInputExecutor::verifyBackward() {
-    auto get_inputs = [](Node &node) {
-        UniInputNode &uni_input = static_cast<UniInputNode&>(node);
-        vector<pair<Node*, string>> inputs = {make_pair(uni_input.input_, "input")};
-        return inputs;
-    };
-    Executor::verifyBackward(get_inputs);
-}
-
-void UniInputExecutor::testBackward() {
-    auto get_inputs = [](Node &node) {
-        UniInputNode &uni_input = static_cast<UniInputNode&>(node);
-        vector<pair<Node*, string>> inputs = {make_pair(uni_input.input_, "input")};
-        return inputs;
-    };
-    Executor::testBackward(get_inputs);
 }
 #endif
 

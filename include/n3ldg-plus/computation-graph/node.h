@@ -223,6 +223,8 @@ private:
     int column_ = 1;
     NodeAbs *batched_node_;
     bool is_pooled_ = true;
+
+    friend class Executor;
 };
 
 class BatchedNode : public NodeAbs {
@@ -570,32 +572,13 @@ protected:
 
     void verifyForward();
 
-    void testForwardInpputs(const std::function<std::vector<Node*>(Node &node)> &get_inputs);
-
-    void testForwardInpputs(const std::function<std::vector<std::pair<Node*,
-            std::string>>(Node &node)> &get_inputs);
-
-    void verifyBackward(const std::function<std::vector<std::pair<Node*,
-            std::string>>(Node &node)> &get_inputs);
-
-    void testBackward(const std::function<std::vector<std::pair<Node*,
-            std::string>>(Node &node)> &get_inputs);
-
-    void testBeforeBackward(const std::function<std::vector<std::pair<Node*,
-            std::string>>(Node &node)> &get_inputs);
-#endif
-};
-
-class UniInputExecutor : public Executor {
-protected:
-#if TEST_CUDA
     void testForwardInpputs();
-
-    void testBeforeBackward();
 
     void verifyBackward();
 
     void testBackward();
+
+    void testBeforeBackward();
 #endif
 };
 

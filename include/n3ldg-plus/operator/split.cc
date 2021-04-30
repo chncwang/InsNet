@@ -192,12 +192,7 @@ public:
         cuda::SplitBackward(grads, offsets_, batch.size(), rows_, in_rows_, cols_,
                 input_grads);
 #if TEST_CUDA
-        auto get_inputs = [](Node &node) {
-            SplitNode &split = static_cast<SplitNode&>(node);
-            vector<pair<Node *, string>> inputs = {make_pair(&split.getInput(), "input")};
-            return inputs;
-        };
-        Executor::testBackward(get_inputs);
+        Executor::testBackward();
         cout << "split backward tested" << endl;
 #endif
     }

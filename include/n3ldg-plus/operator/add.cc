@@ -101,7 +101,7 @@ public:
                 PAddNode *padd = dynamic_cast<PAddNode*>(n);
                 ins.push_back(padd->input_vals_.at(i)->value);
 #if TEST_CUDA
-                cuda::Assert(padd->ins_.at(i)->val().verify("PAdd forward input"));
+                cuda::Assert(padd->input_vals_.at(i)->verify("PAdd forward input"));
 #endif
             }
         }
@@ -145,8 +145,8 @@ public:
 
         for (Node *n : batch) {
             PAddNode *add = dynamic_cast<PAddNode*>(n);
-            for (Node *in : add->ins_) {
-                cuda::Assert(in->loss().verify("PAddExecutor backward"));
+            for (Tensor1D *in : add->input_grads_) {
+                cuda::Assert(in->verify("PAddExecutor backward"));
             }
         }
         cout << "PAddExecutor backward tested" << endl;

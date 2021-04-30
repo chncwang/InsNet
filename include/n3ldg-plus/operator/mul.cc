@@ -122,10 +122,10 @@ public:
         }
         for (Node *n : batch) {
             PMultiNode *pmulti = dynamic_cast<PMultiNode*>(n);
-            cuda::Assert(pmulti->in1->grad().verify(
-                        "PMultiExecutor backward in1 loss"));
-            cuda::Assert(pmulti->in2->grad().verify(
-                        "PMultiExecutor backward in2 loss"));
+            for (Tensor1D *grad : pmulti->input_grads_) {
+                cuda::Assert(grad->verify("PMultiExecutor backward in1 loss"));
+                cuda::Assert(grad->verify("PMultiExecutor backward in2 loss"));
+            }
         }
 #endif
     }

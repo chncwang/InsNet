@@ -14,7 +14,7 @@ namespace n3ldg_plus {
 
 #if USE_GPU
 template<ActivatedEnum activation>
-class ActivationExecutor : public UniInputExecutor {
+class ActivationExecutor : public Executor {
 public:
     vector<dtype*> vals;
 
@@ -40,7 +40,7 @@ public:
         vector<dtype*> losses(batch.size());
         vector<dtype*> input_losses(batch.size());
 #if TEST_CUDA
-        UniInputExecutor::testBeforeBackward();
+        Executor::testBeforeBackward();
         for (Node *node : batch) {
             node->grad().copyFromHostToDevice();
             UniInputNode *i = dynamic_cast<UniInputNode *>(node);
@@ -59,7 +59,7 @@ public:
         cuda::ActivationBackward(activation, losses, vals, batch.size(), dims_,
                 input_losses);
 #if TEST_CUDA
-        UniInputExecutor::testBackward();
+        Executor::testBackward();
         cout << "exp backward tested" << endl;
 #endif
     }
@@ -69,7 +69,7 @@ private:
 };
 #else
 template<ActivatedEnum activation>
-class ActivationExecutor : public UniInputExecutor {
+class ActivationExecutor : public Executor {
 public:
     int calculateFLOPs() override {
         return defaultFLOPs();
@@ -565,7 +565,7 @@ public:
 };
 
 #if USE_GPU
-class MaxScalarExecutor : public UniInputExecutor {
+class MaxScalarExecutor : public Executor {
 public:
     void forward() override {
 #if TEST_CUDA
@@ -613,7 +613,7 @@ public:
 
         cuda::MaxScalarBackward(losses, max_indexes, batch.size(), input_losses);
 #if TEST_CUDA
-        UniInputExecutor::testBackward();
+        Executor::testBackward();
         cout << "max scalar backward tested" << endl;
 #endif
     }
@@ -709,11 +709,11 @@ public:
 };
 
 #if USE_GPU
-class ScalarToVectorExecutor : public UniInputExecutor {
+class ScalarToVectorExecutor : public Executor {
 public:
     void forward() override {
 #if TEST_CUDA
-        UniInputExecutor::testForwardInpputs();
+        Executor::testForwardInpputs();
 #endif
         vector<dtype*> inputs(batch.size());
         vector<dtype*> results(batch.size());
@@ -737,7 +737,7 @@ public:
     void backward() override {
 #if TEST_CUDA
         cout << "scalarToVector test before backward..." << endl;
-        UniInputExecutor::testBeforeBackward();
+        Executor::testBeforeBackward();
         for (Node *node : batch) {
             ScalarToVectorNode * n = dynamic_cast<ScalarToVectorNode*>(node);
             n->grad().copyFromHostToDevice();
@@ -757,7 +757,7 @@ public:
         cuda::ScalarToVectorBackward(losses, batch.size(), dim, dims_, input_losses);
 #if TEST_CUDA
         cout << "scalarToVector test backward..." << endl;
-        UniInputExecutor::testBackward();
+        Executor::testBackward();
         cout << "ScalarToVectorNode backward tested" << endl;
 #endif
     }
@@ -894,7 +894,7 @@ public:
 };
 
 #if USE_GPU
-class SumExecutor : public UniInputExecutor {
+class SumExecutor : public Executor {
     void forward() override {
         vector<dtype*> inputs(batch.size());
         vector<dtype*> results(batch.size());
@@ -935,7 +935,7 @@ class SumExecutor : public UniInputExecutor {
 
         cuda::VectorSumBackward(losses, batch.size(), getDim(), dims_, input_losses);
 #if TEST_CUDA
-        UniInputExecutor::testBackward();
+        Executor::testBackward();
         cout << "sum backward tested" << endl;
 #endif
     }
@@ -1024,7 +1024,7 @@ public:
 };
 
 #if USE_GPU
-class ScaledExecutor : public UniInputExecutor {
+class ScaledExecutor : public Executor {
 public:
     void forward() override {
         vector<dtype *> in_vals(batch.size());

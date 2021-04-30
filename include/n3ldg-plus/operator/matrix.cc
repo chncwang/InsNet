@@ -102,11 +102,7 @@ class MatrixConcatExecutor : public MatrixExecutor {
 public:
     void forward() override {
 #if TEST_CUDA
-        auto get_inputs = [](Node &node) -> vector<Node *> {
-            MatrixConcatNode *m = dynamic_cast<MatrixConcatNode*>(&node);
-            return m->getInputs();
-        };
-        testForwardInpputs(get_inputs);
+        testForwardInpputs();
         cout << "MatrixConcat forward tested" << endl;
 #endif
         in_counts.reserve(batch.size());
@@ -151,15 +147,7 @@ public:
         }
         cuda::MatrixConcatBackward(grads, getCount(), getRow(), in_counts, in_grads);
 #if TEST_CUDA
-        auto get_inputs = [&](Node &node) {
-            vector<pair<Node*, string>> pairs;
-            MatrixConcatNode &concat = dynamic_cast<MatrixConcatNode&>(node);
-            for (Node *input : concat.getInputs()) {
-                pairs.push_back(make_pair(input, input->getNodeType()));
-            }
-            return pairs;
-        };
-        testBackward(get_inputs);
+        testBackward();
 #endif
     }
 
@@ -286,15 +274,7 @@ public:
         MatrixMulMatrixNode &first = dynamic_cast<MatrixMulMatrixNode &>(*batch.front());
         row_ = first.input_dims_.at(0) / first.k_;
 #if TEST_CUDA
-        auto get_inputs = [&](Node &node) {
-            MatrixMulMatrixNode &t = dynamic_cast<MatrixMulMatrixNode&>(node);
-            vector<pair<Node*, string>> pairs = {
-                make_pair(t.ins_.at(0), "a"),
-                make_pair(t.ins_.at(1), "b")
-            };
-            return pairs;
-        };
-        testForwardInpputs(get_inputs);
+        testForwardInpputs();
 #endif
 
         cuda::MatrixMulMatrixForward(a_vals_, b_vals_, count, ks_, b_cols_, row_, vals);
@@ -321,15 +301,7 @@ public:
                 a_grads, b_grads);
 
 #if TEST_CUDA
-        auto get_inputs = [&](Node &node) {
-            MatrixMulMatrixNode &t = dynamic_cast<MatrixMulMatrixNode&>(node);
-            vector<pair<Node*, string>> pairs = {
-                make_pair(t.ins_.at(0), "a"),
-                make_pair(t.ins_.at(1), "b")
-            };
-            return pairs;
-        };
-        testBackward(get_inputs);
+        testBackward();
 #endif
     }
 
@@ -487,14 +459,7 @@ public:
                 input_row_, a_grads, b_grads);
 
 #if TEST_CUDA
-        auto get_inputs = [&](Node &node) {
-            vector<pair<Node*, string>> pairs;
-            TranMatrixMulMatrixNode &t = dynamic_cast<TranMatrixMulMatrixNode &>(node);
-            pairs.push_back(make_pair(t.ins_.at(0), "a"));
-            pairs.push_back(make_pair(t.ins_.at(1), "b"));
-            return pairs;
-        };
-        testBackward(get_inputs);
+        testBackward();
 #endif
     }
 

@@ -79,7 +79,7 @@ public:
 
 #if TEST_CUDA
     void setMask() override {
-        int nSize = ins.size();
+        int nSize = inputSize();
         int thread_count = 8;
         while (thread_count < nSize) {
             thread_count <<= 1;
@@ -89,7 +89,7 @@ public:
             dtype shared_arr[1024];
             dtype shared_indexers[1024];
             for (int i = 0; i < 1024; ++i) {
-                shared_arr[i] = i < nSize ? ins[i]->val()[dim_i] : -INFINITY;
+                shared_arr[i] = i < nSize ? (*input_vals_.at(i))[dim_i] : -INFINITY;
                 shared_indexers[i] = i;
             }
             for (int i = (thread_count >> 1); i > 0; i >>= 1) {
@@ -206,8 +206,8 @@ public:
             batch[idx]->compute();
             cuda::Assert(batch[idx]->val().verify("max pooling forward"));
             MaxPoolNode *n = dynamic_cast<MaxPoolNode*>(batch[idx]);
-            if (!cuda::Verify(n->masks.data(),
-                        hit_inputs.value + idx * dim, dim,
+            int dim = n->input_dims_.front();
+            if (!cuda::Verify(n->masks.data(), hit_inputs.value + idx * dim, dim,
                         "max pooling forward mask")) {
                 abort();
             }
@@ -240,8 +240,8 @@ public:
         }
 
         for (int idx = 0; idx < count; idx++) {
-            for (Node *n : dynamic_cast<MaxPoolNode*>(batch[idx])->ins) {
-                cuda::Assert(n->grad().verify("max pooling backward"));
+            for (Tensor1D *t : dynamic_cast<MaxPoolNode*>(batch[idx])->input_grads_) {
+                cuda::Assert(t->verify("max pooling backward"));
             }
         }
 #endif
@@ -413,8 +413,8 @@ public:
         }
         for (Node *n : batch) {
             SumPoolNode *sum = dynamic_cast<SumPoolNode*>(n);
-            for (Node *in : sum->ins) {
-                cuda::Assert(in->grad().verify("SumPoolExecutor backward"));
+            for (Tensor1D *t : sum->input_grads_) {
+                cuda::Assert(t->verify("SumPoolExecutor backward"));
             }
         }
 #endif

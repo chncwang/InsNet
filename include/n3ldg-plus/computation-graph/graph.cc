@@ -60,6 +60,9 @@ Graph::~Graph() {
         }
         auto &refs = globalPoolReferences();
         for (auto &e : refs) {
+            for (Node *node : e->first) {
+                node->val().cpu::Tensor1D::releaseMemory();
+            }
             e->second = 0;
         }
     } else {

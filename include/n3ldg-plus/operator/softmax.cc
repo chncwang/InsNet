@@ -82,11 +82,11 @@ public:
 };
 
 #if USE_GPU
-class SoftmaxExecutor : public UniInputExecutor {
+class SoftmaxExecutor : public Executor {
 public:
     void forward() override {
 #if TEST_CUDA
-        UniInputExecutor::testForwardInpputs();
+        Executor::testForwardInpputs();
 #endif
         int count = batch.size();
         vector<dtype *> in_vals(count);
@@ -110,13 +110,13 @@ public:
                 max_col_, val_arr_.value);
 #if TEST_CUDA
         try {
-            UniInputExecutor::testForward();
+            Executor::testForward();
         } catch (cuda::CudaVerificationException &e) {
             cerr << "softmax forward verification failed" << endl;
             SoftmaxNode &s = dynamic_cast<SoftmaxNode &>(*batch.at(e.getIndex()));
-            cerr << "input val:" << s.getInput().getVal().toString() << endl;
+            cerr << "input val:" << s.inputVal().toString() << endl;
             cerr << "gpu:" << endl;
-            s.getInput().getVal().print();
+            s.inputVal().print();
             cout << fmt::format("count:{} dim:{} col:{}\n", count, s.getDim(), s.getColumn());
             abort();
         }
@@ -141,7 +141,7 @@ public:
         cuda::SoftmaxBackward(grads, val_arr_.value, count, row_arr_.value, max_row_,
                 col_arr_.value, max_col_, offset_arr.value, in_grads);
 #if TEST_CUDA
-        UniInputExecutor::testBackward();
+        Executor::testBackward();
 #endif
     }
 
@@ -153,7 +153,7 @@ private:
     int max_row_, max_col_;
 };
 #else
-class SoftmaxExecutor : public UniInputExecutor {
+class SoftmaxExecutor : public Executor {
 public:
     int calculateFLOPs() override {
         return 0; // TODO

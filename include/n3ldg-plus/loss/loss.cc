@@ -191,7 +191,7 @@ pair<float, vector<int>> KLDivergenceLoss(vector<Node *> &nodes,
     dtype cpu_loss = cpuKLDivergenceLoss(nodes, answers, factor);
     cout << "KLLoss - gpu loss:" << gpu_loss << " cpu_loss:" << cpu_loss << endl;
     for (Node *node : nodes) {
-        cuda::Assert(node->getLoss().verify("multiCrossEntropyLoss"));
+        cuda::Assert(node->getGrad().verify("multiCrossEntropyLoss"));
     }
 #endif
     dtype loss = gpu_loss;
@@ -229,7 +229,7 @@ float binrayLikelihoodLoss(vector<Node *> &nodes, const vector<vector<int>> &ans
     dtype cpu_loss = cpuBinaryLikelihoodLoss(nodes, answers, factor);
     cout << "multiCrossEntropyLoss - gpu loss:" << gpu_loss << " cpu_loss:" << cpu_loss << endl;
     for (Node *node : nodes) {
-        cuda::Assert(node->getLoss().verify("multiCrossEntropyLoss"));
+        cuda::Assert(node->getGrad().verify("multiCrossEntropyLoss"));
     }
 #endif
     return gpu_loss;

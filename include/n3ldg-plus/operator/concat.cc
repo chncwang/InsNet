@@ -157,8 +157,8 @@ public:
         }
         for (int idx = 0; idx < count; idx++) {
             for (int j = 0; j < inCount(); ++j) {
-                cuda::Assert(dynamic_cast<ConcatNode *>(batch[idx])->
-                        ins_.at(j)->grad().verify("concat backward"));
+                cuda::Assert(dynamic_cast<ConcatNode *>(batch[idx])->input_grads_.at(j)->
+                        verify("concat backward"));
             }
         }
 #endif

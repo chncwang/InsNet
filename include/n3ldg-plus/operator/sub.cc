@@ -98,11 +98,12 @@ class SubExecutor : public Executor {
         vector<dtype*> minuend, subtrahend;
         vector<dtype*> results;
 #if TEST_CUDA
-        testForwardInpputs(getInput);
+        testForwardInpputs();
         for (Node *node : batch) {
             SubNode *sub = static_cast<SubNode*>(node);
-            sub->minuend_->val().copyFromHostToDevice();
-            sub->subtrahend_->val().copyFromHostToDevice();
+            for (Tensor1D *val : sub->input_vals_) {
+                val->copyFromHostToDevice();
+            }
         }
 #endif
 
@@ -132,13 +133,13 @@ class SubExecutor : public Executor {
         }
 #if TEST_CUDA
         cout << "test before sub backward..." << endl;
-        testBeforeBackward(getInput);
+        testBeforeBackward();
 #endif
         int count = batch.size();
         cuda::SubBackward(losses, count, dims_, minuend_losses, subtrahend_losses);
 #if TEST_CUDA
         cout << "test sub backward..." << endl;
-        Executor::testBackward(getInput);
+        Executor::testBackward();
         cout << "sub tested" << endl;
 #endif
     }

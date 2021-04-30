@@ -61,7 +61,7 @@ public:
 };
 
 #if USE_GPU
-class LayerNormExecutor : public UniInputExecutor {
+class LayerNormExecutor : public Executor {
 public:
     void forward() override {
         int count = batch.size();
@@ -88,7 +88,7 @@ public:
         i = 0;
         for (Node *node : batch) {
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
-            auto &input = s.getInput().getVal();
+            auto &input = s.inputVal();
             for (int j = 0; j < s.getColumn(); ++j) {
                 int row = getRow();
                 dtype mean = Mat(input.v + row * j, row, 1).sum() / row;
@@ -112,8 +112,8 @@ public:
             s.grad().copyFromHostToDevice();
             s.val().verify("standard layernorm before backward val");
             s.val().copyFromHostToDevice();
-            s.getInput().grad().verify("standard layernorm before backward input grad");
-            s.getInput().grad().copyFromHostToDevice();
+            s.inputGrad().verify("standard layernorm before backward input grad");
+            s.inputGrad().copyFromHostToDevice();
         }
 #endif
         int count = batch.size();
@@ -160,7 +160,7 @@ public:
                             static_cast<dtype>(n -1)) * Vec(s.getGrad().v + j * n, n) -
                         ((m.mat().sum() - m.vec()) * Vec(s.getVal().v + j * n, n) +
                          Mat(s.getGrad().v + j * n, n, 1).sum() - Vec(s.getGrad().v + j * n, n)));
-                Vec(s.getInput().grad().v + j * n, n) += x.vec();
+                Vec(s.inputGrad().v + j * n, n) += x.vec();
                 ++i;
             }
         }
@@ -175,7 +175,7 @@ private:
     int max_col_;
 };
 #else
-class LayerNormExecutor : public UniInputExecutor {
+class LayerNormExecutor : public Executor {
 public:
     void forward() override {
         for (Node *node : batch) {
@@ -311,7 +311,7 @@ public:
 };
 
 #if USE_GPU
-class PointwiseLinearExecutor : public UniInputExecutor {
+class PointwiseLinearExecutor : public Executor {
 public:
     void forward() override {
 #if TEST_CUDA
@@ -389,7 +389,7 @@ private:
     }
 };
 #else
-class PointwiseLinearExecutor : public UniInputExecutor {
+class PointwiseLinearExecutor : public Executor {
 public:
     int calculateFLOPs() override {
         return 0; // TODO
