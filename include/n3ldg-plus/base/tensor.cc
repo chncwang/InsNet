@@ -2,6 +2,9 @@
 #include "eigen/Eigen/Dense"
 #include "fmt/core.h"
 #include "eigen/unsupported/Eigen/CXX11/Tensor"
+#if USE_GPU
+#include "n3ldg-plus/cuda/n3ldg_plus_cuda.h"
+#endif
 
 using std::vector;
 using std::string;
@@ -282,6 +285,41 @@ void cpu::Tensor2D::norm2one(dtype norm) {
             (*this)[idx][idy] *= scale;
         }
     }
+}
+
+void initAndZeroTensors(vector<cpu::Tensor1D *> &tensors, const vector<int> &dims) {
+    if (tensors.size() != dims.size()) {
+        cerr << fmt::format("initAndZeroTensors - tensor size:{} dim size:{}", tensors.size(),
+                dims.size()) << endl;
+        abort();
+    }
+
+    vector<cpu::Tensor1D *> unique_tesnors;
+    unique_tesnors.reserve(tensors.size());
+    vector<int> unique_dims;
+    unique_dims.reserve(dims.size());
+    int i = 0;
+    for (cpu::Tensor1D *tensor : tensors) {
+        if (!tensor->isInitialized()) {
+            tensor->init(dims.at(i));
+            unique_tesnors.push_back(tensor);
+            unique_dims.push_back(dims.at(i));
+        }
+        ++i;
+    }
+#if USE_GPU
+    vector<dtype *> grads;
+    grads.reserve(unique_tesnors.size());
+    for (cpu::Tensor1D *tensor : unique_tesnors) {
+        cuda::Tensor1D &gpu_tensor = dynamic_cast<cuda::Tensor1D &>(*tensor);
+        grads.push_back(gpu_tensor.value);
+    }
+    cuda::BatchMemset(grads, grads.size(), unique_dims, 0.0f);
+#else
+    for (cpu::Tensor1D *tensor : unique_tesnors) {
+        tensor->zero();
+    }
+#endif
 }
 
 #if USE_GPU

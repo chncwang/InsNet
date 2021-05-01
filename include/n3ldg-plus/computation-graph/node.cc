@@ -51,9 +51,6 @@ string Node::typeSignature() const {
 }
 
 void Node::clear() {
-#if !USE_GPU || TEST_CUDA
-    grad_.zero();
-#endif
     val_.ref_count_ = 1;
     batched_node_ = this;
     column_ = 1;
@@ -96,7 +93,6 @@ void Node::init(int dim) {
         abort();
     }
     dim_ = dim;
-    grad_.init(dim_);
 }
 
 void Node::setInputs(const std::vector<Node*> &inputs) {
@@ -131,6 +127,10 @@ void Node::clearVal(bool force) {
     if (force || isValForwardOnly()) {
         val_.release();
     }
+}
+
+void Node::clearGrad() {
+    grad_.releaseMemory();
 }
 
 string BatchedNode::typeSignature() const {
@@ -237,23 +237,21 @@ int UniInputNode::forwardOnlyInputValSize() {
     return isInputValForwardOnly() ? 1 : 0;
 }
 
-#if USE_GPU
-void clearNodes(vector<Node*> &nodes) {
-    vector<dtype*> grads(nodes.size());
-    vector<int> dims(nodes.size());
-    int i = 0;
-    for (Node *n : nodes) {
-        grads.at(i) = n->getGrad().value;
-        dims.at(i++) = n->getDim();
-    }
-    cuda::BatchMemset(grads, grads.size(), dims, 0.0f);
-#if TEST_CUDA
+void initAndZeroGrads(vector<Node *> &nodes) {
+    int size = nodes.size();
+    vector<cpu::Tensor1D *> grads;
+    grads.reserve(size);
+    vector<int> dims;
+    dims.reserve(size);
     for (Node *node : nodes) {
-        node->grad().verify("clearNodes");
+        if (!node->getGrad().isInitialized()) {
+            grads.push_back(&node->grad());
+            dims.push_back(node->getDim());
+        }
     }
-#endif
+
+    initAndZeroTensors(grads, dims);
 }
-#endif
 
 #if USE_GPU
 vector<dtype *> Executor::getVals() {
@@ -305,11 +303,34 @@ void Executor::forwardFully() {
 }
 
 void Executor::backwardFully() {
+    int size = 0;
+    for (Node *node : batch) {
+        size += node->inputSize();
+    }
+
+    vector<cpu::Tensor1D *> grads;
+    grads.reserve(size);
+    vector<int> dims;
+    dims.reserve(size);
+
+    for (Node *node : batch) {
+        for (int i = 0; i < node->inputSize(); ++i) {
+            Tensor1D &input_grad = *node->input_grads_.at(i);
+            if (!input_grad.isInitialized()) {
+                grads.push_back(&input_grad);
+                dims.push_back(node->input_dims_.at(i));
+            }
+        }
+    }
+
+    initAndZeroTensors(grads, dims);
+
     backward();
 
     for (Node *node : batch) {
         node->clearVal(true);
         node->clearInputVals(true);
+        node->clearGrad();
     }
 }
 

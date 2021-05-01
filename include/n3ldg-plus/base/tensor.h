@@ -23,6 +23,10 @@ struct Tensor1D {
 
     virtual void init(int ndim);
 
+    virtual bool isInitialized() const {
+        return v != nullptr;
+    }
+
     void retain();
 
     void release();
@@ -140,6 +144,9 @@ struct Tensor1D : public n3ldg_plus::cpu::Tensor1D, public Transferable {
     Tensor1D(const Tensor1D &);
     Tensor1D(Tensor1D &&);
     void init(int len) override;
+    virtual bool isInitialized() const override {
+        return value != nullptr;
+    }
     void initOnMemoryAndDevice(int len);
     void initOnMemory(int len);
     void releaseMemory() override;
@@ -202,6 +209,8 @@ private:
 
 }
 #endif
+
+void initAndZeroTensors(std::vector<cpu::Tensor1D *> &tensors, const std::vector<int> &dims);
 
 }
 

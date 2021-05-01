@@ -61,7 +61,8 @@ Graph::~Graph() {
         auto &refs = globalPoolReferences();
         for (auto &e : refs) {
             for (Node *node : e->first) {
-                node->val().cpu::Tensor1D::releaseMemory();
+                node->val().releaseMemory();
+                node->grad().releaseMemory();
             }
             e->second = 0;
         }
@@ -153,9 +154,6 @@ void Graph::forward() {
             }
         }
         free_nodes.erase(min_hash);
-#if USE_GPU
-        clearNodes(cur_exec->batch);
-#endif
 //        cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl;
 
         cur_exec->forwardFully();

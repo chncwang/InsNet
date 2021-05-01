@@ -96,6 +96,9 @@ dtype NLLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers,
             nodes.size(), answers.size());
         abort();
     }
+
+    initAndZeroGrads(nodes);
+
 #if USE_GPU
 #if TEST_CUDA
     for (Node *node : nodes) {
@@ -179,6 +182,7 @@ pair<float, vector<int>> KLDivergenceLoss(vector<Node *> &nodes,
         cerr << "KLLoss - nodes size is not equal to answers size" << endl;
         abort();
     }
+    initAndZeroGrads(nodes);
     validateEqualNodeDims(nodes);
 #if USE_GPU
     vector<dtype *> vals, losses;
@@ -217,6 +221,7 @@ float binrayLikelihoodLoss(vector<Node *> &nodes, const vector<vector<int>> &ans
         cerr << "multiCrossEntropyLoss - nodes size is not equal to answers size" << endl;
         abort();
     }
+    initAndZeroGrads(nodes);
     validateEqualNodeDims(nodes);
 #if USE_GPU
     vector<dtype *> vals, losses;

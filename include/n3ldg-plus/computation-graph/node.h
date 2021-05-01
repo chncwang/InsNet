@@ -191,6 +191,8 @@ public:
 
     void clearVal(bool force);
 
+    void clearGrad();
+
     int inputSize() const {
         return input_dims_.size();
     }
@@ -515,9 +517,7 @@ std::vector<Node*> toNodePointers(const std::vector<T *> &vec) {
     return results;
 }
 
-#if USE_GPU
-void clearNodes(std::vector<Node*> &nodes);
-#endif
+void initAndZeroGrads(std::vector<Node*> &nodes);
 
 class Executor {
 public:
