@@ -244,14 +244,17 @@ void initAndZeroGrads(vector<Node *> &nodes) {
     grads.reserve(size);
     vector<int> dims;
     dims.reserve(size);
+    vector<string> sigs;
+    sigs.reserve(size);
     for (Node *node : nodes) {
         if (!node->getGrad().isInitialized()) {
             grads.push_back(&node->grad());
             dims.push_back(node->getDim());
+            sigs.push_back(node->cachedTypeSig());
         }
     }
 
-    initAndZeroTensors(grads, dims);
+    initAndZeroTensors(grads, dims, sigs);
 }
 
 #if USE_GPU
@@ -320,6 +323,8 @@ void Executor::backwardFully() {
     grads.reserve(size);
     vector<int> dims;
     dims.reserve(size);
+    vector<string> sigs;
+    sigs.reserve(size);
 
     for (Node *node : batch) {
         for (int i = 0; i < node->inputSize(); ++i) {
@@ -327,11 +332,12 @@ void Executor::backwardFully() {
             if (!input_grad.isInitialized()) {
                 grads.push_back(&input_grad);
                 dims.push_back(node->input_dims_.at(i));
+                sigs.push_back(node->cachedTypeSig());
             }
         }
     }
 
-    initAndZeroTensors(grads, dims);
+    initAndZeroTensors(grads, dims, sigs);
 
     backward();
 

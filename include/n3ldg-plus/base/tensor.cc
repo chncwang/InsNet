@@ -8,6 +8,9 @@
 
 using std::vector;
 using std::string;
+using std::map;
+using std::pair;
+using std::make_pair;
 using std::to_string;
 using std::cout;
 using std::cerr;
@@ -295,26 +298,52 @@ void cpu::Tensor2D::norm2one(dtype norm) {
     }
 }
 
-void initAndZeroTensors(vector<cpu::Tensor1D *> &tensors, const vector<int> &dims) {
+void initAndZeroTensors(vector<cpu::Tensor1D *> &tensors, const vector<int> &dims,
+        const vector<string> &signatures) {
     if (tensors.size() != dims.size()) {
         cerr << fmt::format("initAndZeroTensors - tensor size:{} dim size:{}", tensors.size(),
                 dims.size()) << endl;
         abort();
     }
 
+    map<string, map<cpu::Tensor1D *, int>> tensor_map;
+    for (int i = 0; i < tensors.size(); ++i) {
+        const string &sig = signatures.at(i);
+        const auto &it = tensor_map.find(sig);
+        cpu::Tensor1D &tensor = *tensors.at(i);
+        int dim = dims.at(i);
+        if (it == tensor_map.end()) {
+            map<cpu::Tensor1D*, int> m;
+            m.insert(make_pair(&tensor, dim));
+            auto q = make_pair(sig, m);
+            tensor_map.insert(q);
+        } else {
+            const auto &it2 = it->second.find(&tensor);
+            if (it2 == it->second.end()) {
+                it->second.insert(make_pair(&tensor, dim));
+            }
+        }
+    }
+
     vector<cpu::Tensor1D *> unique_tesnors;
     unique_tesnors.reserve(tensors.size());
     vector<int> unique_dims;
     unique_dims.reserve(dims.size());
-    int i = 0;
-    for (cpu::Tensor1D *tensor : tensors) {
-        if (!tensor->isInitialized()) {
-            tensor->init(dims.at(i));
-            unique_tesnors.push_back(tensor);
-            unique_dims.push_back(dims.at(i));
+
+    for (const auto &it : tensor_map) {
+        int sum = 0;
+        for (const auto &it2 : it.second) {
+            sum += it2.second;
         }
-        ++i;
+        auto container = memoryContainer(sum * sizeof(dtype));
+        for (const auto &it2 : it.second) {
+            cpu::Tensor1D &tensor = *it2.first;
+            tensor.init(it2.second, container);
+            unique_tesnors.push_back(&tensor);
+            unique_dims.push_back(it2.second);
+        }
     }
+
 #if USE_GPU
     vector<dtype *> grads;
     grads.reserve(unique_tesnors.size());

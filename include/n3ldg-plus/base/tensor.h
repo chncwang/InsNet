@@ -214,7 +214,8 @@ private:
 }
 #endif
 
-void initAndZeroTensors(std::vector<cpu::Tensor1D *> &tensors, const std::vector<int> &dims);
+void initAndZeroTensors(std::vector<cpu::Tensor1D *> &tensors, const std::vector<int> &dims,
+        const std::vector<std::string> &signatures);
 
 }
 
