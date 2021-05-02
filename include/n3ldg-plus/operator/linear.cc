@@ -65,10 +65,6 @@ vector<Tunable<BaseParam>*> LinearParam::tunableComponents() {
 
 class LinearNode : public UniInputNode, public Poolable<LinearNode> {
 public:
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         setDim(dim);
     }
@@ -385,16 +381,8 @@ class BiasNode : public UniInputNode, public Poolable<BiasNode> {
 public:
     BiasNode() : UniInputNode("bias") {}
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         setDim(dim);
-    }
-
-    void init(int dim) override {
-        UniInputNode::init(dim);
     }
 
     virtual string typeSignature() const override {
@@ -540,8 +528,7 @@ Node *linear(Node &input, Param &param) {
 
     int col = input.getDim() / param.outDim();
     int dim = param.inDim();
-    bool pool = col == 1;
-    LinearNode *uni = LinearNode::newNode(dim * col, pool);
+    LinearNode *uni = LinearNode::newNode(dim * col);
     uni->setColumn(col);
     uni->setParam(*uni_params);
     uni->connect(input);

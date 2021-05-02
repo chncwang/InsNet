@@ -18,10 +18,6 @@ public:
         setDim(dim);
     }
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     string typeSignature() const override {
         return getNodeType();
     }
@@ -106,8 +102,7 @@ public:
     }
 
     void init(Node &input, int row, const vector<int> &offsets, int col = 1) {
-        bool pool = col == 1;
-        allocateBatch(row * col, offsets.size(), pool);
+        allocateBatch(row * col, offsets.size());
         int i = 0;
         for (int offset : offsets) {
             SplitNode *s = dynamic_cast<SplitNode *>(batch().at(i++));

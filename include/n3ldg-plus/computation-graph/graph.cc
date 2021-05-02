@@ -60,11 +60,11 @@ Graph::~Graph() {
         }
         auto &refs = globalPoolReferences();
         for (auto &e : refs) {
-            for (Node *node : e->first) {
+            for (Node *node : *e.first) {
                 node->val().releaseMemory();
                 node->grad().releaseMemory();
             }
-            e->second = 0;
+            *e.second = 0;
         }
     } else {
         for (NodeAbs *node : finish_nodes) {

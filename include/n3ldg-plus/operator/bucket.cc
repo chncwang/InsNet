@@ -9,10 +9,6 @@ class BucketNode : public Node, public Poolable<BucketNode> {
 public:
     BucketNode() : Node("bucket") {}
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         setDim(dim);
     }

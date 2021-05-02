@@ -31,10 +31,6 @@ public:
 
 class MatrixConcatNode : public Node, public Poolable<MatrixConcatNode> {
 public:
-    virtual void initNode(int dim) override {
-        init(dim);
-    }
-
     virtual void setNodeDim(int dim) override {
         setDim(dim);
     }
@@ -178,10 +174,6 @@ public:
 
     void setNodeDim(int dim) override {
         setDim(dim);
-    }
-
-    void initNode(int dim) override {
-        init(dim);
     }
 
     void setInputs(const vector<Node *> &ins) override {
@@ -329,10 +321,6 @@ public:
 
     void setNodeDim(int dim) override {
         setDim(dim);
-    }
-
-    void initNode(int dim) override {
-        init(dim);
     }
 
     void connect(Node &a, Node &b) {

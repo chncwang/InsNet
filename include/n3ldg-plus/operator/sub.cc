@@ -17,10 +17,6 @@ class SubNode : public Node, public Poolable<SubNode> {
 public:
     SubNode() : Node("sub") {}
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         setDim(dim);
     }

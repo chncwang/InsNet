@@ -13,10 +13,6 @@ public:
         setDim(dim);
     }
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void connect(Node &input1, Node &input2) {
         setInputs({&input1, &input2});
         afterConnect({&input1, &input2});

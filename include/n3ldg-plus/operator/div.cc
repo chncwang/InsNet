@@ -21,10 +21,6 @@ class FullDivNode : public Node, public Poolable<FullDivNode>  {
 public:
     FullDivNode() : Node("full_div") {}
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         setDim(dim);
     }

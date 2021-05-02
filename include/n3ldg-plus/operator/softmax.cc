@@ -12,10 +12,6 @@ class SoftmaxNode : public UniInputNode, public Poolable<SoftmaxNode> {
 public:
     SoftmaxNode() : UniInputNode("softmax") {}
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         setDim(dim);
     }
@@ -167,8 +163,7 @@ Executor *SoftmaxNode::generate() {
 
 Node* softmax(Node &input, int input_col) {
     using namespace n3ldg_plus;
-    bool pool = input_col == 1;
-    SoftmaxNode *node = SoftmaxNode::newNode(input.getDim(), pool);
+    SoftmaxNode *node = SoftmaxNode::newNode(input.getDim());
     node->setColumn(input_col);
     node->connect(input);
     return node;

@@ -12,10 +12,6 @@ class StandardLayerNormNode : public UniInputNode, public Poolable<StandardLayer
 public:
     StandardLayerNormNode() : UniInputNode("standard-layernorm") {}
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         Node::setDim(dim);
     }
@@ -242,10 +238,6 @@ class PointwiseLinearNode : public UniInputNode, public Poolable<PointwiseLinear
 public:
     PointwiseLinearNode() : UniInputNode("pointise-linear") {}
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         Node::setDim(dim);
     }
@@ -404,8 +396,7 @@ Executor *PointwiseLinearNode::generate() {
 Node *layerNormalization(LayerNormalizationParams &params, Node &input_layer,
         int col) {
     using namespace n3ldg_plus;
-    bool pool = col == 1;
-    StandardLayerNormNode *a = StandardLayerNormNode::newNode(input_layer.getDim(), pool);
+    StandardLayerNormNode *a = StandardLayerNormNode::newNode(input_layer.getDim());
     a->setColumn(col);
     a->connect(input_layer);
     PointwiseLinearNode *b = PointwiseLinearNode::newNode(input_layer.getDim());

@@ -19,10 +19,6 @@ public:
         setDim(dim);
     }
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setParam(Embedding<ParamType>& param) {
         param_ = param;
     }
@@ -87,9 +83,8 @@ private:
 template <typename ParamType>
 Node *embedding(Graph &graph, const vector<int> &ids, ParamType &lookup,
         bool should_backward = true) {
-    bool pool = ids.size() == 1;
     LookupNode<ParamType>* input_lookup =
-        LookupNode<ParamType>::newNode(lookup.outDim() * ids.size(), pool);
+        LookupNode<ParamType>::newNode(lookup.outDim() * ids.size());
     input_lookup->setShouldBackward(should_backward);
     input_lookup->setParam(lookup);
     input_lookup->connect(graph, ids);

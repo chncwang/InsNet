@@ -19,8 +19,7 @@ public:
         Node::clear();
     }
 
-    void init(int ndim) override {
-        Node::init(ndim);
+    void init(int ndim) {
         masks.resize(ndim);
         for(int idx = 0; idx < ndim; idx++) {
             masks[idx] = -1;
@@ -71,10 +70,6 @@ public:
 
     void setNodeDim(int dim) override {
         setDim(dim);
-    }
-
-    void initNode(int dim) override {
-        init(dim);
     }
 
 #if TEST_CUDA
@@ -141,10 +136,6 @@ public:
 
     void setNodeDim(int dim) override {
         setDim(dim);
-    }
-
-    void initNode(int dim) override {
-        init(dim);
     }
 
     void setMask() override {
@@ -284,10 +275,6 @@ public:
     }
 
     SumPoolNode() : Node("sum-pool") {}
-
-    void initNode(int dim) override {
-        init(dim);
-    }
 
     void setNodeDim(int dim) override {
         setDim(dim);
@@ -453,6 +440,9 @@ Node *maxPool(vector<Node *> &inputs) {
     }
 
     MaxPoolNode *pool = MaxPoolNode::newNode(dim);
+#if !USE_GPU
+    pool->init(dim);
+#endif
     pool->connect(inputs);
     return pool;
 }

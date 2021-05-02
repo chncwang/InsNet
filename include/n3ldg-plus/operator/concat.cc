@@ -14,10 +14,6 @@ class ConcatNode : public Node, public Poolable<ConcatNode> {
 public:
     ConcatNode() : Node("concat") {}
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         setDim(dim);
     }
@@ -218,7 +214,7 @@ Node *concat(BatchedNode &inputs, int col) {
     for (Node *in : inputs.batch()) {
         dim += in->getDim();
     }
-    ConcatNode *concat = ConcatNode::newNode(dim, col == 1);
+    ConcatNode *concat = ConcatNode::newNode(dim);
     concat->setColumn(col);
     concat->setInputs(inputs.batch());
     inputs.addParent(concat);

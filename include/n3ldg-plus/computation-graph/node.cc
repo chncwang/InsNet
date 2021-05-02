@@ -50,6 +50,14 @@ string Node::typeSignature() const {
     return getNodeType() + "-" + to_string(dim_) + "-";
 }
 
+void Node::setDim(int dim) {
+    if (dim <= 0) {
+        cerr << fmt::format("Node::setDim - dim:{}", dim) << endl;
+        abort();
+    }
+    dim_ = dim;
+}
+
 void Node::clear() {
     val_.ref_count_ = 1;
     batched_node_ = this;
@@ -86,14 +94,6 @@ string Node::isVectorSig() const {
 }
 
 Node::Node(const string &node_type, int dim) : NodeAbs(node_type), dim_(dim) {}
-
-void Node::init(int dim) {
-    if (dim <= 0) {
-        cerr << fmt::format("Node init - dim is less than 0:{} type:{}\n", dim, getNodeType());
-        abort();
-    }
-    dim_ = dim;
-}
 
 void Node::setInputs(const std::vector<Node*> &inputs) {
     if (!input_vals_.empty() || !input_grads_.empty() || !input_dims_.empty()) {

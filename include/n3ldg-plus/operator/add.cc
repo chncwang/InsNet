@@ -13,10 +13,6 @@ class PAddNode : public Node, public Poolable<PAddNode> {
 public:
     PAddNode() : Node("point-add") {}
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         setDim(dim);
     }

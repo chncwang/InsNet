@@ -204,11 +204,7 @@ protected:
 
     Node(const std::string &node_type, int dim = 0);
 
-    virtual void setDim(int dim) {
-        dim_ = dim;
-    }
-
-    virtual void init(int ndim);
+    virtual void setDim(int dim);
 
     virtual bool isValForwardOnly() const = 0;
 
@@ -289,12 +285,12 @@ public:
     BatchedNodeImpl() = default;
 
 protected:
-    void allocateBatch(int dim, int size, bool pool = true) {
+    void allocateBatch(int dim, int size) {
         if (!batch().empty()) {
             std::cerr << "batch not empty" << std::endl;
             abort();
         }
-        auto v = NodeType::newNodeVector(dim, size, pool);
+        auto v = NodeType::newNodeVector(dim, size);
         batch().reserve(v.size());
         for (auto *x : v) {
             x->setBatchedNode(this);
@@ -302,7 +298,7 @@ protected:
         }
     }
 
-    void allocateBatch(const std::vector<int> &dims, bool pool = true) {
+    void allocateBatch(const std::vector<int> &dims) {
         if (!batch().empty()) {
             std::cerr << "batch not empty" << std::endl;
             abort();
@@ -310,17 +306,16 @@ protected:
 
         batch().reserve(dims.size());
         for (int dim : dims) {
-            auto node = NodeType::newNode(dim, pool);
+            auto node = NodeType::newNode(dim);
             node->setBatchedNode(this);
-            node->setIsPooled(pool);
             batch().push_back(node);
         }
     }
 };
 
 
-inline std::set<std::pair<std::vector<Node *>, int> *>& globalPoolReferences() {
-    static std::set<std::pair<std::vector<Node *>, int> *> o;
+inline std::map<std::vector<Node *> *, int *> &globalPoolReferences() {
+    static std::map<std::vector<Node *> *, int *> o;
     return o;
 }
 
@@ -342,133 +337,100 @@ inline int NextTwoIntegerPowerNumber(int number) {
     return result;
 }
 
-constexpr int BIG_VECTOR_SIZE = 1024 * 16;
-
 template <typename T>
 class Poolable {
 public:
-    static std::vector<T *> newNodeVector(int key, int size, bool pool = true) {
+    static std::vector<T *> newNodeVector(int key, int size) {
         if (key <= 0) {
             std::cerr << "newNode key:" << key << std::endl;
             abort();
         }
         std::vector<T *> results(size);
-        if (!globalPoolEnabled() || (!pool && key >= BIG_VECTOR_SIZE)) {
+        if (!globalPoolEnabled()) {
             for (int i = 0; i < size; ++i) {
                 T *node = new T;
-                node->initNode(key);
+                node->setNodeDim(key);
                 node->setIsPooled(false);
                 results.at(i) = node;
             }
             return results;
         }
 
-        int original_key = key;
-        if (globalLimitedDimEnabled()) {
-            key = NextTwoIntegerPowerNumber(key);
+        if (pool_.empty()) {
+            globalPoolReferences().insert(std::make_pair(&pool_, &used_count_));
         }
 
-        auto it = pool_.find(key);
-        if (it == pool_.end()) {
-            pool_.insert(make_pair(key, make_pair(std::vector<Node *>(), 0)));
-            it = pool_.find(key);
-            globalPoolReferences().insert(&it->second);
-        }
-        auto &p = it->second;
-        std::vector<Node *> &v = p.first;
-        if (p.second > v.size()) {
+        if (used_count_ > pool_.size()) {
             abort();
-        } else if (v.size() < p.second + size) {
-            int vsize = v.size();
-            for (int i = 0; i < p.second + size - vsize; ++i) {
+        } else if (pool_.size() < used_count_ + size) {
+            int vsize = pool_.size();
+            for (int i = 0; i < used_count_ + size - vsize; ++i) {
                 T *node = new T;
-                node->initNode(key);
-                v.push_back(node);
+                pool_.push_back(node);
             }
         }
 
         std::vector<T *> nodes(size);
         nodes.reserve(size);
         for (int i = 0; i < size; ++i) {
-            T *node = dynamic_cast<T*>(v.at(p.second + i));
-            node->setNodeDim(original_key);
+            T *node = dynamic_cast<T*>(pool_.at(used_count_ + i));
+            node->setNodeDim(key);
             static_cast<Node *>(node)->clear();
             nodes.at(i) = node;
         }
 
-        p.second += size;
+        used_count_ += size;
 
         return nodes;
     }
 
-    static T *newNode(int key, bool pool = true) {
+    static T *newNode(int key) {
         if (key <= 0) {
             std::cerr << "newNode key:" << key << std::endl;
             abort();
         }
-        if (!globalPoolEnabled() || (!pool && key >= BIG_VECTOR_SIZE)) {
+        if (!globalPoolEnabled()) {
             T *node = new T;
-            node->initNode(key);
             node->setIsPooled(false);
             node->setNodeDim(key);
             node->setBatchedNode(node);
             return node;
         }
-        int original_key = key;
-        if (globalLimitedDimEnabled()) {
-            key = NextTwoIntegerPowerNumber(key);
+
+        if (pool_.empty()) {
+            globalPoolReferences().insert(std::make_pair(&pool_, &used_count_));
         }
 
-        std::map<int, std::pair<std::vector<Node *>, int>>::iterator it;
-        if (last_key_ == key) {
-            it = last_it_;
-        } else {
-            it = pool_.find(key);
-            if (it == pool_.end()) {
-                pool_.insert(make_pair(key, make_pair(std::vector<Node *>(), 0)));
-                it = pool_.find(key);
-                globalPoolReferences().insert(&it->second);
-            }
-            last_it_ = it;
-            last_key_ = key;
-        }
-        auto &p = it->second;
-        std::vector<Node *> &v = p.first;
         T *node;
-        if (p.second > v.size()) {
+        if (used_count_ > pool_.size()) {
             abort();
-        } else if (v.size() == p.second) {
+        } else if (pool_.size() == used_count_) {
             node = new T;
-            node->initNode(key);
-            node->setNodeDim(original_key);
+            node->setNodeDim(key);
             node->setBatchedNode(node);
-            v.push_back(node);
-            ++p.second;
+            pool_.push_back(node);
+            ++used_count_;
         } else {
-            node = dynamic_cast<T*>(v.at(p.second));
-            node->setNodeDim(original_key);
+            node = dynamic_cast<T*>(pool_.at(used_count_));
             node->clear();
+            node->setNodeDim(key);
             node->setBatchedNode(node);
-            ++p.second;
+            ++used_count_;
         }
         return node;
     }
 
-    virtual void initNode(int dim) = 0;
     virtual void setNodeDim(int dim) = 0;
 
 private:
-    static std::map<int, std::pair<std::vector<Node *>, int>> pool_;
-    static std::map<int, std::pair<std::vector<Node *>, int>>::iterator last_it_;
-    static int last_key_;
+    static std::vector<Node *> pool_;
+    static int used_count_;
 };
 
 template<typename T>
-std::map<int, std::pair<std::vector<Node *>, int>> Poolable<T>::pool_;
+std::vector<Node *> Poolable<T>::pool_;
 template<typename T>
-std::map<int, std::pair<std::vector<Node *>, int>>::iterator Poolable<T>::last_it_;
-template<typename T>
-int Poolable<T>::last_key_;
+int Poolable<T>::used_count_ = 0;
 
 void validateEqualNodeDims(const std::vector<Node *> &nodes);
 

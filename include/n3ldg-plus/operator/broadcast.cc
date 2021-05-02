@@ -10,10 +10,6 @@ class BroadcastNode : public UniInputNode, public Poolable<BroadcastNode> {
 public:
     BroadcastNode() : UniInputNode("broadcast") {}
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         setDim(dim);
     }

@@ -82,10 +82,6 @@ class TanhNode : public UniInputNode, public Poolable<TanhNode> {
 public:
     TanhNode() : UniInputNode("tanh") {}
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         setDim(dim);
     }
@@ -127,10 +123,6 @@ class SigmoidNode :public UniInputNode, public Poolable<SigmoidNode> {
 public:
     SigmoidNode() : UniInputNode("sigmoid") {}
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         setDim(dim);
     }
@@ -168,10 +160,6 @@ protected:
 class ReluNode :public UniInputNode, public Poolable<ReluNode> {
 public:
     ReluNode() : UniInputNode("relu") {}
-
-    void initNode(int dim) override {
-        init(dim);
-    }
 
     void setNodeDim(int dim) override {
         setDim(dim);
@@ -220,10 +208,6 @@ class SqrtNode :public UniInputNode, public Poolable<SqrtNode> {
 public:
     SqrtNode() : UniInputNode("sqrt") {}
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         setDim(dim);
     }
@@ -271,16 +255,11 @@ class DropoutNode : public UniInputNode, public Poolable<DropoutNode> {
 public:
     DropoutNode() : UniInputNode("dropout") {}
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         Node::setDim(dim);
     }
 
-    void init(int dimm) override {
-        Node::init(dimm);
+    void init(int dimm) {
 #if !USE_GPU || TEST_CUDA
         drop_mask_.init(dimm);
 #endif
@@ -347,6 +326,13 @@ public:
 
     dtype dropoutValue() const {
         return drop_value_;
+    }
+
+    void clear() override {
+#if !USE_GPU || TEST_CUDA
+        drop_mask_.releaseMemory();
+#endif
+        Node::clear();
     }
 
 protected:
@@ -495,10 +481,6 @@ class MaxScalarNode : public UniInputNode, public Poolable<MaxScalarNode> {
 public:
     MaxScalarNode() : UniInputNode("max_scalar_node") {}
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         setDim(dim);
     }
@@ -637,10 +619,6 @@ Executor *MaxScalarNode::generate() {
 class ScalarToVectorNode : public UniInputNode, public Poolable<ScalarToVectorNode> {
 public:
     ScalarToVectorNode() : UniInputNode("scalar_to_vector") {}
-
-    void initNode(int dim) override {
-        init(dim);
-    }
 
     void setNodeDim(int dim) override {
         setDim(dim);
@@ -782,10 +760,6 @@ class ExpNode : public UniInputNode, public Poolable<ExpNode> {
 public:
     ExpNode() : UniInputNode("exp") {}
 
-    void initNode(int dim) override {
-        init(dim);
-    }
-
     void setNodeDim(int dim) override {
         setDim(dim);
     }
@@ -832,10 +806,6 @@ public:
 class SumNode : public UniInputNode, public Poolable<SumNode> {
 public:
     SumNode(): UniInputNode("sum") {}
-
-    void initNode(int dim) override {
-        init(dim);
-    }
 
     void setNodeDim(int dim) override {
         setDim(dim);
@@ -961,10 +931,6 @@ class ScaledExecutor;
 class ScaledNode : public UniInputNode, public Poolable<ScaledNode> {
 public:
     ScaledNode() : UniInputNode("ScaledNode") {}
-
-    void initNode(int dim) override {
-        init(dim);
-    }
 
     void setNodeDim(int dim) override {
         setDim(dim);
