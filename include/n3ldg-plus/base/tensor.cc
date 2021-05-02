@@ -5,6 +5,7 @@
 #if USE_GPU
 #include "n3ldg-plus/cuda/n3ldg_plus_cuda.h"
 #endif
+#include <map>
 
 using std::vector;
 using std::string;

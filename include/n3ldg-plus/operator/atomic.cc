@@ -1136,6 +1136,7 @@ BatchedNode *exp(BatchedNode &input) {
 
 Node *dropout(Node &input, dtype dropout) {
     DropoutNode *node = DropoutNode::newNode(input.getDim());
+    node->init(input.getDim());
     node->setDropValue(dropout);
     node->connect(input);
     return node;
