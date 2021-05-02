@@ -211,17 +211,16 @@ void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y,
         bool useb,
         bool should_x_transpose = false,
         bool should_W_transpose = false);
-void LinearForward(std::vector<dtype *> &in_vals, int count, std::vector<int> &in_cols,
+void LinearForward(dtype **in_val_arr, int count, std::vector<int> &in_cols,
         int in_row,
         int out_row,
         dtype *W,
         dtype *bias,
-        std::vector<dtype *> &vals,
-        NumberArray &concated_in_val);
+        std::vector<dtype *> &vals);
 void LinearBackward(std::vector<dtype *> &grads, int count, std::vector<int> &cols, int in_row,
         int out_row,
         dtype *W_val,
-        dtype *concated_in_val,
+        dtype **in_val_arr,
         dtype *bias_grad,
         std::vector<dtype *> &in_grads,
         dtype *W_grad);

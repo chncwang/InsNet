@@ -103,7 +103,7 @@ protected:
     }
 
     bool isInputValForwardOnly() const override {
-        return true;
+        return false;
     }
 
     bool isValForwardOnly() const override {
@@ -171,8 +171,9 @@ public:
             n->getInputVal().copyFromDeviceToHost();
 #endif
         }
-        cuda::LinearForward(in_vals, count, cols_, inDim(), outDim(), W().val().value, 
-                b() == nullptr ? nullptr : b()->val().value, ys, concated_in_val_);
+        in_val_arr_.init(in_vals.data(), in_vals.size());
+        cuda::LinearForward(in_val_arr_.value, count, cols_, inDim(), outDim(), W().val().value, 
+                b() == nullptr ? nullptr : b()->val().value, ys);
 
 #if TEST_CUDA
         int col_offset = 0;
@@ -235,7 +236,7 @@ public:
         }
 
         cuda::LinearBackward(grads, count, cols_, inDim(), outDim(), W().val().value,
-                concated_in_val_.value, b() == nullptr ? nullptr : b()->grad().value, in_grads,
+                in_val_arr_.value, b() == nullptr ? nullptr : b()->grad().value, in_grads,
                 W().grad().value);
 #if TEST_CUDA
         Tensor2D lx, ly;
@@ -283,9 +284,9 @@ private:
     Tensor2D y_, b_;
     Tensor2D x_;
 #endif
-    cuda::NumberArray concated_in_val_;
     int col_sum_ = 0;
     vector<int> cols_;
+    cuda::NumberPointerArray in_val_arr_;
 };
 #else
 class LinearExecutor : public LinearExecutorBase {
