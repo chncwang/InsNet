@@ -1,4 +1,5 @@
 #include "n3ldg-plus/computation-graph/node.h"
+#include "n3ldg-plus/base/memory.h"
 #include <functional>
 
 using std::string;
@@ -284,8 +285,15 @@ int Executor::calculateActivations() {
 #endif
 
 void Executor::forwardFully() {
+    int size_sum = 0;
     for (Node *node : batch) {
-        node->val().init(node->getDim());
+        size_sum += node->getDim();
+    }
+    
+    auto memory_container = memoryContainer(size_sum * sizeof(dtype));
+
+    for (Node *node : batch) {
+        node->val().init(node->getDim(), memory_container);
     }
 
     forward();

@@ -27,6 +27,7 @@
 #include "n3ldg-plus/cuda/print.cuh"
 #include "n3ldg-plus/cuda/memory_pool.h"
 #include "n3ldg-plus/base/tensor.h"
+#include "n3ldg-plus/base/memory.h"
 
 using n3ldg_plus::cuda::MemoryPool;
 using std::vector;
@@ -205,6 +206,16 @@ void Tensor1D::init(int dim) {
 #endif
 }
 
+void Tensor1D::init(int dim, const shared_ptr<MemoryContainer> &container) {
+    value = static_cast<dtype*>(container->allocate(dim * sizeof(dtype)));
+    memory_container_ = container;
+    this->dim = dim;
+#if TEST_CUDA
+    v = new dtype[dim];
+    zero();
+#endif
+}
+
 void Tensor1D::initOnMemoryAndDevice(int dim) {
     initOnDevice(dim);
     v = new dtype[dim];
@@ -239,9 +250,17 @@ Tensor1D::~Tensor1D() {
 }
 
 void Tensor1D::releaseMemory() {
-    cpu::Tensor1D::releaseMemory();
+    if (v != nullptr) {
+        delete[] v;
+    }
+    ref_count_ = 0;
+
     if (value != nullptr) {
-        MemoryPool::Ins().Free(value);
+        if (memory_container_ == nullptr) {
+            MemoryPool::Ins().Free(value);
+        } else {
+            memory_container_ = nullptr;
+        }
         value = nullptr;
     }
 }

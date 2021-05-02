@@ -1,5 +1,5 @@
-#ifndef N3LDG_CUDA_MEMORY_POOL_H
-#define N3LDG_CUDA_MEMORY_POOL_H
+#ifndef N3LDG_PLUS_MEMORY_POOL_H
+#define N3LDG_PLUS_MEMORY_POOL_H
 
 #include <vector>
 #include <sstream>

@@ -28,8 +28,12 @@ void cpu::Tensor1D::init(int ndim) {
     }
     dim = ndim;
     v = new dtype[dim];
-    zero();
-    ++ref_count_;
+}
+
+void cpu::Tensor1D::init(int dimm, const std::shared_ptr<MemoryContainer> &container) {
+    dim = dimm;
+    v = static_cast<dtype *>(container->allocate(dimm * sizeof(dtype)));
+    memory_container_ = container;
 }
 
 void cpu::Tensor1D::retain() {
@@ -55,7 +59,11 @@ void cpu::Tensor1D::release() {
 
 void cpu::Tensor1D::releaseMemory() {
     if (v != nullptr) {
-        delete[] v;
+        if (memory_container_ == nullptr) {
+            delete[] v;
+        } else {
+            memory_container_ = nullptr;
+        }
         v = nullptr;
     }
     ref_count_ = 0;

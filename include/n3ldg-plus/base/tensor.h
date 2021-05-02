@@ -3,6 +3,7 @@
 
 #include "transferable.h"
 #include "n3ldg-plus/base/eigen-def.h"
+#include "n3ldg-plus/base/memory.h"
 #include "cereal/cereal.hpp"
 #include "cereal/archives/binary.hpp"
 #include "cereal/types/unordered_map.hpp"
@@ -16,12 +17,16 @@ namespace cpu {
 struct Tensor1D {
     dtype *v = nullptr;
     int dim = 0;
+    int ref_count_ = 1;
+    std::shared_ptr<MemoryContainer> memory_container_ = nullptr;
 
     Tensor1D() = default;
 
     virtual ~Tensor1D();
 
-    virtual void init(int ndim);
+    virtual void init(int dim);
+
+    virtual void init(int dim, const std::shared_ptr<MemoryContainer> &container);
 
     virtual bool isInitialized() const {
         return v != nullptr;
@@ -72,8 +77,6 @@ struct Tensor1D {
     virtual std::vector<dtype> toCpu() const;
 
     virtual void checkIsNumber() const;
-
-    int ref_count_ = 1;
 };
 
 struct Tensor2D {
@@ -144,6 +147,7 @@ struct Tensor1D : public n3ldg_plus::cpu::Tensor1D, public Transferable {
     Tensor1D(const Tensor1D &);
     Tensor1D(Tensor1D &&);
     void init(int len) override;
+    void init(int dim, const std::shared_ptr<MemoryContainer> &container) override;
     virtual bool isInitialized() const override {
         return value != nullptr;
     }
