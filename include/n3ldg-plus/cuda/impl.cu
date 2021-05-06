@@ -253,6 +253,7 @@ void Tensor1D::releaseMemory() {
     if (v != nullptr) {
         delete[] v;
     }
+    v = nullptr;
     ref_count_ = 0;
 
     if (value != nullptr) {

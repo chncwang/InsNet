@@ -88,7 +88,7 @@ public:
             for (int j = 0; j < s.getColumn(); ++j) {
                 int row = getRow();
                 dtype mean = Mat(input.v + row * j, row, 1).sum() / row;
-                Tensor1D x;
+                cpu::Tensor1D x;
                 x.init(row);
                 x.vec() = (Vec(input.v + row * j, row) - mean).square();
                 dtype sd = sqrt(x.mat().sum() / row);
