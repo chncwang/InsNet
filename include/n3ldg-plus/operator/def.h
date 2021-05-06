@@ -38,13 +38,12 @@ inline dtype dsigmoid(dtype y) {
     return (1 - y) * y;
 }
 
-inline dtype drelu(const dtype& y) {
-    if (y <= 0) return 0;
-    return 1;
-}
-
 inline dtype dexp(const dtype& x, const dtype& y) {
     return y;
+}
+
+inline dtype drelu(dtype y) {
+    return y > 0 ? 1 : 0;
 }
 
 inline dtype dlog(const dtype& x, const dtype& y) {

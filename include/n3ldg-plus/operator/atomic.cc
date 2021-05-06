@@ -170,7 +170,7 @@ public:
     }
 
     void backward() override {
-        inputGrad().vec() += grad().vec() * inputVal().vec().unaryExpr(ptr_fun(drelu));
+        inputGrad().vec() += grad().vec() * val().vec().unaryExpr(ptr_fun(drelu));
     }
 
     Executor *generate() override {
