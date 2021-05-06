@@ -2651,7 +2651,7 @@ __global__ void KernelMatrixMulMatrixBackwardForB(dtype **grads, dtype **a_vals,
     __syncthreads();
 
     for (int i = threadIdx.x; i < row; i += blockDim.x) {
-        shared_sum[i] += grads[blockIdx.x][blockIdx.y * row + i] *
+        shared_sum[threadIdx.x] += grads[blockIdx.x][blockIdx.y * row + i] *
             a_vals[blockIdx.x][blockIdx.z * row + i];
     }
     __syncthreads();
