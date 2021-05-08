@@ -12,7 +12,7 @@ class LinearParam : public TunableCombination<BaseParam>
 #endif
 {
 public:
-    LinearParam(const ::std::string &name) : b_(name + "-b", true), name_(name) {}
+    LinearParam(const ::std::string &name = "") : b_(name + "-b", true), name_(name) {}
 
     ~LinearParam();
 

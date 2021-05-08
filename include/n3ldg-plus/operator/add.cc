@@ -25,7 +25,8 @@ public:
 
         for (int i = 0; i < x.size(); i++) {
             if (x.at(i)->getDim() != getDim()) {
-                cerr << "dim does not match" << endl;
+                cerr << fmt::format("PAddNode::connect - dim does not match self dim:{} input:{}",
+                        getDim(), x.at(i)->getDim()) << endl;
                 abort();
             }
         }

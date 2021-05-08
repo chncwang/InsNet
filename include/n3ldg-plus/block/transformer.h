@@ -12,7 +12,7 @@ class AttentionHeadParams : public TunableCombination<BaseParam>
 #endif
 {
 public:
-    AttentionHeadParams(const std::string &name);
+    AttentionHeadParams(const std::string &name = "");
 
     void init(int out_dim, int in_dim);
 
@@ -52,7 +52,7 @@ class TransformerEncoderLayerParams : public TunableCombination<BaseParam>
 #endif
 {
 public:
-    TransformerEncoderLayerParams(const std::string &name);
+    TransformerEncoderLayerParams(const std::string &name = "");
 
     void init(int dim, int head_count);
 
@@ -129,7 +129,7 @@ class TransformerParams : public TunableCombination<BaseParam>
 #endif
 {
 public:
-    TransformerParams(const std::string &name) :
+    TransformerParams(const std::string &name = "") :
         positional_encoding_param_(name + "-positional_encoding_param"),
         layer_params_(name + "-layer_params") {}
 
@@ -197,7 +197,7 @@ class TransformerDecoderLayerParams : public TunableCombination<BaseParam>
 #endif
 {
 public:
-    TransformerDecoderLayerParams(const std::string &name);
+    TransformerDecoderLayerParams(const std::string &name = "");
 
     void init(int dim, int head_count);
 

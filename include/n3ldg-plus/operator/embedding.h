@@ -16,7 +16,7 @@ class Embedding : public TunableCombination<BaseParam>
 #endif
 {
 public:
-    Vocab elems;
+    Vocab vocab;
     ParamType E;
     bool bFineTune;
     int nDim;
@@ -43,9 +43,9 @@ public:
 
     void init(const Vocab &alpha, int dim, bool fineTune = true) {
         if (!inited) {
-            elems = alpha;
-            nVSize = elems.size();
-            nUNKId = elems.from_string(UNKNOWN_WORD);
+            vocab = alpha;
+            nVSize = vocab.size();
+            nUNKId = vocab.from_string(UNKNOWN_WORD);
             initWeights(dim, fineTune);
             inited = true;
         }
@@ -53,9 +53,9 @@ public:
 
     void init(const Vocab &alpha, const std::string& inFile, bool fineTune = true,
             dtype norm = -1) {
-        elems = alpha;
-        nVSize = elems.size();
-        nUNKId = elems.from_string(UNKNOWN_WORD);
+        vocab = alpha;
+        nVSize = vocab.size();
+        nUNKId = vocab.from_string(UNKNOWN_WORD);
         initWeights(inFile, fineTune, norm);
     }
 
@@ -129,8 +129,8 @@ public:
                 std::cout << "error embedding file" << std::endl;
             }
             curWord = vecInfo[0];
-            if (elems.find_string(curWord)) {
-                int wordId = elems.insert_string(curWord);
+            if (vocab.find_string(curWord)) {
+                int wordId = vocab.insert_string(curWord);
                 count++;
                 if (nUNKId == wordId) {
                     bHasUnknown = true;
@@ -192,21 +192,21 @@ public:
     }
 
     int getElemId(const std::string& strFeat) const {
-        return elems.find_string(strFeat) ? elems.from_string(strFeat) : nUNKId;
+        return vocab.find_string(strFeat) ? vocab.from_string(strFeat) : nUNKId;
     }
 
     bool findElemId(const std::string &str) const {
-        return elems.find_string(str);
+        return vocab.find_string(str);
     }
 
     template<typename Archive>
     void save(Archive &ar) const {
-        ar(bFineTune, nDim, nVSize, nUNKId, elems, E);
+        ar(bFineTune, nDim, nVSize, nUNKId, vocab, E);
     }
 
     template<typename Archive>
     void load(Archive &ar) {
-        ar(bFineTune, nDim, nVSize, nUNKId, elems);
+        ar(bFineTune, nDim, nVSize, nUNKId, vocab);
         E.init(nDim, nVSize);
         ar(E);
     }
