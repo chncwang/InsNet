@@ -98,16 +98,6 @@ void Graph::addNode(NodeAbs *x) {
     }
     ++all_nodes_count;
 
-    string x_type_hash = x->cachedTypeSig();
-    auto it = node_type_depth.find(x_type_hash);
-    if (it == node_type_depth.end()) {
-        node_type_depth.insert(pair<string, pair<int, int>>(
-                    x_type_hash, pair<int, int>(x->getDepth(), 1)));
-    } else {
-        it->second.first += x->getDepth();
-        it->second.second++;
-    }
-
     if (eager_) {
         forward();
     }
@@ -118,42 +108,26 @@ void Graph::forward() {
         if (Size(free_nodes) <= 0) {
             break;
         }
-        float min_avg_depth = 100000000;
-        vector<NodeAbs *> shallow_nodes;
-        string min_hash;
-        for (auto it : free_nodes) {
-            string type_hash = it.first;
-            auto depth_it = node_type_depth.find(type_hash);
-            if (depth_it == node_type_depth.end()) {
-                cerr << fmt::format("type not found in depth map:{}\n", type_hash);
-                abort();
-            }
-            float avg_depth = (float)depth_it->second.first / depth_it->second.second;
-            if (avg_depth < min_avg_depth) {
-                min_avg_depth = avg_depth;
-                shallow_nodes = it.second;
-                min_hash = type_hash;
-            }
-        }
         //            cout << "type:" <<min_hash << " " << shallow_nodes.size() << endl;
-        NodeAbs *first_node = shallow_nodes.front();
+        auto free_nodes_begin = free_nodes.begin();
+        NodeAbs *first_node = free_nodes_begin->second.front();
         Executor *cur_exec = first_node->generate();
         cur_exec->batch.clear();
-        cur_exec->topo_nodes = shallow_nodes;
+        cur_exec->topo_nodes = free_nodes_begin->second;
         if (first_node->isBatched()) {
-            for (NodeAbs *node : shallow_nodes) {
+            for (NodeAbs *node : free_nodes_begin->second) {
                 auto &v = node->batch();
                 for (Node *atom : v) {
                     cur_exec->batch.push_back(atom);
                 }
             }
         } else {
-            cur_exec->batch.reserve(shallow_nodes.size());
-            for (NodeAbs *node : shallow_nodes) {
+            cur_exec->batch.reserve(free_nodes_begin->second.size());
+            for (NodeAbs *node : free_nodes_begin->second) {
                 cur_exec->batch.push_back(dynamic_cast<Node *>(node));
             }
         }
-        free_nodes.erase(min_hash);
+        free_nodes.erase(free_nodes_begin->first);
 //        cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl;
 
         cur_exec->forwardFully();
@@ -194,15 +168,6 @@ void Graph::forward() {
                     Insert(parent_it, free_nodes);
                 }
             }
-        }
-
-        auto &it = node_type_depth.at(cur_exec->topo_nodes.front()->cachedTypeSig());
-        it.first -= depth_sum;
-        it.second -= cur_exec->topo_nodes.size();
-        if (it.first < 0 || it.second < 0) {
-            cerr << fmt::format("Graph compute - it first:{} second:{}", it.first,
-                    it.second);
-            abort();
         }
     }
 

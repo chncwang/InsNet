@@ -37,7 +37,6 @@ public:
 protected:
     ::std::vector<Executor *> execs;
     NodeMap free_nodes;
-    ::std::map<::std::string, ::std::pair<int, int>> node_type_depth;
     ::std::vector<NodeAbs *> finish_nodes;
 
 private:
