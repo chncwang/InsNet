@@ -28,6 +28,7 @@
 #include "n3ldg-plus/cuda/memory_pool.h"
 #include "n3ldg-plus/base/tensor.h"
 #include "n3ldg-plus/base/memory.h"
+#include "n3ldg-plus/util/profiler.h"
 
 using n3ldg_plus::cuda::MemoryPool;
 using std::vector;

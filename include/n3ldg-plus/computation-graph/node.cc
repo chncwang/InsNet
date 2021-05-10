@@ -1,5 +1,6 @@
 #include "n3ldg-plus/computation-graph/node.h"
 #include "n3ldg-plus/base/memory.h"
+#include "n3ldg-plus/util/profiler.h"
 #include <functional>
 
 using std::string;
@@ -288,6 +289,9 @@ int Executor::calculateActivations() {
 #endif
 
 void Executor::forwardFully() {
+    Profiler &profiler = Profiler::Ins();
+    profiler.BeginEvent("memory_management");
+
     int size_sum = 0;
     for (Node *node : batch) {
         size_sum += node->getDim();
@@ -298,9 +302,13 @@ void Executor::forwardFully() {
     for (Node *node : batch) {
         node->val().init(node->getDim(), memory_container);
     }
+    profiler.EndEvent();
 
+    profiler.BeginEvent(getNodeType() + "-forward");
     forward();
+    profiler.EndCudaEvent();
 
+    profiler.BeginEvent("memory_management");
     for (NodeAbs *node : topo_nodes) {
         node->setDegree(-1);
     }
@@ -311,9 +319,12 @@ void Executor::forwardFully() {
         }
         node->clearInputVals(false);
     }
+    profiler.EndEvent();
 }
 
 void Executor::backwardFully() {
+    Profiler &profiler = Profiler::Ins();
+    profiler.BeginEvent("memory_management");
     int size = 0;
     for (Node *node : batch) {
         size += node->inputSize();
@@ -337,15 +348,20 @@ void Executor::backwardFully() {
         }
     }
 
+    profiler.EndEvent();
     initAndZeroTensors(grads, dims, sigs);
 
+    profiler.BeginEvent(getNodeType() + "-backward");
     backward();
+    profiler.EndCudaEvent();
 
+    profiler.BeginEvent("memory_management");
     for (Node *node : batch) {
         node->clearVal(true);
         node->clearInputVals(true);
         node->clearGrad();
     }
+    profiler.EndEvent();
 }
 
 void Executor::backward() {

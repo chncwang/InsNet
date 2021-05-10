@@ -6,6 +6,7 @@
 #include "n3ldg-plus/cuda/n3ldg_plus_cuda.h"
 #endif
 #include <map>
+#include "n3ldg-plus/util/profiler.h"
 
 using std::vector;
 using std::string;
@@ -307,6 +308,9 @@ void initAndZeroTensors(vector<cpu::Tensor1D *> &tensors, const vector<int> &dim
         abort();
     }
 
+    Profiler &profiler = Profiler::Ins();
+    profiler.BeginEvent("memory_management");
+
     map<string, map<cpu::Tensor1D *, int>> tensor_map;
     for (int i = 0; i < tensors.size(); ++i) {
         const string &sig = signatures.at(i);
@@ -344,6 +348,9 @@ void initAndZeroTensors(vector<cpu::Tensor1D *> &tensors, const vector<int> &dim
             unique_dims.push_back(it2.second);
         }
     }
+    profiler.EndEvent();
+
+    profiler.BeginEvent("clear_grad");
 
 #if USE_GPU
     vector<dtype *> grads;
@@ -358,6 +365,7 @@ void initAndZeroTensors(vector<cpu::Tensor1D *> &tensors, const vector<int> &dim
         tensor->zero();
     }
 #endif
+    profiler.EndCudaEvent();
 }
 
 #if USE_GPU
