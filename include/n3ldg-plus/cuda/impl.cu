@@ -2180,7 +2180,8 @@ __global__ void KernelTranMatrixMulMatrixBackward(dtype **grads, dtype **in_vals
     }
 }
 
-__global__ void KernelMatMul(dtype **a, dtype **b, bool transpose_b, int count, int a_row,
+__global__ void KernelMatMul(dtype **a, bool transpose_a, dtype **b, bool transpose_b, int count,
+        int *a_rows,
         int *b_cols,
         int *ks,
         dtype **vals,
@@ -2191,6 +2192,7 @@ __global__ void KernelMatMul(dtype **a, dtype **b, bool transpose_b, int count, 
     if (b_col_i >= b_col) {
         return;
     }
+    int a_row = a_rows[count_i];
     int a_row_i = blockDim.y * blockIdx.y + threadIdx.y;
     if (a_row_i >= a_row) {
         return;
@@ -2200,7 +2202,7 @@ __global__ void KernelMatMul(dtype **a, dtype **b, bool transpose_b, int count, 
 
     dtype sum = 0;
     for (int i = 0; i < k; ++i) {
-        int a_offset = a_row * i + a_row_i;
+        int a_offset = transpose_a ? k * a_row_i + i : a_row * i + a_row_i;
         dtype av = a[count_i][a_offset];
 
         int b_offset = transpose_b ? b_col * i + b_col_i : k * b_col_i + i;
@@ -2231,9 +2233,16 @@ void TranMatrixMulMatrixBackward(vector<dtype *> &grads, vector<dtype *> &a_vals
     b_val_arr.init(b_vals.data(), count);
     a_grad_arr.init(a_grads.data(), count);
     b_grad_arr.init(b_grads.data(), count);
-    IntArray a_col_arr, b_col_arr;
+    IntArray a_col_arr, b_col_arr, row_arr;
     a_col_arr.init(a_cols.data(), count);
     b_col_arr.init(b_cols.data(), count);
+
+    vector<int> rows;
+    rows.reserve(count);
+    for (int i = 0; i < count; ++i) {
+        rows.push_back(row);
+    }
+    row_arr.init(rows.data(), count);
 
     int max_a_col = *max_element(a_cols.begin(), a_cols.end());
     int max_b_col = *max_element(b_cols.begin(), b_cols.end());
@@ -2245,15 +2254,15 @@ void TranMatrixMulMatrixBackward(vector<dtype *> &grads, vector<dtype *> &a_vals
         int block_z = (max_a_col + TPB_SQRT - 1) / TPB_SQRT;
         dim3 block_dim(count, block_y, block_z);
 
-        KernelMatMul<<<block_dim, thread_dim>>>(b_val_arr.value, grad_arr.value, true, count, row,
-                a_col_arr.value, b_col_arr.value, a_grad_arr.value, true);
+        KernelMatMul<<<block_dim, thread_dim>>>(b_val_arr.value, false, grad_arr.value, true,
+                count, row_arr.value, a_col_arr.value, b_col_arr.value, a_grad_arr.value, true);
         CheckCudaError();
     }
     {
         int block_z = (max_b_col + TPB_SQRT - 1) / TPB_SQRT;
         dim3 block_dim(count, block_y, block_z);
-        KernelMatMul<<<block_dim, thread_dim>>>(a_val_arr.value, grad_arr.value, false, count, row,
-                b_col_arr.value, a_col_arr.value, b_grad_arr.value, true);
+        KernelMatMul<<<block_dim, thread_dim>>>(a_val_arr.value, false, grad_arr.value, false,
+                count, row_arr.value, b_col_arr.value, a_col_arr.value, b_grad_arr.value, true);
 
         CheckCudaError();
     }
@@ -2301,8 +2310,16 @@ void MatrixMulMatrixForward(vector<dtype *> &a, vector<dtype *> &b, int count, v
     int block_z = (max_b_col + TPB_SQRT - 1) / TPB_SQRT;
     dim3 block_dim(count, block_y, block_z);
 
-    KernelMatMul<<<block_dim, thread_dim>>>(a_arr.value, b_arr.value, false, count, row,
-            b_col_arr.value, k_arr.value, val_arr.value, false);
+    vector<int> rows;
+    rows.reserve(count);
+    for (int i = 0; i < count; ++i) {
+        rows.push_back(row);
+    }
+    IntArray row_arr;
+    row_arr.init(rows.data(), count);
+
+    KernelMatMul<<<block_dim, thread_dim>>>(a_arr.value, false, b_arr.value, false, count,
+            row_arr.value, b_col_arr.value, k_arr.value, val_arr.value, false);
     CheckCudaError();
 }
 
@@ -2358,16 +2375,24 @@ void MatrixMulMatrixBackward(vector<dtype *> &grads, vector<dtype *> &a_vals,
     k_arr.init(ks.data(), count);
     b_col_arr.init(b_cols.data(), count);
 
+    vector<int> rows;
+    rows.reserve(count);
+    for (int i = 0; i < count; ++i) {
+        rows.push_back(row);
+    }
+    IntArray row_arr;
+    row_arr.init(rows.data(), count);
+
     int max_k = *max_element(ks.begin(), ks.end());
     int max_b_col = *max_element(b_cols.begin(), b_cols.end());
+    dim3 thread_dim(TPB_SQRT, TPB_SQRT, 1);
 
     {
-        dim3 thread_dim(TPB_SQRT, TPB_SQRT, 1);
         int block_y = (row + TPB_SQRT - 1) / TPB_SQRT;
         int block_z = (max_b_col + TPB_SQRT - 1) / TPB_SQRT;
         dim3 block_dim(count, block_y, block_z);
-        KernelMatMul<<<block_dim, thread_dim>>>(grad_arr.value, b_val_arr.value, true, count, row,
-                k_arr.value, b_col_arr.value, a_grad_arr.value, true);
+        KernelMatMul<<<block_dim, thread_dim>>>(grad_arr.value, false, b_val_arr.value, true,
+                count, row_arr.value, k_arr.value, b_col_arr.value, a_grad_arr.value, true);
 
         CheckCudaError();
     } {
