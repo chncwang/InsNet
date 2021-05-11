@@ -460,8 +460,7 @@ __device__ dtype DeviceAbs(dtype d) {
 }
 
 int DefaultBlockCount(int len) {
-    int block_count = (len - 1 + TPB) /
-        TPB;
+    int block_count = (len - 1 + TPB) / TPB;
     return min(block_count, BLOCK_COUNT);
 }
 
@@ -2180,6 +2179,38 @@ __global__ void KernelTranMatrixMulMatrixBackward(dtype **grads, dtype **in_vals
     }
 }
 
+__global__ void KernelMatMul(dtype **a, dtype **b, bool transpose_b, int count, int a_row,
+        int *b_cols,
+        int *ks,
+        dtype **vals) {
+    int count_i = blockIdx.x;
+    int b_col = b_cols[count_i];
+    int b_col_i = blockDim.x * blockIdx.z + threadIdx.x;
+    if (b_col_i >= b_col) {
+        return;
+    }
+    int a_row_i = blockDim.y * blockIdx.y + threadIdx.y;
+    if (a_row_i >= a_row) {
+        return;
+    }
+
+    int k = ks[count_i];
+
+    dtype sum = 0;
+    for (int i = 0; i < k; ++i) {
+        int a_offset = a_row * i + a_row_i;
+        dtype av = a[count_i][a_offset];
+
+        int b_offset = transpose_b ? b_col * i + b_col_i : k * b_col_i + i;
+        dtype bv = b[count_i][b_offset];
+
+        sum += av * bv;
+    }
+
+    int v_offset = a_row * b_col_i + a_row_i;
+    DeviceAtomicAdd(vals[count_i] + v_offset, sum);
+}
+
 void TranMatrixMulMatrixBackward(vector<dtype *> &grads, vector<dtype *> &a_vals,
         vector<dtype *> &b_vals,
         int count,
@@ -2201,20 +2232,24 @@ void TranMatrixMulMatrixBackward(vector<dtype *> &grads, vector<dtype *> &a_vals
     int max_a_col = *max_element(a_cols.begin(), a_cols.end());
     int max_b_col = *max_element(b_cols.begin(), b_cols.end());
 
+    int thread_count = 32;
+    dim3 thread_dim(thread_count, thread_count, 1);
+    int block_y = (row + thread_count -1) / thread_count;
+
     {
-        dim3 block_dim(count, row, max_a_col);
-        int thread_count = NextTwoIntegerPowerNumber(max_b_col);
-        KernelTranMatrixMulMatrixBackward<<<block_dim, thread_count,
-            thread_count * sizeof(dtype)>>>(grad_arr.value, b_val_arr.value, count,
-                    a_col_arr.value, b_col_arr.value, row, a_grad_arr.value, true);
+        int block_z = (max_a_col + thread_count - 1) / thread_count;
+        dim3 block_dim(count, block_y, block_z);
+
+        KernelMatMul<<<block_dim, thread_dim>>>(b_val_arr.value, grad_arr.value, true, count, row,
+                a_col_arr.value, b_col_arr.value, a_grad_arr.value);
         CheckCudaError();
     }
     {
-        dim3 block_dim(count, row, max_b_col);
-        int thread_count = NextTwoIntegerPowerNumber(max_a_col);
-        KernelTranMatrixMulMatrixBackward<<<block_dim, thread_count,
-            thread_count * sizeof(dtype)>>>(grad_arr.value, a_val_arr.value, count,
-                    b_col_arr.value, a_col_arr.value, row, b_grad_arr.value, false);
+        int block_z = (max_b_col + thread_count - 1) / thread_count;
+        dim3 block_dim(count, block_y, block_z);
+        KernelMatMul<<<block_dim, thread_dim>>>(a_val_arr.value, grad_arr.value, false, count, row,
+                b_col_arr.value, a_col_arr.value, b_grad_arr.value);
+
         CheckCudaError();
     }
 }
