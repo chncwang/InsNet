@@ -2362,14 +2362,15 @@ void MatrixMulMatrixBackward(vector<dtype *> &grads, vector<dtype *> &a_vals,
     int max_b_col = *max_element(b_cols.begin(), b_cols.end());
 
     {
-        dim3 block_dim(count, row, max_k);
-        int thread_count = NextTwoIntegerPowerNumber(max_b_col);
-        KernelTranMatrixMulMatrixBackward<<<block_dim, thread_count,
-            sizeof(dtype) * thread_count>>>(b_val_arr.value, grad_arr.value, count, k_arr.value,
-                    b_col_arr.value, row, a_grad_arr.value, true);
+        dim3 thread_dim(TPB_SQRT, TPB_SQRT, 1);
+        int block_y = (row + TPB_SQRT - 1) / TPB_SQRT;
+        int block_z = (max_b_col + TPB_SQRT - 1) / TPB_SQRT;
+        dim3 block_dim(count, block_y, block_z);
+        KernelMatMul<<<block_dim, thread_dim>>>(grad_arr.value, b_val_arr.value, true, count, row,
+                k_arr.value, b_col_arr.value, a_grad_arr.value, true);
+
         CheckCudaError();
-    }
-    {
+    } {
         dim3 block_dim(count, max_b_col, max_k);
         int thread_count = min(NextTwoIntegerPowerNumber(row), TPB);
         KernelMatrixMulMatrixBackwardForB<<<block_dim, thread_count,
