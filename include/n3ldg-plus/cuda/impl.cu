@@ -2180,8 +2180,7 @@ __global__ void KernelTranMatrixMulMatrixBackward(dtype **grads, dtype **in_vals
     }
 }
 
-__global__ void KernelMatMul(dtype **a, bool transpose_a, dtype **b, bool transpose_b, int count,
-        int *a_rows,
+__global__ void KernelMatMul(dtype **a, bool transpose_a, dtype **b, bool transpose_b, int *a_rows,
         int *b_cols,
         int *ks,
         dtype **vals,
@@ -2255,14 +2254,14 @@ void TranMatrixMulMatrixBackward(vector<dtype *> &grads, vector<dtype *> &a_vals
         dim3 block_dim(count, block_y, block_z);
 
         KernelMatMul<<<block_dim, thread_dim>>>(b_val_arr.value, false, grad_arr.value, true,
-                count, row_arr.value, a_col_arr.value, b_col_arr.value, a_grad_arr.value, true);
+                row_arr.value, a_col_arr.value, b_col_arr.value, a_grad_arr.value, true);
         CheckCudaError();
     }
     {
         int block_z = (max_b_col + TPB_SQRT - 1) / TPB_SQRT;
         dim3 block_dim(count, block_y, block_z);
         KernelMatMul<<<block_dim, thread_dim>>>(a_val_arr.value, false, grad_arr.value, false,
-                count, row_arr.value, b_col_arr.value, a_col_arr.value, b_grad_arr.value, true);
+                row_arr.value, b_col_arr.value, a_col_arr.value, b_grad_arr.value, true);
 
         CheckCudaError();
     }
@@ -2318,8 +2317,8 @@ void MatrixMulMatrixForward(vector<dtype *> &a, vector<dtype *> &b, int count, v
     IntArray row_arr;
     row_arr.init(rows.data(), count);
 
-    KernelMatMul<<<block_dim, thread_dim>>>(a_arr.value, false, b_arr.value, false, count,
-            row_arr.value, b_col_arr.value, k_arr.value, val_arr.value, false);
+    KernelMatMul<<<block_dim, thread_dim>>>(a_arr.value, false, b_arr.value, false, row_arr.value,
+            b_col_arr.value, k_arr.value, val_arr.value, false);
     CheckCudaError();
 }
 
@@ -2392,15 +2391,16 @@ void MatrixMulMatrixBackward(vector<dtype *> &grads, vector<dtype *> &a_vals,
         int block_z = (max_b_col + TPB_SQRT - 1) / TPB_SQRT;
         dim3 block_dim(count, block_y, block_z);
         KernelMatMul<<<block_dim, thread_dim>>>(grad_arr.value, false, b_val_arr.value, true,
-                count, row_arr.value, k_arr.value, b_col_arr.value, a_grad_arr.value, true);
+                row_arr.value, k_arr.value, b_col_arr.value, a_grad_arr.value, true);
 
         CheckCudaError();
     } {
-        dim3 block_dim(count, max_b_col, max_k);
-        int thread_count = min(NextTwoIntegerPowerNumber(row), TPB);
-        KernelMatrixMulMatrixBackwardForB<<<block_dim, thread_count,
-            thread_count * sizeof(dtype)>>>(grad_arr.value, a_val_arr.value, k_arr.value,
-                    b_col_arr.value, row, b_grad_arr.value);
+        int block_y = (max_k + TPB_SQRT - 1) / TPB_SQRT;
+        int block_z = (max_b_col + TPB_SQRT - 1) / TPB_SQRT;
+        dim3 block_dim(count, block_y, block_z);
+        KernelMatMul<<<block_dim, thread_dim>>>(a_val_arr.value, true, grad_arr.value, false,
+                k_arr.value, b_col_arr.value, row_arr.value, b_grad_arr.value, true);
+
         CheckCudaError();
     }
 }
