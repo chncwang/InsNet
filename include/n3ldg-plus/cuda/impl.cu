@@ -74,6 +74,7 @@ namespace cuda {
 #endif
 
 constexpr int TPB = 1024;
+constexpr int TPB_SQRT = 32;
 constexpr int BLOCK_COUNT = 56;
 
 template<typename T>
@@ -2182,7 +2183,8 @@ __global__ void KernelTranMatrixMulMatrixBackward(dtype **grads, dtype **in_vals
 __global__ void KernelMatMul(dtype **a, dtype **b, bool transpose_b, int count, int a_row,
         int *b_cols,
         int *ks,
-        dtype **vals) {
+        dtype **vals,
+        bool acc) {
     int count_i = blockIdx.x;
     int b_col = b_cols[count_i];
     int b_col_i = blockDim.x * blockIdx.z + threadIdx.x;
@@ -2208,7 +2210,11 @@ __global__ void KernelMatMul(dtype **a, dtype **b, bool transpose_b, int count, 
     }
 
     int v_offset = a_row * b_col_i + a_row_i;
-    DeviceAtomicAdd(vals[count_i] + v_offset, sum);
+    if (acc) {
+        DeviceAtomicAdd(vals[count_i] + v_offset, sum);
+    } else {
+        vals[count_i][v_offset] = sum;
+    }
 }
 
 void TranMatrixMulMatrixBackward(vector<dtype *> &grads, vector<dtype *> &a_vals,
@@ -2232,23 +2238,22 @@ void TranMatrixMulMatrixBackward(vector<dtype *> &grads, vector<dtype *> &a_vals
     int max_a_col = *max_element(a_cols.begin(), a_cols.end());
     int max_b_col = *max_element(b_cols.begin(), b_cols.end());
 
-    int thread_count = 32;
-    dim3 thread_dim(thread_count, thread_count, 1);
-    int block_y = (row + thread_count -1) / thread_count;
+    dim3 thread_dim(TPB_SQRT, TPB_SQRT, 1);
+    int block_y = (row + TPB_SQRT -1) / TPB_SQRT;
 
     {
-        int block_z = (max_a_col + thread_count - 1) / thread_count;
+        int block_z = (max_a_col + TPB_SQRT - 1) / TPB_SQRT;
         dim3 block_dim(count, block_y, block_z);
 
         KernelMatMul<<<block_dim, thread_dim>>>(b_val_arr.value, grad_arr.value, true, count, row,
-                a_col_arr.value, b_col_arr.value, a_grad_arr.value);
+                a_col_arr.value, b_col_arr.value, a_grad_arr.value, true);
         CheckCudaError();
     }
     {
-        int block_z = (max_b_col + thread_count - 1) / thread_count;
+        int block_z = (max_b_col + TPB_SQRT - 1) / TPB_SQRT;
         dim3 block_dim(count, block_y, block_z);
         KernelMatMul<<<block_dim, thread_dim>>>(a_val_arr.value, grad_arr.value, false, count, row,
-                b_col_arr.value, a_col_arr.value, b_grad_arr.value);
+                b_col_arr.value, a_col_arr.value, b_grad_arr.value, true);
 
         CheckCudaError();
     }
@@ -2290,11 +2295,14 @@ void MatrixMulMatrixForward(vector<dtype *> &a, vector<dtype *> &b, int count, v
     k_arr.init(ks.data(), count);
     b_col_arr.init(b_cols.data(), count);
     int max_b_col = *max_element(b_cols.begin(), b_cols.end());
-    dim3 block_dim(count, row, max_b_col);
     int max_k = *max_element(ks.begin(), ks.end());
-    int thread_count = NextTwoIntegerPowerNumber(max_k);
-    KernelMatrixMulMatrixForward<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(
-            a_arr.value, b_arr.value, k_arr.value, b_col_arr.value, row, val_arr.value);
+    dim3 thread_dim(TPB_SQRT, TPB_SQRT, 1);
+    int block_y = (row + TPB_SQRT -1) / TPB_SQRT;
+    int block_z = (max_b_col + TPB_SQRT - 1) / TPB_SQRT;
+    dim3 block_dim(count, block_y, block_z);
+
+    KernelMatMul<<<block_dim, thread_dim>>>(a_arr.value, b_arr.value, false, count, row,
+            b_col_arr.value, k_arr.value, val_arr.value, false);
     CheckCudaError();
 }
 
