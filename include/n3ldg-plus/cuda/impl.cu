@@ -1277,7 +1277,7 @@ bool Verify(int *host, int *device, int len, const char* message) {
     return success;
 }
 
-constexpr int MAX_BLOCK_POWER = 40;
+constexpr int MAX_BLOCK_POWER = 50;
 
 MemoryPool& MemoryPool::Ins() {
     static MemoryPool *p;
@@ -1329,6 +1329,8 @@ void MemoryPool::Malloc(void **p, int size) {
                 while (status != cudaSuccess) {
                     status = cudaMalloc(p, fit_size);
                     if (status != cudaSuccess) {
+                        cerr << fmt::format("Malloc cudaMalloc failed - status:{} fit_size:{} size:{}",
+                                status, fit_size, size) << endl;
                         abort();
                     }
                 }
@@ -1336,16 +1338,20 @@ void MemoryPool::Malloc(void **p, int size) {
                 MemoryBlock block(*p, fit_size);
                 busy_blocks_.insert(make_pair(*p, block));
             } else {
-                auto &v = free_blocks_.at(higher_power);
-                MemoryBlock &to_split = v.rbegin()->second;
-                int half_size = to_split.size >> 1;
-                void *half_address = static_cast<void*>(static_cast<char*>(to_split.p) +
-                        half_size);
-                MemoryBlock low_block(to_split.p, half_size, to_split.buddy),
-                            high_block(half_address, half_size, to_split.p);
-                v.erase(v.rbegin()->first);
-                appendFreeBlock(low_block, free_blocks_, higher_power - 1, busy_blocks_);
-                appendFreeBlock(high_block, free_blocks_, higher_power - 1, busy_blocks_);
+                while (higher_power > n) {
+                    auto &v = free_blocks_.at(higher_power);
+                    MemoryBlock &to_split = v.rbegin()->second;
+                    int half_size = to_split.size >> 1;
+                    void *half_address = static_cast<void*>(static_cast<char*>(to_split.p) +
+                            half_size);
+                    MemoryBlock low_block(to_split.p, half_size, to_split.buddy),
+                                high_block(half_address, half_size, to_split.p);
+                    v.erase(v.rbegin()->first);
+
+                    --higher_power;
+                    appendFreeBlock(low_block, free_blocks_, higher_power, busy_blocks_);
+                    appendFreeBlock(high_block, free_blocks_, higher_power, busy_blocks_);
+                }
             }
         } else {
             status = cudaSuccess;
