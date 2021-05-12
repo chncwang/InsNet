@@ -122,18 +122,12 @@ void Node::clearInputVals(bool force) {
     int end = force ? inputSize() : forwardOnlyInputValSize();
     for (int i = begin; i < end; ++i) {
         input_vals_.at(i)->release();
-        if (input_vals_.at(i)->ref_count_ == 0) {
-            cout << fmt::format("release input val {}", getNodeType()) << endl;
-        }
     }
 }
 
 void Node::clearVal(bool force) {
     if (force || isValForwardOnly()) {
         val_.release();
-        if (val_.ref_count_ == 0) {
-            cout << fmt::format("release val {}", getNodeType()) << endl;
-        }
     }
 }
 
