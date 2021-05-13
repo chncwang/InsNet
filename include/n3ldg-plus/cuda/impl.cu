@@ -3904,9 +3904,10 @@ void SoftmaxBackward(vector<dtype *> &grads, dtype **vals, int count, int *rows,
         int *cols,
         int max_col,
         int *offsets,
+        int dim_sum,
         vector<dtype *> &in_grads) {
     NumberArray a;
-    a.init(max_row * max_col * count);
+    a.init(dim_sum);
     NumberPointerArray grad_arr;
     grad_arr.init(grads.data(), count);
     int block_count = DefaultBlockCountWithoutLimit(max_col * max_row * count);

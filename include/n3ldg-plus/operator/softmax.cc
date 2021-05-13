@@ -135,7 +135,7 @@ public:
         cuda::IntArray offset_arr;
         offset_arr.init(offsets.data(), count);
         cuda::SoftmaxBackward(grads, val_arr_.value, count, row_arr_.value, max_row_,
-                col_arr_.value, max_col_, offset_arr.value, in_grads);
+                col_arr_.value, max_col_, offset_arr.value, dim_sum, in_grads);
 #if TEST_CUDA
         Executor::testBackward();
 #endif

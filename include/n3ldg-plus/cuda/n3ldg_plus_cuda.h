@@ -450,6 +450,7 @@ void SoftmaxBackward(std::vector<dtype *> &grads, dtype **vals, int count,
         int *cols,
         int max_col,
         int *offsets,
+        int dim_sum,
         std::vector<dtype *> &in_grads);
 void ScaledForward(std::vector<dtype *> &in_vals, int count, std::vector<int> &dims,
         std::vector<dtype> &factors,
