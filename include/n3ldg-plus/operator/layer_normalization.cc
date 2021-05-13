@@ -337,6 +337,8 @@ public:
     }
 
     void backward() override {
+        params().g().initAndZeroGrad();
+        params().b().initAndZeroGrad();
         int count = batch.size();
         vector<dtype *> grads(count), in_grads(count);
         int i = 0;
@@ -385,6 +387,16 @@ class PointwiseLinearExecutor : public Executor {
 public:
     int calculateFLOPs() override {
         return 0; // TODO
+    }
+
+    void backward() override {
+        params()g().initAndZeroGrad();
+        params()b().initAndZeroGrad();
+        Executor::backward();
+    }
+
+    LayerNormalizationParams &params() {
+        return *dynamic_cast<PointwiseLinearNode *>(batch.front())->params_;
     }
 };
 #endif

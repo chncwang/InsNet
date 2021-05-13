@@ -21,8 +21,6 @@ public:
 
     void init(int outDim, int inDim) override;
 
-    void clearGrad() override;
-
     int outDim() override {
         return val_.row;
     }
@@ -30,6 +28,8 @@ public:
     int inDim() override {
         return val_.col;
     }
+
+    void initAndZeroGrad() override;
 
     void adagrad(dtype alpha, dtype reg, dtype eps) override;
 
@@ -58,7 +58,7 @@ public:
 
 private:
     nr::NRVec<bool> indexers;
-    nr::NRVec<int> last_update;
+    nr::NRVec<int> last_update; // TODO historical code which should be modified to use STL instead.
 };
 
 }

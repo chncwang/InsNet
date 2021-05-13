@@ -46,7 +46,6 @@ void SparseParam::init(int outDim, int inDim) {
 #endif
     dtype bound = sqrt(6.0 / (outDim + inDim));
     val_.random(bound);
-    grad_.init(outDim, inDim);
     indexers.resize(inDim);
     indexers = false;
     last_update.resize(inDim);
@@ -56,52 +55,45 @@ void SparseParam::init(int outDim, int inDim) {
     dIters = new cuda::IntArray;
     dIndexers->init(indexers.c_buf(), indexers.size());
     dIters->init(last_update.c_buf(), last_update.size());
-    cuda::Memset(grad_.value, grad_.size, 0.0f);
     cuda::Memset(aux_square_.value, inDim * outDim, 0.0f);
     cuda::Memset(aux_mean_.value, inDim * outDim, 0.0f);
 #endif
 }
 
-void SparseParam::clearGrad() {
+void SparseParam::initAndZeroGrad() {
+    BaseParam::initAndZeroGrad();
 #if USE_GPU
-    cuda::Memset(grad_.value, grad_.size, 0.0f);
-    cuda::Memset(dIndexers->value, grad_.col, false);
+    cuda::Memset(dIndexers->value, grad_->col, false);
 #if TEST_CUDA
     int inDim = indexers.size();
     for (int index = 0; index < inDim; index++) {
         for (int idx = 0; idx < grad().row; idx++) {
-            grad_[index][idx] = 0;
+            (*grad_)[index][idx] = 0;
         }
     }
     indexers = false;
-    cuda::Assert(grad_.verify("SparseParam clearGrad"));
+    cuda::Assert(grad_->verify("SparseParam clearGrad"));
     cuda::Assert(cuda::Verify(indexers.c_buf(),
-                dIndexers->value, grad_.col, "SparseParam indexers"));
+                dIndexers->value, grad_->col, "SparseParam indexers"));
 #endif
 #else
-    int inDim = indexers.size();
-    for (int index = 0; index < inDim; index++) {
-        for (int idx = 0; idx < grad_.row; idx++) {
-            grad_[index][idx] = 0;
-        }
-    }
     indexers = false;
 #endif
 }
 
 void SparseParam::adagrad(dtype alpha, dtype reg, dtype eps) {
 #if USE_GPU
-    cuda::UpdateAdagrad(val_.value, grad_.value, indexers.size(),
-            grad_.col, aux_square_.value, dIndexers->value, alpha, reg, eps);
+    cuda::UpdateAdagrad(val_.value, grad_->value, indexers.size(),
+            grad_->col, aux_square_.value, dIndexers->value, alpha, reg, eps);
 #if TEST_CUDA
     int inDim = indexers.size();
     for (int index = 0; index < inDim; index++) {
         if (!indexers[index]) continue;
-        for (int idx = 0; idx < grad_.row; idx++) {
-            grad_[index][idx] = grad_[index][idx] + val_[index][idx] * reg;
+        for (int idx = 0; idx < grad_->row; idx++) {
+            (*grad_)[index][idx] = (*grad_)[index][idx] + val_[index][idx] * reg;
             aux_square_[index][idx] = aux_square_[index][idx] +
-                grad_[index][idx] * grad_[index][idx];
-            val_[index][idx] = val_[index][idx] - grad_[index][idx] * alpha /
+                (*grad_)[index][idx] * (*grad_)[index][idx];
+            val_[index][idx] = val_[index][idx] - (*grad_)[index][idx] * alpha /
                 sqrt(aux_square_[index][idx] + eps);
         }
     }
@@ -112,11 +104,11 @@ void SparseParam::adagrad(dtype alpha, dtype reg, dtype eps) {
     int inDim = indexers.size();
     for (int index = 0; index < inDim; index++) {
         if (!indexers[index]) continue;
-        for (int idx = 0; idx < grad_.row; idx++) {
-            grad_[index][idx] = grad_[index][idx] + val_[index][idx] * reg;
-            aux_square_[index][idx] = aux_square_[index][idx] + grad_[index][idx] *
-                grad_[index][idx];
-            val_[index][idx] = val_[index][idx] - grad_[index][idx] * alpha /
+        for (int idx = 0; idx < grad_->row; idx++) {
+            (*grad_)[index][idx] = (*grad_)[index][idx] + val_[index][idx] * reg;
+            aux_square_[index][idx] = aux_square_[index][idx] + (*grad_)[index][idx] *
+                (*grad_)[index][idx];
+            val_[index][idx] = val_[index][idx] - (*grad_)[index][idx] * alpha /
                 sqrt(aux_square_[index][idx] + eps);
         }
     }
@@ -125,19 +117,19 @@ void SparseParam::adagrad(dtype alpha, dtype reg, dtype eps) {
 
 void SparseParam::adam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) {
 #if USE_GPU
-    cuda::UpdateAdam(val_.value, grad_.value, grad_.row, indexers.size(), aux_mean_.value,
+    cuda::UpdateAdam(val_.value, grad_->value, grad_->row, indexers.size(), aux_mean_.value,
             aux_square_.value, dIndexers->value, dIters->value, belta1, belta2, alpha, reg, eps);
 #if TEST_CUDA
     dtype lr_t;
     int inDim = indexers.size();
     for (int index = 0; index < inDim; index++) {
         if (!indexers[index]) continue;
-        for (int idx = 0; idx < grad_.row; idx++) {
-            grad_[index][idx] = grad_[index][idx] + val_[index][idx] * reg;
+        for (int idx = 0; idx < grad_->row; idx++) {
+            (*grad_)[index][idx] = (*grad_)[index][idx] + val_[index][idx] * reg;
             aux_mean_[index][idx] = belta1 * aux_mean_[index][idx] +
-                (1 - belta1) * grad_[index][idx];
+                (1 - belta1) * (*grad_)[index][idx];
             aux_square_[index][idx] = belta2 * aux_square_[index][idx] +
-                (1 - belta2) * grad_[index][idx] * grad_[index][idx];
+                (1 - belta2) * (*grad_)[index][idx] * (*grad_)[index][idx];
             lr_t = alpha * sqrt(1 - pow(belta2, last_update[index] + 1)) /
                 (1 - pow(belta1, last_update[index] + 1));
             val_[index][idx] = val_[index][idx] - aux_mean_[index][idx] * lr_t /
@@ -153,12 +145,12 @@ void SparseParam::adam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype
     int inDim = indexers.size();
     for (int index = 0; index < inDim; index++) {
         if (!indexers[index]) continue;
-        for (int idx = 0; idx < grad_.row; idx++) {
-            grad_[index][idx] = grad_[index][idx] + val_[index][idx] * reg;
+        for (int idx = 0; idx < grad_->row; idx++) {
+            (*grad_)[index][idx] = (*grad_)[index][idx] + val_[index][idx] * reg;
             aux_mean_[index][idx] = belta1 * aux_mean_[index][idx] + (1 - belta1) *
-                grad_[index][idx];
+                (*grad_)[index][idx];
             aux_square_[index][idx] = belta2 * aux_square_[index][idx] + (1 - belta2) *
-                grad_[index][idx] * grad_[index][idx];
+                (*grad_)[index][idx] * (*grad_)[index][idx];
             lr_t = alpha * sqrt(1 - pow(belta2, last_update[index] + 1)) /
                 (1 - pow(belta1, last_update[index] + 1));
             val_[index][idx] = val_[index][idx] - aux_mean_[index][idx] * lr_t /
@@ -190,25 +182,25 @@ void SparseParam::randpoint(int& idx, int &idy) {
 
 dtype SparseParam::gradSquareSum() {
 #if USE_GPU && !TEST_CUDA
-    dtype result = cuda::SquareSum(grad_.value, dIndexers->value,
+    dtype result = cuda::SquareSum(grad_->value, dIndexers->value,
             indexers.size(), val_.row);
     return result;
 #elif USE_GPU && TEST_CUDA
-    grad_.copyFromDeviceToHost();
+    grad_->copyFromDeviceToHost();
     dtype sumNorm = 0.0;
     int inDim = indexers.size();
     for (int index = 0; index < inDim; index++) {
         if (!indexers[index]) continue;
         for (int idx = 0; idx < val_.row; idx++) {
-            sumNorm += grad_[index][idx] * grad_[index][idx];
+            sumNorm += (*grad_)[index][idx] * (*grad_)[index][idx];
         }
     }
 
 
     cuda::Assert(cuda::Verify(indexers.c_buf(), dIndexers->value, indexers.size(),
                 "sparse squareGradNorm"));
-    cuda::Assert(grad_.verify("squareGradNorm grad"));
-    dtype cuda = cuda::SquareSum(grad_.value, dIndexers->value, inDim, val_.row);
+    cuda::Assert(grad_->verify("squareGradNorm grad"));
+    dtype cuda = cuda::SquareSum(grad_->value, dIndexers->value, inDim, val_.row);
     cuda::Assert(n3ldg_plus::isEqual(cuda, sumNorm));
 
     return sumNorm;
@@ -218,7 +210,7 @@ dtype SparseParam::gradSquareSum() {
     for (int index = 0; index < inDim; index++) {
         if (!indexers[index]) continue;
         for (int idx = 0; idx < val_.row; idx++) {
-            sumNorm += grad_[index][idx] * grad_[index][idx];
+            sumNorm += (*grad_)[index][idx] * (*grad_)[index][idx];
         }
     }
 
@@ -228,22 +220,22 @@ dtype SparseParam::gradSquareSum() {
 
 void SparseParam::rescaleGrad(dtype scale) {
 #if USE_GPU
-    cuda::Rescale(grad_.value, grad_.size, scale);
+    cuda::Rescale(grad_->value, grad_->size, scale);
 #if TEST_CUDA
     int inDim = indexers.size();
     for (int index = 0; index < inDim; index++) {
         for (int idx = 0; idx < val_.row; idx++) {
-            grad_[index][idx] = grad_[index][idx] * scale;
+            (*grad_)[index][idx] = (*grad_)[index][idx] * scale;
         }
     }
-    cuda::Assert(grad_.verify("SparseParam rescaleGrad"));
+    cuda::Assert(grad_->verify("SparseParam rescaleGrad"));
 #endif
 #else
     int inDim = indexers.size();
     for (int index = 0; index < inDim; index++) {
         if (!indexers[index]) continue;
         for (int idx = 0; idx < val_.row; idx++) {
-            grad_[index][idx] = grad_[index][idx] * scale;
+            (*grad_)[index][idx] = (*grad_)[index][idx] * scale;
         }
     }
 #endif
