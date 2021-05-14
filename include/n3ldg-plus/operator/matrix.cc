@@ -288,11 +288,24 @@ public:
             a_grads.push_back(m.input_grads_.at(0)->value);
             b_grads.push_back(m.input_grads_.at(1)->value);
         }
-
+#if TEST_CUDA
+        cout << "testing matmul backward input" << endl;
+        testBeforeBackward();
+#endif
         cuda::MatrixMulMatrixBackward(grads, a_vals_, b_vals_, count, ks_, b_cols_, row_,
                 a_grads, b_grads);
 
 #if TEST_CUDA
+        cout << "testing matmul backward" << endl;
+        int i = 0;
+        for (Node *node: batch) {
+            MatrixMulMatrixNode &m = dynamic_cast<MatrixMulMatrixNode&>(*node);
+            int a_dim = m.input_vals_.at(0)->dim;
+            int b_dim = m.input_vals_.at(1)->dim;
+            int k = m.k_;
+            cout << fmt::format("i:{} a_row:{} b_col:{} k:{}", i, a_dim / k, b_dim / k, k) << endl;
+            ++i;
+        }
         testBackward();
 #endif
     }

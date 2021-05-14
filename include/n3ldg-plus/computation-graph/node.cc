@@ -418,17 +418,20 @@ void Executor::testForwardInpputs() {
 }
 
 void Executor::verifyBackward() {
+    int j = 0;
     for (NodeAbs *node : batch) {
         Node *x = dynamic_cast<Node *>(node);
         int i = 0;
         for (Tensor1D *input_grad : x->input_grads_) {
             if (!input_grad->verify((getNodeType() + " backward " + to_string(i++)).c_str())) {
+                cout << fmt::format("{}th node dim:{}", j, node->getDim()) << endl;
                 cout << "cpu:" << endl << input_grad->toString() << endl;;
                 cerr << "gpu:" << endl;
                 input_grad->print();
                 abort();
             }
         }
+        ++j;
     }
 }
 

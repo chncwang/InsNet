@@ -1318,6 +1318,7 @@ void MemoryPool::Malloc(void **p, int size) {
         fit_size <<= 1;
         ++n;
     }
+    Profiler &profiler = Profiler::Ins();
     cudaError_t status = cudaErrorMemoryAllocation;
     while (status != cudaSuccess) {
         if (free_blocks_.at(n).empty()) {
@@ -1338,6 +1339,7 @@ void MemoryPool::Malloc(void **p, int size) {
                 MemoryBlock block(*p, fit_size);
                 busy_blocks_.insert(make_pair(*p, block));
             } else {
+                profiler.BeginEvent("split_memory_block");
                 while (higher_power > n) {
                     auto &v = free_blocks_.at(higher_power);
                     MemoryBlock &to_split = v.rbegin()->second;
@@ -1352,6 +1354,7 @@ void MemoryPool::Malloc(void **p, int size) {
                     appendFreeBlock(low_block, free_blocks_, higher_power, busy_blocks_);
                     appendFreeBlock(high_block, free_blocks_, higher_power, busy_blocks_);
                 }
+                profiler.EndEvent();
             }
         } else {
             status = cudaSuccess;
@@ -1415,6 +1418,8 @@ MemoryBlock mergeBlocks(MemoryBlock &a, MemoryBlock &b) {
 void returnFreeBlock(MemoryBlock &block, vector<map<void*, MemoryBlock>> &free_blocks,
         int power,
         unordered_map<void*, MemoryBlock> &busy_blocks) {
+    Profiler &profiler = Profiler::Ins();
+    profiler.BeginEvent("return_free_block");
     MemoryBlock current_block = block;
     for (int i = power; i <= MAX_BLOCK_POWER; ++i) {
         map<void*, MemoryBlock> &v = free_blocks.at(i);
@@ -1431,6 +1436,7 @@ void returnFreeBlock(MemoryBlock &block, vector<map<void*, MemoryBlock>> &free_b
             v.erase(it);
         }
     }
+    profiler.EndEvent();
 }
 
 void MemoryPool::Free(void *p) {
@@ -2289,7 +2295,7 @@ void MatrixMulMatrixBackward(vector<dtype *> &grads, vector<dtype *> &a_vals,
 
     {
         int block_y = (row + TPB_SQRT - 1) / TPB_SQRT;
-        int block_z = (max_b_col + TPB_SQRT - 1) / TPB_SQRT;
+        int block_z = (max_k + TPB_SQRT - 1) / TPB_SQRT;
         dim3 block_dim(count, block_y, block_z);
         KernelMatMul<<<block_dim, thread_dim>>>(grad_arr.value, false, b_val_arr.value, true,
                 row_arr.value, k_arr.value, b_col_arr.value, a_grad_arr.value, true);

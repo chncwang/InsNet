@@ -83,7 +83,7 @@ void cpu::Tensor1D::zero() {
 string cpu::Tensor1D::toString() const {
     string result = fmt::format("dim:{} ", dim);
     for (int i = 0; i < dim; ++i) {
-        result += to_string(v[i]) + " ";
+        result += to_string(v[i]) + "\n";
     }
     return result;
 }

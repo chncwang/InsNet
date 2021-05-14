@@ -15,6 +15,7 @@ template <typename T>
 class Tunable {
 public:
     virtual std::vector<T *> tunableParams() = 0;
+    virtual ~Tunable() = default;
 };
 
 template <typename T>
@@ -23,6 +24,8 @@ public:
     std::vector<T *> tunableParams() override {
         return {static_cast<T*>(this)};
     }
+
+    virtual ~TunableAtom() = default;
 };
 
 template <typename T>
@@ -43,6 +46,8 @@ public:
         return *tunable_list_;
     }
 
+    virtual ~TunableCombination() = default;
+
 protected:
     virtual std::vector<Tunable<T> *> tunableComponents() = 0;
 
@@ -59,6 +64,8 @@ public:
     BaseParam(const std::string &name, bool is_bias = false) : is_bias_(is_bias), name_(name) {}
 
     BaseParam(bool is_bias = false) : is_bias_(is_bias) {}
+
+    virtual ~BaseParam() = default;
 
     bool isBias() const {
         return is_bias_;
