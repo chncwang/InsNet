@@ -52,7 +52,7 @@ public:
     Executor *generate() override;
 
     string typeSignature() const override {
-        return Node::getNodeType() + "-" + to_string(input_vals_.size());
+        return Node::getNodeType() + "-" + to_string(inputSize());
     }
 
     virtual bool isValForwardOnly() const override {
@@ -99,6 +99,7 @@ public:
                 ins.push_back(padd->input_vals_.at(i)->value);
 #if TEST_CUDA
                 cuda::Assert(padd->input_vals_.at(i)->verify("PAdd forward input"));
+                padd->val().copyFromHostToDevice();
 #endif
             }
         }
@@ -117,6 +118,7 @@ public:
         max_dim_ = *max_element(dims_.begin(), dims_.end());
         cuda::PAddForward(in_vals, count, dims_, max_dim_, inCount(), outs, dim_arr_);
 #if TEST_CUDA
+        cout << fmt::format("count:{} incount:{} max_dim:{}", count, inCount(), max_dim_) << endl;
         testForward();
 #endif
     }

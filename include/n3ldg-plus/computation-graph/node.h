@@ -48,11 +48,11 @@ public:
     virtual std::string typeSignature() const = 0;
     virtual int getDim() const = 0;
 
-    virtual std::string getNodeType() const {
+    virtual const std::string &getNodeType() const {
         return node_type_;
     }
 
-    std::string cachedTypeSig() const;
+    const std::string &cachedTypeSig() const;
 
     virtual void clear();
 
@@ -141,6 +141,10 @@ public:
         return dim_;
     }
 
+    int getId() const {
+        return id_;
+    }
+
     virtual void clear() override;
 
     Node (const Node &) = delete;
@@ -197,6 +201,18 @@ public:
         return input_dims_.size();
     }
 
+    std::vector<Tensor1D *> &inputVals() {
+        return input_vals_;
+    }
+
+    const std::vector<const std::string *> &inputTypes() const {
+        return input_types_;
+    }
+
+    const std::vector<int> &inputIds() const {
+        return input_ids_;
+    }
+
 protected:
     void afterConnect(const std::vector<Node*> &ins);
 
@@ -213,6 +229,8 @@ protected:
     std::vector<Tensor1D *> input_vals_;
     std::vector<Tensor1D *> input_grads_;
     std::vector<int> input_dims_;
+    std::vector<const std::string *> input_types_;
+    std::vector<int> input_ids_;
 
 private:
     Tensor1D val_;
@@ -221,6 +239,7 @@ private:
     int column_ = 1;
     NodeAbs *batched_node_;
     bool is_pooled_ = true;
+    int id_ = 0;
 
     friend class Executor;
 };
@@ -253,7 +272,7 @@ public:
 
     std::string shape() const;
 
-    virtual std::string getNodeType() const override;
+    virtual const std::string &getNodeType() const override;
 
     std::vector<Node *> &batch() override {
         return batch_;
@@ -277,6 +296,7 @@ protected:
 private:
     std::vector<Node *> batch_;
     mutable std::vector<int> *dims_ = nullptr;
+    mutable std::string node_type_;
 };
 
 template<typename NodeType>
@@ -506,7 +526,7 @@ public:
         return node.getDim() / node.getColumn();
     }
 
-    std::string getNodeType() const {
+    const std::string &getNodeType() const {
         return batch.front()->getNodeType();
     }
 

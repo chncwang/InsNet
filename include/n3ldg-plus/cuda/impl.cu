@@ -74,7 +74,7 @@ namespace cuda {
 #endif
 
 constexpr int TPB = 1024;
-constexpr int TPB_SQRT = 32;
+constexpr int TPB_SQRT = 8;
 constexpr int BLOCK_COUNT = 56;
 
 template<typename T>
@@ -1169,7 +1169,7 @@ __global__ void KernelVerify(dtype *host, dtype *device, int len, dtype abs_avg,
             continue; // Ignore INF values that are both postitive or negtative.
         }
         if (DeviceAbs(loss) > 1e-3 * abs_avg && DeviceAbs(loss) > 1e-2 * DeviceAbs(host[i]) &&
-                (DeviceAbs(host[i]) > 1e-6)) {
+                ((DeviceAbs(host[i]) > 1e-6) || (DeviceAbs(device[i]) > 1e-6))) {
             *success = false;
             KernelPrintLine("KernelVerify: host:%.9f device:%.9f abs(loss):%.9f", host[i],
                     device[i], DeviceAbs(loss));
@@ -1305,9 +1305,9 @@ void MemoryPool::Malloc(void **p, int size) {
         cerr << "MemoryPool Malloc p is not nullptr.\n";
         abort();
     }
-#if DEVICE_MEMORY == 1
+#if DEVICE_MEMORY
     cudaError_t r = cudaMalloc(p, size);
-    if (r == cudaSuccess) {
+    if (r != cudaSuccess) {
         cerr << format("MemoryPool Malloc cudaMalloc failed status:{}\n", r);
         abort();
     }
@@ -1440,7 +1440,7 @@ void returnFreeBlock(MemoryBlock &block, vector<map<void*, MemoryBlock>> &free_b
 }
 
 void MemoryPool::Free(void *p) {
-#if DEVICE_MEMORY == 1
+#if DEVICE_MEMORY
     cudaError_t r = cudaFree(p);
     if (r != cudaSuccess) {
         cerr << format("MemoryPool::Free error status:{}\n", r);

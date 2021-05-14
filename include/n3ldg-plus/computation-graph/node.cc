@@ -25,7 +25,7 @@ string addressToString(const void* p) {
     return ss.str();
 }
 
-string NodeAbs::cachedTypeSig() const {
+const string &NodeAbs::cachedTypeSig() const {
     if (type_sig_.empty()) {
         type_sig_ = typeSignature();
     }
@@ -95,7 +95,10 @@ string Node::isVectorSig() const {
     return column_ == 1 ? "-vector-" : "-matrix-";
 }
 
-Node::Node(const string &node_type, int dim) : NodeAbs(node_type), dim_(dim) {}
+Node::Node(const string &node_type, int dim) : NodeAbs(node_type), dim_(dim) {
+    static int id;
+    id_ = id++;
+}
 
 void Node::setInputs(const std::vector<Node*> &inputs) {
     if (!input_vals_.empty() || !input_grads_.empty() || !input_dims_.empty()) {
@@ -108,12 +111,16 @@ void Node::setInputs(const std::vector<Node*> &inputs) {
     input_vals_.reserve(size);
     input_grads_.reserve(size);
     input_dims_.reserve(size);
+    input_types_.reserve(size);
+    input_ids_.reserve(size);
 
     for (Node *input : inputs) {
         input->val_.retain();
         input_vals_.push_back(&input->val_);
         input_grads_.push_back(&input->grad_);
         input_dims_.push_back(input->dim_);
+        input_types_.push_back(&input->getNodeType());
+        input_ids_.push_back(input->getId());
     }
 }
 
@@ -171,8 +178,11 @@ string BatchedNode::shape() const {
     }
 }
 
-string BatchedNode::getNodeType() const {
-    return "Batched-" + batch_.front()->getNodeType();
+const string &BatchedNode::getNodeType() const {
+    if (node_type_.empty()) {
+        node_type_ = "Batched-" + batch_.front()->getNodeType();
+    }
+    return node_type_;
 }
 
 const vector<int> &BatchedNode::getDims() const {
@@ -397,6 +407,7 @@ void Executor::verifyForward() {
     int i = 0;
     for (NodeAbs *node : batch) {
         Node *x = dynamic_cast<Node *>(node);
+        cout << fmt::format("i:{} dim:{}", i, node->getDim()) << endl;
         if(!x->getVal().verify((getNodeType() + " forward").c_str())) {
             cout << "cpu:" << endl;
             cout << x->getVal().toString();
