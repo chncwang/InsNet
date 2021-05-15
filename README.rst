@@ -38,8 +38,6 @@ N3LDG++ uses Apache 2.0 license allowing you to use it in any project. But if yo
   publisher={Acta Scientiarum Naturalium Universitatis Pekinenis}
   }
 
-  InsNet
-
 Due to incorrect Git operations, the very early history of N3LDG++ is missed, but you can check it in another `repo <https://github.com/chncwang/N3LDG>`_.
 
 If you have any question about N3LDG++, feel free to send me an email: chncwang@gmail.com
