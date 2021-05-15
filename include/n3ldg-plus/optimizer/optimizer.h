@@ -10,7 +10,9 @@ public:
     Optimizer(const std::vector<BaseParam *> &params, dtype learning_rate) : params_(params),
     lr_(learning_rate) {}
 
-    virtual void step() = 0;
+    virtual void optimize() = 0;
+
+    void step();
 
     void step(dtype clip_value) {
         clipGrad(clip_value);
@@ -24,8 +26,6 @@ public:
     dtype getLearningRate() const {
         return lr_;
     }
-
-    void zeroGrad();
 
 protected:
     std::vector<BaseParam *> params_;

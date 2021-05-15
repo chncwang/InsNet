@@ -1,5 +1,6 @@
 #include "n3ldg-plus/computation-graph/node.h"
 #include "n3ldg-plus/base/memory.h"
+#include "n3ldg-plus/util/profiler.h"
 #include <functional>
 
 using std::string;
@@ -24,7 +25,7 @@ string addressToString(const void* p) {
     return ss.str();
 }
 
-string NodeAbs::cachedTypeSig() const {
+const string &NodeAbs::cachedTypeSig() const {
     if (type_sig_.empty()) {
         type_sig_ = typeSignature();
     }
@@ -94,7 +95,10 @@ string Node::isVectorSig() const {
     return column_ == 1 ? "-vector-" : "-matrix-";
 }
 
-Node::Node(const string &node_type, int dim) : NodeAbs(node_type), dim_(dim) {}
+Node::Node(const string &node_type, int dim) : NodeAbs(node_type), dim_(dim) {
+    static int id;
+    id_ = id++;
+}
 
 void Node::setInputs(const std::vector<Node*> &inputs) {
     if (!input_vals_.empty() || !input_grads_.empty() || !input_dims_.empty()) {
@@ -107,12 +111,16 @@ void Node::setInputs(const std::vector<Node*> &inputs) {
     input_vals_.reserve(size);
     input_grads_.reserve(size);
     input_dims_.reserve(size);
+    input_types_.reserve(size);
+    input_ids_.reserve(size);
 
     for (Node *input : inputs) {
         input->val_.retain();
         input_vals_.push_back(&input->val_);
         input_grads_.push_back(&input->grad_);
         input_dims_.push_back(input->dim_);
+        input_types_.push_back(&input->getNodeType());
+        input_ids_.push_back(input->getId());
     }
 }
 
@@ -170,8 +178,11 @@ string BatchedNode::shape() const {
     }
 }
 
-string BatchedNode::getNodeType() const {
-    return "Batched-" + batch_.front()->getNodeType();
+const string &BatchedNode::getNodeType() const {
+    if (node_type_.empty()) {
+        node_type_ = "Batched-" + batch_.front()->getNodeType();
+    }
+    return node_type_;
 }
 
 const vector<int> &BatchedNode::getDims() const {
@@ -288,6 +299,9 @@ int Executor::calculateActivations() {
 #endif
 
 void Executor::forwardFully() {
+    Profiler &profiler = Profiler::Ins();
+    profiler.BeginEvent("memory_management");
+
     int size_sum = 0;
     for (Node *node : batch) {
         size_sum += node->getDim();
@@ -298,9 +312,13 @@ void Executor::forwardFully() {
     for (Node *node : batch) {
         node->val().init(node->getDim(), memory_container);
     }
+    profiler.EndEvent();
 
+    profiler.BeginEvent(getNodeType() + "-forward");
     forward();
+    profiler.EndCudaEvent();
 
+    profiler.BeginEvent("memory_management");
     for (NodeAbs *node : topo_nodes) {
         node->setDegree(-1);
     }
@@ -311,9 +329,12 @@ void Executor::forwardFully() {
         }
         node->clearInputVals(false);
     }
+    profiler.EndEvent();
 }
 
 void Executor::backwardFully() {
+    Profiler &profiler = Profiler::Ins();
+    profiler.BeginEvent("memory_management");
     int size = 0;
     for (Node *node : batch) {
         size += node->inputSize();
@@ -337,15 +358,20 @@ void Executor::backwardFully() {
         }
     }
 
+    profiler.EndEvent();
     initAndZeroTensors(grads, dims, sigs);
 
+    profiler.BeginEvent(getNodeType() + "-backward");
     backward();
+    profiler.EndCudaEvent();
 
+    profiler.BeginEvent("memory_management");
     for (Node *node : batch) {
         node->clearVal(true);
         node->clearInputVals(true);
         node->clearGrad();
     }
+    profiler.EndEvent();
 }
 
 void Executor::backward() {
@@ -381,6 +407,7 @@ void Executor::verifyForward() {
     int i = 0;
     for (NodeAbs *node : batch) {
         Node *x = dynamic_cast<Node *>(node);
+        cout << fmt::format("i:{} dim:{}", i, node->getDim()) << endl;
         if(!x->getVal().verify((getNodeType() + " forward").c_str())) {
             cout << "cpu:" << endl;
             cout << x->getVal().toString();
@@ -402,17 +429,20 @@ void Executor::testForwardInpputs() {
 }
 
 void Executor::verifyBackward() {
+    int j = 0;
     for (NodeAbs *node : batch) {
         Node *x = dynamic_cast<Node *>(node);
         int i = 0;
         for (Tensor1D *input_grad : x->input_grads_) {
             if (!input_grad->verify((getNodeType() + " backward " + to_string(i++)).c_str())) {
+                cout << fmt::format("{}th node dim:{}", j, node->getDim()) << endl;
                 cout << "cpu:" << endl << input_grad->toString() << endl;;
                 cerr << "gpu:" << endl;
                 input_grad->print();
                 abort();
             }
         }
+        ++j;
     }
 }
 

@@ -422,15 +422,32 @@ public:
             for (int i = 0; i < count; ++i) {
                 for (int j = 0; j < batch.at(i)->getDim(); ++j) {
                     dtype v = drop_mask[offset + j];
-                    dynamic_cast<DropoutNode*>(batch.at(i))->dropMask()[j] = v <= dropoutValue() ?
+                    dynamic_cast<DropoutNode*>(batch.at(i))->dropMask()[j] = v < dropoutValue() ?
                         0 : 1;
                 }
                 offset += batch.at(i)->getDim();
             }
         }
-        for (int idx = 0; idx < count; idx++) {
-            batch[idx]->compute();
-            cuda::Assert(batch.at(idx)->val().verify("Dropout forward"));
+        Executor::forward();
+
+        i = 0;
+        int offset = 0;
+        for (NodeAbs *node : batch) {
+            Node *x = dynamic_cast<Node *>(node);
+            cout << fmt::format("i:{} dim:{}", i, node->getDim()) << endl;
+            if(!x->getVal().verify((getNodeType() + " forward").c_str())) {
+                cout << "cpu:" << endl;
+                cout << x->getVal().toString();
+                cout << "gpu:" << endl;
+                x->getVal().print();
+                cout << "dropout mask:" << endl;
+                for (int j = 0; j < node->getDim(); ++j) {
+                    cout << j << " " << drop_mask[offset + j] << endl;
+                }
+                throw cuda::CudaVerificationException(i);
+            }
+            offset += node->getDim();
+            ++i;
         }
 #endif
     }

@@ -44,8 +44,6 @@ public:
         return val_.col;
     }
 
-    void clearGrad() override;
-
     void adagrad(dtype alpha, dtype reg, dtype eps) override;
 
     void adam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override;

@@ -190,6 +190,8 @@ public:
             return;
         }
 
+        param().initAndZeroGrad();
+
         int count = batch.size();
         vector<dtype*> grads;
         grads.reserve(count);
@@ -242,6 +244,15 @@ public:
 
     int calculateActivations() override {
         return 0;
+    }
+
+    void backward() override {
+        param().initAndZeroGrad();
+        Executor::backward();
+    }
+
+    ParamType &param() {
+        return *dynamic_cast<LookupNode<ParamType> &>(*batch.front()).param_;
     }
 };
 #endif

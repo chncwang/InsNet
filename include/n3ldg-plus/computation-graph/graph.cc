@@ -1,4 +1,5 @@
 #include "n3ldg-plus/computation-graph/graph.h"
+#include "n3ldg-plus/util/profiler.h"
 
 using std::map;
 using std::pair;
@@ -40,6 +41,9 @@ Graph::Graph(ModelStage stage, bool eager, bool calculate_flops, bool calculate_
     calculate_activations_(calculate_activations) {}
 
 Graph::~Graph() {
+    Profiler &profiler = Profiler::Ins();
+    profiler.BeginEvent("graph_destructor");
+
     int count = execs.size();
     for (int idx = 0; idx < count; idx++) {
         delete execs.at(idx);
@@ -78,6 +82,7 @@ Graph::~Graph() {
             }
         }
     }
+    profiler.EndEvent();
 }
 
 void Graph::backward() {
@@ -105,10 +110,12 @@ void Graph::addNode(NodeAbs *x) {
 
 void Graph::forward() {
     while (true) {
+        Profiler &profiler = Profiler::Ins();
+        profiler.BeginEvent("dynamic_batching");
         if (Size(free_nodes) <= 0) {
+            profiler.EndEvent();
             break;
         }
-        //            cout << "type:" <<min_hash << " " << shallow_nodes.size() << endl;
         auto free_nodes_begin = free_nodes.begin();
         NodeAbs *first_node = free_nodes_begin->second.front();
         Executor *cur_exec = first_node->generate();
@@ -128,9 +135,10 @@ void Graph::forward() {
             }
         }
         free_nodes.erase(free_nodes_begin->first);
-//        cout << "type:" << cur_exec->getSignature() << " " << cur_exec->batch.size() << endl;
 
+        profiler.EndEvent();
         cur_exec->forwardFully();
+        profiler.BeginEvent("dynamic_batching");
         if (eager_) {
             for (Node *node : cur_exec->batch) {
                 node->getVal().checkIsNumber();
@@ -169,6 +177,7 @@ void Graph::forward() {
                 }
             }
         }
+        profiler.EndEvent();
     }
 
     if (finish_nodes.size() != all_nodes_count) {

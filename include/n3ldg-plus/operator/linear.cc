@@ -207,6 +207,10 @@ public:
     }
 
     void backward() {
+        W().initAndZeroGrad();
+        if (b() != nullptr) {
+                b()->initAndZeroGrad();
+        }
         int count = batch.size();
 #if TEST_CUDA
         if (b() != nullptr) {
@@ -338,6 +342,11 @@ public:
     }
 
     void backward() override {
+        W().initAndZeroGrad();
+        if (b() != nullptr) {
+                b()->initAndZeroGrad();
+        }
+
         Tensor2D lx, ly;
         int count = batch.size();
         lx.init(inDim(), col_sum_);

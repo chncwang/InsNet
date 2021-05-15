@@ -12,7 +12,7 @@ public:
         Optimizer(params, learning_rate), beta1_(beta1), beta2_(beta2), eps_(eps),
         l2_penalty_(l2_penalty) {}
 
-    void step() override;
+    void optimize() override;
 
 private:
     dtype beta1_, beta2_, eps_, l2_penalty_;

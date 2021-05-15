@@ -2,6 +2,14 @@
 
 namespace n3ldg_plus {
 
+void Optimizer::step() {
+    optimize();
+
+    for (BaseParam *p : params_) {
+        p->releaseGrad();
+    }
+}
+
 void Optimizer::clipGrad(dtype clip_value) {
     dtype sum = 0;
     for (int idx = 0; idx < params_.size(); idx++) {
@@ -13,12 +21,6 @@ void Optimizer::clipGrad(dtype clip_value) {
         for (int idx = 0; idx < params_.size(); idx++) {
             params_[idx]->rescaleGrad(scale);
         }
-    }
-}
-
-void Optimizer::zeroGrad() {
-    for (BaseParam *param : params_) {
-        param->clearGrad();
     }
 }
 

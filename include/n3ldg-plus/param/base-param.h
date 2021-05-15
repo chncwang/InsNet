@@ -15,6 +15,7 @@ template <typename T>
 class Tunable {
 public:
     virtual std::vector<T *> tunableParams() = 0;
+    virtual ~Tunable() = default;
 };
 
 template <typename T>
@@ -23,25 +24,35 @@ public:
     std::vector<T *> tunableParams() override {
         return {static_cast<T*>(this)};
     }
+
+    virtual ~TunableAtom() = default;
 };
 
 template <typename T>
 class TunableCombination : public Tunable<T> {
 public:
     std::vector<T *> tunableParams() override {
-        auto components = tunableComponents();
-        std::vector<T*> result;
-        for (Tunable<T> * t : components) {
-            auto params = t->tunableParams();
-            for (auto *p : params) {
-                result.push_back(p);
+        if (tunable_list_ == nullptr) {
+            auto components = tunableComponents();
+            std::vector<T*> result;
+            for (Tunable<T> * t : components) {
+                auto params = t->tunableParams();
+                for (auto *p : params) {
+                    result.push_back(p);
+                }
             }
+            tunable_list_ = std::make_unique<std::vector<T*>>(std::move(result));
         }
-        return result;
+        return *tunable_list_;
     }
+
+    virtual ~TunableCombination() = default;
 
 protected:
     virtual std::vector<Tunable<T> *> tunableComponents() = 0;
+
+private:
+    mutable std::unique_ptr<std::vector<T *>> tunable_list_ = nullptr;
 };
 
 class BaseParam : public TunableAtom<BaseParam>
@@ -54,6 +65,8 @@ public:
 
     BaseParam(bool is_bias = false) : is_bias_(is_bias) {}
 
+    virtual ~BaseParam() = default;
+
     bool isBias() const {
         return is_bias_;
     }
@@ -64,7 +77,6 @@ public:
     virtual void adamW(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) = 0;
     virtual int outDim() = 0;
     virtual int inDim() = 0;
-    virtual void clearGrad() = 0;
     virtual const std::string& getParamName() const {
         return name_;
     }
@@ -87,13 +99,20 @@ public:
     }
 
     Tensor2D &grad() {
-        return grad_;
+        return *grad_;
+    }
+
+    virtual void initAndZeroGrad();
+
+    void releaseGrad() {
+        grad_.reset();
     }
 
 protected:
     bool is_bias_ = false;
     std::string name_;
-    Tensor2D val_, grad_, aux_square_, aux_mean_;
+    Tensor2D val_, aux_square_, aux_mean_;
+    std::unique_ptr<Tensor2D> grad_ = nullptr;
 };
 
 typedef Tunable<BaseParam> TunableParam;
