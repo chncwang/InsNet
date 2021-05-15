@@ -6,7 +6,7 @@
 N3LDG++ documentation
 ===================================
 
-`N3LDG++ <https://github.com/chncwang/n3ldg-plus>`_  is a powerful neural network library aiming at building flexible NLP models, especially those with dynamic computation graphs for different instances. It is designed to run dynamic models on the fly and allow users to focus on building the graph for a single instance, leaving batching (both mini-batch and instance level) to the library's lazy execution. This design has at least four advantages as follows:
+`N3LDG++ <https://github.com/chncwang/n3ldg-plus>`_ is a powerful neural network library aiming at building flexible NLP models, especially those with dynamic computation graphs for different instances. It is designed to run dynamic models on the fly and allow users to focus on building the graph for a single instance, leaving batching (both mini-batch and instance level) to the library's lazy execution. This design has at least four advantages as follows:
 
 1. It can batch not only operators in a mini-batch but also operators in the same instance. For example, it can batch two parallel transformers from the same instance.
 2. It makes it super easy to build NLP models with instance-dependent computation graphs, such as tree-LSTM, `dynamic networks <https://arxiv.org/pdf/2102.04906.pdf>`_ and `hierarchical Transformers <https://www.aclweb.org/anthology/P19-1500.pdf>`_.
