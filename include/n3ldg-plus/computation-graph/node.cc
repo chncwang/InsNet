@@ -64,9 +64,12 @@ void Node::clear() {
     val_.ref_count_ = 1;
     batched_node_ = this;
     column_ = 1;
-    input_dims_.clear();
     input_vals_.clear();
     input_grads_.clear();
+    input_dims_.clear();
+    input_types_.clear();
+    input_ids_.clear();
+
     NodeAbs::clear();
 }
 
@@ -97,7 +100,6 @@ string Node::isVectorSig() const {
 
 Node::Node(const string &node_type, int dim) : NodeAbs(node_type), dim_(dim) {
     static int id;
-    cout << fmt::format("Node::Node id:{}", id) << endl;
     id_ = id++;
 }
 
