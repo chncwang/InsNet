@@ -176,14 +176,14 @@ void cpu::Tensor1D::checkIsNumber() const {
 cpu::Tensor2D::Tensor2D() {
     col = row = 0;
     size = 0;
-    v = NULL;
+    v = nullptr;
 }
 
 cpu::Tensor2D::~Tensor2D() {
     if (v) {
         delete[] v;
     }
-    v = NULL;
+    v = nullptr;
     col = row = 0;
     size = 0;
 }
@@ -192,12 +192,16 @@ void cpu::Tensor2D::init(int nrow, int ncol) {
     row = nrow;
     col = ncol;
     size = col * row;
+    if (v != nullptr) {
+        cerr << "cpu::Tensor2D::init v is not nullptr" << endl;
+        abort();
+    }
     v = new dtype[size];
     zero();
 }
 
 void cpu::Tensor2D::zero() {
-    assert(v != NULL);
+    assert(v != nullptr);
     for (int i = 0; i < size; ++i) {
         v[i] = 0;
     }
@@ -416,8 +420,8 @@ string cuda::Tensor2D::name() const {
 }
 
 void cuda::Tensor2D::zero() {
-    assert(v != NULL);
-    if (v == NULL) {
+    assert(v != nullptr);
+    if (v == nullptr) {
         cerr << "tensor2d v is null" << endl;
         abort();
     }

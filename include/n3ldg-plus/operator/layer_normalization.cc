@@ -390,8 +390,8 @@ public:
     }
 
     void backward() override {
-        params()g().initAndZeroGrad();
-        params()b().initAndZeroGrad();
+        params().g().initAndZeroGrad();
+        params().b().initAndZeroGrad();
         Executor::backward();
     }
 

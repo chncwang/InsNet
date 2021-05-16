@@ -97,6 +97,7 @@ string Node::isVectorSig() const {
 
 Node::Node(const string &node_type, int dim) : NodeAbs(node_type), dim_(dim) {
     static int id;
+    cout << fmt::format("Node::Node id:{}", id) << endl;
     id_ = id++;
 }
 
