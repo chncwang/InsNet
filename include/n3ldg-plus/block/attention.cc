@@ -17,13 +17,12 @@ namespace n3ldg_plus {
 pair<BatchedNode *, BatchedNode *> dotAttention(BatchedNode &key_matrix,
         BatchedNode &value_matrix,
         BatchedNode &query_matrix,
-        int q_col,
+        int row,
         bool is_decoder) {
-    int row = query_matrix.getDim() / q_col;
     BatchedNode *raw_weights = tranMatrixMulMatrix(key_matrix, query_matrix, row, is_decoder);
     BatchedNode *scaled_weight = scaled(*raw_weights, 1.0 / ::sqrt((dtype)row));
-    scaled_weight = softmax(*scaled_weight, q_col);
     int v_col = value_matrix.getDim() / row;
+    scaled_weight = softmax(*scaled_weight, v_col);
     BatchedNode *hidden = matrixMulMatrix(value_matrix, *scaled_weight, v_col);
     return make_pair(hidden, scaled_weight);
 }
@@ -50,7 +49,7 @@ pair<Node *, Node *> additiveAttention(Node &guide, Node &value, int value_col,
     Node *sum = add({q, value_matrix});
     sum = tanh(*sum);
     Node *score = linear(*sum, params.vt);
-    Node *weight = softmax(*score, 1);
+    Node *weight = softmax(*score);
     Node *result = matrixMulMatrix(value, *weight, weight->getDim());
     return make_pair(result, weight);
 }

@@ -161,19 +161,30 @@ Executor *SoftmaxNode::generate() {
     return new SoftmaxExecutor;
 }
 
-Node* softmax(Node &input, int input_col) {
+Node* softmax(Node &input, int row) {
     using namespace n3ldg_plus;
     SoftmaxNode *node = SoftmaxNode::newNode(input.getDim());
-    node->setColumn(input_col);
+    int col = input.getDim() / row;
+    if (col * row != input.getDim()) {
+        cerr << fmt::format("softmax - col:{} row:{} input dim:{}", col, row, input.getDim()) <<
+            endl;
+        abort();
+    }
+    node->setColumn(col);
     node->connect(input);
     return node;
 }
 
-BatchedNode* softmax(BatchedNode &input, int col) {
-    using namespace n3ldg_plus;
-    BatchedSoftmaxNode *node = new BatchedSoftmaxNode;
-    node->init(input, col);
-    return node;
+BatchedNode* softmax(BatchedNode &input, int row) {
+    BatchedSoftmaxNode *ret = new BatchedSoftmaxNode;
+    int col = input.getDim() / row;
+    if (col * row != input.getDim()) {
+        cerr << fmt::format("softmax - col:{} row:{} input dim:{}", col, row, input.getDim()) <<
+            endl;
+        abort();
+    }
+    ret->init(input, col);
+    return ret;
 }
 
 }
