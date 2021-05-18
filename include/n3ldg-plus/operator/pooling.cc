@@ -1,11 +1,13 @@
 #include "n3ldg-plus/operator/pooling.h"
 #include "n3ldg-plus/operator/atomic.h"
+#include "n3ldg-plus/operator/split.h"
 #include "n3ldg-plus/util/util.h"
 
 using std::string;
 using std::vector;
 using std::cerr;
 using std::endl;
+using std::function;
 
 namespace n3ldg_plus {
 
@@ -463,9 +465,27 @@ Node *sumPool(vector<Node *> &inputs) {
     return pool;
 }
 
-Node *averagePool(vector<Node *> &inputs) {
+Node *avgPool(vector<Node *> &inputs) {
     Node *sum = sumPool(inputs);
     return scaled(*sum, 1.0 / inputs.size());
+}
+
+Node *avgPool(Node &input, int row) {
+    int col = input.getDim() / row;
+    if (col * row != input.getDim()) {
+        cerr << fmt::format("avgPool col:{} row:{} input dim:{}", col, row, input.getDim()) <<
+            endl;
+        abort();
+    }
+    int offset = 0;
+    vector<Node *> inputs;
+    inputs.reserve(col);
+    for (int i = 0; i < col; ++i) {
+        Node *in = n3ldg_plus::split(input, row, offset);
+        inputs.push_back(in);
+        offset += row;
+    }
+    return avgPool(inputs);
 }
 
 }

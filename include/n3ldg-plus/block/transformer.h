@@ -264,19 +264,16 @@ private:
 
 typedef TransformerParams<TransformerDecoderLayerParams> TransformerDecoderParams;
 
-Node *dotAttention(Node& k, Node& v, int v_col, Node& q, int q_col, int head_count,
-        LinearParam &fusion_param,
+Node *dotAttention(Node& k, Node& v, Node& q, int row, int head_count, LinearParam &fusion_param,
         dtype dropout_value,
         bool use_mask);
 
-std::vector<Node *> transformerEncoder(Node &inputs, int sentence_len,
-        TransformerEncoderParams &params,
+std::vector<Node *> transformerEncoder(Node &inputs, TransformerEncoderParams &params,
         dtype dropout_value);
 
 class TransformerDecoderBuilderAbs {
 public:
     TransformerDecoderBuilderAbs(TransformerDecoderParams &params, Node &encoder_hiddens,
-            int encoder_sentence_len,
             dtype dropout);
 
     virtual ~TransformerDecoderBuilderAbs() = default;
@@ -292,7 +289,6 @@ protected:
     std::vector<Node *> encoder_key_matrices_;
     std::vector<Node *> encoder_value_matrices_;
 
-    int encoder_sentence_len_;
     dtype dropout_;
 
     bool prepared_ = false;
@@ -301,7 +297,6 @@ protected:
 class TransformerDecoderCellBuilder : public TransformerDecoderBuilderAbs {
 public:
     TransformerDecoderCellBuilder(TransformerDecoderParams &params, Node &encoder_hiddens,
-            int encoder_sentence_len,
             dtype dropout);
 
     const std::vector<std::vector<Node *>> &hiddenLayers() {
@@ -321,10 +316,9 @@ private:
 class TransformerDecoderBuilder : public TransformerDecoderBuilderAbs {
 public:
     TransformerDecoderBuilder(TransformerDecoderParams &params, Node &encoder_hiddens,
-            int encoder_sentence_len,
             dtype dropout);
 
-    void connect(Node &inputs, int dec_sentence_len);
+    void connect(Node &inputs);
 
     std::vector<Node *> &hiddenLayers() {
         return hidden_layers_;
@@ -334,8 +328,7 @@ private:
     std::vector<Node *> hidden_layers_;
 };
 
-std::vector<Node *> transformerDecoder(Node &encoder, int encoder_sentence_len, Node &input,
-        int decoder_sentence_len,
+std::vector<Node *> transformerDecoder(Node &encoder, Node &input,
         TransformerDecoderParams &params,
         dtype dropout_value);
 

@@ -111,21 +111,33 @@ vector<Tunable<BaseParam>*> TransformerDecoderLayerParams::tunableComponents() {
         &ffn_inner_params_, &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_, &layer_norm_c_};
 }
 
-Node *dotAttention(Node& k, Node& v, int v_col, Node& q, int q_col, int head_count,
+Node *dotAttention(Node& k, Node& v, Node& q, int row, int head_count,
         LinearParam &fusion_param,
         dtype dropout_value,
         bool use_mask) {
-    int row = q.getDim() / q_col;
     int head_dim = row / head_count;
     vector<int> offsets(head_count);
     for (int i = 0; i < head_count; ++i) {
         offsets.at(i) = i * head_dim;
     }
 
+    int q_col = q.getDim() / row;
+    if (q_col * row != q.getDim()) {
+        cerr << fmt::format("dotAttention - q_col:{} row:{} q dim:{}", q_col, row, q.getDim()) <<
+            endl;
+        abort();
+    }
+    int v_col = v.getDim() / row;
+    if (v_col * row != v.getDim()) {
+        cerr << fmt::format("dotAttention - v_col:{} row:{} v dim:{}", v_col, row, v.getDim()) <<
+            endl;
+        abort();
+    }
+
     BatchedNode *split_q = split(q, head_dim, offsets, q_col);
     BatchedNode *split_k = split(k, head_dim, offsets, v_col);
     BatchedNode *split_v = split(v, head_dim, offsets, v_col);
-    BatchedNode *split_attended = dotAttention(*split_k, *split_v, *split_q, q_col,
+    BatchedNode *split_attended = dotAttention(*split_k, *split_v, *split_q, head_dim,
             use_mask).first;
     Node *attended_matrix = concat(*split_attended, q_col);
     attended_matrix = linear(*attended_matrix, fusion_param);
@@ -133,8 +145,10 @@ Node *dotAttention(Node& k, Node& v, int v_col, Node& q, int q_col, int head_cou
     return attended_matrix;
 }
 
-vector<Node *> transformerEncoder(Node &inputs, int sentence_len, TransformerEncoderParams &params,
+vector<Node *> transformerEncoder(Node &inputs, TransformerEncoderParams &params,
         dtype dropout_value) {
+    int hidden_dim = params.hiddenDim();
+    int sentence_len = inputs.getDim() / hidden_dim;
     vector<int> pos_ids;
     pos_ids.reserve(sentence_len);
     for (int i = 0; i < sentence_len; ++i) {
@@ -161,8 +175,9 @@ vector<Node *> transformerEncoder(Node &inputs, int sentence_len, TransformerEnc
         Node *key = linear(*normed, attention_head_params.k());
         Node *value = linear(*normed, attention_head_params.v());
         Node *q = linear(*normed, attention_head_params.q());
-        Node *attended = dotAttention(*key, *value, sentence_len, *q, sentence_len,
-                params.headCount(), layer_params.headsFusionParams(), dropout_value, false);
+        int dim = params.hiddenDim();
+        Node *attended = dotAttention(*key, *value, *q, dim, params.headCount(),
+                layer_params.headsFusionParams(), dropout_value, false);
         Node *added = add({attended, last_layer});
         normed = layerNormalization(layer_params.layerNormB(), *added, sentence_len);
         Node *t = linear(*normed, layer_params.ffnInnerParams());
@@ -179,9 +194,7 @@ vector<Node *> transformerEncoder(Node &inputs, int sentence_len, TransformerEnc
 
 TransformerDecoderBuilderAbs::TransformerDecoderBuilderAbs(TransformerDecoderParams &params,
         Node &encoder_hiddens,
-        int encoder_sentence_len,
-        dtype dropout) : params_(&params), encoder_hiddens_(&encoder_hiddens),
-    encoder_sentence_len_(encoder_sentence_len), dropout_(dropout) {}
+        dtype dropout) : params_(&params), encoder_hiddens_(&encoder_hiddens), dropout_(dropout) {}
 
 void TransformerDecoderBuilderAbs::prepare() {
     if (prepared_) {
@@ -202,9 +215,7 @@ void TransformerDecoderBuilderAbs::prepare() {
 
 TransformerDecoderCellBuilder::TransformerDecoderCellBuilder(TransformerDecoderParams &params,
         Node &encoder_hiddens,
-        int encoder_sentence_len,
-        dtype dropout) : TransformerDecoderBuilderAbs(params, encoder_hiddens,
-            encoder_sentence_len, dropout) {
+        dtype dropout) : TransformerDecoderBuilderAbs(params, encoder_hiddens, dropout) {
     for (int i = 0; i < params.layerCount(); ++i) {
         key_matrix_layers_.push_back(nullptr);
         value_matrix_layers_.push_back(nullptr);
@@ -237,6 +248,13 @@ void TransformerDecoderCellBuilder::step(Node &decoder_input) {
     pos_encoded = dropout(*pos_encoded, dropout_);
 
     int layer_count = params_->layerCount();
+    int encoder_sentence_len = encoder_hiddens_->getDim() / params_->hiddenDim();
+    if (encoder_sentence_len * params_->hiddenDim() != encoder_hiddens_->getDim()) {
+        cerr << fmt::format("TransformerDecoderCellBuilder::step - encoder_sentence_len:{} hidden_dim:{} encoder_hiddens_ dim:{}",
+                encoder_sentence_len, encoder_hiddens_->getDim(), encoder_hiddens_->getDim())
+            << endl;
+        abort();
+    }
 
     Node *last_layer_node = pos_encoded;
     for (int i = 0; i < layer_count; ++i) {
@@ -253,16 +271,17 @@ void TransformerDecoderCellBuilder::step(Node &decoder_input) {
         value_matrix = value_matrix == nullptr ? v : concat({value_matrix, v});
 
         Node *q = linear(*normed, attention_head_params.q());
-        Node *attended = dotAttention(*key_matrix, *value_matrix, decoded_len_ + 1,
-                *q, 1, params_->headCount(), layer_params.selfFusion(), dropout_, false);
+        int dim = params_->hiddenDim();
+        Node *attended = dotAttention(*key_matrix, *value_matrix, *q, dim, params_->headCount(),
+                layer_params.selfFusion(), dropout_, false);
         Node *added = add({attended, last_layer_node});
         normed = layerNormalization(layer_params.layerNormB(), *added);
 
         auto &attention_head_params_for_encoder = layer_params.encoderAttention();
         q = linear(*normed, attention_head_params_for_encoder.q());
-        attended = dotAttention(*encoder_key_matrices_.at(i),
-                *encoder_value_matrices_.at(i), encoder_sentence_len_, *q, 1,
-                params_->headCount(), layer_params.encoderFusion(), dropout_, false);
+        attended = dotAttention(*encoder_key_matrices_.at(i), *encoder_value_matrices_.at(i),
+                *q, dim, params_->headCount(), layer_params.encoderFusion(),
+                dropout_, false);
         added = add({added, attended});
         normed = layerNormalization(layer_params.layerNormC(), *added);
 
@@ -278,14 +297,20 @@ void TransformerDecoderCellBuilder::step(Node &decoder_input) {
 }
 
 TransformerDecoderBuilder::TransformerDecoderBuilder(TransformerDecoderParams &params,
-        Node &encoder_hiddens,
-        int encoder_sentence_len,
-        dtype dropout) : TransformerDecoderBuilderAbs(params, encoder_hiddens,
-            encoder_sentence_len, dropout) {}
+        Node &encoder_hiddens, dtype dropout) : TransformerDecoderBuilderAbs(params,
+            encoder_hiddens, dropout) {}
 
-void TransformerDecoderBuilder::connect(Node &inputs, int dec_sentence_len) {
+void TransformerDecoderBuilder::connect(Node &inputs) {
     if (!prepared_) {
         cerr << "TransformerDecoderBuilder forward - not prepared" << endl;
+        abort();
+    }
+
+    int dim = this->params_->hiddenDim();
+    int dec_sentence_len = inputs.getDim() / dim;
+    if (dec_sentence_len * dim != inputs.getDim()) {
+        cerr << fmt::format("TransformerDecoderBuilder::connect - dec_sentence_len:{} dim:{} inputs dim:{}",
+                dec_sentence_len, dim, inputs.getDim()) << endl;
         abort();
     }
 
@@ -304,6 +329,14 @@ void TransformerDecoderBuilder::connect(Node &inputs, int dec_sentence_len) {
     int layer_count = params_->layerCount();
     Node *last_layer = pos_encoded;
 
+    int encoder_sentence_len = encoder_hiddens_->getDim() / params_->hiddenDim();
+    if (encoder_sentence_len * params_->hiddenDim() != encoder_hiddens_->getDim()) {
+        cerr << fmt::format("TransformerDecoderCellBuilder::step - encoder_sentence_len:{} hidden_dim:{} encoder_hiddens_ dim:{}",
+                encoder_sentence_len, encoder_hiddens_->getDim(), encoder_hiddens_->getDim())
+            << endl;
+        abort();
+    }
+
     for (int i = 0; i < layer_count; ++i) {
         auto &layer_params = *params_->layerParams().ptrs().at(i);
         auto &attention_head_params = layer_params.selfAttention();
@@ -312,8 +345,9 @@ void TransformerDecoderBuilder::connect(Node &inputs, int dec_sentence_len) {
         Node *k = linear(*normed, attention_head_params.k());
         Node *v = linear(*normed, attention_head_params.v());
         Node *q = linear(*normed, attention_head_params.q());
-        Node *attended = dotAttention(*k, *v, dec_sentence_len, *q, dec_sentence_len,
-                params_->headCount(), layer_params.selfFusion(), dropout_, true);
+        int dim = params_->hiddenDim();
+        Node *attended = dotAttention(*k, *v, *q, dim, params_->headCount(),
+                layer_params.selfFusion(), dropout_, true);
         Node *added = add({attended, last_layer});
         normed = layerNormalization(layer_params.layerNormB(), *added,
                 dec_sentence_len);
@@ -321,8 +355,7 @@ void TransformerDecoderBuilder::connect(Node &inputs, int dec_sentence_len) {
         auto &attention_head_params_for_encoder = layer_params.encoderAttention();
         q = linear(*normed, attention_head_params_for_encoder.q());
         attended = dotAttention(*encoder_key_matrices_.at(i), *encoder_value_matrices_.at(i),
-                encoder_sentence_len_, *q, dec_sentence_len, params_->headCount(),
-                layer_params.encoderFusion(), dropout_, false);
+                *q, dim, params_->headCount(), layer_params.encoderFusion(), dropout_, false);
         added = add({added, attended});
         normed = layerNormalization(layer_params.layerNormC(), *added, dec_sentence_len);
 
@@ -336,13 +369,11 @@ void TransformerDecoderBuilder::connect(Node &inputs, int dec_sentence_len) {
     }
 }
 
-vector<Node *> transformerDecoder(Node &encoder, int encoder_sentence_len, Node &input,
-        int decoder_sentence_len,
-        TransformerDecoderParams &params,
+vector<Node *> transformerDecoder(Node &encoder, Node &input, TransformerDecoderParams &params,
         dtype dropout_value) {
-    TransformerDecoderBuilder builder(params, encoder, encoder_sentence_len, dropout_value);
+    TransformerDecoderBuilder builder(params, encoder, dropout_value);
     builder.prepare();
-    builder.connect(input, decoder_sentence_len);
+    builder.connect(input);
     return builder.hiddenLayers();
 }
 

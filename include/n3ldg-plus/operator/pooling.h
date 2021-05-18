@@ -11,7 +11,9 @@ Node *minPool(std::vector<Node *> &inputs);
 
 Node *sumPool(std::vector<Node *> &inputs);
 
-Node *averagePool(std::vector<Node *> &inputs);
+Node *avgPool(std::vector<Node *> &inputs);
+
+Node *avgPool(Node *input, int row);
 
 }
 
