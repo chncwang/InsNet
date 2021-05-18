@@ -1,4 +1,4 @@
-JIT(Just-in-time) Dynamic Batching
+JIT (Just-in-time) Dynamic Batching
 ====================================
 
 Previous works such as `TensorFlow Fold <https://arxiv.org/pdf/1702.02181.pdf>`_ typically takes RNN, especially TreeRNN as the example to illustrate JIT dynamic batching. N3LDG++ can properly execute such models in batch.

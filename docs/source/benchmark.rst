@@ -124,7 +124,7 @@ Training Throughput on GPU
       - BASE
       - LARGE
     * - 500
-      - 14720
+      - 14886
       - 3178
     * - 1000
       - 17804
@@ -148,7 +148,7 @@ Training Throughput on GPU
       - 19502
       - OOM
 
-Note that the training throughput is tested on our laptop, and it should be higher on better machines.
+Note that the training throughput is tested on our laptop, and it should be much higher on average machines for deep learning training.
 
 Memory Usage on GPU
 ^^^^^^^^^^^^^^^^^^^^^
@@ -161,7 +161,7 @@ Memory Usage on GPU
       - BASE
       - LARGE
     * - 500
-      - 841
+      - 843
       - 3475
     * - 1000
       - 997
@@ -187,4 +187,4 @@ Memory Usage on GPU
 
 The low memory usage is due to N3LDG++'s JIT Dynamic Batching mechanism which does not require paddings.
 
-We will illustrate N3LDG++'s memory management in detail in the future.
+We will illustrate N3LDG++'s efficient memory management in detail in the future.

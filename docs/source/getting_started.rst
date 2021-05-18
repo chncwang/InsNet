@@ -53,7 +53,7 @@ Then assuming we choose Adam to optimize parameters, we can create the optimizer
     n3ldg_plus::Optimzer *optimizer = new n3ldg_plus::AdamOptimizer(
             model_params.tunableParams(), 1e-4, 0.9, 0.999, 1e-10, 0);
 
-During training, we can change the learning rate as below:
+During training, we can change the learning rate as follows:
 
 .. code-block:: c++
 
@@ -85,13 +85,13 @@ Supposing that we have already loaded and randomly shuffled training instances, 
         // it means words or word ids in a source sentence. Suppose we use std::vector<int>
         // here.
         Node *enc_emb = n3ldg_plus::embedding(graph, ins.src, model_params.embedding);
-        Node *enc = n3ldg_plus::transformerEncoder(*enc_emb, ins.src.size(),
-                model_params.encoder, 0.1).back(); // 0.1 means dropout.
-        int tgt_len = ins.shifted_tgt.size();
+
+        // 0.1 means dropout.
+        Node *enc = n3ldg_plus::transformerEncoder(*enc_emb, model_params.encoder, 0.1).back();
+
         Node *dec_emb = n3ldg_plus::embedding(graph, ins.shifted_tgt, model_params.embedding);
-        Node *dec = n3ldg_plus::transformerDecoder(*enc, ins.src.size(), *dec_emb, tgt_len,
-                0.1).back();
-        Node *output = n3ldg_plus::softmax(*dec, ins.tgt.size());
+        Node *dec = n3ldg_plus::transformerDecoder(*enc, *dec_emb, model_params.decoder, 0.1).back();
+        Node *output = n3ldg_plus::softmax(*dec, model_params.embedding.size());
         outputs.push_back(output);
         answers.push_back(ins.tgt);
         tgt_len_sum += ins.tgt.size();
@@ -115,9 +115,94 @@ Supposing that we have already loaded and randomly shuffled training instances, 
 
 The above codes show that we need not merge inputs from a mini-batch into a tensor nor append paddings.
 
+Example of Hierarchical Model
+-------------------------------
+
+In the following, we will introduce a hierarchical model to show how it is convenient to build such models using N3LDG++.
+
+Suppose we are tacking a text summarization problem which smmarizes a given paragraph, i.e., a sentence list into a sentence. We can first define the instance structure as follows:
+
+.. code-block:: c++
+
+    struct Instance {
+        vector<vector<int>> src;
+        vector<int> tgt;
+        vector<int> shifted_tgt;
+    };
+
+Next, we want to pass *src* to a Transformer layer where every word only attends words from the same sentence. One way is to use sophisticated attention masks, but it would be too much trouble and cause a massive waste of memory. Whereas, using N3LDG++, it is straightforward to do this as follows:
+
+.. code-block:: c++
+
+        for (const Instance &ins : minibatch) {
+            ...
+
+            for (const vector<int> &sentence : ins.src) {
+                Node *emb = n3ldg_plus::embedding(graph, sentence, model_params.embedding);
+
+                // model_params.sentence_encoder is the parameter to encode sentences.
+                Node *enc = n3ldg_plus::transformerEncoder(*emb, ins.src.size(),
+                        model_params.sentence_encoder, 0.1).back();
+                ...
+            }
+
+            ...
+        }
+
+Thus the operators in *transformerEncoder* will be executed in batch during the lazy execution period.
+
+Then suppose we want to attain sentence embeddings by using *avgPool* so that we can expand the above code as follows:
+
+.. code-block:: c++
+
+        for (const Instance &ins : minibatch) {
+            vector<Node *> sen_embs;
+            sen_embs.reserve(ins.src.size());
+
+            for (const vector<int> &sentence : ins.src) {
+                Node *emb = n3ldg_plus::embedding(graph, sentence, model_params.embedding);
+
+                // model_params.sentence_encoder is the parameter to encode sentences.
+                Node *enc = n3ldg_plus::transformerEncoder(*emb, ins.src.size(),
+                        model_params.sentence_encoder, 0.1).back();
+                enc = n3ldg_plus::avgPool(*enc, 512); // 512 is the hidden dim.
+                sen_embs.push_back(enc);
+            }
+
+            ...
+        }
+
+As expected, N3LDG++ will execute all *avgPool* in batch, regardless of different columns of the input matrices.
+
+Finally, based on the sentence embeddings, we can build the encoder of paragraphs. Given the relatively small number of paragraphs, we may want to impose stronger inductive bias by using LSTM, and the completed code of building the encoder is as follows:
+
+.. code-block:: c++
+        Graph graph;
+        Node *h0 = n3ldg_plus::bucket(graph, 512, 0.0f); // The initial hidden state of LSTM.
+
+        for (const Instance &ins : minibatch) {
+            vector<Node *> sen_embs;
+            sen_embs.reserve(ins.src.size());
+
+            for (const vector<int> &sentence : ins.src) {
+                Node *emb = n3ldg_plus::embedding(graph, sentence, model_params.embedding);
+
+                // model_params.sentence_encoder is the parameter to encode sentences.
+                Node *enc = n3ldg_plus::transformerEncoder(*emb, ins.src.size(),
+                        model_params.sentence_encoder, 0.1).back();
+                enc = n3ldg_plus::avgPool(*enc, 512); // 512 is the hidden dim.
+                sen_embs.push_back(enc);
+            }
+
+            vector<Node *> para_embs = n3ldg_plus::lstm(*h0, sen_embs, model_params.para_encoder, 0.1);
+            Node *enc = n3ldg_plus::concat(para_embs);
+
+            ... // The decoder part.
+        }
+
 Enabling CUDA
 ---------------
-To enable CUDA, you need specify the device id (required) and pre-allocated memory in GB (optinal) at the beginning of the program as bellow:
+To enable CUDA, you need specify the device id (required) and pre-allocated memory in GB (optinal) at the beginning of the program as follows:
 
 .. code-block:: c++
 
