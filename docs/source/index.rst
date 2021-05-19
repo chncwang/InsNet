@@ -65,12 +65,19 @@ We illustrate the just-in-time dynamic batching mechanism of N3LDG++ as below:
 
     dynamic_batch
 
-The benchmark for N3LDG++'s traning speed and memory usage on various settings is as below:
+The benchmarks for N3LDG++'s traning speed and memory usage on various settings is as below:
 
 .. toctree::
     :maxdepth: 1
 
     benchmark
+
+See the manual reference to know how to use N3LDG++ in detail.
+
+.. toctree::
+    :maxdepth: 2
+
+    reference
 
 .. toctree::
    :maxdepth: 2

@@ -4,3 +4,4 @@ docs/build
 build
 tags
 compile_commands.json
+docs/doxygen/xml

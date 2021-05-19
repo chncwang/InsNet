@@ -120,7 +120,7 @@ Example of Hierarchical Model
 
 In the following, we will introduce a hierarchical model to show how it is convenient to build such models using N3LDG++.
 
-Suppose we are tacking a text summarization problem which smmarizes a given paragraph, i.e., a sentence list into a sentence. We can first define the instance structure as follows:
+Suppose we are tacking a text summarization problem which smmarizes a given document, i.e., a sentence list into a sentence. We can first define the instance structure as follows:
 
 .. code-block:: c++
 
@@ -174,9 +174,10 @@ Then suppose we want to attain sentence embeddings by using *avgPool* so that we
 
 As expected, N3LDG++ will execute all *avgPool* in batch, regardless of different columns of the input matrices.
 
-Finally, based on the sentence embeddings, we can build the encoder of paragraphs. Given the relatively small number of paragraphs, we may want to impose stronger inductive bias by using LSTM, and the completed code of building the encoder is as follows:
+Finally, based on the sentence embeddings, we can build the encoder of documents. Given the relatively small number of documents, we may want to impose stronger inductive bias by using LSTM, and the completed code of building the encoder is as follows:
 
 .. code-block:: c++
+
         Graph graph;
         Node *h0 = n3ldg_plus::bucket(graph, 512, 0.0f); // The initial hidden state of LSTM.
 
@@ -194,8 +195,8 @@ Finally, based on the sentence embeddings, we can build the encoder of paragraph
                 sen_embs.push_back(enc);
             }
 
-            vector<Node *> para_embs = n3ldg_plus::lstm(*h0, sen_embs, model_params.para_encoder, 0.1);
-            Node *enc = n3ldg_plus::concat(para_embs);
+            vector<Node *> doc_embs = n3ldg_plus::lstm(*h0, sen_embs, model_params.para_encoder, 0.1);
+            Node *enc = n3ldg_plus::concat(doc_embs);
 
             ... // The decoder part.
         }
