@@ -5,7 +5,7 @@
 
 namespace n3ldg_plus {
 
-Node *maxScalar(Node &input, int input_col);
+Node *max(Node &input, int input_row);
 
 BatchedNode *maxScalar(BatchedNode &input, int input_col);
 

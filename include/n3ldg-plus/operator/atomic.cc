@@ -1060,7 +1060,13 @@ Executor *ScaledNode::generate() {
     return new ScaledExecutor;
 }
 
-Node *maxScalar(Node &input, int input_col) {
+Node *max(Node &input, int input_row) {
+    int input_col = input.getDim() / input_row;
+    if (input_col * input_row != input.getDim()) {
+        cerr << fmt::format("input_col:{} input_row:{} dim:{}", input_col, input_row,
+                input.getDim()) << endl;
+        abort();
+    }
     MaxScalarNode *node = MaxScalarNode::newNode(input_col);
     node->connect(input);
     return node;
