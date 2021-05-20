@@ -4,6 +4,9 @@
 #include <unordered_map>
 #include "n3ldg-plus/computation-graph/node.h"
 
+/// \defgroup operator
+
+/// \addtopgroup n3ldg_plus
 namespace n3ldg_plus {
 
 typedef std::unordered_map<std::string, std::vector<NodeAbs *>> NodeMap;

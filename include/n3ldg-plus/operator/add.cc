@@ -64,25 +64,7 @@ public:
     }
 
 private:
-    friend class BatchedPAddNode;
     friend class PAddExecutor;
-};
-
-class BatchedPAddNode : public BatchedNodeImpl<PAddNode> {
-public:
-    void init(const vector<BatchedNode *> &inputs) {
-        allocateBatch(inputs.front()->getDim(), inputs.front()->batch().size());
-
-        for (BatchedNode *in : inputs) {
-            if (in->getDim() != getDim()) {
-                cerr << "dim does not match" << endl;
-                abort();
-            }
-        }
-
-        setInputsPerNode(inputs);
-        afterInit( inputs);
-    }
 };
 
 #if USE_GPU
@@ -184,12 +166,6 @@ Node *add(const vector<Node*> &inputs) {
     PAddNode *result = PAddNode::newNode(dim);
     result->connect(inputs);
     return result;
-}
-
-BatchedNode *addInBatch(const vector<BatchedNode *> &inputs) {
-    BatchedPAddNode *node = new BatchedPAddNode;
-    node->init(inputs);
-    return node;
 }
 
 }
