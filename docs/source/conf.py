@@ -27,17 +27,20 @@ subprocess.call('cd ../doxygen; doxygen', shell=True)
 # ones.
 extensions = [
     'sphinx.ext.mathjax',
+    'sphinx.ext.pngmath',
+    'sphinx.ext.todo',
     'breathe',
     'nbsphinx',
     'sphinx.ext.autodoc',
     'm2r',
-    'sphinxcontrib.napoleon' # Yay Napoleon! Go France!
+    'sphinxcontrib.napoleon'
 ]
 breathe_projects = {"N3LDG++": "../doxygen/xml/"}
 breathe_default_project = "N3LDG++"
 
 # -- Project information -----------------------------------------------------
 
+project = "N3LDG++"
 copyright = '2021, Chauncey Wang'
 author = 'Chauncey Wang'
 

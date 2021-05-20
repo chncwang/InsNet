@@ -5,5 +5,5 @@ Operators
 ----------
 
 .. doxygengroup:: operator
-    ::members:
-    :content-only:
+        :members:
+        :content-only:
