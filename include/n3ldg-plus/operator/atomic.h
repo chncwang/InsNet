@@ -13,8 +13,6 @@ namespace n3ldg_plus {
 /// \param row The row number for which the row-wise max should be calculated. Note that the input tensor's size should be divisible by the row number.
 Node *max(Node &input, int row);
 
-BatchedNode *maxScalar(BatchedNode &input, int input_col);
-
 Node *tanh(Node &input);
 
 Node *sigmoid(Node &input);
