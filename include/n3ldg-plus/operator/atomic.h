@@ -7,8 +7,6 @@ namespace n3ldg_plus {
 
 Node *max(Node &input, int input_row);
 
-BatchedNode *maxScalar(BatchedNode &input, int input_col);
-
 Node *tanh(Node &input);
 
 Node *sigmoid(Node &input);

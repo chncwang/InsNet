@@ -554,15 +554,6 @@ private:
     friend class MaxScalarExecutor;
 };
 
-class BatchedMaxScalarNode : public BatchedNodeImpl<MaxScalarNode> {
-public:
-    void init(BatchedNode &input, int input_col) {
-        allocateBatch(input_col, input.batch().size());
-        setInputsPerNode({&input});
-        afterInit({&input});
-    }
-};
-
 #if USE_GPU
 class MaxScalarExecutor : public Executor {
 public:
@@ -1071,12 +1062,6 @@ Node *max(Node &input, int input_row) {
     node->connect(input);
     return node;
 }
-
-BatchedNode *maxScalar(BatchedNode &input, int input_col) {
-    BatchedMaxScalarNode *node = new BatchedMaxScalarNode;
-    node->init(input, input_col);
-    return node;
-};
 
 Node *tanh(Node &input) {
     TanhNode *result = TanhNode::newNode(input.getDim());
