@@ -40,8 +40,6 @@ Node *relu(Node &input);
 
 Node *sqrt(Node &input);
 
-BatchedNode *sqrt(BatchedNode &input);
-
 Node *scalarToVector(Node &input, int row);
 
 BatchedNode *scalarToVector(BatchedNode &input, int row);
