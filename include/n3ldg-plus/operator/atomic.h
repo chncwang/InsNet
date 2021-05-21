@@ -13,8 +13,6 @@ Node *sigmoid(Node &input);
 
 Node *relu(Node &input);
 
-BatchedNode *relu(BatchedNode &input);
-
 Node *sqrt(Node &input);
 
 BatchedNode *sqrt(BatchedNode &input);

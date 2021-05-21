@@ -41,7 +41,7 @@ public:
     }
 
     void compute() override {
-        int dim = getDim() / ids_.size();
+        int dim = size() / ids_.size();
         int i = 0;
         for (int id : ids_) {
             Vec(val().v + i++ * dim, dim) = Vec(param_->val()[id], dim);
@@ -50,7 +50,7 @@ public:
 
     void backward() override {
         if (should_backward_) {
-            int dim = getDim() / ids_.size();
+            int dim = size() / ids_.size();
             int i = 0;
             for (int id : ids_) {
                 Vec(param_->grad()[id], dim) += Vec(grad().v + i++ * dim, dim);

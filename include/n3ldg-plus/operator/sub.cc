@@ -28,9 +28,9 @@ public:
     void setInputs(const vector<Node *> &inputs) override {
         Node &minuend = *inputs.at(MINUEND);
         Node &subtrahend = *inputs.at(SUBTRAHEND);
-        if (getDim() != minuend.getDim() || getDim() != subtrahend.getDim()) {
-            cerr << fmt::format("dim:{} minuend:{} subtrahend:{}\n", getDim(),
-                minuend.getDim(), subtrahend.getDim());
+        if (size() != minuend.size() || size() != subtrahend.size()) {
+            cerr << fmt::format("dim:{} minuend:{} subtrahend:{}\n", size(),
+                minuend.size(), subtrahend.size());
             abort();
         }
         Node::setInputs(inputs);
@@ -70,14 +70,14 @@ private:
 class BatchedSubNode : public BatchedNodeImpl<SubNode> {
 public:
     void init(BatchedNode &minuend, BatchedNode &subtrahend) {
-        allocateBatch(minuend.getDims());
+        allocateBatch(minuend.sizes());
         setInputsPerNode({&minuend, &subtrahend});
         afterInit({&minuend, &subtrahend});
     }
 };
 
 Node *sub(Node &minuend, Node &subtrahend) {
-    SubNode *result = SubNode::newNode(minuend.getDim());
+    SubNode *result = SubNode::newNode(minuend.size());
     result->connect(minuend, subtrahend);
     return result;
 }
@@ -108,7 +108,7 @@ class SubExecutor : public Executor {
             minuend.push_back(sub->input_vals_.at(MINUEND)->value);
             subtrahend.push_back(sub->input_vals_.at(SUBTRAHEND)->value);
             results.push_back(sub->getVal().value);
-            dims_.push_back(node->getDim());
+            dims_.push_back(node->size());
         }
 
         cuda::SubForward(minuend, subtrahend, batch.size(), dims_, results);

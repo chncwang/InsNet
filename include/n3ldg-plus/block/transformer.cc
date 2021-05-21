@@ -121,15 +121,15 @@ Node *dotAttention(Node& k, Node& v, Node& q, int row, int head_count,
         offsets.at(i) = i * head_dim;
     }
 
-    int q_col = q.getDim() / row;
-    if (q_col * row != q.getDim()) {
-        cerr << fmt::format("dotAttention - q_col:{} row:{} q dim:{}", q_col, row, q.getDim()) <<
+    int q_col = q.size() / row;
+    if (q_col * row != q.size()) {
+        cerr << fmt::format("dotAttention - q_col:{} row:{} q dim:{}", q_col, row, q.size()) <<
             endl;
         abort();
     }
-    int v_col = v.getDim() / row;
-    if (v_col * row != v.getDim()) {
-        cerr << fmt::format("dotAttention - v_col:{} row:{} v dim:{}", v_col, row, v.getDim()) <<
+    int v_col = v.size() / row;
+    if (v_col * row != v.size()) {
+        cerr << fmt::format("dotAttention - v_col:{} row:{} v dim:{}", v_col, row, v.size()) <<
             endl;
         abort();
     }
@@ -148,7 +148,7 @@ Node *dotAttention(Node& k, Node& v, Node& q, int row, int head_count,
 vector<Node *> transformerEncoder(Node &inputs, TransformerEncoderParams &params,
         dtype dropout_value) {
     int hidden_dim = params.hiddenDim();
-    int sentence_len = inputs.getDim() / hidden_dim;
+    int sentence_len = inputs.size() / hidden_dim;
     vector<int> pos_ids;
     pos_ids.reserve(sentence_len);
     for (int i = 0; i < sentence_len; ++i) {
@@ -157,7 +157,7 @@ vector<Node *> transformerEncoder(Node &inputs, TransformerEncoderParams &params
 
     Graph &graph = dynamic_cast<Graph &>(inputs.getNodeContainer());
     Node *pos_emb = embedding(graph, pos_ids, params.positionalEncodingParam(), false);
-    Node *scaled_input = scaled(inputs, ::sqrt(inputs.getDim() / inputs.getColumn()));
+    Node *scaled_input = scaled(inputs, ::sqrt(inputs.size() / inputs.getColumn()));
     Node *pos_encoded = add({pos_emb, scaled_input});
     pos_encoded = dropout(*pos_encoded, dropout_value);
 
@@ -241,17 +241,17 @@ void TransformerDecoderCellBuilder::step(Node &decoder_input) {
         abort();
     }
     Node *scaled_input = scaled(decoder_input,
-            std::sqrt(static_cast<dtype>(decoder_input.getDim())));
+            std::sqrt(static_cast<dtype>(decoder_input.size())));
     Graph &graph = dynamic_cast<Graph &>(decoder_input.getNodeContainer());
     Node *emb = embedding(graph, decoded_len_, params_->positionalEncodingParam(), false);
     Node *pos_encoded = add({scaled_input, emb});
     pos_encoded = dropout(*pos_encoded, dropout_);
 
     int layer_count = params_->layerCount();
-    int encoder_sentence_len = encoder_hiddens_->getDim() / params_->hiddenDim();
-    if (encoder_sentence_len * params_->hiddenDim() != encoder_hiddens_->getDim()) {
+    int encoder_sentence_len = encoder_hiddens_->size() / params_->hiddenDim();
+    if (encoder_sentence_len * params_->hiddenDim() != encoder_hiddens_->size()) {
         cerr << fmt::format("TransformerDecoderCellBuilder::step - encoder_sentence_len:{} hidden_dim:{} encoder_hiddens_ dim:{}",
-                encoder_sentence_len, encoder_hiddens_->getDim(), encoder_hiddens_->getDim())
+                encoder_sentence_len, encoder_hiddens_->size(), encoder_hiddens_->size())
             << endl;
         abort();
     }
@@ -307,10 +307,10 @@ void TransformerDecoderBuilder::connect(Node &inputs) {
     }
 
     int dim = this->params_->hiddenDim();
-    int dec_sentence_len = inputs.getDim() / dim;
-    if (dec_sentence_len * dim != inputs.getDim()) {
+    int dec_sentence_len = inputs.size() / dim;
+    if (dec_sentence_len * dim != inputs.size()) {
         cerr << fmt::format("TransformerDecoderBuilder::connect - dec_sentence_len:{} dim:{} inputs dim:{}",
-                dec_sentence_len, dim, inputs.getDim()) << endl;
+                dec_sentence_len, dim, inputs.size()) << endl;
         abort();
     }
 
@@ -321,7 +321,7 @@ void TransformerDecoderBuilder::connect(Node &inputs) {
 
     Graph &graph = dynamic_cast<Graph &>(inputs.getNodeContainer());
     Node *pos_emb = embedding(graph, pos_ids, params_->positionalEncodingParam(), false);
-    int row = inputs.getDim() / dec_sentence_len;
+    int row = inputs.size() / dec_sentence_len;
     Node *scaled_input = scaled(inputs, ::sqrt(row));
     Node *pos_encoded = add({pos_emb, scaled_input});
     pos_encoded = dropout(*pos_encoded, dropout_);
@@ -329,10 +329,10 @@ void TransformerDecoderBuilder::connect(Node &inputs) {
     int layer_count = params_->layerCount();
     Node *last_layer = pos_encoded;
 
-    int encoder_sentence_len = encoder_hiddens_->getDim() / params_->hiddenDim();
-    if (encoder_sentence_len * params_->hiddenDim() != encoder_hiddens_->getDim()) {
+    int encoder_sentence_len = encoder_hiddens_->size() / params_->hiddenDim();
+    if (encoder_sentence_len * params_->hiddenDim() != encoder_hiddens_->size()) {
         cerr << fmt::format("TransformerDecoderCellBuilder::step - encoder_sentence_len:{} hidden_dim:{} encoder_hiddens_ dim:{}",
-                encoder_sentence_len, encoder_hiddens_->getDim(), encoder_hiddens_->getDim())
+                encoder_sentence_len, encoder_hiddens_->size(), encoder_hiddens_->size())
             << endl;
         abort();
     }

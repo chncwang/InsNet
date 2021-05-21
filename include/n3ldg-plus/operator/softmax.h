@@ -8,13 +8,13 @@ namespace n3ldg_plus {
 Node* softmax(Node &input, int row);
 
 inline Node* softmax(Node &input) {
-    return softmax(input, input.getDim());
+    return softmax(input, input.size());
 }
 
 BatchedNode* softmax(BatchedNode &input, int row);
 
 inline BatchedNode* softmax(BatchedNode &input) {
-    return softmax(input, input.getDim());
+    return softmax(input, input.size());
 }
 
 }

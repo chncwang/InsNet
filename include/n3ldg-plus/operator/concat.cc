@@ -28,11 +28,11 @@ public:
         int cur_dim = 0;
         in_rows_.reserve(in_size);
         for (int i = 0; i < in_size; ++i) {
-            in_rows_.push_back(ins.at(i)->getDim() / getColumn());
+            in_rows_.push_back(ins.at(i)->size() / getColumn());
             cur_dim += in_rows_.at(i);
         }
-        if (cur_dim * getColumn() != getDim()) {
-            cerr << "input dim size not match" << cur_dim << "\t" << getDim() << endl;
+        if (cur_dim * getColumn() != size()) {
+            cerr << "input dim size not match" << cur_dim << "\t" << size() << endl;
             abort();
         }
 
@@ -61,7 +61,7 @@ public:
 
     void compute() override {
         int in_size = input_vals_.size();
-        int row = getDim() / getColumn();
+        int row = size() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
             int offset = 0;
             for (int j = 0; j < in_size; ++j) {
@@ -74,7 +74,7 @@ public:
 
     void backward() override {
         int in_size = input_vals_.size();
-        int row = getDim() / getColumn();
+        int row = size() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
             int offset = 0;
             for (int j = 0; j < in_size; ++j) {
@@ -120,7 +120,7 @@ public:
         }
 
         ConcatNode &first = dynamic_cast<ConcatNode &>(*batch.front());
-        row_ = first.getDim() / first.getColumn();
+        row_ = first.size() / first.getColumn();
         cuda::ConcatForward(in_vals, dynamic_cast<ConcatNode*>(batch.at(0))->in_rows_, vals,
                 count, inCount(), row_, cols_);
 #if TEST_CUDA
@@ -190,7 +190,7 @@ public:
     void init(const vector<BatchedNode *> &ins) {
         int dim = 0;
         for (BatchedNode *node : ins) {
-            dim += node->getDim();
+            dim += node->size();
         }
         allocateBatch(dim, ins.front()->batch().size());
         setInputsPerNode(ins);
@@ -201,7 +201,7 @@ public:
 Node *concat(const vector<Node*> &inputs, int col) {
     int dim = 0;
     for (Node *in : inputs) {
-        dim += in->getDim();
+        dim += in->size();
     }
     ConcatNode *concat = ConcatNode::newNode(dim);
     concat->setColumn(col);
@@ -212,7 +212,7 @@ Node *concat(const vector<Node*> &inputs, int col) {
 Node *concat(BatchedNode &inputs, int col) {
     int dim = 0;
     for (Node *in : inputs.batch()) {
-        dim += in->getDim();
+        dim += in->size();
     }
     ConcatNode *concat = ConcatNode::newNode(dim);
     concat->setColumn(col);

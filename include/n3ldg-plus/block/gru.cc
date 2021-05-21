@@ -58,7 +58,7 @@ void GRUBuilder::step(GRUParam &gru_params, Node &input, Node &h0, dtype dropout
     Node *candidate = add({candidate_input, candidate_hidden});
     candidate = tanh(*candidate);
 
-    int hidden_dim = h0.getDim();
+    int hidden_dim = h0.size();
     Graph &graph = dynamic_cast<Graph&>(input.getNodeContainer());
     Node *one = bucket(graph, hidden_dim, 1);
     Node *reversal_update = sub(*one, *update_gate);
