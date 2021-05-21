@@ -233,15 +233,6 @@ protected:
     }
 };
 
-class BatchedSqrtNode : public BatchedNodeImpl<SqrtNode> {
-public:
-    void init(BatchedNode &input) {
-        allocateBatch(input.size(), input.batch().size());
-        setInputsPerNode({&input});
-        afterInit({&input});
-    }
-};
-
 class DropoutNode : public UniInputNode, public Poolable<DropoutNode> {
 public:
     DropoutNode() : UniInputNode("dropout") {}
@@ -1076,12 +1067,6 @@ Node *sqrt(Node &input) {
     SqrtNode *result = SqrtNode::newNode(input.size());
     result->connect(input);
     return result;
-}
-
-BatchedNode *sqrt(BatchedNode &input) {
-    BatchedSqrtNode *node = new BatchedSqrtNode;
-    node->init(input);
-    return node;
 }
 
 Node *scalarToVector(Node &input, int row) {
