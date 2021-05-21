@@ -30,9 +30,9 @@ public:
     }
 
     void setInputs(const vector<Node *> &inputs) override {
-        if (getDim() != inputs.at(0)->getDim() || getDim() != inputs.at(1)->getDim()) {
-            cerr << fmt::format("dim:{} minuend:{} subtrahend:{}\n", getDim(),
-                inputs.at(0)->getDim(), inputs.at(1)->getDim());
+        if (size() != inputs.at(0)->size() || size() != inputs.at(1)->size()) {
+            cerr << fmt::format("dim:{} minuend:{} subtrahend:{}\n", size(),
+                inputs.at(0)->size(), inputs.at(1)->size());
             abort();
         }
 
@@ -73,7 +73,7 @@ private:
 class BatchedFullDivNode : public BatchedNodeImpl<FullDivNode> {
 public:
     void init(BatchedNode &numerator, BatchedNode &denominator) {
-        allocateBatch(numerator.getDims());
+        allocateBatch(numerator.sizes());
         auto ins = {&numerator, &denominator};
         setInputsPerNode(ins);
         afterInit(ins);
@@ -94,7 +94,7 @@ public:
             numerators.push_back(div->input_vals_.at(NUMERATOR)->value);
             denominators.push_back(div->input_vals_.at(DENOMINATOR)->value);
             results.push_back(div->getVal().value);
-            dims.push_back(node->getDim());
+            dims.push_back(node->size());
         }
 
         cuda::FullDivForward(numerators, denominators, batch.size(), dims, results);
@@ -144,7 +144,7 @@ Executor *FullDivNode::generate() {
 }
 
 Node *fullDiv(Node &numerator, Node &denominator) {
-    FullDivNode *result = FullDivNode::newNode(numerator.getDim());
+    FullDivNode *result = FullDivNode::newNode(numerator.size());
     result->connect(numerator, denominator);
     return result;
 }

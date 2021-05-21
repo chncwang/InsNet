@@ -24,9 +24,9 @@ public:
         }
 
         for (int i = 0; i < x.size(); i++) {
-            if (x.at(i)->getDim() != getDim()) {
+            if (x.at(i)->size() != size()) {
                 cerr << fmt::format("PAddNode::connect - dim does not match self dim:{} input:{}",
-                        getDim(), x.at(i)->getDim()) << endl;
+                        size(), x.at(i)->size()) << endl;
                 abort();
             }
         }
@@ -92,7 +92,7 @@ public:
         for (Node * n : batch) {
             PAddNode &padd = dynamic_cast<PAddNode&>(*n);
             outs.push_back(padd.val().value);
-            dims_.push_back(padd.getDim());
+            dims_.push_back(padd.size());
             for (auto &in_val : padd.input_vals_) {
                 in_vals.push_back(in_val->value);
             }
@@ -150,7 +150,7 @@ public:
         int sum = 0;
         for (Node *node : batch) {
             PAddNode *add = dynamic_cast<PAddNode*>(node);
-            sum += add->getDim() * add->inputSize();
+            sum += add->size() * add->inputSize();
         }
         return sum;
     }
@@ -162,7 +162,7 @@ Executor *PAddNode::generate() {
 }
 
 Node *add(const vector<Node*> &inputs) {
-    int dim = inputs.front()->getDim();
+    int dim = inputs.front()->size();
     PAddNode *result = PAddNode::newNode(dim);
     result->connect(inputs);
     return result;

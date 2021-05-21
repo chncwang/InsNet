@@ -46,7 +46,7 @@ public:
 
     virtual Executor* generate() = 0;
     virtual std::string typeSignature() const = 0;
-    virtual int getDim() const = 0;
+    virtual int size() const = 0;
 
     virtual const std::string &getNodeType() const {
         return node_type_;
@@ -137,7 +137,7 @@ public:
         return grad_;
     }
 
-    int getDim() const override {
+    int size() const override {
         return dim_;
     }
 
@@ -156,7 +156,7 @@ public:
     }
 
     int getRow() const {
-        return getDim() / column_;
+        return size() / column_;
     }
 
     Mat valMat() {
@@ -262,8 +262,8 @@ public:
 
     virtual void clear() override;
 
-    int getDim() const override {
-        return batch_.front()->getDim();
+    int size() const override {
+        return batch_.front()->size();
     }
 
     BatchedNode();
@@ -286,7 +286,7 @@ public:
         return batch_.front()->generate();
     }
 
-    const std::vector<int> &getDims() const;
+    const std::vector<int> &sizes() const;
 
 protected:
     void afterInit(const std::vector<BatchedNode *> &ins);
@@ -517,13 +517,13 @@ public:
     virtual int calculateActivations();
 #endif
 
-    int getDim() const {
-        return dynamic_cast<Node *>(batch.back())->getDim();
+    int size() const {
+        return dynamic_cast<Node *>(batch.back())->size();
     }
 
     int getRow() const {
         Node &node = dynamic_cast<Node &>(*batch.front());
-        return node.getDim() / node.getColumn();
+        return node.size() / node.getColumn();
     }
 
     const std::string &getNodeType() const {

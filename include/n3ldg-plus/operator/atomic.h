@@ -38,8 +38,6 @@ Node *sigmoid(Node &input);
 /// \return The result tensor. Its size is equal to input.size().
 Node *relu(Node &input);
 
-BatchedNode *relu(BatchedNode &input);
-
 Node *sqrt(Node &input);
 
 BatchedNode *sqrt(BatchedNode &input);

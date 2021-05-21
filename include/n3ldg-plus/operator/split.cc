@@ -23,9 +23,9 @@ public:
     }
 
     void connect(Node &input, int offset) {
-        if (input.getDim() < offset + getDim()) {
-            cerr << fmt::format("input dim:{} offset:{} this dim:{}\n", input.getDim(),
-                offset, getDim());
+        if (input.size() < offset + size()) {
+            cerr << fmt::format("input dim:{} offset:{} this dim:{}\n", input.size(),
+                offset, size());
             abort();
         }
 
@@ -36,7 +36,7 @@ public:
     Executor *generate() override;
 
     void compute () override {
-        int row = getDim() / getColumn();
+        int row = size() / getColumn();
         int in_row = inputDim() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
             Vec(val().v + i * row, row) = Vec(inputVal().v + i * in_row + offset_, row);
@@ -44,7 +44,7 @@ public:
     }
 
     void backward() override {
-        int row = getDim() / getColumn();
+        int row = size() / getColumn();
         int in_row = inputDim() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
             Vec(inputGrad().v + i * in_row + offset_, row) += Vec(getGrad().v + i * row, row);
@@ -53,7 +53,7 @@ public:
 
 protected:
     virtual bool isDimLegal(const Node &input) const override {
-        return offset_ + getDim() <= input.getDim();
+        return offset_ + size() <= input.size();
     }
 
     bool isInputValForwardOnly() const override {
@@ -87,9 +87,9 @@ public:
         int i = 0;
         for (int offset : offsets) {
             for (Node *input_node : input.batch()) {
-                if (offset + dim > input_node->getDim()) {
+                if (offset + dim > input_node->size()) {
                     cerr << fmt::format("offset:{} dim:{} input dim:{}\n", offset, dim,
-                        input_node->getDim());
+                        input_node->size());
                     abort();
                 }
                 SplitNode *s = dynamic_cast<SplitNode *>(batch().at(i++));
@@ -164,7 +164,7 @@ public:
             results.push_back(split.getVal().value);
             int col = split.getColumn();
             cols_.push_back(col);
-            rows_.push_back(split.getDim() / col);
+            rows_.push_back(split.size() / col);
             in_rows_.push_back(split.inputDim() / col);
         }
         cuda::SplitForward(inputs, offsets_, count, rows_, in_rows_, cols_, results);

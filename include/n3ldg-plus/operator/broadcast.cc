@@ -17,26 +17,26 @@ public:
     Executor *generate() override;
 
     void compute() override {
-        int row = getDim() / getColumn();
+        int row = size() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
             Vec(val().v + row * i, row) = inputVal().vec();
         }
     }
 
     void backward() override {
-        int row = getDim() / getColumn();
+        int row = size() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
             inputGrad().vec() += Vec(getGrad().v + row * i, row);
         }
     }
 
     string typeSignature() const override {
-        return Node::getNodeType() + to_string(getDim() / getColumn());
+        return Node::getNodeType() + to_string(size() / getColumn());
     }
 
 protected:
     virtual bool isDimLegal(const Node &input) const override {
-        return getColumn() * input.getDim() == getDim();
+        return getColumn() * input.size() == size();
     }
 
     bool isInputValForwardOnly() const override {
@@ -65,7 +65,7 @@ public:
             in_vals.push_back(b.inputVal().value);
             vals.push_back(b.getVal().value);
             ns.push_back(b.getColumn());
-            in_dim_ = b.getDim() /  b.getColumn();
+            in_dim_ = b.size() /  b.getColumn();
         }
         cuda::NumberPointerArray in_val_arr, val_arr;
         in_val_arr.init(in_vals.data(), count);
@@ -122,7 +122,7 @@ Executor *BroadcastNode::generate() {
 }
 
 Node *broadcast(Node &input, int count) {
-    BroadcastNode *result = BroadcastNode::newNode(input.getDim() * count);
+    BroadcastNode *result = BroadcastNode::newNode(input.size() * count);
     result->setColumn(count);
     result->connect(input);
     return result;

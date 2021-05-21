@@ -198,7 +198,7 @@ public:
         col_offset = 0;
         for (int i = 0; i < count; i++) {
             LinearNode &l = dynamic_cast<LinearNode &>(*batch.at(i));
-            l.val().vec() = Vec(y_.v + col_offset * outDim(), l.getDim());
+            l.val().vec() = Vec(y_.v + col_offset * outDim(), l.size());
             col_offset += l.getColumn();
         }
         Executor::verifyForward();
@@ -250,7 +250,7 @@ public:
         int col_offset = 0;
         for (int i = 0; i < count; i++) {
             LinearNode &l = dynamic_cast<LinearNode &>(*batch.at(i));
-            Vec(ly.v + col_offset * outDim(), l.getDim()) = l.getGrad().vec();
+            Vec(ly.v + col_offset * outDim(), l.size()) = l.getGrad().vec();
             col_offset += l.getColumn();
         }
 
@@ -336,7 +336,7 @@ public:
         col_offset = 0;
         for (int i = 0; i < count; i++) {
             LinearNode &l = dynamic_cast<LinearNode &>(*batch.at(i));
-            l.val().vec() = Vec(y.v + col_offset * outDim(), l.getDim());
+            l.val().vec() = Vec(y.v + col_offset * outDim(), l.size());
             col_offset += l.getColumn();
         }
     }
@@ -355,7 +355,7 @@ public:
         int col_offset = 0;
         for (int i = 0; i < count; i++) {
             LinearNode &l = dynamic_cast<LinearNode &>(*batch.at(i));
-            Vec(ly.v + col_offset * outDim(), l.getDim()) = l.getGrad().vec();
+            Vec(ly.v + col_offset * outDim(), l.size()) = l.getGrad().vec();
             col_offset += l.getColumn();
         }
 
@@ -412,8 +412,8 @@ public:
 
     void setParam(BiasParam &param) {
         bias_param_ = &param;
-        if (getDim() > bias_param_->outDim()) {
-            cerr << fmt::format("dim is {}, but bias param dim is {}\n", getDim(),
+        if (size() > bias_param_->outDim()) {
+            cerr << fmt::format("dim is {}, but bias param dim is {}\n", size(),
                 bias_param_->outDim());
             abort();
         }
@@ -421,7 +421,7 @@ public:
 
 protected:
     virtual bool isDimLegal(const Node &input) const override {
-        return input.getDim() == getDim();
+        return input.size() == size();
     }
 
     bool isInputValForwardOnly() const override {
@@ -440,7 +440,7 @@ private:
 class BatchedBiasNode : public BatchedNodeImpl<BiasNode> {
 public:
     void init(BatchedNode &input, BiasParam &param) {
-        allocateBatch(input.getDim(), input.batch().size());
+        allocateBatch(input.size(), input.batch().size());
         for (Node *node : batch()) {
             BiasNode *b = dynamic_cast<BiasNode *>(node);
             b->setParam(param);
@@ -461,7 +461,7 @@ public:
             inputs.push_back(bias_node->inputVal().value);
             vals.push_back(bias_node->getVal().value);
         }
-        cuda::BiasForward(inputs, bias, batch.size(), getDim(), vals);
+        cuda::BiasForward(inputs, bias, batch.size(), size(), vals);
 #if TEST_CUDA
         Executor::testForward();
         cout << "bias forward tested" << endl;
@@ -476,7 +476,7 @@ public:
             losses.push_back(bias_node->getGrad().value);
             in_losses.push_back(bias_node->inputGrad().value);
         }
-        cuda::BiasBackward(losses, batch.size(), getDim(), bias, in_losses);
+        cuda::BiasBackward(losses, batch.size(), size(), bias, in_losses);
 #if TEST_CUDA
         Executor::testBackward();
         cout << "count:" << batch.size() << endl;
@@ -504,12 +504,12 @@ Executor *BiasNode::generate() {
 }
 
 Node *linear(Node &input, LinearParam &params) {
-    if (input.getDim() % params.W().outDim() != 0) {
-        cerr << fmt::format("linear input dim:{} input col:{} W row:{} W col:{}\n", input.getDim(),
+    if (input.size() % params.W().outDim() != 0) {
+        cerr << fmt::format("linear input dim:{} input col:{} W row:{} W col:{}\n", input.size(),
             input.getColumn(), params.W().outDim(), params.W().inDim());
         abort();
     }
-    int col = input.getDim() / params.W().outDim();
+    int col = input.size() / params.W().outDim();
     int dim = params.W().inDim();
     LinearNode *uni = LinearNode::newNode(dim * col);
     uni->setColumn(col);
@@ -519,8 +519,8 @@ Node *linear(Node &input, LinearParam &params) {
 }
 
 Node *linear(Node &input, Param &param) {
-    if (input.getDim() % param.outDim() != 0) {
-        cerr << fmt::format("linear input dim:%1% W col:%2% W col:%3%\n", input.getDim(),
+    if (input.size() % param.outDim() != 0) {
+        cerr << fmt::format("linear input dim:%1% W col:%2% W col:%3%\n", input.size(),
             input.getColumn(), param.inDim());
         abort();
     }
@@ -536,7 +536,7 @@ Node *linear(Node &input, Param &param) {
         uni_params = it->second;
     }
 
-    int col = input.getDim() / param.outDim();
+    int col = input.size() / param.outDim();
     int dim = param.inDim();
     LinearNode *uni = LinearNode::newNode(dim * col);
     uni->setColumn(col);
@@ -546,7 +546,7 @@ Node *linear(Node &input, Param &param) {
 }
 
 Node *bias(Node &input, BiasParam &param) {
-    int dim = input.getDim();
+    int dim = input.size();
     BiasNode *node = BiasNode::newNode(dim);
     node->setParam(param);
     node->connect(input);

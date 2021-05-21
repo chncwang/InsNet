@@ -22,9 +22,9 @@ public:
         Node::setInputs(inputs);
         Node *in1 = inputs.at(0);
         Node *in2 = inputs.at(1);
-        if (in1->getDim() != getDim() || in2->getDim() != getDim()) {
+        if (in1->size() != size() || in2->size() != size()) {
             cerr << fmt::format("PMultiNode setInputs dim error a:{} b:{} self:{}\n",
-                in1->getDim(), in2->getDim(), getDim());
+                in1->size(), in2->size(), size());
             abort();
         }
     }
@@ -56,7 +56,7 @@ private:
 class BatchedPMultiNode : public BatchedNodeImpl<PMultiNode> {
 public:
     void init(BatchedNode &a, BatchedNode &b) {
-        allocateBatch(a.getDim(), a.batch().size());
+        allocateBatch(a.size(), a.batch().size());
         setInputsPerNode({&a, &b});
         afterInit({&a, &b});
     }
@@ -86,7 +86,7 @@ public:
             in_vals2.push_back(pmulti->input_vals_.at(1)->value);
             vals.push_back(pmulti->val().value);
         }
-        cuda::PMultiForward(in_vals1, in_vals2, count, getDim(), vals);
+        cuda::PMultiForward(in_vals1, in_vals2, count, size(), vals);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->compute();
@@ -111,7 +111,7 @@ public:
             grads1.push_back(pmulti->input_grads_.at(0)->value);
             grads2.push_back(pmulti->input_grads_.at(1)->value);
         }
-        cuda::PMultiBackward(grads, vals1, vals2, count, getDim(), grads1, grads2);
+        cuda::PMultiBackward(grads, vals1, vals2, count, size(), grads1, grads2);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
             batch[idx]->backward();
@@ -134,18 +134,18 @@ Executor * PMultiNode::generate() {
 };
 
 Node *pointwiseMultiply(Node &a, Node &b) {
-    if (a.getDim() != b.getDim()) {
-        cerr << fmt::format("a dim:{} b dim:{}\n", a.getDim(), b.getDim());
+    if (a.size() != b.size()) {
+        cerr << fmt::format("a dim:{} b dim:{}\n", a.size(), b.size());
         abort();
     }
-    PMultiNode *node = PMultiNode::newNode(a.getDim());
+    PMultiNode *node = PMultiNode::newNode(a.size());
     node->connect(a, b);
     return node;
 }
 
 BatchedNode *pointwiseMultiply(BatchedNode &a, BatchedNode &b) {
-    if (a.getDim() != b.getDim()) {
-        cerr << fmt::format("a dim:{} b dim:{}", a.getDim(), b.getDim());
+    if (a.size() != b.size()) {
+        cerr << fmt::format("a dim:{} b dim:{}", a.size(), b.size());
         abort();
     }
     BatchedPMultiNode *node = new BatchedPMultiNode;

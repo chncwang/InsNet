@@ -27,12 +27,12 @@ public:
     Executor *generate() override;
 
     string typeSignature() const override {
-        return Node::getNodeType() + to_string(getDim() / getColumn());
+        return Node::getNodeType() + to_string(size() / getColumn());
     }
 
 protected:
     virtual bool isDimLegal(const Node &input) const override {
-        return input.getDim() == getDim();
+        return input.size() == size();
     }
 
     bool isInputValForwardOnly() const override {
@@ -50,7 +50,7 @@ private:
 class BatchedStandardLayerNormNode : public BatchedNodeImpl<StandardLayerNormNode> {
 public:
     void init(BatchedNode &input) {
-        allocateBatch(input.getDim(), input.batch().size());
+        allocateBatch(input.size(), input.batch().size());
         setInputsPerNode({&input});
         afterInit({&input});
     }
@@ -122,7 +122,7 @@ public:
             StandardLayerNormNode &s = dynamic_cast<StandardLayerNormNode &>(*node);
             col_offsets.at(i) = col_sum;
             dim_offsets.at(i) = col_sum * row;
-            dims.at(i) = s.getDim();
+            dims.at(i) = s.size();
             in_grads.at(i) = s.inputGrad().value;
             grads.at(i++) = s.getGrad().value;
             col_sum += s.getColumn();
@@ -243,7 +243,7 @@ public:
     }
 
     void compute() override {
-        int row = getDim() / getColumn();
+        int row = size() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
             Vec(val().v + i * row, row) = Vec(getInputVal().v + i * row, row) *
                 params_->g().val().vec() + params_->b().val().vec();
@@ -251,7 +251,7 @@ public:
     }
 
     void backward() override {
-        int row = getDim() / getColumn();
+        int row = size() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
             Vec(inputGrad().v + i * row, row) += Vec(getGrad().v + i * row, row) *
                 params_->g().val().vec();
@@ -269,7 +269,7 @@ public:
 
 protected:
     virtual bool isDimLegal(const Node &input) const override {
-        return input.getDim() == getDim();;
+        return input.size() == size();;
     }
 
     bool isInputValForwardOnly() const override {
@@ -292,7 +292,7 @@ private:
 class BatchedPointwiseLinearNode : public BatchedNodeImpl<PointwiseLinearNode> {
 public:
     void init(BatchedNode &input, LayerNormalizationParams &params) {
-        allocateBatch(input.getDim(), input.batch().size());
+        allocateBatch(input.size(), input.batch().size());
         setInputsPerNode({&input});
         for (Node *node : batch()) {
             PointwiseLinearNode &p = dynamic_cast<PointwiseLinearNode &>(*node);
@@ -348,7 +348,7 @@ public:
         for (Node *node : batch)  {
             PointwiseLinearNode &p = dynamic_cast<PointwiseLinearNode &>(*node);
             grads.at(i) = p.getGrad().value;
-            dims.at(i) = p.getDim();
+            dims.at(i) = p.size();
             dim_offsets.at(i) = col_sum * row;
             in_grads.at(i++) = p.inputGrad().value;
             col_sum += p.getColumn();
@@ -408,10 +408,10 @@ Executor *PointwiseLinearNode::generate() {
 Node *layerNormalization(LayerNormalizationParams &params, Node &input_layer,
         int col) {
     using namespace n3ldg_plus;
-    StandardLayerNormNode *a = StandardLayerNormNode::newNode(input_layer.getDim());
+    StandardLayerNormNode *a = StandardLayerNormNode::newNode(input_layer.size());
     a->setColumn(col);
     a->connect(input_layer);
-    PointwiseLinearNode *b = PointwiseLinearNode::newNode(input_layer.getDim());
+    PointwiseLinearNode *b = PointwiseLinearNode::newNode(input_layer.size());
     b->setColumn(col);
     b->params_ = &params;
     b->connect(*a);

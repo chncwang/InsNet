@@ -35,7 +35,7 @@ public:
         }
         int nSize = x.size();
         for (int i = 0; i < nSize; i++) {
-            if (x[i]->val().dim != getDim()) {
+            if (x[i]->val().dim != size()) {
                 cerr << "input matrixes are not matched" << endl;
                 abort();
             }
@@ -51,14 +51,14 @@ public:
 
     void compute() override {
         setMask();
-        for(int i = 0; i < getDim(); i++) {
+        for(int i = 0; i < size(); i++) {
             int mask_i = masks.at(i);
             val()[i] = (*input_vals_.at(mask_i))[i];
         }
     }
 
     void backward() override {
-        for(int i = 0; i < getDim(); i++) {
+        for(int i = 0; i < size(); i++) {
             int mask_i = masks.at(i);
             (*input_grads_.at(mask_i))[i] += grad()[i];
         }
@@ -82,7 +82,7 @@ public:
             thread_count <<= 1;
         }
 
-        for (int dim_i = 0; dim_i < getDim(); ++dim_i) {
+        for (int dim_i = 0; dim_i < size(); ++dim_i) {
             dtype shared_arr[1024];
             dtype shared_indexers[1024];
             for (int i = 0; i < 1024; ++i) {
@@ -143,7 +143,7 @@ public:
     void setMask() override {
         int size = inputSize();
 
-        for (int idx = 0; idx < getDim(); idx++) {
+        for (int idx = 0; idx < size(); idx++) {
             int max_i = -1;
             for (int i = 0; i < size; ++i) {
                 if (max_i == -1 || (*input_vals_.at(i))[idx] > (*input_vals_.at(i))[idx]) {
@@ -171,7 +171,7 @@ class MaxPoolExecutor : public Executor
 public:
     void forward() override {
         int count = batch.size();
-        hit_inputs.init(count * getDim());
+        hit_inputs.init(count * size());
         in_counts.reserve(count);
         for (Node *n : batch) {
             MaxPoolNode *m = dynamic_cast<MaxPoolNode*>(n);
@@ -192,7 +192,7 @@ public:
                 in_vals.push_back(NULL);
             }
         }
-        cuda::PoolForward(cuda::PoolingEnum::MAX, in_vals, vals, count, in_counts, getDim(),
+        cuda::PoolForward(cuda::PoolingEnum::MAX, in_vals, vals, count, in_counts, size(),
                 hit_inputs.value);
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
@@ -225,7 +225,7 @@ public:
             }
         }
 
-        cuda::PoolBackward(grades, in_grades, in_counts, hit_inputs.value, count, getDim());
+        cuda::PoolBackward(grades, in_grades, in_counts, hit_inputs.value, count, size());
 
 #if TEST_CUDA
         for (int idx = 0; idx < count; idx++) {
@@ -289,7 +289,7 @@ public:
         }
 
         for (int i = 0; i < x.size(); i++) {
-            if (x[i]->getDim() != getDim()) {
+            if (x[i]->size() != size()) {
                 cerr << "dim does not match" << endl;
                 abort();
             }
@@ -416,7 +416,7 @@ public:
         int sum = 0;
         for (Node *node : batch) {
             SumPoolNode *s = dynamic_cast<SumPoolNode*>(node);
-            sum += s->getDim() * s->inputSize();
+            sum += s->size() * s->inputSize();
         }
         return sum;
     }
@@ -427,15 +427,15 @@ Executor * SumPoolNode::generate() {
     SumPoolExecutor* exec = new SumPoolExecutor();
     exec->batch.push_back(this);
 #if USE_GPU
-    exec->dim = getDim();
+    exec->dim = size();
 #endif
     return exec;
 }
 
 Node *maxPool(vector<Node *> &inputs) {
-    int dim = inputs.front()->getDim();
+    int dim = inputs.front()->size();
     for (int i = 1; i < inputs.size(); ++i) {
-        if (dim != inputs.at(i)->getDim()) {
+        if (dim != inputs.at(i)->size()) {
             cerr << "dim not equal" << endl;
             abort();
         }
@@ -459,7 +459,7 @@ Node *minPool(vector<Node *> &inputs) {
 }
 
 Node *sumPool(vector<Node *> &inputs) {
-    int dim = inputs.front()->getDim();
+    int dim = inputs.front()->size();
     SumPoolNode *pool = SumPoolNode::newNode(dim);
     pool->connect(inputs);
     return pool;
@@ -471,9 +471,9 @@ Node *avgPool(vector<Node *> &inputs) {
 }
 
 Node *avgPool(Node &input, int row) {
-    int col = input.getDim() / row;
-    if (col * row != input.getDim()) {
-        cerr << fmt::format("avgPool col:{} row:{} input dim:{}", col, row, input.getDim()) <<
+    int col = input.size() / row;
+    if (col * row != input.size()) {
+        cerr << fmt::format("avgPool col:{} row:{} input dim:{}", col, row, input.size()) <<
             endl;
         abort();
     }

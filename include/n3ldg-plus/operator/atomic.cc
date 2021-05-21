@@ -27,7 +27,7 @@ public:
             UniInputNode *expnode = dynamic_cast<UniInputNode*>(node);
             inputs.at(i++) = expnode->inputVal().value;
             vals.push_back(expnode->getVal().value);
-            dims_.push_back(node->getDim());
+            dims_.push_back(node->size());
         }
         cuda::ActivationForward(activation, inputs, batch.size(), dims_, vals);
 #if TEST_CUDA
@@ -102,7 +102,7 @@ public:
 
 protected:
     virtual bool isDimLegal(const Node &input) const override {
-        return input.getDim() == getDim();
+        return input.size() == size();
     }
 
     bool isInputValForwardOnly() const override {
@@ -145,7 +145,7 @@ public:
 
 protected:
     virtual bool isDimLegal(const Node &input) const override {
-        return input.getDim() == getDim();
+        return input.size() == size();
     }
 
     bool isInputValForwardOnly() const override {
@@ -183,7 +183,7 @@ public:
 
 protected:
     virtual bool isDimLegal(const Node &input) const override {
-        return input.getDim() == getDim();
+        return input.size() == size();
     }
 
     bool isInputValForwardOnly() const override {
@@ -192,15 +192,6 @@ protected:
 
     bool isValForwardOnly() const override {
         return false;
-    }
-};
-
-class BatchedReluNode : public BatchedNodeImpl<ReluNode> {
-public:
-    void init(BatchedNode &input) {
-        allocateBatch(input.getDim(), input.batch().size());
-        setInputsPerNode({&input});
-        afterInit({&input});
     }
 };
 
@@ -230,7 +221,7 @@ public:
 
 protected:
     virtual bool isDimLegal(const Node &input) const override {
-        return input.getDim() == getDim();
+        return input.size() == size();
     }
 
     bool isInputValForwardOnly() const override {
@@ -245,7 +236,7 @@ protected:
 class BatchedSqrtNode : public BatchedNodeImpl<SqrtNode> {
 public:
     void init(BatchedNode &input) {
-        allocateBatch(input.getDim(), input.batch().size());
+        allocateBatch(input.size(), input.batch().size());
         setInputsPerNode({&input});
         afterInit({&input});
     }
@@ -267,13 +258,13 @@ public:
 
 #if !USE_GPU || TEST_CUDA
     virtual void generate_dropmask() {
-        int dropNum = (int)(getDim() * drop_value_);
-        vector<int> tmp_masks(getDim());
-        for (int idx = 0; idx < getDim(); idx++) {
+        int dropNum = (int)(size() * drop_value_);
+        vector<int> tmp_masks(size());
+        for (int idx = 0; idx < size(); idx++) {
             tmp_masks[idx] = idx < dropNum ? 0 : 1;
         }
         random_shuffle(tmp_masks.begin(), tmp_masks.end());
-        for (int idx = 0; idx < getDim(); idx++) {
+        for (int idx = 0; idx < size(); idx++) {
             drop_mask_[idx] = tmp_masks[idx];
         }
     }
@@ -337,7 +328,7 @@ public:
 
 protected:
     virtual bool isDimLegal(const Node &input) const override {
-        return input.getDim() == getDim();;
+        return input.size() == size();;
     }
 
     bool isInputValForwardOnly() const override {
@@ -358,7 +349,7 @@ private:
 class BatchedDropoutNode : public BatchedNodeImpl<DropoutNode> {
 public:
     void init(BatchedNode &input, dtype dropout) {
-        allocateBatch(input.getDim(), input.batch().size());
+        allocateBatch(input.size(), input.batch().size());
         for (Node *node : batch()) {
             DropoutNode *d = dynamic_cast<DropoutNode *>(node);
             d->setDropValue(dropout);
@@ -396,8 +387,8 @@ public:
         for (Node *node : batch) {
             DropoutNode &dropout_node = dynamic_cast<DropoutNode&>(*node);
             offsets_.push_back(dim_sum_);
-            dim_sum_ += dropout_node.getDim();
-            dims_.push_back(dropout_node.getDim());
+            dim_sum_ += dropout_node.size();
+            dims_.push_back(dropout_node.size());
         }
 
         drop_mask.init(dim_sum_);
@@ -420,12 +411,12 @@ public:
             drop_mask.copyFromDeviceToHost();
             int offset = 0;
             for (int i = 0; i < count; ++i) {
-                for (int j = 0; j < batch.at(i)->getDim(); ++j) {
+                for (int j = 0; j < batch.at(i)->size(); ++j) {
                     dtype v = drop_mask[offset + j];
                     dynamic_cast<DropoutNode*>(batch.at(i))->dropMask()[j] = v < dropoutValue() ?
                         0 : 1;
                 }
-                offset += batch.at(i)->getDim();
+                offset += batch.at(i)->size();
             }
         }
         Executor::forward();
@@ -434,19 +425,19 @@ public:
         int offset = 0;
         for (NodeAbs *node : batch) {
             Node *x = dynamic_cast<Node *>(node);
-            cout << fmt::format("i:{} dim:{}", i, node->getDim()) << endl;
+            cout << fmt::format("i:{} dim:{}", i, node->size()) << endl;
             if(!x->getVal().verify((getNodeType() + " forward").c_str())) {
                 cout << "cpu:" << endl;
                 cout << x->getVal().toString();
                 cout << "gpu:" << endl;
                 x->getVal().print();
                 cout << "dropout mask:" << endl;
-                for (int j = 0; j < node->getDim(); ++j) {
+                for (int j = 0; j < node->size(); ++j) {
                     cout << j << " " << drop_mask[offset + j] << endl;
                 }
                 throw cuda::CudaVerificationException(i);
             }
-            offset += node->getDim();
+            offset += node->size();
             ++i;
         }
 #endif
@@ -512,8 +503,8 @@ public:
     }
 
     void compute() override {
-        int input_row = inputDim() / getDim();
-        for (int i = 0; i < getDim(); ++i) {
+        int input_row = inputDim() / size();
+        for (int i = 0; i < size(); ++i) {
             float max = inputVal()[input_row * i];
             int max_i = 0;
             for (int j = 1; j < input_row; ++j) {
@@ -528,8 +519,8 @@ public:
     }
 
     void backward() override {
-        int input_row = inputGrad().dim / getDim();
-        for (int i = 0; i < getDim(); ++i) {
+        int input_row = inputGrad().dim / size();
+        for (int i = 0; i < size(); ++i) {
             inputGrad()[i * input_row + max_indexes_.at(i)] += getGrad()[i];
         }
     }
@@ -538,7 +529,7 @@ public:
 
 protected:
     bool isDimLegal(const Node &input) const override {
-        return input.getDim() % getDim() == 0;
+        return input.size() % size() == 0;
     }
 
     bool isInputValForwardOnly() const override {
@@ -567,9 +558,9 @@ public:
 #endif
         vector<dtype*> inputs(batch.size());
         vector<dtype*> results(batch.size());
-        max_indexes.resize(batch.size() * batch.front()->getDim());
+        max_indexes.resize(batch.size() * batch.front()->size());
         vector<int> head_dims(batch.size());
-        int dim = Executor::getDim();
+        int dim = Executor::size();
         for (int i = 0; i < batch.size(); ++i) {
             MaxScalarNode *node = dynamic_cast<MaxScalarNode*>(batch.at(i));
             inputs.at(i) = node->inputVal().value;
@@ -677,7 +668,7 @@ private:
 class BatchedScalarToVectorNode : public BatchedNodeImpl<ScalarToVectorNode> {
 public:
     void init(BatchedNode &input, int row) {
-        allocateBatch(input.getDim() * row, input.batch().size());
+        allocateBatch(input.size() * row, input.batch().size());
         setInputsPerNode({&input});
         afterInit({&input});
     }
@@ -686,7 +677,7 @@ public:
         vector<int> dims(rows.size());
         int i = 0;
         for (int row : rows) {
-            dims.at(i++) = row * input.getDim();
+            dims.at(i++) = row * input.size();
         }
         allocateBatch(dims);
         setInputsPerNode({&input});
@@ -710,7 +701,7 @@ public:
             ScalarToVectorNode *n = dynamic_cast<ScalarToVectorNode*>(node);
             inputs.at(i) = n->inputVal().value;
             results.at(i++) = n->getVal().value;
-            dims_.push_back(n->getDim() / n->getInputVal().dim);
+            dims_.push_back(n->size() / n->getInputVal().dim);
             dim = n->getInputVal().dim;
         }
         cuda::ScalarToVectorForward(inputs, batch.size(), dim, dims_, results);
@@ -790,7 +781,7 @@ public:
 
 protected:
     bool isDimLegal(const Node &input) const override {
-        return input.getDim() == getDim();
+        return input.size() == size();
     }
 
     bool isInputValForwardOnly() const override {
@@ -805,7 +796,7 @@ protected:
 class BatchedExpNode : public BatchedNodeImpl<ExpNode> {
 public:
     void init(BatchedNode &input) {
-        allocateBatch(input.getDims());
+        allocateBatch(input.sizes());
         setInputsPerNode({&input});
         afterInit({&input});
     }
@@ -826,9 +817,9 @@ public:
     }
 
     void compute() override {
-        for (int i = 0; i < getDim(); ++i) {
+        for (int i = 0; i < size(); ++i) {
             dtype sum = 0;
-            int input_row = getInputVal().dim / getDim();
+            int input_row = getInputVal().dim / size();
             for (int j = 0; j < input_row; ++j) {
                 sum += getInputVal()[i * input_row + j];
             }
@@ -837,8 +828,8 @@ public:
     }
 
     void backward() override {
-        for (int i = 0; i < getDim(); ++i) {
-            int input_row = inputGrad().dim / getDim();
+        for (int i = 0; i < size(); ++i) {
+            int input_row = inputGrad().dim / size();
             for (int j = 0; j < input_row; ++j) {
                 inputGrad()[i * input_row + j] += getGrad()[i];
             }
@@ -847,7 +838,7 @@ public:
 
 protected:
     bool isDimLegal(const Node &input) const override {
-        return input.getDim() % getDim() == 0;
+        return input.size() % size() == 0;
     }
 
     bool isInputValForwardOnly() const override {
@@ -882,15 +873,15 @@ class SumExecutor : public Executor {
             SumNode *sum = dynamic_cast<SumNode*>(node);
             inputs.at(i) = sum->inputVal().value;
             results.at(i++) = sum->getVal().value;
-            int row = sum->getInputVal().dim / getDim();
-            if (row * getDim() != sum->getInputVal().dim) {
+            int row = sum->getInputVal().dim / size();
+            if (row * size() != sum->getInputVal().dim) {
                 cerr << fmt::format("SumExecutor forward row:{} dim:{} input dim:{}\n", row,
-                        getDim(), sum->getInputVal().dim);
+                        size(), sum->getInputVal().dim);
                 abort();
             }
             dims_.push_back(row);
         }
-        cuda::VectorSumForward(inputs, batch.size(), getDim(), dims_, results);
+        cuda::VectorSumForward(inputs, batch.size(), size(), dims_, results);
 #if TEST_CUDA
         Executor::testForward();
         cout << "sum tested" << endl;
@@ -911,7 +902,7 @@ class SumExecutor : public Executor {
             input_losses.at(i++) = sum->inputGrad().value;
         }
 
-        cuda::VectorSumBackward(losses, batch.size(), getDim(), dims_, input_losses);
+        cuda::VectorSumBackward(losses, batch.size(), size(), dims_, input_losses);
 #if TEST_CUDA
         Executor::testBackward();
         cout << "sum backward tested" << endl;
@@ -964,7 +955,7 @@ public:
 
 protected:
     bool isDimLegal(const Node &input) const override {
-        return input.getDim() == getDim();
+        return input.size() == size();
     }
 
     bool isInputValForwardOnly() const override {
@@ -983,7 +974,7 @@ private:
 class BatchedScaledNode : public BatchedNodeImpl<ScaledNode> {
 public:
     void init(BatchedNode &input, const vector<dtype> &factors) {
-        const auto &dims = input.getDims();
+        const auto &dims = input.sizes();
         allocateBatch(dims);
 
         int i = 0;
@@ -1008,7 +999,7 @@ public:
         for (Node *node : batch) {
             ScaledNode *scaled = dynamic_cast<ScaledNode *>(node);
             in_vals.at(i++) = scaled->inputVal().value;
-            dims.push_back(scaled->getDim());
+            dims.push_back(scaled->size());
             factors.push_back(scaled->factor_);
         }
         auto vals = getVals();
@@ -1052,10 +1043,10 @@ Executor *ScaledNode::generate() {
 }
 
 Node *max(Node &input, int input_row) {
-    int input_col = input.getDim() / input_row;
-    if (input_col * input_row != input.getDim()) {
+    int input_col = input.size() / input_row;
+    if (input_col * input_row != input.size()) {
         cerr << fmt::format("input_col:{} input_row:{} dim:{}", input_col, input_row,
-                input.getDim()) << endl;
+                input.size()) << endl;
         abort();
     }
     MaxScalarNode *node = MaxScalarNode::newNode(input_col);
@@ -1064,31 +1055,25 @@ Node *max(Node &input, int input_row) {
 }
 
 Node *tanh(Node &input) {
-    TanhNode *result = TanhNode::newNode(input.getDim());
+    TanhNode *result = TanhNode::newNode(input.size());
     result->connect(input);
     return result;
 }
 
 Node *sigmoid(Node &input) {
-    SigmoidNode *result = SigmoidNode::newNode(input.getDim());
+    SigmoidNode *result = SigmoidNode::newNode(input.size());
     result->connect(input);
     return result;
 }
 
 Node *relu(Node &input) {
-    ReluNode *result = ReluNode::newNode(input.getDim());
+    ReluNode *result = ReluNode::newNode(input.size());
     result->connect(input);
     return result;
 }
 
-BatchedNode *relu(BatchedNode &input) {
-    BatchedReluNode *node = new BatchedReluNode;
-    node->init(input);
-    return node;
-}
-
 Node *sqrt(Node &input) {
-    SqrtNode *result = SqrtNode::newNode(input.getDim());
+    SqrtNode *result = SqrtNode::newNode(input.size());
     result->connect(input);
     return result;
 }
@@ -1100,8 +1085,8 @@ BatchedNode *sqrt(BatchedNode &input) {
 }
 
 Node *scalarToVector(Node &input, int row) {
-    ScalarToVectorNode *node = ScalarToVectorNode::newNode(row * input.getDim());
-    node->setColumn(input.getDim());
+    ScalarToVectorNode *node = ScalarToVectorNode::newNode(row * input.size());
+    node->setColumn(input.size());
     node->connect(input);
     return node;
 }
@@ -1131,7 +1116,7 @@ BatchedNode *vectorSum(BatchedNode &input,  int input_col) {
 }
 
 Node *exp(Node &input) {
-    ExpNode *node = ExpNode::newNode(input.getDim());
+    ExpNode *node = ExpNode::newNode(input.size());
     node->connect(input);
     return node;
 }
@@ -1143,8 +1128,8 @@ BatchedNode *exp(BatchedNode &input) {
 }
 
 Node *dropout(Node &input, dtype dropout) {
-    DropoutNode *node = DropoutNode::newNode(input.getDim());
-    node->init(input.getDim());
+    DropoutNode *node = DropoutNode::newNode(input.size());
+    node->init(input.size());
     node->setDropValue(dropout);
     node->connect(input);
     return node;
@@ -1157,7 +1142,7 @@ BatchedNode *dropout(BatchedNode &input, dtype dropout) {
 }
 
 Node *scaled(Node &input, dtype factor) {
-    ScaledNode *node = ScaledNode::newNode(input.getDim());
+    ScaledNode *node = ScaledNode::newNode(input.size());
     node->setFactor(factor);
     node->connect(input);
     return node;

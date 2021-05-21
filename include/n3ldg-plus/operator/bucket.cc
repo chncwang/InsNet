@@ -14,9 +14,9 @@ public:
     }
 
     void forward(Graph &graph, const vector<dtype> &input) {
-        if (input.size() != getDim()) {
+        if (input.size() != size()) {
             cerr << fmt::format("input size {} is not equal to dim {}\n", input.size(),
-                getDim());
+                size());
             abort();
         }
         input_ = input;
@@ -107,22 +107,22 @@ public:
 #if USE_GPU
         int count = batch.size();
         vector<dtype*> ys(batch.size());
-        vector<dtype> cpu_x(batch.size() * getDim());
+        vector<dtype> cpu_x(batch.size() * size());
         int batch_i = 0;
         int j = 0;
         for (Node *node : batch) {
             BucketNode *bucket = dynamic_cast<BucketNode*>(node);
             ys.at(batch_i++) = bucket->val().value;
-            for (int i = 0; i < getDim(); ++i) {
+            for (int i = 0; i < size(); ++i) {
                 cpu_x.at(j++) = bucket->input_.at(i);
             }
         }
-        cuda::BucketForward(cpu_x, count, getDim(), ys);
+        cuda::BucketForward(cpu_x, count, size(), ys);
 #if TEST_CUDA
         for (Node *node : batch) {
             BucketNode *bucket = dynamic_cast<BucketNode*>(node);
             dtype *v = node->val().v;
-            for (int i = 0; i < getDim(); ++i) {
+            for (int i = 0; i < size(); ++i) {
                 v[i] = bucket->input_.at(i);
             }
             cuda::Assert(node->val().verify("bucket forward"));

@@ -74,8 +74,8 @@ void Node::clear() {
 }
 
 void Node::setColumn(int column) {
-    if (getDim() % column != 0) {
-        cerr << fmt::format("MatrixNode setColumn - dim:{} column:{}\n", getDim(),
+    if (size() % column != 0) {
+        cerr << fmt::format("MatrixNode setColumn - dim:{} column:{}\n", size(),
                 column);
         abort();
     }
@@ -165,16 +165,16 @@ BatchedNode::~BatchedNode() {
 string BatchedNode::shape() const {
     bool dims_same = true;
     for (int i = 1; i < batch().size(); ++i) {
-        if (batch().front()->getDim() != batch().at(i)->getDim()) {
+        if (batch().front()->size() != batch().at(i)->size()) {
             dims_same = false;
             break;
         }
     }
     if (dims_same) {
-        return fmt::format("batch size:{} dim:{}", batch().size(), getDim());
+        return fmt::format("batch size:{} dim:{}", batch().size(), size());
     } else {
         string str = fmt::format("batch size:{} dims:", batch().size());
-        for (int dim : getDims()) {
+        for (int dim : sizes()) {
             str += to_string(dim) + ",";
         }
         return str;
@@ -188,12 +188,12 @@ const string &BatchedNode::getNodeType() const {
     return node_type_;
 }
 
-const vector<int> &BatchedNode::getDims() const {
+const vector<int> &BatchedNode::sizes() const {
     if (dims_ == nullptr) {
         dims_ = new vector<int>(batch_.size());
         int i = 0;
         for (Node *node : batch_) {
-            dims_->at(i++) = node->getDim();
+            dims_->at(i++) = node->size();
         }
     }
     return *dims_;
@@ -224,10 +224,10 @@ void BatchedNode::setInputsPerNode(const vector<BatchedNode *> &batched_inputs) 
 
 void validateEqualNodeDims(const vector<Node *> &nodes) {
     for (int i = 1; i < nodes.size(); ++i) {
-        if (nodes.at(i)->getDim() != nodes.front()->getDim()) {
+        if (nodes.at(i)->size() != nodes.front()->size()) {
             cerr << fmt::format(
                     "validateEqualNodeDims - first node size is {}, but {}st is {}",
-                nodes.size(), i, nodes.front()->getDim());
+                nodes.size(), i, nodes.front()->size());
             abort();
         }
     }
@@ -240,7 +240,7 @@ string UniInputNode::typeSignature() const {
 
 void UniInputNode::connect(Node &input) {
     if (!isDimLegal(input)) {
-        cerr << fmt::format("dim:%1% input dim:%2%\n", Node::getDim(), input.getDim());
+        cerr << fmt::format("dim:%1% input dim:%2%\n", Node::size(), input.size());
         abort();
     }
     vector<Node*> ins = {&input};
@@ -263,7 +263,7 @@ void initAndZeroGrads(vector<Node *> &nodes) {
     for (Node *node : nodes) {
         if (!node->getGrad().isInitialized()) {
             grads.push_back(&node->grad());
-            dims.push_back(node->getDim());
+            dims.push_back(node->size());
             sigs.push_back(node->cachedTypeSig());
         }
     }
@@ -295,7 +295,7 @@ vector<dtype *> Executor::getGrads() {
 int Executor::calculateActivations() {
     int sum = 0;
     for (Node *node : batch) {
-        sum += node->getDim();
+        sum += node->size();
     }
     return sum;
 }
@@ -307,13 +307,13 @@ void Executor::forwardFully() {
 
     int size_sum = 0;
     for (Node *node : batch) {
-        size_sum += node->getDim();
+        size_sum += node->size();
     }
     
     auto memory_container = memoryContainer(size_sum * sizeof(dtype));
 
     for (Node *node : batch) {
-        node->val().init(node->getDim(), memory_container);
+        node->val().init(node->size(), memory_container);
     }
     profiler.EndEvent();
 
@@ -395,7 +395,7 @@ int Executor::defaultFLOPs() {
     int sum = 0;
     for (NodeAbs *node : batch) {
         Node *x = dynamic_cast<Node *>(node);
-        sum += x->getDim();
+        sum += x->size();
     }
     return sum;
 }
@@ -410,7 +410,7 @@ void Executor::verifyForward() {
     int i = 0;
     for (NodeAbs *node : batch) {
         Node *x = dynamic_cast<Node *>(node);
-        cout << fmt::format("i:{} dim:{}", i, node->getDim()) << endl;
+        cout << fmt::format("i:{} dim:{}", i, node->size()) << endl;
         if(!x->getVal().verify((getNodeType() + " forward").c_str())) {
             cout << "cpu:" << endl;
             cout << x->getVal().toString();
@@ -438,7 +438,7 @@ void Executor::verifyBackward() {
         int i = 0;
         for (Tensor1D *input_grad : x->input_grads_) {
             if (!input_grad->verify((getNodeType() + " backward " + to_string(i++)).c_str())) {
-                cout << fmt::format("{}th node dim:{}", j, node->getDim()) << endl;
+                cout << fmt::format("{}th node dim:{}", j, node->size()) << endl;
                 cout << "cpu:" << endl << input_grad->toString() << endl;;
                 cerr << "gpu:" << endl;
                 input_grad->print();

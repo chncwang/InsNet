@@ -44,9 +44,9 @@ public:
     }
 
     void setInputs(const vector<Node *> &inputs) override {
-        int input_dim = inputs.front()->getDim();
+        int input_dim = inputs.front()->size();
         for (auto it = inputs.begin() + 1; it != inputs.end(); ++it) {
-            if (input_dim != (*it)->getDim()) {
+            if (input_dim != (*it)->size()) {
                 cerr << "MatrixConcatNode - forward inconsistent input dims" << endl;
                 abort();
             }
@@ -177,7 +177,7 @@ public:
     }
 
     void setInputs(const vector<Node *> &ins) override {
-        int a_size = ins.at(0)->getDim();
+        int a_size = ins.at(0)->size();
         if (a_size % k_ != 0) {
             cerr << fmt::format("MatrixMulMatrixNode setInputs a_size:{} k:{}\n", a_size, k_);
             abort();
@@ -232,8 +232,8 @@ private:
 class BatchedMatrixMulMatrixNode : public BatchedNodeImpl<MatrixMulMatrixNode> {
 public:
     void init(BatchedNode &a, BatchedNode &b, int k) {
-        int a_row = a.getDim() / k;
-        int b_col = b.getDim() / k;
+        int a_row = a.size() / k;
+        int b_col = b.size() / k;
         allocateBatch(a_row * b_col, a.batch().size());
         for (Node *node : batch()) {
             MatrixMulMatrixNode &m = dynamic_cast<MatrixMulMatrixNode &>(*node);
@@ -395,8 +395,8 @@ class BatchedTranMatrixMulMatrixNode : public BatchedNodeImpl<TranMatrixMulMatri
 public:
     void init(BatchedNode &a, BatchedNode &b, int input_row,
             bool use_lower_triangle_mask = false) {
-        int a_col = a.getDim() / input_row;
-        int b_col = b.getDim() / input_row;
+        int a_col = a.size() / input_row;
+        int b_col = b.size() / input_row;
         if (use_lower_triangle_mask && a_col != b_col) {
             cerr << fmt::format("BatchedTranMatrixMulMatrixNode init a_col:{} b_col:{}\n",
                 a_col, b_col);
@@ -484,7 +484,7 @@ Executor* TranMatrixMulMatrixNode::generate() {
 }
 
 Node *concatToMatrix(const vector<Node *> &inputs) {
-    int input_dim = inputs.front()->getDim();
+    int input_dim = inputs.front()->size();
     MatrixConcatNode *node = MatrixConcatNode::newNode(inputs.size() * input_dim);
     node->connect(inputs);
     return node;
@@ -498,8 +498,8 @@ BatchedNode *tranMatrixMulMatrix(BatchedNode &a, BatchedNode &b, int input_row,
 }
 
 Node *matrixMulMatrix(Node &a, Node &b, int k) {
-    int a_row = a.getDim() / k;
-    int b_col = b.getDim() / k;
+    int a_row = a.size() / k;
+    int b_col = b.size() / k;
     MatrixMulMatrixNode *result = MatrixMulMatrixNode::newNode(a_row * b_col);
     result->setColumn(b_col);
     result->k_ = k;

@@ -21,7 +21,7 @@ pair<BatchedNode *, BatchedNode *> dotAttention(BatchedNode &key_matrix,
         bool is_decoder) {
     BatchedNode *raw_weights = tranMatrixMulMatrix(key_matrix, query_matrix, row, is_decoder);
     BatchedNode *scaled_weight = scaled(*raw_weights, 1.0 / ::sqrt((dtype)row));
-    int v_col = value_matrix.getDim() / row;
+    int v_col = value_matrix.size() / row;
     scaled_weight = softmax(*scaled_weight, v_col);
     BatchedNode *hidden = matrixMulMatrix(value_matrix, *scaled_weight, v_col);
     return make_pair(hidden, scaled_weight);
@@ -50,7 +50,7 @@ pair<Node *, Node *> additiveAttention(Node &guide, Node &value, int value_col,
     sum = tanh(*sum);
     Node *score = linear(*sum, params.vt);
     Node *weight = softmax(*score);
-    Node *result = matrixMulMatrix(value, *weight, weight->getDim());
+    Node *result = matrixMulMatrix(value, *weight, weight->size());
     return make_pair(result, weight);
 }
 

@@ -19,7 +19,7 @@ public:
     Executor *generate() override;
 
     void compute() override {
-        int row = getDim() / getColumn();
+        int row = size() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
             dtype max = Mat(inputVal().v + row * i, row, 1).maxCoeff();
             Tensor1D x_exp, x;
@@ -33,7 +33,7 @@ public:
     }
 
     void backward() override {
-        int row = getDim() / getColumn();
+        int row = size() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
             Tensor1D a;
             a.init(row);
@@ -68,7 +68,7 @@ protected:
 class BatchedSoftmaxNode : public BatchedNodeImpl<SoftmaxNode> {
 public:
     void init(BatchedNode &input, int col) {
-        allocateBatch(input.getDims());
+        allocateBatch(input.sizes());
         setInputsPerNode({&input});
         for (Node *node : batch()) {
             node->setColumn(col);
@@ -93,7 +93,7 @@ public:
         for (Node *node : batch) {
             SoftmaxNode &s = dynamic_cast<SoftmaxNode &>(*node);
             vals_.push_back(s.getVal().value);
-            rows_.push_back(s.getDim() / s.getColumn());
+            rows_.push_back(s.size() / s.getColumn());
             cols_.push_back(s.getColumn());
             in_vals.at(i++) = s.inputVal().value;
         }
@@ -113,7 +113,7 @@ public:
             cerr << "input val:" << s.inputVal().toString() << endl;
             cerr << "gpu:" << endl;
             s.inputVal().print();
-            cout << fmt::format("count:{} dim:{} col:{}\n", count, s.getDim(), s.getColumn());
+            cout << fmt::format("count:{} dim:{} col:{}\n", count, s.size(), s.getColumn());
             abort();
         }
 #endif
@@ -128,7 +128,7 @@ public:
         for (Node *node : batch) {
             SoftmaxNode &s = dynamic_cast<SoftmaxNode &>(*node);
             offsets.at(i) = dim_sum;
-            dim_sum += s.getDim();
+            dim_sum += s.size();
             grads.at(i) = s.getGrad().value;
             in_grads.at(i++) = s.inputGrad().value;
         }
@@ -163,10 +163,10 @@ Executor *SoftmaxNode::generate() {
 
 Node* softmax(Node &input, int row) {
     using namespace n3ldg_plus;
-    SoftmaxNode *node = SoftmaxNode::newNode(input.getDim());
-    int col = input.getDim() / row;
-    if (col * row != input.getDim()) {
-        cerr << fmt::format("softmax - col:{} row:{} input dim:{}", col, row, input.getDim()) <<
+    SoftmaxNode *node = SoftmaxNode::newNode(input.size());
+    int col = input.size() / row;
+    if (col * row != input.size()) {
+        cerr << fmt::format("softmax - col:{} row:{} input dim:{}", col, row, input.size()) <<
             endl;
         abort();
     }
@@ -177,9 +177,9 @@ Node* softmax(Node &input, int row) {
 
 BatchedNode* softmax(BatchedNode &input, int row) {
     BatchedSoftmaxNode *ret = new BatchedSoftmaxNode;
-    int col = input.getDim() / row;
-    if (col * row != input.getDim()) {
-        cerr << fmt::format("softmax - col:{} row:{} input dim:{}", col, row, input.getDim()) <<
+    int col = input.size() / row;
+    if (col * row != input.size()) {
+        cerr << fmt::format("softmax - col:{} row:{} input dim:{}", col, row, input.size()) <<
             endl;
         abort();
     }
