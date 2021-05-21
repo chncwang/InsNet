@@ -4,6 +4,8 @@ Manual Reference
 Operators
 ----------
 
-.. doxygengroup:: operator
-        :members:
-        :content-only:
+.. doxygenfunction:: add
+.. doxygenfunction:: max
+.. doxygenfunction:: relu
+.. doxygenfunction:: sigmoid
+.. doxygenfunction:: tanh
