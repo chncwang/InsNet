@@ -38,6 +38,12 @@ Node *sigmoid(Node &input);
 /// \return The result tensor. Its size is equal to input.size().
 Node *relu(Node &input);
 
+/// \ingroup operator
+/// The pointwise sqrt function.
+///
+/// **All sqrt operators will be executed in batch.**
+/// \param input The input tensor.
+/// \return The result tensor. Its size is equal to input.size().
 Node *sqrt(Node &input);
 
 Node *scalarToVector(Node &input, int row);

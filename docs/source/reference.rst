@@ -8,4 +8,5 @@ Operators
 .. doxygenfunction:: max
 .. doxygenfunction:: relu
 .. doxygenfunction:: sigmoid
+.. doxygenfunction:: sqrt
 .. doxygenfunction:: tanh
