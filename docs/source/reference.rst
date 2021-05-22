@@ -10,4 +10,5 @@ Operators
 .. doxygenfunction:: relu
 .. doxygenfunction:: sigmoid
 .. doxygenfunction:: sqrt
+.. doxygenfunction:: sum
 .. doxygenfunction:: tanh

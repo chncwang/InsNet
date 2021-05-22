@@ -50,6 +50,7 @@ Node *sqrt(Node &input);
 /// Expand the input tensor in the row-wise direction.
 ///
 /// For example, expand([0.1, 0.2], 3) will return [0.1, 0.1, 0.1, 0.2, 0.2, 0.2].
+///
 /// We consider expansion in the column-wise direction is rarely used, but if it is really your case, you can use *concat* and pass the same input tensor.
 ///
 /// **The operators whose input tensor's sizes are equal will be executed in batch.** But this batching rule seems not reasonable enough and needs to be modified.
@@ -58,6 +59,17 @@ Node *sqrt(Node &input);
 /// \return The expanded tensor. Its size is equal to input.size() * row.
 Node *expand(Node &input, int row);
 
+/// \ingroup operator
+/// Sum up the input tensor's elements in the row-wise direction.
+///
+/// For example, sum([0.1, 0.1, 0.1, 0.2, 0.2, 0.2], 3) will return [0.3, 0.6].
+/// 
+/// If you want to sum up in the column-wise direction, use *sumPool* instead.
+///
+/// **The operators that returns the equal size of tensors will be executed in batch.** But this batching rule seems not reasonable enough and needs to be modified.
+/// \param input The input tensor.
+/// \param input_row The input tensor's row number.
+/// \return The result tensor. Its size is equal to input.size() / input_row.
 Node *sum(Node &input,  int input_row);
 
 Node *exp(Node &input);
