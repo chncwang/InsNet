@@ -46,6 +46,16 @@ Node *relu(Node &input);
 /// \return The result tensor. Its size is equal to input.size().
 Node *sqrt(Node &input);
 
+/// \ingroup operator
+/// Expand the input tensor in the row-wise direction.
+///
+/// For example, expand([0.1, 0.2], 3) will return [0.1, 0.1, 0.1, 0.2, 0.2, 0.2].
+/// We consider expansion in the column-wise direction is rarely used, but if it is really your case, you can use *concat* and pass the same input tensor.
+///
+/// **The operators whose input tensor's sizes are equal will be executed in batch.** But this batching rule seems not reasonable enough and needs to be modified.
+/// \param input The input tensor.
+/// \param row The row number to expand with.
+/// \return The expanded tensor. Its size is equal to input.size() * row.
 Node *expand(Node &input, int row);
 
 Node *vectorSum(Node &input,  int input_col);
