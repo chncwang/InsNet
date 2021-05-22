@@ -72,6 +72,12 @@ Node *expand(Node &input, int row);
 /// \return The result tensor. Its size is equal to input.size() / input_row.
 Node *sum(Node &input,  int input_row);
 
+/// \ingroup operator
+/// The pointwise exp function.
+///
+/// **All exp operators will be executed in batch.**
+/// \param input The input tensor.
+/// \return The result tensor. Its size is equal to input.size().
 Node *exp(Node &input);
 
 Node *dropout(Node &input, dtype dropout);

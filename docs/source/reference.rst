@@ -5,6 +5,7 @@ Operators
 ----------
 
 .. doxygenfunction:: add
+.. doxygenfunction:: exp
 .. doxygenfunction:: expand
 .. doxygenfunction:: max
 .. doxygenfunction:: relu
