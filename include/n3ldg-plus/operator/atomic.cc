@@ -824,15 +824,6 @@ private:
     friend class SumExecutor;
 };
 
-class BatchedSumNode : public BatchedNodeImpl<SumNode> {
-public:
-    void init(BatchedNode &input, dtype dim) {
-        allocateBatch(dim, input.batch().size());
-        setInputsPerNode({&input});
-        afterInit({&input});
-    }
-};
-
 #if USE_GPU
 class SumExecutor : public Executor {
     void forward() override {
@@ -1056,16 +1047,11 @@ Node *expand(Node &input, int row) {
     return node;
 }
 
-Node *vectorSum(Node &input,  int input_col) {
+Node *sum(Node &input,  int input_row) {
+    int input_col = input.size() / input_row;
     SumNode *sum = SumNode::newNode(input_col);
     sum->connect(input);
     return sum;
-}
-
-BatchedNode *vectorSum(BatchedNode &input,  int input_col) {
-    BatchedSumNode *node = new BatchedSumNode;
-    node->init(input, input_col);
-    return node;
 }
 
 Node *exp(Node &input) {

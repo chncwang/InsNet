@@ -58,9 +58,7 @@ Node *sqrt(Node &input);
 /// \return The expanded tensor. Its size is equal to input.size() * row.
 Node *expand(Node &input, int row);
 
-Node *vectorSum(Node &input,  int input_col);
-
-BatchedNode *vectorSum(BatchedNode &input,  int input_col);
+Node *sum(Node &input,  int input_row);
 
 Node *exp(Node &input);
 
