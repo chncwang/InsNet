@@ -74,8 +74,6 @@ Node *sum(Node &input,  int input_row);
 
 Node *exp(Node &input);
 
-BatchedNode *exp(BatchedNode &input);
-
 Node *dropout(Node &input, dtype dropout);
 
 BatchedNode *dropout(BatchedNode &input, dtype dropout);

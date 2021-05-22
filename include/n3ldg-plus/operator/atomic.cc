@@ -764,15 +764,6 @@ protected:
     }
 };
 
-class BatchedExpNode : public BatchedNodeImpl<ExpNode> {
-public:
-    void init(BatchedNode &input) {
-        allocateBatch(input.sizes());
-        setInputsPerNode({&input});
-        afterInit({&input});
-    }
-};
-
 class SumNode : public UniInputNode, public Poolable<SumNode> {
 public:
     SumNode(): UniInputNode("sum") {}
@@ -1057,12 +1048,6 @@ Node *sum(Node &input,  int input_row) {
 Node *exp(Node &input) {
     ExpNode *node = ExpNode::newNode(input.size());
     node->connect(input);
-    return node;
-}
-
-BatchedNode *exp(BatchedNode &input) {
-    BatchedExpNode *node = new BatchedExpNode;
-    node->init(input);
     return node;
 }
 
