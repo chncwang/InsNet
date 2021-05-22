@@ -21,11 +21,7 @@ Node *relu(Node &input);
 
 Node *sqrt(Node &input);
 
-Node *scalarToVector(Node &input, int row);
-
-BatchedNode *scalarToVector(BatchedNode &input, int row);
-
-BatchedNode *scalarToVector(BatchedNode &input, const ::std::vector<int> &rows);
+Node *expand(Node &input, int row);
 
 Node *vectorSum(Node &input,  int input_col);
 

@@ -656,26 +656,6 @@ private:
     friend class ScalarToVectorExecutor;
 };
 
-class BatchedScalarToVectorNode : public BatchedNodeImpl<ScalarToVectorNode> {
-public:
-    void init(BatchedNode &input, int row) {
-        allocateBatch(input.size() * row, input.batch().size());
-        setInputsPerNode({&input});
-        afterInit({&input});
-    }
-
-    void init(BatchedNode &input, const vector<int> &rows) {
-        vector<int> dims(rows.size());
-        int i = 0;
-        for (int row : rows) {
-            dims.at(i++) = row * input.size();
-        }
-        allocateBatch(dims);
-        setInputsPerNode({&input});
-        afterInit({&input});
-    }
-};
-
 #if USE_GPU
 class ScalarToVectorExecutor : public Executor {
 public:
@@ -1069,22 +1049,10 @@ Node *sqrt(Node &input) {
     return result;
 }
 
-Node *scalarToVector(Node &input, int row) {
+Node *expand(Node &input, int row) {
     ScalarToVectorNode *node = ScalarToVectorNode::newNode(row * input.size());
     node->setColumn(input.size());
     node->connect(input);
-    return node;
-}
-
-BatchedNode *scalarToVector(BatchedNode &input, int row) {
-    BatchedScalarToVectorNode *node = new BatchedScalarToVectorNode;
-    node->init(input, row);
-    return node;
-}
-
-BatchedNode *scalarToVector(BatchedNode &input, const vector<int> &rows) {
-    BatchedScalarToVectorNode *node = new BatchedScalarToVectorNode;
-    node->init(input, rows);
     return node;
 }
 
