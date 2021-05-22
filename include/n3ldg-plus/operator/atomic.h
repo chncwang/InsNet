@@ -80,8 +80,6 @@ Node *sum(Node &input,  int input_row);
 /// \return The result tensor. Its size is equal to input.size().
 Node *exp(Node &input);
 
-BatchedNode *exp(BatchedNode &input);
-
 Node *dropout(Node &input, dtype dropout);
 
 BatchedNode *dropout(BatchedNode &input, dtype dropout);
