@@ -337,19 +337,6 @@ private:
     dtype drop_value_ = 0.0f;
 };
 
-class BatchedDropoutNode : public BatchedNodeImpl<DropoutNode> {
-public:
-    void init(BatchedNode &input, dtype dropout) {
-        allocateBatch(input.size(), input.batch().size());
-        for (Node *node : batch()) {
-            DropoutNode *d = dynamic_cast<DropoutNode *>(node);
-            d->setDropValue(dropout);
-        }
-        setInputsPerNode({&input});
-        afterInit({&input});
-    }
-};
-
 class DropoutExecutor :public Executor {
 public:
     bool isTraining() const {
@@ -1056,12 +1043,6 @@ Node *dropout(Node &input, dtype dropout) {
     node->init(input.size());
     node->setDropValue(dropout);
     node->connect(input);
-    return node;
-}
-
-BatchedNode *dropout(BatchedNode &input, dtype dropout) {
-    BatchedDropoutNode *node = new BatchedDropoutNode;
-    node->init(input, dropout);
     return node;
 }
 

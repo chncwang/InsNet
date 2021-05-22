@@ -76,8 +76,6 @@ Node *exp(Node &input);
 
 Node *dropout(Node &input, dtype dropout);
 
-BatchedNode *dropout(BatchedNode &input, dtype dropout);
-
 Node *scaled(Node &input, dtype factor);
 
 BatchedNode *scaled(BatchedNode &input, const ::std::vector<dtype> &factors);
