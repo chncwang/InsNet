@@ -11,7 +11,7 @@ namespace n3ldg_plus {
 /// **The operators that returns the equal size of tensors will be executed in batch.** But this batching rule seems not reasonable enough and needs to be modified.
 /// \param input The input tensor.
 /// \param row The row number for which the row-wise max should be calculated. Note that the input tensor's size should be divisible by the row number.
-/// \return The tensor of maximal values. Its size is input.size() / row;
+/// \return The tensor of maximal values. Its size is *input.size() / row*;
 Node *max(Node &input, int row);
 
 /// \ingroup operator
@@ -19,7 +19,7 @@ Node *max(Node &input, int row);
 ///
 /// **All tanh operators will be executed in batch.**
 /// \param input The input tensor.
-/// \return The result tensor. Its size is equal to input.size().
+/// \return The result tensor. Its size is equal to *input.size()*.
 Node *tanh(Node &input);
 
 /// \ingroup operator
@@ -27,7 +27,7 @@ Node *tanh(Node &input);
 ///
 /// **All sigmoid operators will be executed in batch.**
 /// \param input The input tensor.
-/// \return The result tensor. Its size is equal to input.size().
+/// \return The result tensor. Its size is equal to *input.size()*.
 Node *sigmoid(Node &input);
 
 /// \ingroup operator
@@ -35,7 +35,7 @@ Node *sigmoid(Node &input);
 ///
 /// **All relu operators will be executed in batch.**
 /// \param input The input tensor.
-/// \return The result tensor. Its size is equal to input.size().
+/// \return The result tensor. Its size is equal to *input.size()*.
 Node *relu(Node &input);
 
 /// \ingroup operator
@@ -43,18 +43,18 @@ Node *relu(Node &input);
 ///
 /// **All sqrt operators will be executed in batch.**
 /// \param input The input tensor.
-/// \return The result tensor. Its size is equal to input.size().
+/// \return The result tensor. Its size is equal to *input.size()*.
 Node *sqrt(Node &input);
 
 /// \ingroup operator
 /// Expand the input tensor in the row-wise direction.
 ///
-/// For example, expand([0.1, 0.2], 3) will return [0.1, 0.1, 0.1, 0.2, 0.2, 0.2].
+/// For example, expandRowwisely([0.1, 0.2], 3) will return [0.1, 0.1, 0.1, 0.2, 0.2, 0.2].
 ///
 /// **The operators whose input tensor's sizes are equal will be executed in batch.** But this batching rule seems not reasonable enough and needs to be modified.
 /// \param input The input tensor.
 /// \param row The row number to expand with.
-/// \return The expanded tensor. Its size is equal to input.size() * row.
+/// \return The expanded tensor. Its size is equal to *input.size() * row*.
 Node *expandRowwisely(Node &input, int row);
 
 /// \ingroup operator
@@ -67,7 +67,7 @@ Node *expandRowwisely(Node &input, int row);
 /// **The operators that returns the equal size of tensors will be executed in batch.** But this batching rule seems not reasonable enough and needs to be modified.
 /// \param input The input tensor.
 /// \param input_row The input tensor's row number.
-/// \return The result tensor. Its size is equal to input.size() / input_row.
+/// \return The result tensor. Its size is equal to *input.size() / input_row*.
 Node *sum(Node &input,  int input_row);
 
 /// \ingroup operator
@@ -75,7 +75,7 @@ Node *sum(Node &input,  int input_row);
 ///
 /// **All exp operators will be executed in batch.**
 /// \param input The input tensor.
-/// \return The result tensor. Its size is equal to input.size().
+/// \return The result tensor. Its size is equal to *input.size()*.
 Node *exp(Node &input);
 
 /// \ingroup operator
@@ -88,7 +88,7 @@ Node *exp(Node &input);
 /// For example, dropout([0.1, 0.1], 0.1) and dropout([0.2, 0.2, 0.2], 0.1) will be executed in batch, but dropout([0.1, 0.1], 0.1) and dropout([0.2, 0.2], 0.2) will not.
 /// \param input The input tensor.
 /// \param p The dropout probability.
-/// \return The result tensor. Its size is equal to input.size().
+/// \return The result tensor. Its size is equal to *input.size()*.
 Node *dropout(Node &input, dtype p);
 
 /// \ingroup operator
@@ -99,7 +99,7 @@ Node *dropout(Node &input, dtype p);
 /// **All mul operators will be executed in batch.**
 /// \param input The input tensor.
 /// \param factor The number to multiply with.
-/// \return The multiplied tensor. Its size is equal to input.size().
+/// \return The multiplied tensor. Its size is equal to *input.size()*.
 Node *mul(Node &input, dtype factor);
 
 BatchedNode *mul(BatchedNode &input, dtype factor);
