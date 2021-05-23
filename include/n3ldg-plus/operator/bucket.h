@@ -20,7 +20,7 @@ Node *tensor(Graph &graph, int size, dtype value);
 /// \ingroup operator
 /// Initialize a tensor with the computation graph and list.
 ///
-/// For example, tensor(graph, [0.1, 0.2]) will return [0.1, 0.2].
+/// For example, tensor(graph, {0.1, 0.2}) will return [0.1, 0.2].
 ///
 /// **The operators passed with the equal size of list will be executed in batch.**
 /// \param graph The computation graph.
