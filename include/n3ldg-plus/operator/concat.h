@@ -5,11 +5,9 @@
 
 namespace n3ldg_plus {
 
-Node *concat(const std::vector<Node*> &inputs, int col = 1);
+Node *cat(const std::vector<Node*> &inputs, int col = 1);
 
-Node *concat(BatchedNode &inputs, int col = 1);
-
-BatchedNode *concatInBatch(const std::vector<BatchedNode *> &inputs);
+Node *cat(BatchedNode &inputs, int col = 1);
 
 }
 

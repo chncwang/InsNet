@@ -185,20 +185,7 @@ Executor* ConcatNode::generate() {
     return new ConcatExecutor();
 }
 
-class BatchedConcatNode : public BatchedNodeImpl<ConcatNode> {
-public:
-    void init(const vector<BatchedNode *> &ins) {
-        int dim = 0;
-        for (BatchedNode *node : ins) {
-            dim += node->size();
-        }
-        allocateBatch(dim, ins.front()->batch().size());
-        setInputsPerNode(ins);
-        afterInit(ins);
-    }
-};
-
-Node *concat(const vector<Node*> &inputs, int col) {
+Node *cat(const vector<Node*> &inputs, int col) {
     int dim = 0;
     for (Node *in : inputs) {
         dim += in->size();
@@ -209,7 +196,7 @@ Node *concat(const vector<Node*> &inputs, int col) {
     return concat;
 }
 
-Node *concat(BatchedNode &inputs, int col) {
+Node *cat(BatchedNode &inputs, int col) {
     int dim = 0;
     for (Node *in : inputs.batch()) {
         dim += in->size();
@@ -221,12 +208,6 @@ Node *concat(BatchedNode &inputs, int col) {
     NodeContainer &container = inputs.getNodeContainer();
     container.addNode(concat);
     return concat;
-}
-
-BatchedNode *concatInBatch(const vector<BatchedNode *> &inputs) {
-    BatchedConcatNode *node = new BatchedConcatNode;
-    node->init(inputs);
-    return node;
 }
 
 }

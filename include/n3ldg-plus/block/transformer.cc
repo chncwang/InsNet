@@ -139,7 +139,7 @@ Node *dotAttention(Node& k, Node& v, Node& q, int row, int head_count,
     BatchedNode *split_v = split(v, head_dim, offsets, v_col);
     BatchedNode *split_attended = dotAttention(*split_k, *split_v, *split_q, head_dim,
             use_mask).first;
-    Node *attended_matrix = concat(*split_attended, q_col);
+    Node *attended_matrix = cat(*split_attended, q_col);
     attended_matrix = linear(*attended_matrix, fusion_param);
     attended_matrix = dropout(*attended_matrix, dropout_value);
     return attended_matrix;
@@ -266,9 +266,9 @@ void TransformerDecoderCellBuilder::step(Node &decoder_input) {
         Node *v = linear(*normed, attention_head_params.v());
 
         Node *&key_matrix = key_matrix_layers_.at(i);
-        key_matrix = key_matrix == nullptr ? k : concat({key_matrix, k});
+        key_matrix = key_matrix == nullptr ? k : cat({key_matrix, k});
         Node *&value_matrix = value_matrix_layers_.at(i);
-        value_matrix = value_matrix == nullptr ? v : concat({value_matrix, v});
+        value_matrix = value_matrix == nullptr ? v : cat({value_matrix, v});
 
         Node *q = linear(*normed, attention_head_params.q());
         int dim = params_->hiddenDim();
