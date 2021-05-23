@@ -6,6 +6,7 @@ Operators
 
 .. doxygenfunction:: add
 .. doxygenfunction:: cat(const std::vector<Node*> &inputs, int col = 1)
+.. doxygenfunction:: div
 .. doxygenfunction:: dropout
 .. doxygenfunction:: exp
 .. doxygenfunction:: expandColumnwisely
