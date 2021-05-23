@@ -9,6 +9,7 @@ Operators
 .. doxygenfunction:: exp
 .. doxygenfunction:: expand
 .. doxygenfunction:: max
+.. doxygenfunction:: mul(Node &, dtype)
 .. doxygenfunction:: relu
 .. doxygenfunction:: sigmoid
 .. doxygenfunction:: sqrt

@@ -93,6 +93,15 @@ Node *exp(Node &input);
 /// \return The result tensor. Its size is equal to input.size().
 Node *dropout(Node &input, dtype p);
 
+/// \ingroup operator
+/// It multiplies the input tensor by the factor.
+//
+/// For example, mul([0.1, 0.1], 2) will return [0.2, 0.2].
+///
+/// **All mul operators will be executed in batch.**
+/// \param input The input tensor.
+/// \param factor The number to multiply with.
+/// \return The multiplied tensor. Its size is equal to input.size().
 Node *mul(Node &input, dtype factor);
 
 BatchedNode *mul(BatchedNode &input, dtype factor);
