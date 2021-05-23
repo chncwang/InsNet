@@ -51,19 +51,7 @@ private:
     friend class BucketExecutor;
 };
 
-class BatchedBucketNode : public BatchedNodeImpl<BucketNode> {
-public:
-    void init(Graph &graph, const vector<dtype> &vals, int batch_size) {
-        allocateBatch(vals.size(), batch_size);
-        for (Node *node : batch()) {
-            BucketNode *b = dynamic_cast<BucketNode *>(node);
-            b->setVals(vals);
-        }
-        graph.addNode(this);
-    }
-};
-
-Node *bucket(Graph &graph, int dim, float v) {
+Node *tensor(Graph &graph, int dim, float v) {
     vector<dtype> vals(dim);
     for (int i = 0; i < dim; ++i) {
         vals.at(i) = v;
@@ -73,26 +61,10 @@ Node *bucket(Graph &graph, int dim, float v) {
     return bucket;
 }
 
-Node *bucket(Graph &graph, const vector<dtype> &v) {
+Node *tensor(Graph &graph, const vector<dtype> &v) {
     BucketNode *bucket = BucketNode::newNode(v.size());
     bucket->forward(graph, v);
     return bucket;
-}
-
-BatchedNode *bucket(Graph &graph, int batch_size, const vector<dtype> &v) {
-    BatchedBucketNode *node = new BatchedBucketNode;
-    node->init(graph, v, batch_size);
-    return node;
-}
-
-BatchedNode *bucket(Graph &graph, int dim, int batch_size, dtype v) {
-    vector<dtype> vals(dim);
-    for (int i = 0; i < dim; ++i) {
-        vals.at(i) = v;
-    }
-    BatchedBucketNode *node = new BatchedBucketNode;
-    node->init(graph, vals, batch_size);
-    return node;
 }
 
 class BucketExecutor : public Executor {

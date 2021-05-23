@@ -60,7 +60,7 @@ void GRUBuilder::step(GRUParam &gru_params, Node &input, Node &h0, dtype dropout
 
     int hidden_dim = h0.size();
     Graph &graph = dynamic_cast<Graph&>(input.getNodeContainer());
-    Node *one = bucket(graph, hidden_dim, 1);
+    Node *one = tensor(graph, hidden_dim, 1);
     Node *reversal_update = sub(*one, *update_gate);
     Node *passed_last_hidden = pointwiseMultiply(*reversal_update, *last_hidden);
     Node *updated_candidate = pointwiseMultiply(*update_gate, *candidate);
