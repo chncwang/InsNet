@@ -70,16 +70,6 @@ private:
     friend class FullDivExecutor;
 };
 
-class BatchedFullDivNode : public BatchedNodeImpl<FullDivNode> {
-public:
-    void init(BatchedNode &numerator, BatchedNode &denominator) {
-        allocateBatch(numerator.sizes());
-        auto ins = {&numerator, &denominator};
-        setInputsPerNode(ins);
-        afterInit(ins);
-    }
-};
-
 #if USE_GPU
 class FullDivExecutor : public Executor {
 public:
@@ -143,16 +133,10 @@ Executor *FullDivNode::generate() {
     return new FullDivExecutor();
 }
 
-Node *fullDiv(Node &numerator, Node &denominator) {
+Node *div(Node &numerator, Node &denominator) {
     FullDivNode *result = FullDivNode::newNode(numerator.size());
     result->connect(numerator, denominator);
     return result;
-}
-
-BatchedNode *fullDiv(BatchedNode &numerator, BatchedNode &denominator) {
-    BatchedFullDivNode *node = new BatchedFullDivNode;
-    node->init(numerator, denominator);
-    return node;
 }
 
 }
