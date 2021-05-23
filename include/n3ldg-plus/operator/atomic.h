@@ -82,7 +82,7 @@ Node *exp(Node &input);
 /// The dropout function.
 ///
 /// If the graph is set to the training stage, it drop out all elements independently with the probability *p*.
-/// Otherwise it scales all elements by *(1 - p)*
+/// Otherwise it scales all elements by (1 - p)
 ///
 /// **The operators with the equal dropout probability will be executed in batch.**
 /// For example, dropout([0.1, 0.1], 0.1) and dropout([0.2, 0.2, 0.2], 0.1) will be executed in batch, but dropout([0.1, 0.1], 0.1) and dropout([0.2, 0.2], 0.2) will not.
