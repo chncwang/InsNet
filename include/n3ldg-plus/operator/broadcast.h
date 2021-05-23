@@ -5,7 +5,7 @@
 
 namespace n3ldg_plus {
 
-Node *broadcast(Node &input, int count);
+Node *expandColumnwisely(Node &input, int col);
 
 }
 

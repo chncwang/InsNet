@@ -45,7 +45,7 @@ pair<Node *, Node *> additiveAttention(Node &guide, Node &value, int value_col,
         AdditiveAttentionParams &params) {
     Node *value_matrix = linear(value, params.k);
     Node *q = linear(guide, params.q);
-    q = broadcast(*q, value_col);
+    q = expandColumnwisely(*q, value_col);
     Node *sum = add({q, value_matrix});
     sum = tanh(*sum);
     Node *score = linear(*sum, params.vt);

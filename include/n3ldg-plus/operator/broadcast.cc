@@ -121,7 +121,7 @@ Executor *BroadcastNode::generate() {
     return new BroadcastExecutor;
 }
 
-Node *broadcast(Node &input, int count) {
+Node *expandColumnwisely(Node &input, int count) {
     BroadcastNode *result = BroadcastNode::newNode(input.size() * count);
     result->setColumn(count);
     result->connect(input);

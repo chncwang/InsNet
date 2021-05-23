@@ -1018,7 +1018,7 @@ Node *sqrt(Node &input) {
     return result;
 }
 
-Node *expand(Node &input, int row) {
+Node *expandRowwisely(Node &input, int row) {
     ScalarToVectorNode *node = ScalarToVectorNode::newNode(row * input.size());
     node->setColumn(input.size());
     node->connect(input);
