@@ -1046,25 +1046,25 @@ Node *dropout(Node &input, dtype dropout) {
     return node;
 }
 
-Node *scaled(Node &input, dtype factor) {
+Node *mul(Node &input, dtype factor) {
     ScaledNode *node = ScaledNode::newNode(input.size());
     node->setFactor(factor);
     node->connect(input);
     return node;
 }
 
-BatchedNode *scaled(BatchedNode &input, const vector<dtype> &factors) {
+BatchedNode *mul(BatchedNode &input, const vector<dtype> &factors) {
     BatchedScaledNode *node = new BatchedScaledNode;
     node->init(input, factors);
     return node;
 }
 
-BatchedNode *scaled(BatchedNode &input, dtype factor) {
+BatchedNode *mul(BatchedNode &input, dtype factor) {
     vector<dtype> factors(input.batch().size());
     for (int i = 0; i < input.batch().size(); ++i) {
         factors.at(i) = factor;
     }
-    return scaled(input, factors);
+    return mul(input, factors);
 }
 
 }

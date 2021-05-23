@@ -20,7 +20,7 @@ pair<BatchedNode *, BatchedNode *> dotAttention(BatchedNode &key_matrix,
         int row,
         bool is_decoder) {
     BatchedNode *raw_weights = tranMatrixMulMatrix(key_matrix, query_matrix, row, is_decoder);
-    BatchedNode *scaled_weight = scaled(*raw_weights, 1.0 / ::sqrt((dtype)row));
+    BatchedNode *scaled_weight = mul(*raw_weights, 1.0 / ::sqrt((dtype)row));
     int v_col = value_matrix.size() / row;
     scaled_weight = softmax(*scaled_weight, v_col);
     BatchedNode *hidden = matrixMulMatrix(value_matrix, *scaled_weight, v_col);

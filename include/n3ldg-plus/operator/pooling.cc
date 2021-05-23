@@ -453,9 +453,9 @@ Node *minPool(vector<Node *> &inputs) {
     vector<Node *> negative;
     negative.reserve(inputs.size());
     for (Node *input : inputs) {
-        negative.push_back(scaled(*input, -1));
+        negative.push_back(mul(*input, -1));
     }
-    return scaled(*maxPool(negative), -1);
+    return mul(*maxPool(negative), -1);
 }
 
 Node *sumPool(vector<Node *> &inputs) {
@@ -467,7 +467,7 @@ Node *sumPool(vector<Node *> &inputs) {
 
 Node *avgPool(vector<Node *> &inputs) {
     Node *sum = sumPool(inputs);
-    return scaled(*sum, 1.0 / inputs.size());
+    return mul(*sum, 1.0 / inputs.size());
 }
 
 Node *avgPool(Node &input, int row) {

@@ -93,11 +93,10 @@ Node *exp(Node &input);
 /// \return The result tensor. Its size is equal to input.size().
 Node *dropout(Node &input, dtype p);
 
-Node *scaled(Node &input, dtype factor);
+Node *mul(Node &input, dtype factor);
 
-BatchedNode *scaled(BatchedNode &input, const ::std::vector<dtype> &factors);
+BatchedNode *mul(BatchedNode &input, dtype factor);
 
-BatchedNode *scaled(BatchedNode &input, dtype factor);
 
 }
 

@@ -157,7 +157,7 @@ vector<Node *> transformerEncoder(Node &inputs, TransformerEncoderParams &params
 
     Graph &graph = dynamic_cast<Graph &>(inputs.getNodeContainer());
     Node *pos_emb = embedding(graph, pos_ids, params.positionalEncodingParam(), false);
-    Node *scaled_input = scaled(inputs, ::sqrt(inputs.size() / inputs.getColumn()));
+    Node *scaled_input = mul(inputs, ::sqrt(inputs.size() / inputs.getColumn()));
     Node *pos_encoded = add({pos_emb, scaled_input});
     pos_encoded = dropout(*pos_encoded, dropout_value);
 
@@ -240,7 +240,7 @@ void TransformerDecoderCellBuilder::step(Node &decoder_input) {
         cerr << "TransformerDecoderBuilder forward - not prepared" << endl;
         abort();
     }
-    Node *scaled_input = scaled(decoder_input,
+    Node *scaled_input = mul(decoder_input,
             std::sqrt(static_cast<dtype>(decoder_input.size())));
     Graph &graph = dynamic_cast<Graph &>(decoder_input.getNodeContainer());
     Node *emb = embedding(graph, decoded_len_, params_->positionalEncodingParam(), false);
@@ -322,7 +322,7 @@ void TransformerDecoderBuilder::connect(Node &inputs) {
     Graph &graph = dynamic_cast<Graph &>(inputs.getNodeContainer());
     Node *pos_emb = embedding(graph, pos_ids, params_->positionalEncodingParam(), false);
     int row = inputs.size() / dec_sentence_len;
-    Node *scaled_input = scaled(inputs, ::sqrt(row));
+    Node *scaled_input = mul(inputs, ::sqrt(row));
     Node *pos_encoded = add({pos_emb, scaled_input});
     pos_encoded = dropout(*pos_encoded, dropout_);
 
