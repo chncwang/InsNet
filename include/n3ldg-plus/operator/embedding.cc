@@ -82,24 +82,24 @@ private:
 
 template <typename ParamType>
 Node *embedding(Graph &graph, const vector<int> &ids, ParamType &lookup,
-        bool should_backward = true) {
+        bool freeze = false) {
     LookupNode<ParamType>* input_lookup =
         LookupNode<ParamType>::newNode(lookup.outDim() * ids.size());
-    input_lookup->setShouldBackward(should_backward);
+    input_lookup->setShouldBackward(!freeze);
     input_lookup->setParam(lookup);
     input_lookup->connect(graph, ids);
     return input_lookup;
 }
 
 template <typename ParamType>
-Node *embedding(Graph &graph, int id, ParamType &lookup, bool should_backward = true) {
+Node *embedding(Graph &graph, int id, ParamType &lookup, bool freeze = false) {
     vector<int> ids = {id};
-    return embedding(graph, ids, lookup, should_backward);
+    return embedding(graph, ids, lookup, freeze);
 }
 
 template <typename ParamType>
 Node *embedding(Graph &graph, const vector<string> &words, Embedding<ParamType> &lookup, int dim,
-        bool should_backward = true) {
+        bool freeze = false) {
     using namespace std;
     vector<int> ids;
     ids.reserve(words.size());
@@ -119,30 +119,30 @@ Node *embedding(Graph &graph, const vector<string> &words, Embedding<ParamType> 
     LookupNode<ParamType>* input_lookup = LookupNode<ParamType>::newNode(dim * words.size());
     input_lookup->setParam(lookup.E);
     input_lookup->connect(graph, ids);
-    input_lookup->setShouldBackward(should_backward);
+    input_lookup->setShouldBackward(!freeze);
     return input_lookup;
 }
 
 template <typename ParamType>
 Node *embedding(Graph &graph, const string &word, Embedding<ParamType> &lookup, int dim,
-        bool should_backward = true) {
+        bool freeze = false) {
     using namespace std;
     vector<string> words = {word};
-    return embedding(graph, words, lookup, dim, should_backward);
+    return embedding(graph, words, lookup, dim, freeze);
 }
 
 template <typename ParamType>
 Node *embedding(Graph &graph, const vector<string> &words, Embedding<ParamType> &lookup,
-        bool should_backward = true) {
-    return embedding(graph, words, lookup, lookup.nDim, should_backward);
+        bool freeze = false) {
+    return embedding(graph, words, lookup, lookup.nDim, freeze);
 }
 
 template <typename ParamType>
 Node *embedding(Graph &graph, const string &word, Embedding<ParamType> &lookup,
-        bool should_backward = true) {
+        bool freeze = false) {
     using namespace std;
     vector<string> words = {word};
-    return embedding(graph, words, lookup, should_backward);
+    return embedding(graph, words, lookup, freeze);
 }
 
 template<typename ParamType>
@@ -263,31 +263,31 @@ Executor* LookupNode<ParamType>::generate() {
 }
 
 Node *embedding(Graph &graph, const vector<int> &ids, Param &lookup,
-        bool should_backward) {
-    return embedding<Param>(graph, ids, lookup, should_backward);
+        bool freeze) {
+    return embedding<Param>(graph, ids, lookup, freeze);
 }
 
-Node *embedding(Graph &graph, int id, Param &lookup, bool should_backward) {
-    return embedding<Param>(graph, id, lookup, should_backward);
+Node *embedding(Graph &graph, int id, Param &lookup, bool freeze) {
+    return embedding<Param>(graph, id, lookup, freeze);
 }
 
 Node *embedding(Graph &graph, const vector<string> &words, Embedding<Param> &lookup,
-        bool should_backward) {
-    return embedding<Param>(graph, words, lookup, should_backward);
+        bool freeze) {
+    return embedding<Param>(graph, words, lookup, freeze);
 }
 
 Node *embedding(Graph &graph, const vector<string> &words, Embedding<SparseParam> &lookup,
-        bool should_backward) {
-    return embedding<SparseParam>(graph, words, lookup, should_backward);
+        bool freeze) {
+    return embedding<SparseParam>(graph, words, lookup, freeze);
 }
 
-Node *embedding(Graph &graph, const string &word, Embedding<Param> &lookup, bool should_backward) {
-    return embedding<Param>(graph, word, lookup, should_backward);
+Node *embedding(Graph &graph, const string &word, Embedding<Param> &lookup, bool freeze) {
+    return embedding<Param>(graph, word, lookup, freeze);
 }
 
 Node *embedding(Graph &graph, const string &word, Embedding<SparseParam> &lookup,
-        bool should_backward) {
-    return embedding<SparseParam>(graph, word, lookup, should_backward);
+        bool freeze) {
+    return embedding<SparseParam>(graph, word, lookup, freeze);
 }
 
 }
