@@ -80,7 +80,18 @@ Node *sum(Node &input,  int input_row);
 /// \return The result tensor. Its size is equal to input.size().
 Node *exp(Node &input);
 
-Node *dropout(Node &input, dtype dropout);
+/// \ingroup operator
+/// The dropout function.
+///
+/// If the graph is set to the training stage, it drop out all elements independently with the probability *p*.
+/// Otherwise it scales all elements by *(1 - p)*
+///
+/// **The operators with the equal dropout probability will be executed in batch.**
+/// For example, dropout([0.1, 0.1], 0.1) and dropout([0.2, 0.2, 0.2], 0.1) will be executed in batch, but dropout([0.1, 0.1], 0.1) and dropout([0.2, 0.2], 0.2) will not.
+/// \param input The input tensor.
+/// \param p The dropout probability.
+/// \return The result tensor. Its size is equal to input.size().
+Node *dropout(Node &input, dtype p);
 
 Node *scaled(Node &input, dtype factor);
 
