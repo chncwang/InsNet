@@ -51,7 +51,7 @@ private:
     friend class BucketExecutor;
 };
 
-Node *tensor(Graph &graph, int dim, float v) {
+Node *tensor(Graph &graph, int dim, dtype v) {
     vector<dtype> vals(dim);
     for (int i = 0; i < dim; ++i) {
         vals.at(i) = v;
