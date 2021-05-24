@@ -262,32 +262,32 @@ Executor* LookupNode<ParamType>::generate() {
     return new LookupExecutor<ParamType>();
 }
 
-Node *embedding(Graph &graph, const vector<int> &ids, Param &lookup,
+Node *embedding(Graph &graph, const vector<int> &ids, BaseParam &lookup,
         bool freeze) {
-    return embedding<Param>(graph, ids, lookup, freeze);
+    return lookup.isSparse() ?
+        embedding<SparseParam>(graph, ids, dynamic_cast<SparseParam &>(lookup), freeze) :
+        embedding<Param>(graph, ids, dynamic_cast<Param &>(lookup), freeze);
 }
 
-Node *embedding(Graph &graph, int id, Param &lookup, bool freeze) {
-    return embedding<Param>(graph, id, lookup, freeze);
+Node *embedding(Graph &graph, int id, BaseParam &lookup, bool freeze) {
+    return lookup.isSparse() ?
+        embedding<SparseParam>(graph, id, dynamic_cast<SparseParam &>(lookup), freeze) :
+        embedding<Param>(graph, id, dynamic_cast<Param &>(lookup), freeze);
 }
 
-Node *embedding(Graph &graph, const vector<string> &words, Embedding<Param> &lookup,
+Node *embedding(Graph &graph, const vector<string> &words, EmbeddingAbs &lookup,
         bool freeze) {
-    return embedding<Param>(graph, words, lookup, freeze);
+    return lookup.param().isSparse() ?
+        embedding<SparseParam>(graph, words, dynamic_cast<Embedding<SparseParam> &>(lookup),
+                freeze) :
+        embedding<Param>(graph, words, dynamic_cast<Embedding<Param> &>(lookup), freeze);
 }
 
-Node *embedding(Graph &graph, const vector<string> &words, Embedding<SparseParam> &lookup,
-        bool freeze) {
-    return embedding<SparseParam>(graph, words, lookup, freeze);
-}
-
-Node *embedding(Graph &graph, const string &word, Embedding<Param> &lookup, bool freeze) {
-    return embedding<Param>(graph, word, lookup, freeze);
-}
-
-Node *embedding(Graph &graph, const string &word, Embedding<SparseParam> &lookup,
-        bool freeze) {
-    return embedding<SparseParam>(graph, word, lookup, freeze);
+Node *embedding(Graph &graph, const string &word, EmbeddingAbs &lookup, bool freeze) {
+    return lookup.param().isSparse() ?
+        embedding<SparseParam>(graph, word, dynamic_cast<Embedding<SparseParam> &>(lookup),
+                freeze) :
+        embedding<Param>(graph, word, dynamic_cast<Embedding<Param> &>(lookup), freeze);
 }
 
 }

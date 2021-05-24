@@ -9,8 +9,13 @@
 
 namespace n3ldg_plus {
 
+class EmbeddingAbs {
+public:
+    virtual BaseParam &param() = 0;
+};
+
 template<typename ParamType>
-class Embedding : public TunableCombination<BaseParam>
+class Embedding : public TunableCombination<BaseParam>, public EmbeddingAbs
 #if USE_GPU
 , public cuda::TransferableComponents
 #endif
@@ -29,6 +34,10 @@ public:
         nDim = 0;
         nUNKId = -1;
         bFineTune = false;
+    }
+
+    BaseParam &param() override {
+        return E;
     }
 
     int size() const {
@@ -212,21 +221,14 @@ public:
     }
 };
 
-Node *embedding(Graph &graph, const std::vector<int> &ids, Param &lookup, bool freeze = false);
+Node *embedding(Graph &graph, const std::vector<int> &ids, BaseParam &lookup, bool freeze = false);
 
-Node *embedding(Graph &graph, int id, Param &lookup, bool freeze = false);
+Node *embedding(Graph &graph, int id, BaseParam &lookup, bool freeze = false);
 
-Node *embedding(Graph &graph, const std::vector<std::string> &words, Embedding<Param> &lookup,
+Node *embedding(Graph &graph, const std::vector<std::string> &words, EmbeddingAbs &lookup,
         bool freeze = false);
 
-Node *embedding(Graph &graph, const std::vector<std::string> &words,
-        Embedding<SparseParam> &lookup,
-        bool freeze = false);
-
-Node *embedding(Graph &graph, const std::string &word, Embedding<Param> &lookup,
-        bool freeze = false);
-
-Node *embedding(Graph &graph, const std::string &word, Embedding<SparseParam> &lookup,
+Node *embedding(Graph &graph, const std::string &word, EmbeddingAbs &lookup,
         bool freeze = false);
 
 }

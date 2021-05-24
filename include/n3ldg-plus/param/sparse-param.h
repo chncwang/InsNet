@@ -46,6 +46,10 @@ public:
 
     void rescaleGrad(dtype scale) override;
 
+    bool isSparse() override {
+        return true;
+    }
+
     template<typename Archive>
     void serialize(Archive &ar) {
         ar(val_, aux_square_, aux_mean_);

@@ -77,6 +77,8 @@ public:
     virtual void adamW(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) = 0;
     virtual int outDim() = 0;
     virtual int inDim() = 0;
+    virtual bool isSparse() = 0;
+
     virtual const std::string& getParamName() const {
         return name_;
     }
