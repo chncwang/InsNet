@@ -9,6 +9,7 @@ Operators
 .. doxygenfunction:: div
 .. doxygenfunction:: dropout
 .. doxygenfunction:: exp
+.. doxygenfunction:: embedding(Graph &graph, const std::vector<int> &ids, BaseParam &param, bool freeze = false)
 .. doxygenfunction:: expandColumnwisely
 .. doxygenfunction:: expandRowwisely
 .. doxygenfunction:: max
