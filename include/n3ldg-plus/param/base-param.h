@@ -75,9 +75,25 @@ public:
     virtual void adagrad(dtype alpha, dtype reg, dtype eps) = 0;
     virtual void adam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) = 0;
     virtual void adamW(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) = 0;
-    virtual int outDim() = 0;
-    virtual int inDim() = 0;
     virtual bool isSparse() = 0;
+
+    int row() const {
+        return val_.row;
+    }
+
+    int col() const {
+        return val_.col;
+    }
+
+    [[deprecated("use row() instead")]]
+    int outDim() {
+        return val_.row;
+    }
+
+    [[deprecated("use col() instead")]]
+    int inDim() {
+        return val_.col;
+    }
 
     virtual const std::string& getParamName() const {
         return name_;

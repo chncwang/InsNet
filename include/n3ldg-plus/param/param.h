@@ -36,14 +36,6 @@ public:
     }
 #endif
 
-    int outDim() override {
-        return val_.row;
-    }
-
-    int inDim() override {
-        return val_.col;
-    }
-
     void adagrad(dtype alpha, dtype reg, dtype eps) override;
 
     void adam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) override;
