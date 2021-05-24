@@ -21,14 +21,6 @@ public:
 
     void init(int outDim, int inDim) override;
 
-    int outDim() override {
-        return val_.row;
-    }
-
-    int inDim() override {
-        return val_.col;
-    }
-
     void initAndZeroGrad() override;
 
     void adagrad(dtype alpha, dtype reg, dtype eps) override;
