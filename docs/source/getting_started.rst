@@ -141,8 +141,8 @@ Next, we want to pass *src* to a Transformer layer where every word only attends
                 Node *emb = n3ldg_plus::embedding(graph, sentence, model_params.embedding);
 
                 // model_params.sentence_encoder is the parameter to encode sentences.
-                Node *enc = n3ldg_plus::transformerEncoder(*emb, ins.src.size(),
-                        model_params.sentence_encoder, 0.1).back();
+                Node *enc = n3ldg_plus::transformerEncoder(*emb, model_params.sentence_encoder,
+                    0.1).back();
                 ...
             }
 
@@ -163,8 +163,8 @@ Then suppose we want to attain sentence embeddings by using *avgPool* so that we
                 Node *emb = n3ldg_plus::embedding(graph, sentence, model_params.embedding);
 
                 // model_params.sentence_encoder is the parameter to encode sentences.
-                Node *enc = n3ldg_plus::transformerEncoder(*emb, ins.src.size(),
-                        model_params.sentence_encoder, 0.1).back();
+                Node *enc = n3ldg_plus::transformerEncoder(*emb, model_params.sentence_encoder,
+                    0.1).back();
                 enc = n3ldg_plus::avgPool(*enc, 512); // 512 is the hidden dim.
                 sen_embs.push_back(enc);
             }
@@ -189,8 +189,8 @@ Finally, based on the sentence embeddings, we can build the encoder of documents
                 Node *emb = n3ldg_plus::embedding(graph, sentence, model_params.embedding);
 
                 // model_params.sentence_encoder is the parameter to encode sentences.
-                Node *enc = n3ldg_plus::transformerEncoder(*emb, ins.src.size(),
-                        model_params.sentence_encoder, 0.1).back();
+                Node *enc = n3ldg_plus::transformerEncoder(*emb, model_params.sentence_encoder,
+                    0.1).back();
                 enc = n3ldg_plus::avgPool(*enc, 512); // 512 is the hidden dim.
                 sen_embs.push_back(enc);
             }
