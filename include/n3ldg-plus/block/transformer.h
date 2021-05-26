@@ -72,11 +72,11 @@ public:
         return ffn_outter_params_;
     }
 
-    LayerNormalizationParams &layerNormA() {
+    LayerNormParams &layerNormA() {
         return layer_norm_a_;
     }
 
-    LayerNormalizationParams &layerNormB() {
+    LayerNormParams &layerNormB() {
         return layer_norm_b_;
     }
 
@@ -98,8 +98,8 @@ private:
     LinearParam heads_fusion_params_;
     LinearParam ffn_inner_params_;
     LinearParam ffn_outter_params_;
-    LayerNormalizationParams layer_norm_a_;
-    LayerNormalizationParams layer_norm_b_;
+    LayerNormParams layer_norm_a_;
+    LayerNormParams layer_norm_b_;
 };
 
 inline void initPositionalEncodingParam(Param &param, int dim, int max_sentence_len) {
@@ -225,15 +225,15 @@ public:
         return ffn_outter_params_;
     }
 
-    LayerNormalizationParams &layerNormA() {
+    LayerNormParams &layerNormA() {
         return layer_norm_a_;
     }
 
-    LayerNormalizationParams &layerNormB() {
+    LayerNormParams &layerNormB() {
         return layer_norm_b_;
     }
 
-    LayerNormalizationParams &layerNormC() {
+    LayerNormParams &layerNormC() {
         return layer_norm_c_;
     }
 
@@ -257,9 +257,9 @@ private:
     LinearParam encoder_fusion_;
     LinearParam ffn_inner_params_;
     LinearParam ffn_outter_params_;
-    LayerNormalizationParams layer_norm_a_;
-    LayerNormalizationParams layer_norm_b_;
-    LayerNormalizationParams layer_norm_c_;
+    LayerNormParams layer_norm_a_;
+    LayerNormParams layer_norm_b_;
+    LayerNormParams layer_norm_c_;
 };
 
 typedef TransformerParams<TransformerDecoderLayerParams> TransformerDecoderParams;

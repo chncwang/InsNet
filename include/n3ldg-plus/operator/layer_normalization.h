@@ -5,13 +5,13 @@
 
 namespace n3ldg_plus {
 
-class LayerNormalizationParams : public TunableCombination<BaseParam>
+class LayerNormParams : public TunableCombination<BaseParam>
 #if USE_GPU
 , public cuda::TransferableComponents 
 #endif
 {
 public:
-    LayerNormalizationParams(const std::string &name) : g_(name + "-g"), b_(name + "-b") {}
+    LayerNormParams(const std::string &name) : g_(name + "-g"), b_(name + "-b") {}
 
     void init(int dim) {
         g_.init(dim, 1);
@@ -48,12 +48,11 @@ private:
     BiasParam b_;
 };
 
-Node *layerNormalization(LayerNormalizationParams &params, Node &input_layer, int col = 1);
+Node *layerNorm(Node &input, int row);
 
-BatchedNode *layerNormalization(LayerNormalizationParams &params, BatchedNode &input_layer);
+Node *layerNorm(Node &input, LayerNormParams &params);
 
-std::vector<Node *> layerNormalization(LayerNormalizationParams &params,
-        const std::vector<Node *> &input_layer);
+Node *affine(Node &input, LayerNormParams &params);
 
 }
 
