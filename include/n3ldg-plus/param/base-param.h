@@ -85,12 +85,12 @@ public:
         return val_.col;
     }
 
-    [[deprecated("use row() instead")]]
+    [[deprecated("Obscured name, use row() instead")]]
     int outDim() {
         return val_.row;
     }
 
-    [[deprecated("use col() instead")]]
+    [[deprecated("Obscured name, use col() instead")]]
     int inDim() {
         return val_.col;
     }

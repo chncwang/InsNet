@@ -4,6 +4,7 @@ using std::string;
 using std::to_string;
 using std::vector;
 using std::cout;
+using std::cerr;
 using std::endl;
 
 namespace n3ldg_plus {
@@ -45,15 +46,6 @@ protected:
 
 private:
     friend class LayerNormExecutor;
-};
-
-class BatchedStandardLayerNormNode : public BatchedNodeImpl<StandardLayerNormNode> {
-public:
-    void init(BatchedNode &input) {
-        allocateBatch(input.size(), input.batch().size());
-        setInputsPerNode({&input});
-        afterInit({&input});
-    }
 };
 
 #if USE_GPU
@@ -267,6 +259,8 @@ public:
         return Node::getNodeType() + "-" + addressToString(params_);
     }
 
+    LayerNormParams *params_;
+
 protected:
     virtual bool isDimLegal(const Node &input) const override {
         return input.size() == size();;
@@ -278,27 +272,6 @@ protected:
 
     bool isValForwardOnly() const override {
         return true;
-    }
-
-private:
-    LayerNormalizationParams *params_;
-
-    friend class BatchedPointwiseLinearNode;
-    friend class PointwiseLinearExecutor;
-    friend Node *layerNormalization(LayerNormalizationParams &params,
-            Node &input_layer, int col);
-};
-
-class BatchedPointwiseLinearNode : public BatchedNodeImpl<PointwiseLinearNode> {
-public:
-    void init(BatchedNode &input, LayerNormalizationParams &params) {
-        allocateBatch(input.size(), input.batch().size());
-        setInputsPerNode({&input});
-        for (Node *node : batch()) {
-            PointwiseLinearNode &p = dynamic_cast<PointwiseLinearNode &>(*node);
-            p.params_ = &params;
-        }
-        afterInit({&input});
     }
 };
 
@@ -378,7 +351,7 @@ private:
     cuda::IntArray col_arr_;
     int max_col_;
 
-    LayerNormalizationParams &params() {
+    LayerNormParams &params() {
         return *dynamic_cast<PointwiseLinearNode *>(batch.front())->params_;
     }
 };
@@ -395,7 +368,7 @@ public:
         Executor::backward();
     }
 
-    LayerNormalizationParams &params() {
+    LayerNormParams &params() {
         return *dynamic_cast<PointwiseLinearNode *>(batch.front())->params_;
     }
 };
@@ -405,37 +378,37 @@ Executor *PointwiseLinearNode::generate() {
     return new PointwiseLinearExecutor;
 }
 
-Node *layerNormalization(LayerNormalizationParams &params, Node &input_layer,
-        int col) {
-    using namespace n3ldg_plus;
-    StandardLayerNormNode *a = StandardLayerNormNode::newNode(input_layer.size());
+Node *layerNorm(Node &input, LayerNormParams &params) {
+    int row = params.g().row();
+    return affine(*layerNorm(input, row), params);
+}
+
+Node *layerNorm(Node &input, int row) {
+    StandardLayerNormNode *a = StandardLayerNormNode::newNode(input.size());
+    int col = input.size() / row;
+    if (col * row != input.size()) {
+        cerr << fmt::format("layerNorm - col:{} row:{} input size:{}\n", col, row, input.size()) <<
+            endl;
+        abort();
+    }
     a->setColumn(col);
-    a->connect(input_layer);
-    PointwiseLinearNode *b = PointwiseLinearNode::newNode(input_layer.size());
+    a->connect(input);
+    return a;
+}
+
+Node *affine(Node &input, LayerNormParams &params) {
+    PointwiseLinearNode *b = PointwiseLinearNode::newNode(input.size());
+    int row = params.g().row();
+    int col = input.size() / params.g().row();
+    if (col * row != input.size()) {
+        cerr << fmt::format("layerNorm - col:{} row:{} input size:{}\n", col, row, input.size()) <<
+            endl;
+        abort();
+    }
     b->setColumn(col);
     b->params_ = &params;
-    b->connect(*a);
+    b->connect(input);
     return b;
-}
-
-BatchedNode *layerNormalization(LayerNormalizationParams &params,
-        BatchedNode &input_layer) {
-    using namespace n3ldg_plus;
-    BatchedStandardLayerNormNode *a = new BatchedStandardLayerNormNode;
-    a->init(input_layer);
-    BatchedPointwiseLinearNode *b = new BatchedPointwiseLinearNode;
-    b->init(*a, params);
-    return b;
-}
-
-vector<Node *> layerNormalization(LayerNormalizationParams &params,
-        const vector<Node *> &input_layer) {
-    vector<Node *> results;
-    results.reserve(input_layer.size());
-    for (Node *x : input_layer) {
-        results.push_back(layerNormalization(params, *x));
-    }
-    return results;
 }
 
 }

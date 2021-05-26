@@ -169,8 +169,7 @@ vector<Node *> transformerEncoder(Node &inputs, TransformerEncoderParams &params
     for (int i = 0; i < layer_count; ++i) {
         auto &layer_params = *params.layerParams().ptrs().at(i);
 
-        Node *normed = layerNormalization(layer_params.layerNormA(), *last_layer,
-                sentence_len);
+        Node *normed = layerNorm(*last_layer, layer_params.layerNormA());
         auto &attention_head_params = layer_params.multiHeadAttentionParams();
         Node *key = linear(*normed, attention_head_params.k());
         Node *value = linear(*normed, attention_head_params.v());
@@ -179,7 +178,7 @@ vector<Node *> transformerEncoder(Node &inputs, TransformerEncoderParams &params
         Node *attended = dotAttention(*key, *value, *q, dim, params.headCount(),
                 layer_params.headsFusionParams(), dropout_value, false);
         Node *added = add({attended, last_layer});
-        normed = layerNormalization(layer_params.layerNormB(), *added, sentence_len);
+        normed = layerNorm(*added, layer_params.layerNormB());
         Node *t = linear(*normed, layer_params.ffnInnerParams());
         t = relu(*t);
         t = linear(*t, layer_params.ffnOutterParams());
@@ -260,8 +259,7 @@ void TransformerDecoderCellBuilder::step(Node &decoder_input) {
     for (int i = 0; i < layer_count; ++i) {
         auto &layer_params = *params_->layerParams().ptrs().at(i);
         auto &attention_head_params = layer_params.selfAttention();
-        Node *normed = layerNormalization(layer_params.layerNormA(),
-                *last_layer_node);
+        Node *normed = layerNorm(*last_layer_node, layer_params.layerNormA());
         Node *k = linear(*normed, attention_head_params.k());
         Node *v = linear(*normed, attention_head_params.v());
 
@@ -275,7 +273,7 @@ void TransformerDecoderCellBuilder::step(Node &decoder_input) {
         Node *attended = dotAttention(*key_matrix, *value_matrix, *q, dim, params_->headCount(),
                 layer_params.selfFusion(), dropout_, false);
         Node *added = add({attended, last_layer_node});
-        normed = layerNormalization(layer_params.layerNormB(), *added);
+        normed = layerNorm(*added, layer_params.layerNormB());
 
         auto &attention_head_params_for_encoder = layer_params.encoderAttention();
         q = linear(*normed, attention_head_params_for_encoder.q());
@@ -283,7 +281,7 @@ void TransformerDecoderCellBuilder::step(Node &decoder_input) {
                 *q, dim, params_->headCount(), layer_params.encoderFusion(),
                 dropout_, false);
         added = add({added, attended});
-        normed = layerNormalization(layer_params.layerNormC(), *added);
+        normed = layerNorm(*added, layer_params.layerNormC());
 
         Node *t = linear(*normed, layer_params.ffnInnerParams());
         t = relu(*t);
@@ -340,8 +338,7 @@ void TransformerDecoderBuilder::connect(Node &inputs) {
     for (int i = 0; i < layer_count; ++i) {
         auto &layer_params = *params_->layerParams().ptrs().at(i);
         auto &attention_head_params = layer_params.selfAttention();
-        Node *normed = layerNormalization(layer_params.layerNormA(), *last_layer,
-                dec_sentence_len);
+        Node *normed = layerNorm(*last_layer, layer_params.layerNormA());
         Node *k = linear(*normed, attention_head_params.k());
         Node *v = linear(*normed, attention_head_params.v());
         Node *q = linear(*normed, attention_head_params.q());
@@ -349,15 +346,14 @@ void TransformerDecoderBuilder::connect(Node &inputs) {
         Node *attended = dotAttention(*k, *v, *q, dim, params_->headCount(),
                 layer_params.selfFusion(), dropout_, true);
         Node *added = add({attended, last_layer});
-        normed = layerNormalization(layer_params.layerNormB(), *added,
-                dec_sentence_len);
+        normed = layerNorm(*added, layer_params.layerNormB());
 
         auto &attention_head_params_for_encoder = layer_params.encoderAttention();
         q = linear(*normed, attention_head_params_for_encoder.q());
         attended = dotAttention(*encoder_key_matrices_.at(i), *encoder_value_matrices_.at(i),
                 *q, dim, params_->headCount(), layer_params.encoderFusion(), dropout_, false);
         added = add({added, attended});
-        normed = layerNormalization(layer_params.layerNormC(), *added, dec_sentence_len);
+        normed = layerNorm(*added, layer_params.layerNormC());
 
         Node *t = linear(*normed, layer_params.ffnInnerParams());
         t = relu(*t);
