@@ -221,15 +221,44 @@ public:
     }
 };
 
-Node *embedding(Graph &graph, const std::vector<int> &ids, BaseParam &lookup, bool freeze = false);
+/// \ingroup operator
+/// Find embeddings from a parameter matrix with the specified ids.
+///
+/// For example, assumming we have the parameter matrix param = [[0.1, 0.1], [0.2, 0.2]], embedding(graph, {1, 0}, param) will return [0.2, 0.2, 0.1, 0.1].
+///
+/// **The operators with the same parameter matrix will be executed in batch.**
+/// For example, given the same *param*, embedding(graph, {0, 122, 3333, 33333, 1}, param) and embedding(graph, {0, 323, 34223, 1}, param) will be executed in batch.
+/// \param graph The computation graph.
+/// \param ids The column numbers of the parameter matrix to find the embeddings.
+/// \param param The parameter matrix. If the gradients will(will not) be sparse, pass an instance of SparseParam(Param).
+/// \param freeze Whether to freeze the parameter matrix.
+/// \return The result tensor of concaternated found embeddings. Its size is equal to *param.row() * ids.size()*.
+Node *embedding(Graph &graph, const std::vector<int> &ids, BaseParam &param, bool freeze = false);
 
-Node *embedding(Graph &graph, int id, BaseParam &lookup, bool freeze = false);
+/// \ingroup operator
+/// Find embeddings from a parameter matrix with the specified id.
+///
+/// It is a shortcut to call *embedding(graph, {id}, param, freeze)*.
+Node *embedding(Graph &graph, int id, BaseParam &param, bool freeze = false);
 
-Node *embedding(Graph &graph, const std::vector<std::string> &words, EmbeddingAbs &lookup,
+/// \ingroup operator
+/// Find embeddings from a parameter matrix with the specified words.
+///
+/// **The operators with the same parameter matrix will be executed in batch.**
+/// For example, given the same *param*, embedding(graph, {"what", "is", "zero-padding", "?"}, param) and embedding(graph, {"zero-padding", "is", "a", "waste", "of", "memory", "."}, param) will be executed in batch.
+/// \param graph The computation graph.
+/// \param words The words to find the embeddings.
+/// \param table The embedding table. If the gradients will(will not) be sparse, pass an instance of Embedding<SparseParam>(Embedding<Param>).
+/// \param freeze Whether to freeze the embedding table.
+/// \return The result tensor of concaternated found embeddings. Its size is equal to *table.param().row() * ids.size()*.
+Node *embedding(Graph &graph, const std::vector<std::string> &words, EmbeddingAbs &table,
         bool freeze = false);
 
-Node *embedding(Graph &graph, const std::string &word, EmbeddingAbs &lookup,
-        bool freeze = false);
+/// \ingroup operator
+/// Find embeddings from a parameter matrix with the specified words.
+///
+/// It is a shortcut to call *embedding(graph, {word}, param, freeze)*.
+Node *embedding(Graph &graph, const std::string &word, EmbeddingAbs &table, bool freeze = false);
 
 }
 
