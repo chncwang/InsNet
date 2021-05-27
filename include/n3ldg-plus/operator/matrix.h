@@ -5,8 +5,6 @@
 
 namespace n3ldg_plus {
 
-Node *concatToMatrix(const std::vector<Node *> &inputs);
-
 BatchedNode *tranMatrixMulMatrix(BatchedNode &a, BatchedNode &b, int input_row,
         bool use_lower_triangle_mask = false);
 
