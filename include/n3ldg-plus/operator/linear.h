@@ -6,18 +6,18 @@
 
 namespace n3ldg_plus {
 
-class LinearParam : public TunableCombination<BaseParam>
+class LinearParams : public TunableCombination<BaseParam>
 #if USE_GPU
 , public cuda::TransferableComponents
 #endif
 {
 public:
-    LinearParam(const ::std::string &name = "") : b_(name + "-b", true), name_(name) {}
+    LinearParams(const std::string &name = "") : b_(name + "-b", true), name_(name) {}
 
-    ~LinearParam();
+    ~LinearParams();
 
     void init(int out_dim, int in_dim, bool use_b = true,
-            const ::std::function<dtype(int, int)> *bound = nullptr,
+            const std::function<dtype(int, int)> *bound = nullptr,
             InitDistribution dist = InitDistribution::UNI);
 
     void init(Param &W);
@@ -31,7 +31,7 @@ public:
     }
 
 #if USE_GPU
-    ::std::vector<cuda::Transferable *> transferablePtrs() override;
+    std::vector<cuda::Transferable *> transferablePtrs() override;
 #endif
 
     Param &W() {
@@ -47,22 +47,22 @@ public:
     }
 
 protected:
-    ::std::vector<Tunable<BaseParam>*> tunableComponents() override;
+    std::vector<Tunable<BaseParam>*> tunableComponents() override;
 
 private:
     Param *W_ = nullptr;
     Param b_;
-    ::std::string name_;
+    std::string name_;
     bool bias_enabled_ = true;
     bool is_W_owner_ = true;
 };
 
 class BiasParam : public Param {
 public:
-    BiasParam(const ::std::string &name) : Param(name, true) {}
+    BiasParam(const std::string &name) : Param(name, true) {}
 
     void init(int outDim, int inDim) override {
-        ::std::cerr << "BiasParam::init - unsupported method" << ::std::endl;
+        std::cerr << "BiasParam::init - unsupported method" << std::endl;
         abort();
     }
 
@@ -71,13 +71,11 @@ public:
     }
 };
 
-Node *linear(Node &input, LinearParam &params);
+Node *linear(Node &input, LinearParams &params);
 
 Node *linear(Node &input, Param &param);
 
 Node *bias(Node &input, BiasParam &param);
-
-BatchedNode *bias(BatchedNode &input, BiasParam &param);
 
 }
 

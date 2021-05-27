@@ -10,12 +10,12 @@ struct GRUParam : public TunableCombination<BaseParam>
 , public cuda::TransferableComponents
 #endif
 {
-    LinearParam update_input;
-    LinearParam update_hidden;
-    LinearParam reset_input;
-    LinearParam reset_hidden;
-    LinearParam candidate_input;
-    LinearParam candidate_hidden;
+    LinearParams update_input;
+    LinearParams update_hidden;
+    LinearParams reset_input;
+    LinearParams reset_hidden;
+    LinearParams candidate_input;
+    LinearParams candidate_hidden;
 
     GRUParam(const std::string &name);
 

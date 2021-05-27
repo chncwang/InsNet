@@ -16,15 +16,15 @@ public:
 
     void init(int out_dim, int in_dim);
 
-    LinearParam &q() {
+    LinearParams &q() {
         return q_;
     }
 
-    LinearParam &k() {
+    LinearParams &k() {
         return k_;
     }
 
-    LinearParam &v() {
+    LinearParams &v() {
         return v_;
     }
 
@@ -41,9 +41,9 @@ protected:
     virtual std::vector<Tunable<BaseParam>*> tunableComponents() override;
 
 private:
-    LinearParam q_;
-    LinearParam k_;
-    LinearParam v_;
+    LinearParams q_;
+    LinearParams k_;
+    LinearParams v_;
 };
 
 class TransformerEncoderLayerParams : public TunableCombination<BaseParam>
@@ -60,15 +60,15 @@ public:
         return multi_head_attention_params_;
     }
 
-    LinearParam &headsFusionParams() {
+    LinearParams &headsFusionParams() {
         return heads_fusion_params_;
     }
 
-    LinearParam &ffnInnerParams() {
+    LinearParams &ffnInnerParams() {
         return ffn_inner_params_;
     }
 
-    LinearParam &ffnOutterParams() {
+    LinearParams &ffnOutterParams() {
         return ffn_outter_params_;
     }
 
@@ -95,9 +95,9 @@ protected:
 
 private:
     AttentionHeadParams multi_head_attention_params_;
-    LinearParam heads_fusion_params_;
-    LinearParam ffn_inner_params_;
-    LinearParam ffn_outter_params_;
+    LinearParams heads_fusion_params_;
+    LinearParams ffn_inner_params_;
+    LinearParams ffn_outter_params_;
     LayerNormParams layer_norm_a_;
     LayerNormParams layer_norm_b_;
 };
@@ -209,19 +209,19 @@ public:
         return encoder_attention_;
     }
 
-    LinearParam &selfFusion() {
+    LinearParams &selfFusion() {
         return self_fusion_;
     }
 
-    LinearParam &encoderFusion() {
+    LinearParams &encoderFusion() {
         return encoder_fusion_;
     }
 
-    LinearParam &ffnInnerParams() {
+    LinearParams &ffnInnerParams() {
         return ffn_inner_params_;
     }
 
-    LinearParam &ffnOutterParams() {
+    LinearParams &ffnOutterParams() {
         return ffn_outter_params_;
     }
 
@@ -253,10 +253,10 @@ protected:
 private:
     AttentionHeadParams self_attention_;
     AttentionHeadParams encoder_attention_;
-    LinearParam self_fusion_;
-    LinearParam encoder_fusion_;
-    LinearParam ffn_inner_params_;
-    LinearParam ffn_outter_params_;
+    LinearParams self_fusion_;
+    LinearParams encoder_fusion_;
+    LinearParams ffn_inner_params_;
+    LinearParams ffn_outter_params_;
     LayerNormParams layer_norm_a_;
     LayerNormParams layer_norm_b_;
     LayerNormParams layer_norm_c_;
@@ -264,7 +264,7 @@ private:
 
 typedef TransformerParams<TransformerDecoderLayerParams> TransformerDecoderParams;
 
-Node *dotAttention(Node& k, Node& v, Node& q, int row, int head_count, LinearParam &fusion_param,
+Node *dotAttention(Node& k, Node& v, Node& q, int row, int head_count, LinearParams &fusion_param,
         dtype dropout_value,
         bool use_mask);
 

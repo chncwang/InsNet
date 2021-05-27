@@ -10,14 +10,14 @@ struct LSTMParams : TunableCombination<BaseParam>
 , public cuda::TransferableComponents
 #endif
 {
-    LinearParam input_hidden;
-    LinearParam input_input;
-    LinearParam output_hidden;
-    LinearParam output_input;
-    LinearParam forget_hidden;
-    LinearParam forget_input;
-    LinearParam cell_hidden;
-    LinearParam cell_input;
+    LinearParams input_hidden;
+    LinearParams input_input;
+    LinearParams output_hidden;
+    LinearParams output_input;
+    LinearParams forget_hidden;
+    LinearParams forget_input;
+    LinearParams cell_hidden;
+    LinearParams cell_input;
 
     LSTMParams(const std::string &name);
 

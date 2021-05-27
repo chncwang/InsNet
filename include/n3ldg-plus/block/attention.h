@@ -29,7 +29,7 @@ struct AdditiveAttentionParams : TunableCombination<BaseParam>
 , public cuda::TransferableComponents
 #endif
 {
-    LinearParam k, q, vt;
+    LinearParams k, q, vt;
 
     AdditiveAttentionParams(const std::string &name);
 

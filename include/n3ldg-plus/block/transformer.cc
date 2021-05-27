@@ -112,7 +112,7 @@ vector<Tunable<BaseParam>*> TransformerDecoderLayerParams::tunableComponents() {
 }
 
 Node *dotAttention(Node& k, Node& v, Node& q, int row, int head_count,
-        LinearParam &fusion_param,
+        LinearParams &fusion_param,
         dtype dropout_value,
         bool use_mask) {
     int head_dim = row / head_count;

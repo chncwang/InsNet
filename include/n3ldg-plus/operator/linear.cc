@@ -11,13 +11,13 @@ using std::cout;
 
 namespace n3ldg_plus {
 
-LinearParam::~LinearParam() {
+LinearParams::~LinearParams() {
     if (W_ != nullptr && is_W_owner_) {
         delete W_;
     }
 }
 
-void LinearParam::init(int out_dim, int in_dim, bool use_b,
+void LinearParams::init(int out_dim, int in_dim, bool use_b,
         const function<dtype(int, int)> *bound,
         InitDistribution dist) {
     if (W_ != nullptr) {
@@ -34,7 +34,7 @@ void LinearParam::init(int out_dim, int in_dim, bool use_b,
     }
 }
 
-void LinearParam::init(Param &W) {
+void LinearParams::init(Param &W) {
     if (W_ != nullptr) {
         cerr << "UniParams init already initialized" << endl;
         abort();
@@ -45,7 +45,7 @@ void LinearParam::init(Param &W) {
 }
 
 #if USE_GPU
-vector<cuda::Transferable *> LinearParam::transferablePtrs() {
+vector<cuda::Transferable *> LinearParams::transferablePtrs() {
     vector<Transferable *> ptrs = {W_};
     if (bias_enabled_) {
         ptrs.push_back(&b_);
@@ -55,7 +55,7 @@ vector<cuda::Transferable *> LinearParam::transferablePtrs() {
 #endif
 
 
-vector<Tunable<BaseParam>*> LinearParam::tunableComponents() {
+vector<Tunable<BaseParam>*> LinearParams::tunableComponents() {
     if (bias_enabled_) {
         return {W_, &b_};
     } else {
@@ -71,7 +71,7 @@ public:
 
     LinearNode() : UniInputNode("linear") {}
 
-    void setParam(LinearParam &uni_params) {
+    void setParam(LinearParams &uni_params) {
         param_ = &uni_params;
     }
 
@@ -111,7 +111,7 @@ protected:
     }
 
 private:
-    LinearParam* param_ = nullptr;
+    LinearParams* param_ = nullptr;
 };
 
 class LinearExecutorBase : public Executor {
@@ -437,19 +437,6 @@ private:
     friend class BiasExecutor;
 };
 
-class BatchedBiasNode : public BatchedNodeImpl<BiasNode> {
-public:
-    void init(BatchedNode &input, BiasParam &param) {
-        allocateBatch(input.size(), input.batch().size());
-        for (Node *node : batch()) {
-            BiasNode *b = dynamic_cast<BiasNode *>(node);
-            b->setParam(param);
-        }
-        setInputsPerNode({&input});
-        afterInit({&input});
-    }
-};
-
 #if USE_GPU
 class BiasExecutor : public Executor {
 public:
@@ -503,7 +490,7 @@ Executor *BiasNode::generate() {
     return new BiasExecutor;
 }
 
-Node *linear(Node &input, LinearParam &params) {
+Node *linear(Node &input, LinearParams &params) {
     if (input.size() % params.W().outDim() != 0) {
         cerr << fmt::format("linear input dim:{} input col:{} W row:{} W col:{}\n", input.size(),
             input.getColumn(), params.W().outDim(), params.W().inDim());
@@ -525,11 +512,11 @@ Node *linear(Node &input, Param &param) {
         abort();
     }
 
-    static map<void *, LinearParam *> param_map;
+    static map<void *, LinearParams *> param_map;
     auto it = param_map.find(&param);
-    LinearParam *uni_params;
+    LinearParams *uni_params;
     if (it == param_map.end()) {
-        uni_params = new LinearParam("uni" + addressToString(&param));
+        uni_params = new LinearParams("uni" + addressToString(&param));
         uni_params->init(param);
         param_map.insert(make_pair(&param, uni_params));
     } else {
@@ -550,12 +537,6 @@ Node *bias(Node &input, BiasParam &param) {
     BiasNode *node = BiasNode::newNode(dim);
     node->setParam(param);
     node->connect(input);
-    return node;
-}
-
-BatchedNode *bias(BatchedNode &input, BiasParam &param) {
-    BatchedBiasNode *node = new BatchedBiasNode;
-    node->init(input, param);
     return node;
 }
 
