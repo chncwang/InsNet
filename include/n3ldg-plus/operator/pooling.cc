@@ -142,8 +142,7 @@ public:
 
     void setMask() override {
         int size = inputSize();
-
-        for (int idx = 0; idx < size(); idx++) {
+        for (int idx = 0; idx < this->size(); idx++) {
             int max_i = -1;
             for (int i = 0; i < size; ++i) {
                 if (max_i == -1 || (*input_vals_.at(i))[idx] > (*input_vals_.at(i))[idx]) {

@@ -182,6 +182,7 @@ cpu::Tensor2D::Tensor2D() {
 cpu::Tensor2D::~Tensor2D() {
     if (v) {
         delete[] v;
+        v = nullptr;
     }
     v = nullptr;
     col = row = 0;
