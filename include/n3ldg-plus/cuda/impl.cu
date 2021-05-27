@@ -367,6 +367,7 @@ Tensor2D::~Tensor2D() {
     }
     if (v != nullptr) {
         delete[] v;
+        v = nullptr;
     }
 }
 
