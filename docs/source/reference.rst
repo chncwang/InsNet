@@ -6,6 +6,7 @@ Operators
 
 .. doxygenfunction:: add
 .. doxygenfunction:: affine
+.. doxygenfunction:: bias
 .. doxygenfunction:: cat(const std::vector<Node*> &, int col = 1)
 .. doxygenfunction:: div
 .. doxygenfunction:: dropout

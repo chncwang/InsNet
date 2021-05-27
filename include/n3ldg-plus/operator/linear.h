@@ -72,29 +72,36 @@ public:
 };
 
 /// \ingroup operator
-/// The linear transformation with bias. \f${W^T}{X} + [b b .. b]\f$
+/// The linear transformation with bias. \f${W^T}{X} + [b b .. b]\f$.
 ///
 /// You can disable the bias term when initializing *params*.
 ///
-/// **The operators with the same parameters will be executed in batch**
+/// **The operators with the same parameters will be executed in batch.**
 /// For example, supposing we have *params* with a 2x2 weight matrix, linear([0.1, 0.2, 0.3, 0.4], params) and linear([0.1, 0.2], params) will be executed in batch.
 /// \param X The input tensor.
 /// \param params W and b.
-/// \return The transformed tensor. its size is equal to x.size() / params.W.row() * params.W.col().
+/// \return The transformed tensor. its size is equal to X.size() / params.W.row() * params.W.col().
 Node *linear(Node &X, LinearParams &params);
 
 /// \ingroup operator
-/// The linear transformation. \f${W^T}{X}\f$
+/// The linear transformation. \f${W^T}{X}\f$.
 ///
 /// This operator is especially useful when you want to share the weight matrix with another component. For example, to tie the input and output embeddings, call this operator like *linear(h, emb_table.param())*.
 ///
-/// **The operators with the same parameters will be executed in batch**
+/// **The operators with the same weight matrix will be executed in batch.**
 /// \param X The input tensor.
 /// \param W The weight matrix.
-/// \return The transformed tensor. its size is equal to x.size() / W.row() * W.col().
+/// \return The transformed tensor. its size is equal to X.size() / W.row() * W.col().
 Node *linear(Node &X, Param &W);
 
-Node *bias(Node &input, BiasParam &param);
+/// \ingroup operator
+/// Add the bias iterm to the input tensor. \f$X + [b b .. b]\f$.
+///
+/// **The operators with the same bias and X.size() will be executed in batch.** Note that this batching rule needs to be loosed in the future version.
+/// \param X The input tensor.
+/// \param b The bias parameters.
+/// \Return The result tensor. Its size is equal to X.size().
+Node *bias(Node &X, BiasParam &b);
 
 }
 
