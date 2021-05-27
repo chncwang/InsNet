@@ -34,7 +34,7 @@ From the above computation process, we find that linear transformations with the
 :math:`Y = A^T B`
 ^^^^^^^^^^^^^^^^^^
 
-One way to implement formula (4) is to divide it into two operators, i.e., matrix transposition and matrix multiplication, which would help keep public APIs fine-grained and orthogonal. However, considering the additional data transfer of the former matrix it would cause, we still implement it as one operator.
+One way to implement formula (4) is to divide it into two operators, i.e., matrix transposition and matrix multiplication, which would help keep public APIs fine-grained and orthogonal. However, considering the additional data transfer of the former matrix it would cause, and more importantly, the cache friendliness it would lose, we still implement it as one operator.
 
 Then we need to determine that when the input matrices meet what condition, the operators can be executed in batch. Still taking formula (4) as the example, obviously, the condition should not be that the shapes of :math:`\{K_i\}_{i=1}^b` and :math:`\{Q_i\}_{i=1}^b` are equal, respectively, for :math:`col(Q_i)` and :math:`col(K_i)` are not equal in a mini-batch. Thus we set the signature to :code:`"transpose-mul-" + to_string(row(A))`
 
