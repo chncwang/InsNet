@@ -5,6 +5,7 @@ Operators
 ----------
 
 .. doxygenfunction:: add
+.. doxygenfunction:: affine
 .. doxygenfunction:: cat(const std::vector<Node*> &, int col = 1)
 .. doxygenfunction:: div
 .. doxygenfunction:: dropout
@@ -15,6 +16,8 @@ Operators
 .. doxygenfunction:: exp
 .. doxygenfunction:: expandColumnwisely
 .. doxygenfunction:: expandRowwisely
+.. doxygenfunction:: layerNorm(Node &, int)
+.. doxygenfunction:: layerNorm(Node &, LayerNormParams &)
 .. doxygenfunction:: max
 .. doxygenfunction:: mul(Node &, dtype)
 .. doxygenfunction:: relu
