@@ -18,6 +18,8 @@ Operators
 .. doxygenfunction:: expandRowwisely
 .. doxygenfunction:: layerNorm(Node &, int)
 .. doxygenfunction:: layerNorm(Node &, LayerNormParams &)
+.. doxygenfunction:: linear(Node &, LinearParams &)
+.. doxygenfunction:: linear(Node &, Param &)
 .. doxygenfunction:: max
 .. doxygenfunction:: mul(Node &, dtype)
 .. doxygenfunction:: relu

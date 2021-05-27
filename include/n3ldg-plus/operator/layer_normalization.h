@@ -61,7 +61,7 @@ private:
 Node *layerNorm(Node &input, int row);
 
 /// \ingroup operator
-/// The row-wise layer normalization with the parameters of the subsequent affine transformation.
+/// The row-wise layer normalization with the parameters of the subsequent *affine* transformation.
 ///
 /// For Example, supposing params.g() is [0.1, -0.1] and params.b() is [0, 0] layerNorm([1.1, 0.9, -1.2, -0.8], params) will return [0.1, 0.1, -0.1, -0.1].
 ///
@@ -72,9 +72,9 @@ Node *layerNorm(Node &input, int row);
 Node *layerNorm(Node &input, LayerNormParams &params);
 
 /// \ingroup operator
-/// The affine transformation in layer normalization.
+/// The affine transformation in layer normalization. \f$[{x_0}{g_0}, {x_1}{g_1}, ..., {x_n}{g_n}] + [b_0, b_1, ..., b_n]\f$
 ///
-/// For Example, supposing params.g() is [0.1, -0.1] and params.b() is [0, 0] affine([1, -1, -1, 1], params) will return [0.1, 0.1, -0.1, -0.1].
+/// Following the Pytorch documentation's *LayerNorm*, we call this affine transformation, but it should actually be a simplified version. For Example, supposing params.g() is [0.1, -0.1] and params.b() is [0, 0] affine([1, -1, -1, 1], params) will return [0.1, 0.1, -0.1, -0.1].
 ///
 /// **The operators with the same parameters will be executed in batch.** 
 /// \param input The input tensor.
