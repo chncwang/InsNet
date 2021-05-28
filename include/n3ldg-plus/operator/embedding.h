@@ -231,7 +231,7 @@ public:
 /// \param graph The computation graph.
 /// \param ids The column numbers of the parameter matrix to find the embeddings.
 /// \param param The parameter matrix. If the gradients will(will not) be sparse, pass an instance of SparseParam(Param).
-/// \param freeze Whether to freeze the parameter matrix.
+/// \param freeze Whether to freeze the parameter matrix. *The default value is false.*
 /// \return The result tensor of concaternated found embeddings. Its size is equal to *param.row() * ids.size()*.
 Node *embedding(Graph &graph, const std::vector<int> &ids, BaseParam &param, bool freeze = false);
 
@@ -249,7 +249,7 @@ Node *embedding(Graph &graph, int id, BaseParam &param, bool freeze = false);
 /// \param graph The computation graph.
 /// \param words The words to find the embeddings.
 /// \param table The embedding table. If the gradients will(will not) be sparse, pass an instance of Embedding<SparseParam>(Embedding<Param>).
-/// \param freeze Whether to freeze the embedding table.
+/// \param freeze Whether to freeze the embedding table. *The default value is false.*
 /// \return The result tensor of concaternated found embeddings. Its size is equal to *table.param().row() * ids.size()*.
 Node *embedding(Graph &graph, const std::vector<std::string> &words, EmbeddingAbs &table,
         bool freeze = false);
