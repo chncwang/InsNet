@@ -50,7 +50,7 @@ pair<Node *, Node *> additiveAttention(Node &guide, Node &value, int value_col,
     sum = tanh(*sum);
     Node *score = linear(*sum, params.vt);
     Node *weight = softmax(*score);
-    Node *result = matrixMulMatrix(value, *weight, weight->size());
+    Node *result = matmul(value, *weight, weight->size());
     return make_pair(result, weight);
 }
 

@@ -208,7 +208,7 @@ public:
         b_col_ = input_dims_.at(1) / input_row_;
         Mat(val().v, a_col_, b_col_) = Mat(input_vals_.at(0)->v, input_row_, a_col_).transpose()
             * Mat(input_vals_.at(1)->v, input_row_, b_col_);
-        if (use_lower_triangle_mask_) {
+        if (use_lower_triangular_mask_) {
             if (a_col_ != b_col_) {
                 cerr << fmt::format("a_col_:{} b_col_:{}\n", a_col_, b_col_);
                 abort();
@@ -233,8 +233,11 @@ public:
 
     string typeSignature() const override {
         return Node::getNodeType() + to_string(input_row_) +
-            (use_lower_triangle_mask_ ? "-mask" : "-no-mask");
+            (use_lower_triangular_mask_ ? "-mask" : "-no-mask");
     }
+
+    int a_col_, b_col_, input_row_;
+    bool use_lower_triangular_mask_ = false;
 
 protected:
     int forwardOnlyInputValSize() override {
@@ -246,19 +249,16 @@ protected:
     }
 
 private:
-    int a_col_, b_col_, input_row_;
-    bool use_lower_triangle_mask_ = false;
     friend class TranMatrixMulMatrixExecutor;
-    friend class BatchedTranMatrixMulMatrixNode;
 };
 
 class BatchedTranMatrixMulMatrixNode : public BatchedNodeImpl<TranMatrixMulMatrixNode> {
 public:
     void init(BatchedNode &a, BatchedNode &b, int input_row,
-            bool use_lower_triangle_mask = false) {
+            bool use_lower_triangular_mask = false) {
         int a_col = a.size() / input_row;
         int b_col = b.size() / input_row;
-        if (use_lower_triangle_mask && a_col != b_col) {
+        if (use_lower_triangular_mask && a_col != b_col) {
             cerr << fmt::format("BatchedTranMatrixMulMatrixNode init a_col:{} b_col:{}\n",
                 a_col, b_col);
             abort();
@@ -267,7 +267,7 @@ public:
         setInputsPerNode({&a, &b});
         for (Node *node : batch()) {
             TranMatrixMulMatrixNode &t = dynamic_cast<TranMatrixMulMatrixNode &>(*node);
-            t.use_lower_triangle_mask_ = use_lower_triangle_mask;
+            t.use_lower_triangular_mask_ = use_lower_triangular_mask;
             t.input_row_ = input_row;
         }
         afterInit({&a, &b});
@@ -287,8 +287,8 @@ public:
         a_vals_.reserve(count);
         b_vals_.reserve(count);
         input_row_ = dynamic_cast<TranMatrixMulMatrixNode &>(*batch.front()).input_row_;
-        use_lower_triangle_mask_ =
-            dynamic_cast<TranMatrixMulMatrixNode &>(*batch.front()).use_lower_triangle_mask_;
+        use_lower_triangular_mask_ =
+            dynamic_cast<TranMatrixMulMatrixNode &>(*batch.front()).use_lower_triangular_mask_;
         for (Node *node : batch) {
             TranMatrixMulMatrixNode &t = dynamic_cast<TranMatrixMulMatrixNode &>(*node);
             a_vals_.push_back(t.input_vals_.at(0)->value);
@@ -299,7 +299,7 @@ public:
         }
 
         cuda::TranMatrixMulMatrixForward(a_vals_, b_vals_, count, a_cols_, b_cols_, input_row_,
-                use_lower_triangle_mask_, vals);
+                use_lower_triangular_mask_, vals);
 
 #if TEST_CUDA
         testForward();
@@ -329,7 +329,7 @@ private:
     vector<dtype *> a_vals_, b_vals_;
     vector<int> a_cols_, b_cols_;
     int input_row_;
-    bool use_lower_triangle_mask_;
+    bool use_lower_triangular_mask_;
 };
 #else
 class TranMatrixMulMatrixExecutor : public Executor {
@@ -345,20 +345,47 @@ Executor* TranMatrixMulMatrixNode::generate() {
 }
 
 BatchedNode *tranMatrixMulMatrix(BatchedNode &a, BatchedNode &b, int input_row,
-        bool use_lower_triangle_mask) {
+        bool use_lower_triangular_mask) {
     BatchedTranMatrixMulMatrixNode *node = new BatchedTranMatrixMulMatrixNode;
-    node->init(a, b, input_row, use_lower_triangle_mask);
+    node->init(a, b, input_row, use_lower_triangular_mask);
     return node;
 }
 
-Node *matrixMulMatrix(Node &a, Node &b, int k) {
-    int a_row = a.size() / k;
-    int b_col = b.size() / k;
-    MatrixMulMatrixNode *result = MatrixMulMatrixNode::newNode(a_row * b_col);
-    result->setColumn(b_col);
-    result->k_ = k;
-    result->connect(a, b);
-    return result;
+Node *matmul(Node &a, Node &b, int b_row, bool transpose_a, bool use_lower_triangular_mask) {
+    if (transpose_a) {
+        int a_col = a.size() / b_row;
+        if (a_col * b_row != a.size()) {
+            cerr << fmt::format("a size:{} b_row:{}", a.size(), b_row) << endl;
+            abort();
+        }
+        int b_col = b.size() / b_row;
+        if (b_col * b_row != b.size()) {
+            cerr << fmt::format("b size:{} b_row:{}", b.size(), b_row) << endl;
+            abort();
+        }
+        if (use_lower_triangular_mask && a_col != b_col) {
+            cerr << fmt::format("matmul init a_col:{} b_col:{}\n", a_col, b_col);
+            abort();
+        }
+        TranMatrixMulMatrixNode *result = TranMatrixMulMatrixNode::newNode(a_col * b_col);
+        result->use_lower_triangular_mask_ = use_lower_triangular_mask;
+        result->input_row_ = b_row;
+        result->connect(a, b);
+        return result;
+    } else {
+        if (use_lower_triangular_mask) {
+            cerr << fmt::format("matmul transpose_a:{} use_lower_triangular_mask:{}", transpose_a,
+                    use_lower_triangular_mask) << endl;
+            abort();
+        }
+        int a_row = a.size() / b_row;
+        int b_col = b.size() / b_row;
+        MatrixMulMatrixNode *result = MatrixMulMatrixNode::newNode(a_row * b_col);
+        result->setColumn(b_col);
+        result->k_ = b_row;
+        result->connect(a, b);
+        return result;
+    }
 }
 
 BatchedNode *matrixMulMatrix(BatchedNode &a, BatchedNode &b, int k) {
