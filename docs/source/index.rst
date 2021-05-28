@@ -40,9 +40,9 @@ N3LDG++ uses *Apache 2.0* license allowing you to use it in any project. But if 
   publisher={Acta Scientiarum Naturalium Universitatis Pekinenis}
   }
 
-Due to incorrect Git operations, the very early history of N3LDG++ is missed, but you can check it in another `repo <https://github.com/chncwang/N3LDG>`_.
+Due to incorrect Git operations, the very early history of N3LDG++ is erased, but you can see it in another `repo <https://github.com/chncwang/N3LDG>`_.
 
-If you have any question about N3LDG++, feel free to send me an email: chncwang@gmail.com
+If you have any question about N3LDG++, feel free to post an issue or send me an email: chncwang@gmail.com
 
 N3LDG++ can be installed according to the instructions below:
 
