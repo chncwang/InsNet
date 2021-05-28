@@ -5,9 +5,7 @@
 
 namespace n3ldg_plus {
 
-Node *pointwiseMultiply(Node &a, Node &b);
-
-BatchedNode *pointwiseMultiply(BatchedNode &a, BatchedNode &b);
+Node *mul(Node &a, Node &b);
 
 }
 
