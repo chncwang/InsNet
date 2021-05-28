@@ -11,7 +11,7 @@ BatchedNode *tranMatrixMulMatrix(BatchedNode &a, BatchedNode &b, int input_row,
 /// Matrix multiplication. \f$A B\f$ (if *transpose_a* is false) or \f$A^T B\f$ (if *transpose_a* is true).
 ///
 /// No matter *transpose_a* is true or false, the shapes of *A* and *B* are determined by *b_row*.
-/// In particular, N3LDG++ supports transposing A in *matmul* for cache friendliness.
+/// N3LDG++ supports transposing A in *matmul* for cache friendliness.
 ///
 /// **No matter transpose_a is true or false, the operators with equal row of A will be executed in batch.**
 /// For example, \f$K^T Q\f$ and \f$VA\f$ of the Transformer in the same mini-batch will be executed in batch.
