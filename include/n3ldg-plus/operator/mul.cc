@@ -53,15 +53,6 @@ private:
     friend class PMultiExecutor;
 };
 
-class BatchedPMultiNode : public BatchedNodeImpl<PMultiNode> {
-public:
-    void init(BatchedNode &a, BatchedNode &b) {
-        allocateBatch(a.size(), a.batch().size());
-        setInputsPerNode({&a, &b});
-        afterInit({&a, &b});
-    }
-};
-
 class PMultiExecutor :public Executor {
 public:
     vector<dtype*> in_vals1;
@@ -133,23 +124,13 @@ Executor * PMultiNode::generate() {
     return exec;
 };
 
-Node *pointwiseMultiply(Node &a, Node &b) {
+Node *mul(Node &a, Node &b) {
     if (a.size() != b.size()) {
         cerr << fmt::format("a dim:{} b dim:{}\n", a.size(), b.size());
         abort();
     }
     PMultiNode *node = PMultiNode::newNode(a.size());
     node->connect(a, b);
-    return node;
-}
-
-BatchedNode *pointwiseMultiply(BatchedNode &a, BatchedNode &b) {
-    if (a.size() != b.size()) {
-        cerr << fmt::format("a dim:{} b dim:{}", a.size(), b.size());
-        abort();
-    }
-    BatchedPMultiNode *node = new BatchedPMultiNode;
-    node->init(a, b);
     return node;
 }
 

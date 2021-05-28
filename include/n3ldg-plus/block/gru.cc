@@ -53,7 +53,7 @@ void GRUBuilder::step(GRUParam &gru_params, Node &input, Node &h0, dtype dropout
     reset_gate = sigmoid(*reset_gate);
 
     Node *candidate_input = linear(input, gru_params.candidate_input);
-    Node *updated_hidden = pointwiseMultiply(*reset_gate, *last_hidden);
+    Node *updated_hidden = mul(*reset_gate, *last_hidden);
     Node *candidate_hidden = linear(*updated_hidden, gru_params.candidate_hidden);
     Node *candidate = add({candidate_input, candidate_hidden});
     candidate = tanh(*candidate);
@@ -62,8 +62,8 @@ void GRUBuilder::step(GRUParam &gru_params, Node &input, Node &h0, dtype dropout
     Graph &graph = dynamic_cast<Graph&>(input.getNodeContainer());
     Node *one = tensor(graph, hidden_dim, 1);
     Node *reversal_update = sub(*one, *update_gate);
-    Node *passed_last_hidden = pointwiseMultiply(*reversal_update, *last_hidden);
-    Node *updated_candidate = pointwiseMultiply(*update_gate, *candidate);
+    Node *passed_last_hidden = mul(*reversal_update, *last_hidden);
+    Node *updated_candidate = mul(*update_gate, *candidate);
     Node *h = add({passed_last_hidden, updated_candidate});
     hiddens_.push_back(h);
 }

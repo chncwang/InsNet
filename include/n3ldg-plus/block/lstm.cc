@@ -60,11 +60,11 @@ LSTMState lstm(LSTMState &last_state, Node &input, LSTMParams &params, dtype dro
     Node *halfcell_input = linear(input, params.cell_input);
     Node *halfcell_add = add({halfcell_hidden, halfcell_input});
     Node *halfcell = tanh(*halfcell_add);
-    Node *inputfilter = pointwiseMultiply(*inputgate, *halfcell);
-    Node *forgetfilter = pointwiseMultiply(last_cell, *forgetgate);
+    Node *inputfilter = mul(*inputgate, *halfcell);
+    Node *forgetfilter = mul(last_cell, *forgetgate);
     Node *cell = add({inputfilter, forgetfilter});
     Node *halfhidden = tanh(*cell);
-    Node *hidden = pointwiseMultiply(*halfhidden, *outputgate);
+    Node *hidden = mul(*halfhidden, *outputgate);
     hidden = dropout(*hidden, dropout_value);
     return {hidden, cell};
 }
