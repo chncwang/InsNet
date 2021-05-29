@@ -6,6 +6,7 @@ Operators
 
 .. doxygenfunction:: add
 .. doxygenfunction:: affine
+.. doxygenfunction:: avgPool
 .. doxygenfunction:: bias
 .. doxygenfunction:: cat(const std::vector<Node*> &, int col = 1)
 .. doxygenfunction:: div
@@ -23,12 +24,15 @@ Operators
 .. doxygenfunction:: linear(Node &, Param &)
 .. doxygenfunction:: matmul
 .. doxygenfunction:: max
+.. doxygenfunction:: maxPool
+.. doxygenfunction:: minPool
 .. doxygenfunction:: mul(Node &, dtype)
 .. doxygenfunction:: mul(Node &, Node &)
 .. doxygenfunction:: relu
 .. doxygenfunction:: sigmoid
 .. doxygenfunction:: sqrt
 .. doxygenfunction:: sum
+.. doxygenfunction:: sumPool
 .. doxygenfunction:: tanh
 .. doxygenfunction:: tensor(Graph &, const std::vector<dtype> &)
 .. doxygenfunction:: tensor(Graph &, int, dtype)
