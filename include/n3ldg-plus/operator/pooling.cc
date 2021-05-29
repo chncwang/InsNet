@@ -443,7 +443,7 @@ Node *maxPool(vector<Node *> &inputs) {
     }
 
     MaxPoolNode *pool = MaxPoolNode::newNode(dim);
-#if !USE_GPU
+#if !USE_GPU || TEST_CUDA
     pool->init(dim);
 #endif
     pool->connect(inputs);
