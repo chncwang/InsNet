@@ -473,7 +473,7 @@ Node *avgPool(vector<Node *> &inputs) {
 
 Node *avgPool(Node &input, int row) {
     Node *sum = sumPool(input, row);
-    return mul(*sum, row / input.size());
+    return mul(*sum, static_cast<dtype>(row) / input.size());
 }
 
 Node *sumPool(Node &input, int row) {
