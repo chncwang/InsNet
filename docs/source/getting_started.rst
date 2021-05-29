@@ -195,7 +195,7 @@ Finally, based on the sentence embeddings, we can build the encoder of documents
                 sen_embs.push_back(enc);
             }
 
-            vector<Node *> doc_embs = n3ldg_plus::lstm(*h0, sen_embs, model_params.para_encoder, 0.1);
+            auto doc_embs = n3ldg_plus::lstm(*h0, sen_embs, model_params.para_encoder, 0.1);
             Node *enc = n3ldg_plus::concat(doc_embs);
 
             ... // The decoder part.
