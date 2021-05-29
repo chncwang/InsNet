@@ -5,15 +5,13 @@
 
 namespace n3ldg_plus {
 
-Node *maxPool(std::vector<Node *> &inputs);
+Node *maxPool(Node &input, int row);
 
-Node *minPool(std::vector<Node *> &inputs);
+Node *minPool(Node &input, int row);
 
-Node *sumPool(std::vector<Node *> &inputs);
+Node *sumPool(Node &input, int row);
 
-Node *avgPool(std::vector<Node *> &inputs);
-
-Node *avgPool(Node *input, int row);
+Node *avgPool(Node &input, int row);
 
 }
 

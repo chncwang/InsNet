@@ -6,6 +6,7 @@
 using std::string;
 using std::vector;
 using std::cerr;
+using std::cout;
 using std::endl;
 using std::function;
 
@@ -35,8 +36,9 @@ public:
         }
         int nSize = x.size();
         for (int i = 0; i < nSize; i++) {
-            if (x[i]->val().dim != size()) {
-                cerr << "input matrixes are not matched" << endl;
+            if (x[i]->size() != size()) {
+                cerr << fmt::format("input matrixes are not matched size:{} input size:{}", size(),
+                        x[i]->size()) << endl;
                 abort();
             }
         }
@@ -470,9 +472,14 @@ Node *avgPool(vector<Node *> &inputs) {
 }
 
 Node *avgPool(Node &input, int row) {
+    Node *sum = sumPool(input, row);
+    return mul(*sum, row / input.size());
+}
+
+Node *sumPool(Node &input, int row) {
     int col = input.size() / row;
     if (col * row != input.size()) {
-        cerr << fmt::format("avgPool col:{} row:{} input dim:{}", col, row, input.size()) <<
+        cerr << fmt::format("sumPool col:{} row:{} input dim:{}", col, row, input.size()) <<
             endl;
         abort();
     }
@@ -484,7 +491,29 @@ Node *avgPool(Node &input, int row) {
         inputs.push_back(in);
         offset += row;
     }
-    return avgPool(inputs);
+    return sumPool(inputs);
+}
+
+Node *maxPool(Node &input, int row) {
+    int col = input.size() / row;
+    if (col * row != input.size()) {
+        cerr << fmt::format("sumPool col:{} row:{} input dim:{}", col, row, input.size()) <<
+            endl;
+        abort();
+    }
+    int offset = 0;
+    vector<Node *> inputs;
+    inputs.reserve(col);
+    for (int i = 0; i < col; ++i) {
+        Node *in = n3ldg_plus::split(input, row, offset);
+        inputs.push_back(in);
+        offset += row;
+    }
+    return maxPool(inputs);
+}
+
+Node *minPool(Node &input, int row) {
+    return mul(*maxPool(*mul(input, -1), row), -1);
 }
 
 }

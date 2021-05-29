@@ -117,7 +117,7 @@ public:
     }
 };
 
-Node* split(Graph &graph, Node &input, int dim, int offset, int col) {
+Node* split(Node &input, int dim, int offset, int col) {
     SplitNode *split = SplitNode::newNode(dim * col);
     split->setColumn(col);
     split->connect(input, offset);
