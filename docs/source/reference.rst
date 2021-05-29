@@ -24,6 +24,7 @@ Operators
 .. doxygenfunction:: matmul
 .. doxygenfunction:: max
 .. doxygenfunction:: mul(Node &, dtype)
+.. doxygenfunction:: mul(Node &, Node &)
 .. doxygenfunction:: relu
 .. doxygenfunction:: sigmoid
 .. doxygenfunction:: sqrt
