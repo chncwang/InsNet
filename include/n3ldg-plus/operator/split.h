@@ -5,11 +5,12 @@
 
 namespace n3ldg_plus {
 
-Node* split(Node &input, int dim, int offset, int col = 1);
-
-BatchedNode* split(BatchedNode &input, int dim, int offset);
-
-BatchedNode *split(BatchedNode &input, int dim, const std::vector<int> &offsets);
+/// Returns a contiguous region of a matrix.
+///
+/// For example, split([0.1, 0.2, 0.3, 0.4], 2, 2) will return [0.3, 0.4] and split([0.1, 0.2, 0.3, 0.4], 1, 1, 2) will return [0.2, 0.4].
+///
+/// **All the operators will be executed in batch.**
+Node* split(Node &input, int result_row, int row_offset, int input_col = 1);
 
 BatchedNode *split(Node &input, int row, const std::vector<int> &offsets, int col = 1);
 
