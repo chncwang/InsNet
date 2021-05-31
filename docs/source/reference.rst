@@ -1,4 +1,4 @@
-Manual Reference
+APIs
 =================
 
 Operators
@@ -32,6 +32,7 @@ Operators
 .. doxygenfunction:: sigmoid
 .. doxygenfunction:: softmax(Node &, int)
 .. doxygenfunction:: softmax(Node &)
+.. doxygenfunction:: split(Node &, int, int, int input_col = 1)
 .. doxygenfunction:: sqrt
 .. doxygenfunction:: sum
 .. doxygenfunction:: sumPool
