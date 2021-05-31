@@ -14,7 +14,7 @@ Operators
 .. doxygenfunction:: embedding(Graph &, const std::vector<std::string> &, EmbeddingAbs &, bool freeze = false)
 .. doxygenfunction:: embedding(Graph &, const std::string &, EmbeddingAbs &, bool freeze = false)
 .. doxygenfunction:: embedding(Graph &, const std::vector<int> &, BaseParam &, bool freeze = false)
-.. doxygenfunction:: embedding(Graph &, int, BaseParam &param, bool freeze = false)
+.. doxygenfunction:: embedding(Graph &, int, BaseParam &, bool freeze = false)
 .. doxygenfunction:: exp
 .. doxygenfunction:: expandColumnwisely
 .. doxygenfunction:: expandRowwisely
@@ -30,6 +30,8 @@ Operators
 .. doxygenfunction:: mul(Node &, Node &)
 .. doxygenfunction:: relu
 .. doxygenfunction:: sigmoid
+.. doxygenfunction:: softmax(Node &, int)
+.. doxygenfunction:: softmax(Node &)
 .. doxygenfunction:: sqrt
 .. doxygenfunction:: sum
 .. doxygenfunction:: sumPool
