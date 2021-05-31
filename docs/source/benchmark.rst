@@ -185,6 +185,6 @@ Memory Usage on GPU
       - 2077
       - OOM
 
-The low memory usage is due to N3LDG++'s JIT Dynamic Batching mechanism which does not require paddings.
+The low memory usage shall be attributed to N3LDG++'s Padding-free Dynamic Batching feature.
 
 We will illustrate N3LDG++'s efficient memory management in detail in the future.
