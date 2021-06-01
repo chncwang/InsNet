@@ -111,7 +111,7 @@ vector<Tunable<BaseParam>*> TransformerDecoderLayerParams::tunableComponents() {
         &ffn_inner_params_, &ffn_outter_params_, &layer_norm_a_, &layer_norm_b_, &layer_norm_c_};
 }
 
-Node *dotAttention(Node& k, Node& v, Node& q, int row, int head_count,
+Node *multiheadAttention(Node& q, Node& k, Node& v, int row, int head_count,
         LinearParams &fusion_param,
         dtype dropout_value,
         bool use_mask) {
@@ -175,7 +175,7 @@ vector<Node *> transformerEncoder(Node &inputs, TransformerEncoderParams &params
         Node *value = linear(*normed, attention_head_params.v());
         Node *q = linear(*normed, attention_head_params.q());
         int dim = params.hiddenDim();
-        Node *attended = dotAttention(*key, *value, *q, dim, params.headCount(),
+        Node *attended = multiheadAttention(*q, *key, *value, dim, params.headCount(),
                 layer_params.headsFusionParams(), dropout_value, false);
         Node *added = add({attended, last_layer});
         normed = layerNorm(*added, layer_params.layerNormB());
@@ -270,16 +270,16 @@ void TransformerDecoderCellBuilder::step(Node &decoder_input) {
 
         Node *q = linear(*normed, attention_head_params.q());
         int dim = params_->hiddenDim();
-        Node *attended = dotAttention(*key_matrix, *value_matrix, *q, dim, params_->headCount(),
-                layer_params.selfFusion(), dropout_, false);
+        Node *attended = multiheadAttention(*q, *key_matrix, *value_matrix, dim,
+                params_->headCount(), layer_params.selfFusion(), dropout_, false);
         Node *added = add({attended, last_layer_node});
         normed = layerNorm(*added, layer_params.layerNormB());
 
         auto &attention_head_params_for_encoder = layer_params.encoderAttention();
         q = linear(*normed, attention_head_params_for_encoder.q());
-        attended = dotAttention(*encoder_key_matrices_.at(i), *encoder_value_matrices_.at(i),
-                *q, dim, params_->headCount(), layer_params.encoderFusion(),
-                dropout_, false);
+        attended = multiheadAttention(*q, *encoder_key_matrices_.at(i),
+                *encoder_value_matrices_.at(i), dim, params_->headCount(),
+                layer_params.encoderFusion(), dropout_, false);
         added = add({added, attended});
         normed = layerNorm(*added, layer_params.layerNormC());
 
@@ -343,15 +343,16 @@ void TransformerDecoderBuilder::connect(Node &inputs) {
         Node *v = linear(*normed, attention_head_params.v());
         Node *q = linear(*normed, attention_head_params.q());
         int dim = params_->hiddenDim();
-        Node *attended = dotAttention(*k, *v, *q, dim, params_->headCount(),
+        Node *attended = multiheadAttention(*q, *k, *v, dim, params_->headCount(),
                 layer_params.selfFusion(), dropout_, true);
         Node *added = add({attended, last_layer});
         normed = layerNorm(*added, layer_params.layerNormB());
 
         auto &attention_head_params_for_encoder = layer_params.encoderAttention();
         q = linear(*normed, attention_head_params_for_encoder.q());
-        attended = dotAttention(*encoder_key_matrices_.at(i), *encoder_value_matrices_.at(i),
-                *q, dim, params_->headCount(), layer_params.encoderFusion(), dropout_, false);
+        attended = multiheadAttention(*q, *encoder_key_matrices_.at(i),
+                *encoder_value_matrices_.at(i), dim, params_->headCount(),
+                layer_params.encoderFusion(), dropout_, false);
         added = add({added, attended});
         normed = layerNorm(*added, layer_params.layerNormC());
 
