@@ -264,8 +264,8 @@ private:
 
 typedef TransformerParams<TransformerDecoderLayerParams> TransformerDecoderParams;
 
-Node *dotAttention(Node& k, Node& v, Node& q, int row, int head_count, LinearParams &fusion_param,
-        dtype dropout_value,
+Node *multiheadAttention(Node& q, Node& k, Node& v, int embed_dim, int num_heads, LinearParams &Wo,
+        dtype dropout,
         bool use_mask);
 
 std::vector<Node *> transformerEncoder(Node &inputs, TransformerEncoderParams &params,

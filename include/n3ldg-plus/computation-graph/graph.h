@@ -5,6 +5,7 @@
 #include "n3ldg-plus/computation-graph/node.h"
 
 /// \defgroup operator
+/// \defgroup module
 
 /// \addtopgroup n3ldg_plus
 namespace n3ldg_plus {
