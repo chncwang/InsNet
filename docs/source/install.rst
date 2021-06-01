@@ -9,9 +9,9 @@ Prerequisites
 There are several prerequisites for building N3LDG++ as below:
 
 - g++ 9.3.0 (lower versions supporting C++ 14 should also work but are not guaranteed)
-- CMake 3.20 (3.8 should also work)
+- CMake 3.20 (lower versions such as 3.10 would probably fail to build N3LDG++)
 
-For the CPU version, eigen is already included in N3LDG++ (keeping the original MPL 2.0 license), so you need not specify external libraries. For the GPU version, N3LDG++ only relies on CUDA 11.1 (lower versions should also work).
+For the CPU version, eigen is already included in N3LDG++ (keeping the original MPL 2.0 license), so you need not specify external libraries. For the GPU version, N3LDG++ only relies on CUDA 11.1 (lower versions or the latest should also work).
 
 Building & Linking
 ------------------
@@ -35,5 +35,3 @@ If you use the GPU version, you need to set USE_CUDA to 1 and specify your GPU a
 .. code-block:: console
 
     cmake .. -DUSE_CUDA=1 -DCARD_NUMBER=75 # "75" means Turing architecture.
-
-

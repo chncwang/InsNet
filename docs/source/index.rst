@@ -6,14 +6,14 @@
 N3LDG++ documentation
 ===================================
 
-`N3LDG++ <https://github.com/chncwang/n3ldg-plus>`_ is a powerful neural network library aiming at building flexible NLP models, especially those with instance-dependent computation grahs. It is designed to execute dynamic batching just-in-time, thus allow users to focus on building the graph for a single instance. This design has at least four advantages as follows:
+`N3LDG++ <https://github.com/chncwang/n3ldg-plus>`_ is a powerful neural network library aiming at building flexible NLP models, especially those with instance-dependent computation grahs. It is designed to support padding-free dynamic batching, thus allow users to focus on building the graph for a single instance. This design has at least four advantages as follows:
 
 1. **It can batch not only operators in a mini-batch but also operators in the same instance.** For example, it can batch two parallel transformers from the same instance.
 2. **It makes it super easy to build NLP models with instance-dependent computation graphs**, such as tree-LSTM, `dynamic networks <https://arxiv.org/pdf/2102.04906.pdf>`_ and `hierarchical Transformers <https://www.aclweb.org/anthology/P19-1500.pdf>`_.
 3. **It reduces users' intellectual burden of manual batching**, as N3LDG++ can efficiently take over all batching procedures. As such, users even need not know the concept of tensor, but only the matrix and vector (which is a one-column matrix), neither the concept of padding.
 4. **It significantly reduces memory usage since no padding is needed**.
 
-To summarize, we believe that **Just-in-time Dynamic Batching is the feature that NLPers will dive into but is surprisingly not supported by today's most popular deep learning libraries**.
+To summarize, we believe that **Padding-free Dynamic Batching is the feature that NLPers will dive into but is surprisingly not supported by today's deep learning libraries**.
 
 Besides, N3LDG++ has the following features:
 
@@ -22,7 +22,7 @@ Besides, N3LDG++ has the following features:
 3. Both lazy and eager execution is supported, with the former allowing for automatic batching and the latter facilitating users' debugging.
 4. For the moment, it provides more than twenty operators with both GPU and CPU implementations, supporting building modern NLP models for sentence classification, sequence tagging, and language generation. It furthermore provides NLP modules such as attention, RNNs, and the Transformer, built with the aforementioned operators.
 
-Researches using N3LDG++ are listed as follows, and we are looking forward to enriching this list:
+Studies using N3LDG++ are listed as follows, and we are looking forward to enriching this list:
 
 - `Unseen Target Stance Detection with Adversarial Domain Generalization <https://arxiv.org/pdf/2010.05471.pdf>`_
 - `Cue-word Driven Neural Response Generation with a Shrinking Vocabulary <https://arxiv.org/pdf/2010.04927.pdf>`_
@@ -58,7 +58,7 @@ See the following tutorial to get started.
 
     getting_started
 
-We illustrate the just-in-time dynamic batching mechanism of N3LDG++ as below:
+We illustrate the padding-free dynamic batching mechanism of N3LDG++ as below:
 
 .. toctree::
     :maxdepth: 2

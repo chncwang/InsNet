@@ -13,7 +13,7 @@ N3LDG++ documentation
 3. **It reduces users' intellectual burden of manual batching**, as N3LDG++ can efficiently take over all batching procedures. As such, users even need not know the concept of tensor, but only the matrix and vector (which is a one-column matrix), neither the concept of padding.
 4. **It significantly reduces memory usage since no padding is needed**.
 
-To summarize, we believe that **Just-in-time Dynamic Batching is the feature that NLPers will dive into but is surprisingly not supported by today's most popular deep learning libraries**.
+To summarize, we believe that **Padding-free Dynamic Batching is the feature that NLPers will dive into but is surprisingly not supported by today's deep learning libraries**.
 
 Besides, N3LDG++ has the following features:
 
@@ -22,7 +22,7 @@ Besides, N3LDG++ has the following features:
 3. Both lazy and eager execution is supported, with the former allowing for automatic batching and the latter facilitating users' debugging.
 4. For the moment, it provides more than twenty operators with both GPU and CPU implementations, supporting building modern NLP models for sentence classification, sequence tagging, and language generation. It furthermore provides NLP modules such as attention, RNNs, and the Transformer, built with the aforementioned operators.
 
-Researches using N3LDG++ are listed as follows, and we are looking forward to enriching this list:
+Studies using N3LDG++ are listed as follows, and we are looking forward to enriching this list:
 
 - `Unseen Target Stance Detection with Adversarial Domain Generalization <https://arxiv.org/pdf/2010.05471.pdf>`_
 - `Cue-word Driven Neural Response Generation with a Shrinking Vocabulary <https://arxiv.org/pdf/2010.04927.pdf>`_

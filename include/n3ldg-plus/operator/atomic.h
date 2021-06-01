@@ -8,7 +8,7 @@ namespace n3ldg_plus {
 /// \ingroup operator
 /// Find the row-wise max scalars of the input tensor.
 ///
-/// **All softmax will be executed in batch.**
+/// **The max operators with the same returned tensor's size will be executed in batch.** But this batching rule seems not reasonable enough and needs to be modified.
 /// \param input The input tensor.
 /// \param row The row number for which the row-wise max should be calculated. Note that the input tensor's size should be divisible by the row number.
 /// \return The tensor of maximal values. Its size is *input.size() / row*;

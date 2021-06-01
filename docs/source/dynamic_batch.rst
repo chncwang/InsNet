@@ -1,9 +1,9 @@
-JIT (Just-in-time) Dynamic Batching
+Padding-free Dynamic Batching
 ====================================
 
-Previous works such as `TensorFlow Fold <https://arxiv.org/pdf/1702.02181.pdf>`_ typically takes RNN, especially TreeRNN as the example to illustrate JIT dynamic batching. N3LDG++ can properly execute such models in batch.
+Previous works such as `TensorFlow Fold <https://arxiv.org/pdf/1702.02181.pdf>`_ typically takes RNN, especially TreeRNN as the example to illustrate dynamic batching. N3LDG++ can properly execute such models in batch.
 
-But it is the Transformer era now, thus in this topic, we will discuss the JIT dynamic batching mechanism of N3LDG++ using Transformers' self-attention's forward pass as an example. To simplify the illustration, it will not cover multi-head attention, but the method we will discuss can generalize to any operator. 
+But it is the Transformer era now, thus in this topic, we will discuss the padding-free dynamic batching mechanism of N3LDG++ using Transformers' self-attention's forward pass as an example. To simplify the illustration, it will not cover multi-head attention, but the method we will discuss can generalize to any operator. 
 
 Self-attention's Forward Pass Example
 -----------------------------------------
@@ -60,4 +60,4 @@ Importance of Model Design Bias
 
 One may concern that shall we define these general-purpose operators' signatures to adapt self-attention? More generally, shall we exploit model design bias?
 
-Our answer is "Yes" because the JIT dynamic batching task is only tractable when exploiting model design bias. For example, recall how N3LDG++ batch :math:`Y = W X` and we can realize that the efficiency of :math:`\bigl[ \begin{smallmatrix}Y_1 & Y_2 & ... & Y_b\end{smallmatrix} \bigr] = W \bigl[ \begin{smallmatrix}X_1 & X_2 & ... & X_b\end{smallmatrix} \bigr]` is guaranteed by the assumption that :math:`W` is shared in a mini-batch. Otherwise, why not try :math:`Y = \bigl[ \begin{smallmatrix}W_1 W_2 & ... & W_N\end{smallmatrix} \bigr]^T X` instead?
+Our answer is "Yes" because the padding-free dynamic batching task is only tractable when exploiting model design bias. For example, recall how N3LDG++ batch :math:`Y = W X` and we can realize that the efficiency of :math:`\bigl[ \begin{smallmatrix}Y_1 & Y_2 & ... & Y_b\end{smallmatrix} \bigr] = W \bigl[ \begin{smallmatrix}X_1 & X_2 & ... & X_b\end{smallmatrix} \bigr]` is guaranteed by the assumption that :math:`W` is shared in a mini-batch. Otherwise, why not try :math:`Y = \bigl[ \begin{smallmatrix}W_1 W_2 & ... & W_N\end{smallmatrix} \bigr]^T X` instead?
