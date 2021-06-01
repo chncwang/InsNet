@@ -7,8 +7,6 @@ namespace n3ldg_plus {
 
 Node *sub(Node &minuend, Node &subtrahend);
 
-BatchedNode *sub(BatchedNode &minuend, BatchedNode &subtrahend);
-
 }
 
 #endif

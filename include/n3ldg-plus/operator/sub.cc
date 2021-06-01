@@ -67,25 +67,10 @@ private:
     friend vector<pair<Node *, string>> getInput(Node &node);
 };
 
-class BatchedSubNode : public BatchedNodeImpl<SubNode> {
-public:
-    void init(BatchedNode &minuend, BatchedNode &subtrahend) {
-        allocateBatch(minuend.sizes());
-        setInputsPerNode({&minuend, &subtrahend});
-        afterInit({&minuend, &subtrahend});
-    }
-};
-
 Node *sub(Node &minuend, Node &subtrahend) {
     SubNode *result = SubNode::newNode(minuend.size());
     result->connect(minuend, subtrahend);
     return result;
-}
-
-BatchedNode *sub(BatchedNode &minuend, BatchedNode &subtrahend) {
-    BatchedSubNode *node = new BatchedSubNode;
-    node->init(minuend, subtrahend);
-    return node;
 }
 
 #if USE_GPU
