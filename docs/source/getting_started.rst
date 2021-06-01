@@ -179,7 +179,7 @@ Finally, based on the sentence embeddings, we can build the encoder of documents
 .. code-block:: c++
 
         Graph graph;
-        Node *h0 = n3ldg_plus::bucket(graph, 512, 0.0f); // The initial hidden state of LSTM.
+        Node *h0 = n3ldg_plus::tensor(graph, 512, 0.0f); // The initial hidden state of LSTM.
 
         for (const Instance &ins : minibatch) {
             vector<Node *> sen_embs;
