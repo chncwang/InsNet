@@ -11,7 +11,7 @@ N3LDG++ documentation
 1. **It can batch not only operators in a mini-batch but also operators in the same instance.** For example, it can batch two parallel transformers from the same instance.
 2. **It makes it super easy to build NLP models with instance-dependent computation graphs**, such as tree-LSTM, `dynamic networks <https://arxiv.org/pdf/2102.04906.pdf>`_ and `hierarchical Transformers <https://www.aclweb.org/anthology/P19-1500.pdf>`_.
 3. **It reduces users' intellectual burden of manual batching**, as N3LDG++ can efficiently take over all batching procedures. As such, users even need not know the concept of tensor, but only the matrix and vector (which is a one-column matrix), neither the concept of padding.
-4. **It significantly reduces memory usage since no padding is needed and lazy execution can release useless tensors more immediately.**
+4. **It significantly reduces memory usage since no padding is needed and lazy execution can release useless tensors immediately.**
 
 To summarize, we believe that **Padding-free Dynamic Batching is the feature that NLPers will dive into but is surprisingly not supported by today's deep learning libraries**.
 
