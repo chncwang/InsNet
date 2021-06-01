@@ -34,6 +34,7 @@ Operators
 .. doxygenfunction:: softmax(Node &)
 .. doxygenfunction:: split(Node &, int, int, int input_col = 1)
 .. doxygenfunction:: sqrt
+.. doxygenfunction:: sub
 .. doxygenfunction:: sum
 .. doxygenfunction:: sumPool
 .. doxygenfunction:: tanh
