@@ -1039,11 +1039,15 @@ Node *exp(Node &input) {
 }
 
 Node *dropout(Node &input, dtype dropout) {
-    DropoutNode *node = DropoutNode::newNode(input.size());
-    node->init(input.size());
-    node->setDropValue(dropout);
-    node->connect(input);
-    return node;
+    if (dropout <= 1e-10) {
+        return &input;
+    } else {
+        DropoutNode *node = DropoutNode::newNode(input.size());
+        node->init(input.size());
+        node->setDropValue(dropout);
+        node->connect(input);
+        return node;
+    }
 }
 
 Node *mul(Node &input, dtype factor) {

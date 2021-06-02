@@ -5,7 +5,7 @@
 
 namespace n3ldg_plus {
 
-struct GRUParam : public TunableCombination<BaseParam>
+struct GRUParams : public TunableCombination<BaseParam>
 #if USE_GPU
 , public cuda::TransferableComponents
 #endif
@@ -17,7 +17,7 @@ struct GRUParam : public TunableCombination<BaseParam>
     LinearParams candidate_input;
     LinearParams candidate_hidden;
 
-    GRUParam(const std::string &name);
+    GRUParams(const std::string &name);
 
     template<typename Archive>
     void serialize(Archive &ar) {
@@ -28,11 +28,11 @@ struct GRUParam : public TunableCombination<BaseParam>
     void init(int out_size, int in_size);
 
     int inDim() {
-        return update_input.W().outDim();
+        return update_input.W().row();
     }
 
     int outDim() {
-        return update_input.W().inDim();
+        return update_input.W().col();
     }
 
 #if USE_GPU
@@ -43,21 +43,18 @@ protected:
     std::vector<Tunable<BaseParam> *> tunableComponents() override;
 };
 
-class GRUBuilder {
-public:
-    int size() const {
-        return hiddens_.size();
-    }
+/// \ingroup module
+/// Return the next GRU state.
+///
+/// **The operators inside guarantee that gru with the same params and dropout value will be executed in batch.**
+/// \param last_state The last hidden state.
+/// \param input The input vector.
+/// \param params The GRU parameters.
+/// \param dropout The dropout value.
+Node *gru(Node &last_state, Node &input, GRUParams &params, dtype dropout);
 
-    const std::vector<Node *> &hiddens() {
-        return hiddens_;
-    }
-
-    void step(GRUParam &gru_params, Node &input, Node &h0, dtype dropout);
-
-private:
-    std::vector<Node*> hiddens_;
-};
+std::vector<Node *> gru(Node &initial_state, const std::vector<Node *> &inputs, GRUParams &params,
+        dtype dropout_value);
 
 }
 

@@ -7,15 +7,6 @@
 
 namespace n3ldg_plus {
 
-std::pair<BatchedNode *, BatchedNode *> dotAttention(Node& key_matrix, Node& value_matrix,
-        BatchedNode& guide,
-        const std::vector<int> *matrix_cols = nullptr);
-
-std::pair<BatchedNode *, BatchedNode *> dotAttention(BatchedNode &key_matrix,
-        BatchedNode &value_matrix,
-        BatchedNode& guide,
-        const std::vector<int> *matrix_cols = nullptr);
-
 std::pair<BatchedNode *, BatchedNode *> dotAttention(BatchedNode &key_matrix,
         BatchedNode &value_matrix,
         BatchedNode &query_matrix,

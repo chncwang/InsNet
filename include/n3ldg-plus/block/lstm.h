@@ -30,11 +30,11 @@ struct LSTMParams : TunableCombination<BaseParam>
     }
 
     int inDim() {
-        return input_input.W().outDim();
+        return input_input.W().row();
     }
 
     int outDim() {
-        return input_input.W().inDim();
+        return input_input.W().col();
     }
 
 #if USE_GPU
