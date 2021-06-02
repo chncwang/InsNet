@@ -45,3 +45,5 @@ Modules
 ---------------------
 
 .. doxygenfunction:: multiheadAttention
+.. doxygenfunction:: gru(Node &, Node &, GRUParams &, dtype)
+.. doxygenfunction:: gru(Node &, const std::vector<Node *> &, GRUParams &, dtype)
