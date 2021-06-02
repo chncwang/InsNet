@@ -40,3 +40,8 @@ Operators
 .. doxygenfunction:: tanh
 .. doxygenfunction:: tensor(Graph &, const std::vector<dtype> &)
 .. doxygenfunction:: tensor(Graph &, int, dtype)
+
+Modules
+---------------------
+
+.. doxygenfunction:: multiheadAttention
