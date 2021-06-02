@@ -44,17 +44,27 @@ protected:
 };
 
 /// \ingroup module
-/// Return the next GRU state.
+/// Return the next GRU hidden state.
 ///
 /// **The operators inside guarantee that gru with the same params and dropout value will be executed in batch.**
 /// \param last_state The last hidden state.
 /// \param input The input vector.
 /// \param params The GRU parameters.
-/// \param dropout The dropout value.
+/// \param dropout The dropout value. The dropout will take place when returning the result vector.
+/// \return The next hidden state.
 Node *gru(Node &last_state, Node &input, GRUParams &params, dtype dropout);
 
+/// \ingroup module
+/// Return GRU hidden states.
+///
+/// It is implemented using *gru(Node &last_state, Node &input, GRUParams &params, dtype dropout)*.
+///
+/// \param initial_state The initial hidden state commonly remarked as h_0.
+/// \param inputs The input vectors.
+/// \param params The GRU parameters.
+/// \param dropout The dropout value.
 std::vector<Node *> gru(Node &initial_state, const std::vector<Node *> &inputs, GRUParams &params,
-        dtype dropout_value);
+        dtype dropout);
 
 }
 

@@ -79,7 +79,7 @@ Node *sum(Node &input,  int input_row);
 Node *exp(Node &input);
 
 /// \ingroup operator
-/// The dropout function. But if the dropout value is no greater than 1e-10, it will return the input tensor directly.
+/// The dropout function. In particular, if the dropout value is no greater than 1e-10, it will return the input tensor directly.
 ///
 /// If the graph is set to the training stage, it drop out all elements independently with the probability *p*.
 /// Otherwise it scales all elements by (1 - p).
