@@ -37,6 +37,33 @@ vector<Tunable<BaseParam> *> GRUParams::tunableComponents() {
         &candidate_hidden};
 }
 
+Node *gru(Node &last_state, Node &input, GRUParams &params, dtype dropout_value) {
+    Node *update_input = linear(input, params.update_input);
+    Node *update_hidden = linear(last_state, params.update_hidden);
+    Node *update_gate = add({update_input, update_hidden});
+    update_gate = sigmoid(*update_gate);
+
+    Node *reset_input = linear(input, params.reset_input);
+    Node *reset_hidden = linear(last_state, params.reset_hidden);
+    Node *reset_gate = add({reset_input, reset_hidden});
+    reset_gate = sigmoid(*reset_gate);
+
+    Node *candidate_input = linear(input, params.candidate_input);
+    Node *updated_hidden = mul(*reset_gate, last_state);
+    Node *candidate_hidden = linear(*updated_hidden, params.candidate_hidden);
+    Node *candidate = add({candidate_input, candidate_hidden});
+    candidate = tanh(*candidate);
+
+    int hidden_dim = last_state.size();
+    Graph &graph = dynamic_cast<Graph&>(input.getNodeContainer());
+    Node *one = tensor(graph, hidden_dim, 1);
+    Node *reversal_update = sub(*one, *update_gate);
+    Node *passed_last_state = mul(*reversal_update, last_state);
+    Node *updated_candidate = mul(*update_gate, *candidate);
+    Node *h = add({passed_last_state, updated_candidate});
+    return dropout(*h, dropout_value);
+}
+
 vector<Node *> gru(Node &initial_state, const vector<Node *> &inputs, GRUParams &params,
         dtype dropout_value) {
     Node *last_state = &initial_state;
