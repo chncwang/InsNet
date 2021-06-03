@@ -271,13 +271,13 @@ typedef TransformerParams<TransformerDecoderLayerParams> TransformerDecoderParam
 /// For example, *multiheadAttention* in the same layer and mini-batch will be commonly executed in batch.
 /// \param Q The query matrix before divided into multi-heads. Its size can be different with K and V, but should be divisble by embed_dim.
 /// \param K The key matrix before divided into multi-heads. Its size should be equal to V and be divisible by embed_dim.
-/// \param V The value matrix before divided into multi-heads. Its size should be equal to K and be divisible by embed_dim. Note that *multiheadAttention* assumes that Q, K and V are already linear transformed before they are passed so they will not be linear transformed again and *multiheadAttention* does not accept weight matrix parameters of Q, K and V.
+/// \param V The value matrix before divided into multi-heads. Its size should be equal to K and be divisible by embed_dim. **Note that multiheadAttention assumes Q, K and V are already linear transformed before they are passed so they will not be linear transformed again and as such multiheadAttention does not accept weight matrix parameters of Wq, Wk and Wv.**
 /// \param embed_dim The row number of Q, K and V. It should be divisible by *num_heads*.
 /// \param num_heads The head number.
 /// \param Wo The weight matrix of the output linear transformation.
 /// \param dropout The dropout value of the dropout following the output linear transformation.
-/// \param mask Whether to mask future tokens in K, which is typically used in the Transformer decoder's self-attention. But user-defined masks are not supported yet.
-/// \return The result matrix. Its size is equal to both K.size() and V.size().
+/// \param mask Whether to mask future tokens in K, which is typically used in the Transformer decoder's self-attention. For the moment, user-defined masks are not supported yet.
+/// \return The result matrix. Its size is equal to both Q.size().
 Node *multiheadAttention(Node& Q, Node& K, Node& V, int embed_dim, int num_heads, LinearParams &Wo,
         dtype dropout,
         bool use_mask);
