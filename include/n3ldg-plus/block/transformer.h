@@ -282,8 +282,16 @@ Node *multiheadAttention(Node& Q, Node& K, Node& V, int embed_dim, int num_heads
         dtype dropout,
         bool use_mask);
 
-std::vector<Node *> transformerEncoder(Node &inputs, TransformerEncoderParams &params,
-        dtype dropout_value);
+/// \ingroup module
+/// The Transformer encoder.
+/// 
+/// **The operators inside guarantee that transformerEncoder with the same params and dropout will be executed in batch layer by layer.**
+/// \param input The input matrix. Note that for the current version, the positional encoding is added inside transformerEncoder using sin and cos, which may lack flexibility.
+/// \param params The Transformer parameters.
+/// \param dropout The dropout value. The dropout is added after self-attention and FFN, respectively.
+/// \return The list of hidden matrices of each layer.
+std::vector<Node *> transformerEncoder(Node &input, TransformerEncoderParams &params,
+        dtype dropout);
 
 class TransformerDecoderBuilderAbs {
 public:

@@ -50,8 +50,27 @@ struct LSTMState {
     Node *cell;
 };
 
+/// \ingroup module
+/// Return the next LSTM hidden state, i.e., hi and ci.
+///
+/// **The operators inside guarantee that lstm with the same params and dropout value will be executed in batch.**
+/// \param last_state The last lstm state containing h_i and c_i.
+/// \param input The input vector.
+/// \param params The LSTM parameters.
+/// \param dropout The dropout value. The dropout will be added when returning the hidden vector.
+/// \return The next LSTM state.
 LSTMState lstm(LSTMState &last_state, Node &input, LSTMParams &params, dtype dropout);
 
+/// \ingroup module
+/// Return LSTM hidden states.
+///
+/// It is implemented using lstm(LSTMState &, Node &, LSTMParams &, dtype).
+///
+/// \param initial_state The initial state commonly remarked as h_0 and c_0.
+/// \param inputs The input vectors.
+/// \param params The LSTM parameters.
+/// \param dropout The dropout value.
+/// \return The hidden states.
 std::vector<Node *> lstm(LSTMState &initial_state, const std::vector<Node *> &inputs,
         LSTMParams &params,
         dtype dropout);
