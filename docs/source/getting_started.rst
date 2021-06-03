@@ -3,7 +3,7 @@ N3LDG++ Tutorial
 
 In this topic, we will demonstrate how to train a model using N3LDG++ from scratch, taking the conversation model as an example.
 
-Before getting started, note that N3LDG++ uses procedural style computation APIs. Thus Unlike PyTorch, there is no concept of "module" and parameters are decoupled from models, making it straightforward when reusing the same parameters in different layers or places of the neural network.
+Before getting started, note that N3LDG++ uses procedural style computation APIs. Thus Unlike PyTorch, parameters are decoupled from models.
 
 Getting Started
 ------------------
