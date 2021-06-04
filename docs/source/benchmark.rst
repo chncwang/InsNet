@@ -1,7 +1,7 @@
 Benchmarks
 ==============================================
 
-This topic will conduct the benchmarks (`Source Code <https://github.com/chncwang/n3ldg-plus-benchmark>`_) to measure N3LDG++'s training speed and memory usage on Transformer-based seq2seq models, respectively, with various model size settings.
+This topic will conduct the benchmarks (`Source Code <https://github.com/chncwang/n3ldg-plus-benchmark>`_) to measure N3LDG++'s training speed and memory usage on Transformer-based seq2seq models, with various model size settings.
 
 Dataset
 ---------
