@@ -6,10 +6,10 @@
 InsNet documentation
 ===================================
 
-`InsNet <https://github.com/chncwang/insnet>`_ (`documentation <https://insnet.readthedocs.io/en/latest>`_) is a powerful neural network library aiming at building flexible NLP models, especially those with instance-dependent computation grahs. It is designed to execute dynamic batching just-in-time, thus allow users to focus on building the graph for a single instance. This design has at least four advantages as follows:
+`InsNet <https://github.com/chncwang/insnet>`_ (`documentation <https://insnet.readthedocs.io/en/latest>`_) is a powerful neural network library aiming at building instance-dependent computation grahs. It is designed to support padding-free dynamic batching, thus allow users to focus on building the graph for a single instance. This design has at least four advantages as follows:
 
 1. **It can batch not only operators in a mini-batch but also operators in the same instance.** For example, it can batch two parallel transformers from the same instance.
-2. **It makes it super easy to build NLP models with instance-dependent computation graphs but execute them in batch**, such as tree-LSTM  and `hierarchical Transformers <https://www.aclweb.org/anthology/P19-1500.pdf>`_.
+2. **It makes it super easy to build NLP models with instance-dependent computation graphs and execute them in batch**, such as tree-LSTM  and `hierarchical Transformers <https://www.aclweb.org/anthology/P19-1500.pdf>`_.
 3. **It reduces users' intellectual burden of manual batching**, as InsNet can efficiently take over all batching procedures. As such, users even need not know the concept of tensor, but only the matrix and vector (which is a one-column matrix), neither the concept of padding.
 4. **It significantly reduces memory usage since no padding is needed and lazy execution can release useless tensors immediately.**
 
