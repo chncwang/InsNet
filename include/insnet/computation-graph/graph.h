@@ -6,6 +6,7 @@
 
 /// \defgroup operator
 /// \defgroup module
+/// \defgroup loss
 
 /// \addtopgroup insnet
 namespace insnet {
