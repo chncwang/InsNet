@@ -1,7 +1,7 @@
 Benchmarks
 ==============================================
 
-This topic will conduct the benchmarks (`Source Code <https://github.com/chncwang/n3ldg-plus-benchmark>`_) to measure N3LDG++'s training speed and memory usage on Transformer-based seq2seq models, with various model size settings.
+This topic will conduct the benchmarks (`Source Code <https://github.com/chncwang/insnet-benchmark>`_) to measure InsNet's training speed and memory usage on Transformer-based seq2seq models, with various model size settings.
 
 Dataset
 ---------
@@ -185,6 +185,6 @@ Memory Usage on GPU
       - 2077
       - OOM
 
-The low memory usage shall be partly attributed to N3LDG++'s Padding-free Dynamic Batching feature.
+The low memory usage shall be partly attributed to InsNet's Padding-free Dynamic Batching feature.
 
-We will illustrate N3LDG++'s efficient memory management in detail in the future.
+We will illustrate InsNet's efficient memory management in detail in the future.

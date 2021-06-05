@@ -1,9 +1,9 @@
 Padding-free Dynamic Batching
 ====================================
 
-Previous works such as `TensorFlow Fold <https://arxiv.org/pdf/1702.02181.pdf>`_ typically takes RNN, especially TreeRNN as the example to illustrate dynamic batching. N3LDG++ can properly execute such models in batch.
+Previous works such as `TensorFlow Fold <https://arxiv.org/pdf/1702.02181.pdf>`_ typically takes RNN, especially TreeRNN as the example to illustrate dynamic batching. InsNet can properly execute such models in batch.
 
-But it is the Transformer era now, thus in this topic, we will discuss the padding-free dynamic batching mechanism of N3LDG++ using Transformers' self-attention's forward pass as an example. To simplify the illustration, it will not cover multi-head attention, but the method we will discuss can generalize to any operator. 
+But it is the Transformer era now, thus in this topic, we will discuss the padding-free dynamic batching mechanism of InsNet using Transformers' self-attention's forward pass as an example. To simplify the illustration, it will not cover multi-head attention, but the method we will discuss can generalize to any operator. 
 
 Self-attention's Forward Pass Example
 -----------------------------------------
@@ -22,7 +22,7 @@ Given a mini-batch containing matrices :math:`\{X_i\}_{i=1}^b` satisfying :math:
         Y_i = A_i V_i\tag{7}
     \end{align}
 
-Executing the same formula in batch can generally speed up computation, especially on the GPU. To this end, following DyNet, N3LDG++ maps every operator into a signature, where operators with the same signature mean that they should be computed in batch. In the following, we will discuss how N3LDG++ executes the above formulas one by one.
+Executing the same formula in batch can generally speed up computation, especially on the GPU. To this end, following DyNet, InsNet maps every operator into a signature, where operators with the same signature mean that they should be computed in batch. In the following, we will discuss how InsNet executes the above formulas one by one.
 
 :math:`Y = W X`
 ^^^^^^^^^^^^^^^^^
@@ -41,14 +41,14 @@ Then we need to determine that when the input matrices meet what condition, the 
 :math:`Y = \alpha X`
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-Taking formula (5) as the example, since the sizes of :math:`\{S_i\}_{i=1}^b` are not equal in the mini-batch, we define the signature as :code:`"factor"`, i.e., N3LDG++ executes this type of operators in batch regardless of the input sizes.
+Taking formula (5) as the example, since the sizes of :math:`\{S_i\}_{i=1}^b` are not equal in the mini-batch, we define the signature as :code:`"factor"`, i.e., InsNet executes this type of operators in batch regardless of the input sizes.
 
-More generally, N3LDG++ executes all single-input operators :math:`Y = F(X)` satisfying :math:`y_i = f(x_i), 0 < i < size(X)`, e.g., :code:`dropout`, :code:`tanh` and :code:`relu` in batch regardless of their sizes.
+More generally, InsNet executes all single-input operators :math:`Y = F(X)` satisfying :math:`y_i = f(x_i), 0 < i < size(X)`, e.g., :code:`dropout`, :code:`tanh` and :code:`relu` in batch regardless of their sizes.
 
 :math:`Y = softmax(X)`
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Similarly, we define softmax's signature as :code:`"softmax"`, which means N3LDG++ executes all softmax operators in batch.
+Similarly, we define softmax's signature as :code:`"softmax"`, which means InsNet executes all softmax operators in batch.
 
 :math:`Y = A B`
 ^^^^^^^^^^^^^^^^^
@@ -60,4 +60,4 @@ Importance of Model Design Bias
 
 One may concern that shall we define these general-purpose operators' signatures to adapt self-attention? More generally, shall we exploit model design bias?
 
-Our answer is "Yes" because the padding-free dynamic batching task is only tractable when exploiting model design bias. For example, recall how N3LDG++ batch :math:`Y = W X` and we can realize that the efficiency of :math:`\bigl[ \begin{smallmatrix}Y_1 & Y_2 & ... & Y_b\end{smallmatrix} \bigr] = W \bigl[ \begin{smallmatrix}X_1 & X_2 & ... & X_b\end{smallmatrix} \bigr]` is guaranteed by the assumption that :math:`W` is shared in a mini-batch. Otherwise, why not try :math:`Y = \bigl[ \begin{smallmatrix}W_1 W_2 & ... & W_N\end{smallmatrix} \bigr]^T X` instead?
+Our answer is "Yes" because the padding-free dynamic batching task is only tractable when exploiting model design bias. For example, recall how InsNet batch :math:`Y = W X` and we can realize that the efficiency of :math:`\bigl[ \begin{smallmatrix}Y_1 & Y_2 & ... & Y_b\end{smallmatrix} \bigr] = W \bigl[ \begin{smallmatrix}X_1 & X_2 & ... & X_b\end{smallmatrix} \bigr]` is guaranteed by the assumption that :math:`W` is shared in a mini-batch. Otherwise, why not try :math:`Y = \bigl[ \begin{smallmatrix}W_1 W_2 & ... & W_N\end{smallmatrix} \bigr]^T X` instead?
