@@ -56,6 +56,7 @@ Modules
 .. doxygenfunction:: gru(Node &, Node &, GRUParams &, dtype)
 .. doxygenfunction:: gru(Node &, const std::vector<Node *> &, GRUParams &, dtype)
 .. doxygenfunction:: lstm(LSTMState &, Node &, LSTMParams &, dtype)
-.. doxygenfunction:: lstm(LSTMState &initial_state, const std::vector<Node *> &, LSTMParams &, dtype);
-.. doxygenfunction:: transformerDecoder
+.. doxygenfunction:: lstm(LSTMState &initial_state, const std::vector<Node *> &, LSTMParams &, dtype)
+.. doxygenfunction:: transformerDecoder(Node &, Node &, TransformerDecoderParams &, dtype)
+.. doxygenfunction:: transformerDecoder(TransformerDecoderState &, const std::vector<Node*> &, const std::vector<Node*> &, Node &, TransformerDecoderParams &, dtype);
 .. doxygenfunction:: transformerEncoder
