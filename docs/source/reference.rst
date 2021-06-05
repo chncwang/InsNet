@@ -14,6 +14,7 @@ Operators
 
 .. doxygenfunction:: add
 .. doxygenfunction:: affine
+.. doxygenfunction:: argmax
 .. doxygenfunction:: avgPool
 .. doxygenfunction:: bias
 .. doxygenfunction:: cat(const std::vector<Node*> &, int col = 1)

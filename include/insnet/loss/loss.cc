@@ -56,7 +56,7 @@ vector<vector<int>> gpuPredict(const vector<Node *> &nodes, int row) {
 #endif
 }
 
-vector<vector<int>> predict(const vector<Node *> &nodes, int row) {
+vector<vector<int>> argmax(const vector<Node *> &nodes, int row) {
 #if USE_GPU
     return gpuPredict(nodes, row);
 #else
@@ -175,7 +175,7 @@ float cpuKLDivergenceLoss(vector<Node *> &nodes,
 
 }
 
-pair<float, vector<int>> KLDivergenceLoss(vector<Node *> &nodes,
+dtype KLDivergenceLoss(vector<Node *> &nodes,
         const vector<shared_ptr<vector<dtype>>> &answers,
         dtype factor) {
     if (nodes.size() != answers.size()) {
@@ -202,17 +202,7 @@ pair<float, vector<int>> KLDivergenceLoss(vector<Node *> &nodes,
 #else
     dtype loss = cpuKLDivergenceLoss(nodes, answers, factor);
 #endif
-    auto predicted_ids = predict(nodes, nodes.front()->size());
-    vector<int> ids;
-    for (const auto &x : predicted_ids) {
-        if (x.size() != 1) {
-            cerr << fmt::format("KLLoss x size:{}\n", x.size());
-            abort();
-        }
-        ids.push_back(x.front());
-    }
-    pair<float, vector<int>> result = make_pair(loss, ids);
-    return result;
+    return loss;
 }
 
 float binrayLikelihoodLoss(vector<Node *> &nodes, const vector<vector<int>> &answers,
