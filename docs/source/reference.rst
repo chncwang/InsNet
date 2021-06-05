@@ -61,3 +61,7 @@ Modules
 .. doxygenfunction:: transformerDecoder(Node &, Node &, TransformerDecoderParams &, dtype)
 .. doxygenfunction:: transformerDecoder(TransformerDecoderState &, const std::vector<Node*> &, const std::vector<Node*> &, Node &, TransformerDecoderParams &, dtype);
 .. doxygenfunction:: transformerEncoder
+
+Losses
+---------
+.. doxygenfunction:: NLLLoss

@@ -16,8 +16,16 @@ namespace insnet {
 /// \return The result indexes.
 std::vector<std::vector<int>> argmax(const std::vector<Node *> &nodes, int row);
 
-dtype NLLLoss(std::vector<Node *> &nodes, int row,
-        const std::vector<std::vector<int>> &answers,
+/// \ingroup loss
+/// The negative log likelihood loss.
+///
+/// It returns the loss and add gradients to probs.
+///
+/// **It will be executed eagerly.**
+/// \param probs The probability matrices. their sizes can be different but should be divisible by row. **Note that we may change this argument to log probabilities in the future to guarantee numerical stability.**
+/// \param row The row number of probability matrices.
+/// \return The loss.
+dtype NLLLoss(std::vector<Node *> &probs, int row, const std::vector<std::vector<int>> &answers,
         dtype factor);
 
 dtype KLDivergenceLoss(std::vector<Node *> &nodes,
