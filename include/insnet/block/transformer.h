@@ -283,7 +283,7 @@ Node *multiheadAttention(Node& Q, Node& K, Node& V, int embed_dim, int num_heads
         bool use_mask);
 
 /// \ingroup module
-/// The Transformer encoder.
+/// The Transformer encoder. It uses the pre-layernorm version of the Transformer. See <a href="https://openreview.net/forum?id=B1x8anVFPr">On Layer Normalization in the Transformer Architecture</a>.
 /// 
 /// **The operators inside guarantee that transformerEncoder with the same params and dropout will be executed in batch layer by layer.**
 /// \param input The input matrix. Note that for the current version, the positional encoding is added inside transformerEncoder using sin and cos, which may lack flexibility.
@@ -351,7 +351,7 @@ private:
 };
 
 /// \ingroup module
-/// The Transformer decoder.
+/// The Transformer decoder. It uses the pre-layernorm version of the Transformer. See <a href="https://openreview.net/forum?id=B1x8anVFPr">On Layer Normalization in the Transformer Architecture</a>.
 /// 
 /// **The operators inside guarantee that transformerDecoder with the same params and dropout will be executed in batch layer by layer.**
 /// \param input The input matrix. Note that for the current version, the positional encoding is added inside transformerDecoder using sin and cos, which may lack flexibility.
@@ -391,6 +391,17 @@ private:
     std::vector<Node *> keys_, values_;
 };
 
+/// \ingroup module
+/// Return the next Transformer hidden state, i.e., n layers of key and value matrices(their column number is equal to the decoded length), where n is the layer number.
+/// 
+/// It exploits the previous state to compute the next, which is useful in beam search.
+/// \param state The last state. In particular, it should contain nullptr vector of size n if it is the initial state, where n is the layer number.
+/// \param encoder_keys The encoder key matrices. Its size is equal to the layer number.
+/// \param encoder_values The encoder value matrices. Its size is equal to the layer number.
+/// \param input The decoder input vector. Its size is equal to hidden_dim, i.e., it does not contain previous inputs.
+/// \param params The Transformer decoder parameters.
+/// \param dropout The dropout value.
+/// \return The next state which appends one column to the last state's key and value matrices.
 TransformerDecoderState transformerDecoder(TransformerDecoderState &state,
         const std::vector<Node*> &encoder_keys,
         const std::vector<Node*> &encoder_values,
