@@ -354,6 +354,42 @@ std::vector<Node *> transformerDecoder(Node &encoder, Node &input,
         TransformerDecoderParams &params,
         dtype dropout_value);
 
+class TransformerDecoderState {
+public:
+    TransformerDecoderState(int layer);
+
+    TransformerDecoderState(const std::vector<Node *> &keys, const std::vector<Node *> &values) :
+        keys_(keys), values_(values) {}
+
+    TransformerDecoderState(const TransformerDecoderState &) = default;
+
+    TransformerDecoderState(TransformerDecoderState &&) = default;
+
+    TransformerDecoderState &operator=(const TransformerDecoderState &) = default;
+
+    TransformerDecoderState &operator=(TransformerDecoderState &&) = default;
+
+    int layerCount() const;
+
+    const std::vector<Node *> &keys() const {
+        return keys_;
+    }
+
+    const std::vector<Node *> &values() const {
+        return values_;
+    }
+
+private:
+    std::vector<Node *> keys_, values_;
+};
+
+TransformerDecoderState transformerDecoder(TransformerDecoderState &state,
+        const std::vector<Node*> &encoder_keys,
+        const std::vector<Node*> &encoder_values,
+        Node &input,
+        TransformerDecoderParams &params,
+        dtype dropout);
+
 }
 
 #endif

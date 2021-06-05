@@ -366,12 +366,106 @@ void TransformerDecoderBuilder::connect(Node &inputs) {
     }
 }
 
+TransformerDecoderState::TransformerDecoderState(int layer) {
+    for (auto *v : {&keys_, &values_}) {
+        v->reserve(layer);
+        for (int i = 0; i < layer; ++i) {
+            v->push_back(nullptr);
+        }
+    }
+}
+int TransformerDecoderState::layerCount() const {
+    if (keys_.size() != values_.size()) {
+        cerr << fmt::format("TransformerDecoderState layerCount keys_ size:{} values_ size:{}",
+                keys_.size(), values_.size()) << endl;
+        abort();
+    }
+    return keys_.size();
+}
+
 vector<Node *> transformerDecoder(Node &encoder, Node &input, TransformerDecoderParams &params,
         dtype dropout_value) {
     TransformerDecoderBuilder builder(params, encoder, dropout_value);
     builder.prepare();
     builder.connect(input);
     return builder.hiddenLayers();
+}
+
+TransformerDecoderState transformerDecoder(const TransformerDecoderState &state,
+        const std::vector<Node*> &encoder_keys,
+        const std::vector<Node*> &encoder_values,
+        Node &input,
+        TransformerDecoderParams &params,
+        dtype dropout_value) {
+    if (state.layerCount() != params.layerCount()) {
+        cerr << fmt::format("transformerDecoder - state layerCount:{} params layerCount:{}",
+                state.layerCount(), params.layerCount()) << endl;
+        abort();
+    }
+    int dim = params.hiddenDim();
+    int decoded_len = state.keys().front() == nullptr ? 0 : state.keys().front()->size() / dim;
+    if (decoded_len * dim != state.keys().front()->size()) {
+        cerr << fmt::format("transformerDecoder decoded_len:{} dim:{} state keys front size:{}",
+                decoded_len, dim, state.keys().front()->size()) << endl;
+        abort();
+    }
+    Node *scaled_input = mul(input, std::sqrt(static_cast<dtype>(input.size())));
+    Graph &graph = dynamic_cast<Graph &>(input.getNodeContainer());
+    Node *emb = embedding(graph, decoded_len, params.positionalEncodingParam(), true);
+    Node *pos_encoded = add({scaled_input, emb});
+    pos_encoded = dropout(*pos_encoded, dropout_value);
+
+    int layer_count = params.layerCount();
+    int encoder_sentence_len = encoder_keys.front()->size() / params.hiddenDim();
+    if (encoder_sentence_len * params.hiddenDim() != encoder_keys.front()->size()) {
+        cerr << fmt::format("transformerDecoder - encoder_sentence_len:{} params hidden_dim:{} encoder_keys front size:{}",
+                encoder_sentence_len, params.hiddenDim(), encoder_keys.front()->size()) << endl;
+        abort();
+    }
+
+    vector<Node *> next_keys, next_values;
+    next_keys.reserve(layer_count);
+    next_values.reserve(layer_count);
+
+    Node *last_layer_node = pos_encoded;
+    for (int i = 0; i < layer_count; ++i) {
+        auto &layer_params = *params.layerParams().ptrs().at(i);
+        auto &attention_head_params = layer_params.selfAttention();
+        Node *normed = layerNorm(*last_layer_node, layer_params.layerNormA());
+        Node *k = linear(*normed, attention_head_params.k());
+        Node *v = linear(*normed, attention_head_params.v());
+
+        Node *key_matrix = state.keys().at(i);
+        key_matrix = key_matrix == nullptr ? k : cat({key_matrix, k});
+        next_keys.push_back(key_matrix);
+        Node *value_matrix = state.values().at(i);
+        value_matrix = value_matrix == nullptr ? v : cat({value_matrix, v});
+        next_values.push_back(value_matrix);
+
+        Node *q = linear(*normed, attention_head_params.q());
+        int dim = params.hiddenDim();
+        Node *attended = multiheadAttention(*q, *key_matrix, *value_matrix, dim,
+                params.headCount(), layer_params.selfFusion(), dropout_value, false);
+        Node *added = add({attended, last_layer_node});
+        normed = layerNorm(*added, layer_params.layerNormB());
+
+        auto &attention_head_params_for_encoder = layer_params.encoderAttention();
+        q = linear(*normed, attention_head_params_for_encoder.q());
+        attended = multiheadAttention(*q, *encoder_keys.at(i),
+                *encoder_values.at(i), dim, params.headCount(),
+                layer_params.encoderFusion(), dropout_value, false);
+        added = add({added, attended});
+        normed = layerNorm(*added, layer_params.layerNormC());
+
+        Node *t = linear(*normed, layer_params.ffnInnerParams());
+        t = relu(*t);
+        t = linear(*t, layer_params.ffnOutterParams());
+        t = dropout(*t, dropout_value);
+        added = add({added, t});
+        last_layer_node = added;
+    }
+
+    return TransformerDecoderState(next_keys, next_values);
 }
 
 }
