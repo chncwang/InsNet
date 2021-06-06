@@ -29,7 +29,7 @@ dtype NLLLoss(std::vector<Node *> &probs, int row, const std::vector<std::vector
         dtype factor);
 
 dtype KLDivLoss(std::vector<Node *> &nodes,
-        const std::vector<std::shared_ptr<std::vector<dtype>>> &answers,
+        const std::vector<std::vector<dtype> *> &answers,
         dtype factor);
 
 float binrayLikelihoodLoss(std::vector<Node *> &nodes,
