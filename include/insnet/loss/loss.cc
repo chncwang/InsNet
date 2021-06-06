@@ -175,7 +175,7 @@ float cpuKLDivergenceLoss(vector<Node *> &nodes,
 
 }
 
-dtype KLDivergenceLoss(vector<Node *> &nodes,
+dtype KLDivLoss(vector<Node *> &nodes,
         const vector<shared_ptr<vector<dtype>>> &answers,
         dtype factor) {
     if (nodes.size() != answers.size()) {

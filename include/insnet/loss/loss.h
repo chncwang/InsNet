@@ -28,7 +28,7 @@ std::vector<std::vector<int>> argmax(const std::vector<Node *> &nodes, int row);
 dtype NLLLoss(std::vector<Node *> &probs, int row, const std::vector<std::vector<int>> &answers,
         dtype factor);
 
-dtype KLDivergenceLoss(std::vector<Node *> &nodes,
+dtype KLDivLoss(std::vector<Node *> &nodes,
         const std::vector<std::shared_ptr<std::vector<dtype>>> &answers,
         dtype factor);
 
