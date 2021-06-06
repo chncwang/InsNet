@@ -3049,7 +3049,7 @@ __global__ void KernelKLCrossEntropyLossVector(dtype **in_vals,
 }
 
 dtype KLCrossEntropyLoss(vector<dtype*> &vals,
-        vector<shared_ptr<vector<dtype>>> &answers,
+        vector<vector<dtype> *> &answers,
         int count,
         int dim,
         dtype factor,

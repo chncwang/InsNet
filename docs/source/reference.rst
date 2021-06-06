@@ -63,5 +63,6 @@ Modules
 .. doxygenfunction:: transformerEncoder
 
 Loss Functions
----------
+------------------
+.. doxygenfunction:: KLDivLoss
 .. doxygenfunction:: NLLLoss

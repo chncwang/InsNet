@@ -36,13 +36,11 @@ dtype NLLLoss(std::vector<Node *> &probs, int row, const std::vector<std::vector
 /// It returns the loss and accumulate gradients to probs.
 ///
 /// **It will be executed eagerly.**
-/// \param probs The probability matrices. their sizes can be variant but should all be divisible by row. **Note that we may change this argument to log probabilities in the future to guarantee numerical stability.**
-/// \param row The row number of probability matrices.
-/// \param answers The answers. The inner vector's sizes should be equal to probs' size one by one.
-/// \param factor The factor that the loss will be multiplied with. Specifically, pass 1.0 if you want sum reduction, or 1.0 / n if you want average reduction, where n is the sum of answer sizes.
+/// \param probs The probability vectors. **Note that for the current version they are all vectors of the same row and we may change it to support matrices of variant sizes in the future.**
+/// \param answers The answers.
+/// \param factor The factor that the loss will be multiplied with.
 /// \return The loss.
-dtype KLDivLoss(std::vector<Node *> &probs,
-        const std::vector<std::shared_ptr<std::vector<dtype>>> &answers,
+dtype KLDivLoss(std::vector<Node *> &probs, const std::vector<std::vector<dtype> *> &answers,
         dtype factor);
 
 float binrayLikelihoodLoss(std::vector<Node *> &nodes,

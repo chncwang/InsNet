@@ -423,7 +423,7 @@ dtype MultiCrossEntropyLoss(std::vector<dtype*> &vals,
         dtype factor,
         std::vector<dtype*> &losses);
 dtype KLCrossEntropyLoss(std::vector<dtype*> &vals,
-        std::vector<std::shared_ptr<std::vector<dtype>>> &answers,
+        std::vector<std::vector<dtype> *> &answers,
         int count,
         int dim,
         dtype factor,

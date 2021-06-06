@@ -175,9 +175,7 @@ float cpuKLDivergenceLoss(vector<Node *> &nodes,
 
 }
 
-dtype KLDivLoss(vector<Node *> &nodes,
-        const vector<shared_ptr<vector<dtype>>> &answers,
-        dtype factor) {
+dtype KLDivLoss(vector<Node *> &nodes, const vector<vector<dtype> *> &answers, dtype factor) {
     if (nodes.size() != answers.size()) {
         cerr << "KLLoss - nodes size is not equal to answers size" << endl;
         abort();
@@ -188,8 +186,7 @@ dtype KLDivLoss(vector<Node *> &nodes,
     vector<dtype *> vals, losses;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     transform(nodes.begin(), nodes.end(), back_inserter(losses), gpu_get_node_loss);
-    dtype gpu_loss = cuda::KLCrossEntropyLoss(vals,
-            const_cast<vector<shared_ptr<vector<dtype>>>&>(answers),
+    dtype gpu_loss = cuda::KLCrossEntropyLoss(vals, const_cast<vector<vector<dtype> *> &>(answers),
             nodes.size(), nodes.front()->size(), factor, losses);
 #if TEST_CUDA
     dtype cpu_loss = cpuKLDivergenceLoss(nodes, answers, factor);
