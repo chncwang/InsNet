@@ -8,7 +8,13 @@ Before getting started, note that InsNet uses procedural style computation APIs.
 Getting Started
 ------------------
 
-Firstly, we define model parameters as follows:
+Firstly, we shall include the header file as follows:
+
+.. code-block:: c++
+
+    #include "insnet/insnet.h"
+
+Then we define model parameters as follows:
 
 .. code-block:: c++
 
