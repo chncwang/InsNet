@@ -417,8 +417,7 @@ dtype CrossEntropyLoss(std::vector<dtype *> &vals,
         int row,
         dtype factor,
         std::vector<dtype *> &grads);
-dtype MultiCrossEntropyLoss(std::vector<dtype*> &vals,
-        std::vector<std::vector<int>> &answers,
+dtype MultiCrossEntropyLoss(std::vector<dtype*> &vals, std::vector<std::vector<int> *> &answers,
         int count, int dim,
         dtype factor,
         std::vector<dtype*> &losses);

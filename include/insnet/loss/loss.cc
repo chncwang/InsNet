@@ -202,8 +202,7 @@ dtype KLDivLoss(vector<Node *> &nodes, const vector<vector<dtype> *> &answers, d
     return loss;
 }
 
-float binrayLikelihoodLoss(vector<Node *> &nodes, const vector<vector<int>> &answers,
-        dtype factor) {
+float BCELoss(vector<Node *> &nodes, const vector<vector<int> *> &answers, dtype factor) {
     if (nodes.size() != answers.size()) {
         cerr << "multiCrossEntropyLoss - nodes size is not equal to answers size" << endl;
         abort();
@@ -214,9 +213,8 @@ float binrayLikelihoodLoss(vector<Node *> &nodes, const vector<vector<int>> &ans
     vector<dtype *> vals, losses;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     transform(nodes.begin(), nodes.end(), back_inserter(losses), gpu_get_node_loss);
-    dtype gpu_loss = cuda::MultiCrossEntropyLoss(vals,
-            const_cast<vector<vector<int>>&>(answers), nodes.size(),
-            nodes.front()->size(), factor, losses);
+    dtype gpu_loss = cuda::MultiCrossEntropyLoss(vals, const_cast<vector<vector<int> *>&>(answers),
+            nodes.size(), nodes.front()->size(), factor, losses);
 #if TEST_CUDA
     dtype cpu_loss = cpuBinaryLikelihoodLoss(nodes, answers, factor);
     cout << "multiCrossEntropyLoss - gpu loss:" << gpu_loss << " cpu_loss:" << cpu_loss << endl;

@@ -2949,8 +2949,7 @@ vector<T *> GPUArrayVectors(vector<shared_ptr<GPUArray<T>>> &ptrs, int count, in
     return result;
 }
 
-dtype MultiCrossEntropyLoss(vector<dtype*> &vals, vector<vector<int>> &answers,
-        int count,
+dtype MultiCrossEntropyLoss(vector<dtype*> &vals, vector<vector<int> *> &answers, int count,
         int dim,
         dtype factor,
         vector<dtype*> &losses) {
@@ -2963,7 +2962,7 @@ dtype MultiCrossEntropyLoss(vector<dtype*> &vals, vector<vector<int>> &answers,
     vector<int *> answer_gpu_pointers;
     for (auto &answer : answers) {
         shared_ptr<IntArray> answer_gpu(new IntArray);
-        answer_gpu->init(answer.data(), answer.size());
+        answer_gpu->init(answer->data(), answer->size());
         answer_gpus.push_back(answer_gpu);
         answer_gpu_pointers.push_back(answer_gpu->value);
     }
