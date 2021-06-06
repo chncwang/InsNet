@@ -64,5 +64,6 @@ Modules
 
 Loss Functions
 ------------------
+.. doxygenfunction:: BCELoss
 .. doxygenfunction:: KLDivLoss
 .. doxygenfunction:: NLLLoss

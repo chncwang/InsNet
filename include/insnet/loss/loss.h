@@ -43,7 +43,17 @@ dtype NLLLoss(std::vector<Node *> &probs, int row, const std::vector<std::vector
 dtype KLDivLoss(std::vector<Node *> &probs, const std::vector<std::vector<dtype> *> &answers,
         dtype factor);
 
-float BCELoss(std::vector<Node *> &nodes, const std::vector<std::vector<int> *> &answers,
+/// \ingroup loss
+/// The binary cross entropy loss.
+///
+/// It returns the loss and accumulate gradients to probs.
+///
+/// **It will be executed eagerly.**
+/// \param probs The probability vectors. **Note that for the current version they are all vectors of the same row and we may change it to support matrices of variant sizes in the future.**
+/// \param answers The answers. Their values should be either 0 or 1.
+/// \param factor The factor that the loss will be multiplied with.
+/// \return The loss.
+float BCELoss(std::vector<Node *> &probs, const std::vector<std::vector<int> *> &answers,
         dtype factor);
 }
 
