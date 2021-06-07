@@ -137,7 +137,7 @@ dtype NLLLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers
 
 namespace {
 
-float cpuBinaryLikelihoodLoss(vector<Node *> &nodes, const vector<vector<int>> &answers,
+float cpuBinaryLikelihoodLoss(vector<Node *> &nodes, const vector<vector<int> *> &answers,
         dtype factor) {
     dtype loss = 0;
     for (int i = 0; i < nodes.size(); ++i) {
@@ -145,15 +145,14 @@ float cpuBinaryLikelihoodLoss(vector<Node *> &nodes, const vector<vector<int>> &
         const auto &answer = answers.at(i);
         for (int j = 0; j < node.size(); ++j) {
             dtype val = node.getVal()[j];
-            node.grad()[j] += (answer.at(j) ?  -1 / val : 1 / (1 - val)) * factor;
-            loss += (answer.at(j) ? -log(val): -log(1 - val));
+            node.grad()[j] += (answer->at(j) ?  -1 / val : 1 / (1 - val)) * factor;
+            loss += (answer->at(j) ? -log(val): -log(1 - val));
         }
     }
     return loss * factor;
 }
 
-float cpuKLDivergenceLoss(vector<Node *> &nodes,
-        const vector<shared_ptr<vector<dtype>>> &answers,
+float cpuKLDivergenceLoss(vector<Node *> &nodes, const vector<vector<dtype> *> &answers,
         dtype factor) {
     dtype loss = 0;
     for (int i = 0; i < nodes.size(); ++i) {
