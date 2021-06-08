@@ -52,6 +52,8 @@ We use two Transformer-based seq2seq models, namely *BASE* and *LARGE*, with the
       - 16
       - 0.1
 
+For Both models, we use the ADAM optimizer.
+
 Environment
 -------------
 
