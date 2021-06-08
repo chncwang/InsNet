@@ -97,8 +97,9 @@ Supposing that we have already loaded and randomly shuffled training instances, 
 
         Node *dec_emb = insnet::embedding(graph, ins.shifted_tgt, model_params.embedding);
         Node *dec = insnet::transformerDecoder(*enc, *dec_emb, model_params.decoder, 0.1).back();
-        Node *output = insnet::softmax(*dec, model_params.embedding.size());
-        outputs.push_back(output);
+        dec = insnet::linear(*dec, model_params.embedding);
+        dec = insnet::softmax(*dec, model_params.embedding.size());
+        outputs.push_back(dec);
         answers.push_back(ins.tgt);
         tgt_len_sum += ins.tgt.size();
     }
