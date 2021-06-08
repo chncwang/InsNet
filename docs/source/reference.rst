@@ -5,7 +5,7 @@ There are several principles for API design as follows:
 
 1. Tensor dimensions are no greater than 2, i.e., they are all column-major matrices.
 2. The shape information is not kept in and broadcasted among Node objects but only coupled with operators, while Node objects only keep their sizes. For example, shapes of *matmul*'s input matrix A and B are inferred from A.size(), B.size() and b_row, while methods such as *add* do not care shapes, but only sizes. So we do not need shape-related methods such as reshape and view.
-3. Batch rules are designed to be ignored by users.
+3. For each operator, we define the corresponding batching rule, but it is designed to be ignored by users.
 4. Operators and modules are all functions.
 5. We do not invent but borrow function names from PyTorch, except for those not included in PyTorch but implemented in InsNet for strong reasons.
 
