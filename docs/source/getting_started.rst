@@ -203,7 +203,7 @@ Finally, based on the sentence embeddings, we can build the encoder of documents
             }
 
             auto doc_embs = insnet::lstm(*h0, sen_embs, model_params.para_encoder, 0.1);
-            Node *enc = insnet::concat(doc_embs);
+            Node *enc = insnet::cat(doc_embs);
 
             ... // The decoder part.
         }
