@@ -27,7 +27,7 @@ subprocess.call('cd ../doxygen; doxygen', shell=True)
 # ones.
 # -- Project information -----------------------------------------------------
 
-project = "N3LDG++"
+project = "InsNet"
 copyright = '2021, Chauncey Wang'
 author = 'Chauncey Wang'
 
@@ -50,8 +50,8 @@ extensions = [
     'nbsphinx',
     'sphinx.ext.autodoc',
 ]
-breathe_projects = {"N3LDG++": "../doxygen/xml/"}
-breathe_default_project = "N3LDG++"
+breathe_projects = {"InsNet": "../doxygen/xml/"}
+breathe_default_project = "InsNet"
 
 
 # Add any paths that contain templates here, relative to this directory.
