@@ -56,7 +56,7 @@ vector<vector<int>> gpuPredict(const vector<Node *> &nodes, int row) {
 #endif
 }
 
-vector<vector<int>> predict(const vector<Node *> &nodes, int row) {
+vector<vector<int>> argmax(const vector<Node *> &nodes, int row) {
 #if USE_GPU
     return gpuPredict(nodes, row);
 #else
@@ -89,7 +89,7 @@ dtype cpuLikelihoodLoss(vector<Node *> &nodes, int row, const vector<vector<int>
 
 }
 
-dtype NLLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers,
+dtype NLLLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers,
         dtype factor) {
     if (nodes.size() != answers.size()) {
         cerr << fmt::format("crossEntropyLoss - node size is {}, but answer size is {}\n",
@@ -137,7 +137,7 @@ dtype NLLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers,
 
 namespace {
 
-float cpuBinaryLikelihoodLoss(vector<Node *> &nodes, const vector<vector<int>> &answers,
+float cpuBinaryLikelihoodLoss(vector<Node *> &nodes, const vector<vector<int> *> &answers,
         dtype factor) {
     dtype loss = 0;
     for (int i = 0; i < nodes.size(); ++i) {
@@ -145,15 +145,14 @@ float cpuBinaryLikelihoodLoss(vector<Node *> &nodes, const vector<vector<int>> &
         const auto &answer = answers.at(i);
         for (int j = 0; j < node.size(); ++j) {
             dtype val = node.getVal()[j];
-            node.grad()[j] += (answer.at(j) ?  -1 / val : 1 / (1 - val)) * factor;
-            loss += (answer.at(j) ? -log(val): -log(1 - val));
+            node.grad()[j] += (answer->at(j) ?  -1 / val : 1 / (1 - val)) * factor;
+            loss += (answer->at(j) ? -log(val): -log(1 - val));
         }
     }
     return loss * factor;
 }
 
-float cpuKLDivergenceLoss(vector<Node *> &nodes,
-        const vector<shared_ptr<vector<dtype>>> &answers,
+float cpuKLDivergenceLoss(vector<Node *> &nodes, const vector<vector<dtype> *> &answers,
         dtype factor) {
     dtype loss = 0;
     for (int i = 0; i < nodes.size(); ++i) {
@@ -175,9 +174,7 @@ float cpuKLDivergenceLoss(vector<Node *> &nodes,
 
 }
 
-pair<float, vector<int>> KLDivergenceLoss(vector<Node *> &nodes,
-        const vector<shared_ptr<vector<dtype>>> &answers,
-        dtype factor) {
+dtype KLDivLoss(vector<Node *> &nodes, const vector<vector<dtype> *> &answers, dtype factor) {
     if (nodes.size() != answers.size()) {
         cerr << "KLLoss - nodes size is not equal to answers size" << endl;
         abort();
@@ -188,8 +185,7 @@ pair<float, vector<int>> KLDivergenceLoss(vector<Node *> &nodes,
     vector<dtype *> vals, losses;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     transform(nodes.begin(), nodes.end(), back_inserter(losses), gpu_get_node_loss);
-    dtype gpu_loss = cuda::KLCrossEntropyLoss(vals,
-            const_cast<vector<shared_ptr<vector<dtype>>>&>(answers),
+    dtype gpu_loss = cuda::KLCrossEntropyLoss(vals, const_cast<vector<vector<dtype> *> &>(answers),
             nodes.size(), nodes.front()->size(), factor, losses);
 #if TEST_CUDA
     dtype cpu_loss = cpuKLDivergenceLoss(nodes, answers, factor);
@@ -202,21 +198,10 @@ pair<float, vector<int>> KLDivergenceLoss(vector<Node *> &nodes,
 #else
     dtype loss = cpuKLDivergenceLoss(nodes, answers, factor);
 #endif
-    auto predicted_ids = predict(nodes, nodes.front()->size());
-    vector<int> ids;
-    for (const auto &x : predicted_ids) {
-        if (x.size() != 1) {
-            cerr << fmt::format("KLLoss x size:{}\n", x.size());
-            abort();
-        }
-        ids.push_back(x.front());
-    }
-    pair<float, vector<int>> result = make_pair(loss, ids);
-    return result;
+    return loss;
 }
 
-float binrayLikelihoodLoss(vector<Node *> &nodes, const vector<vector<int>> &answers,
-        dtype factor) {
+float BCELoss(vector<Node *> &nodes, const vector<vector<int> *> &answers, dtype factor) {
     if (nodes.size() != answers.size()) {
         cerr << "multiCrossEntropyLoss - nodes size is not equal to answers size" << endl;
         abort();
@@ -227,9 +212,8 @@ float binrayLikelihoodLoss(vector<Node *> &nodes, const vector<vector<int>> &ans
     vector<dtype *> vals, losses;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     transform(nodes.begin(), nodes.end(), back_inserter(losses), gpu_get_node_loss);
-    dtype gpu_loss = cuda::MultiCrossEntropyLoss(vals,
-            const_cast<vector<vector<int>>&>(answers), nodes.size(),
-            nodes.front()->size(), factor, losses);
+    dtype gpu_loss = cuda::MultiCrossEntropyLoss(vals, const_cast<vector<vector<int> *>&>(answers),
+            nodes.size(), nodes.front()->size(), factor, losses);
 #if TEST_CUDA
     dtype cpu_loss = cpuBinaryLikelihoodLoss(nodes, answers, factor);
     cout << "multiCrossEntropyLoss - gpu loss:" << gpu_loss << " cpu_loss:" << cpu_loss << endl;

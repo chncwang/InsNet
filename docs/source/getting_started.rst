@@ -8,7 +8,13 @@ Before getting started, note that InsNet uses procedural style computation APIs.
 Getting Started
 ------------------
 
-Firstly, we define model parameters as follows:
+Firstly, we shall include the header file as follows:
+
+.. code-block:: c++
+
+    #include "insnet/insnet.h"
+
+Then we define model parameters as follows:
 
 .. code-block:: c++
 
@@ -91,8 +97,9 @@ Supposing that we have already loaded and randomly shuffled training instances, 
 
         Node *dec_emb = insnet::embedding(graph, ins.shifted_tgt, model_params.embedding);
         Node *dec = insnet::transformerDecoder(*enc, *dec_emb, model_params.decoder, 0.1).back();
-        Node *output = insnet::softmax(*dec, model_params.embedding.size());
-        outputs.push_back(output);
+        dec = insnet::linear(*dec, model_params.embedding);
+        dec = insnet::softmax(*dec, model_params.embedding.size());
+        outputs.push_back(dec);
         answers.push_back(ins.tgt);
         tgt_len_sum += ins.tgt.size();
     }
@@ -196,7 +203,7 @@ Finally, based on the sentence embeddings, we can build the encoder of documents
             }
 
             auto doc_embs = insnet::lstm(*h0, sen_embs, model_params.para_encoder, 0.1);
-            Node *enc = insnet::concat(doc_embs);
+            Node *enc = insnet::cat(doc_embs);
 
             ... // The decoder part.
         }

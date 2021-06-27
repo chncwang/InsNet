@@ -1,7 +1,7 @@
 Benchmarks
 ==============================================
 
-This topic will conduct the benchmarks (`Source Code <https://github.com/chncwang/insnet-benchmark>`_) to measure InsNet's training speed and memory usage on Transformer-based seq2seq models, with various model size settings.
+This topic will conduct the benchmarks (`Source Code <https://github.com/chncwang/insnet-benchmark>`_) to measure InsNet's training speed and memory usage on Transformer-based seq2seq models, with various model size settings. By the way, we also report perplexity on the development set.
 
 Dataset
 ---------
@@ -51,6 +51,8 @@ We use two Transformer-based seq2seq models, namely *BASE* and *LARGE*, with the
       - 4096
       - 16
       - 0.1
+
+For Both models, we use the ADAM optimizer.
 
 Environment
 -------------
@@ -188,3 +190,75 @@ Memory Usage on GPU
 The low memory usage shall be partly attributed to InsNet's Padding-free Dynamic Batching feature.
 
 We will illustrate InsNet's efficient memory management in detail in the future.
+
+Perplexity
+^^^^^^^^^^^
+By the way, we also report perplexity for the first 20 epochs on the validation set. Note that we do not filter rare words when testing perplexity, thus the vocabulary size is 33904.
+
+.. list-table:: perplexity on the validation set
+    :widths: 3 3 2
+    :header-rows: 1
+
+    * - epoch
+      - BASE
+      - LARGE
+    * - 0
+      - 75.26
+      - 71.90
+    * - 1
+      - 59.40
+      - 52.21
+    * - 2
+      - 52.36
+      - 42.66
+    * - 3
+      - 48.26
+      - 36.39
+    * - 4
+      - 45.10
+      - 31.36
+    * - 5
+      - 42.79
+      - 27.51
+    * - 6
+      - 40.87
+      - 24.12
+    * - 7
+      - 39.20
+      - 21.13
+    * - 8
+      - 37.72
+      - 18.59
+    * - 9
+      - 36.41
+      - 16.46
+    * - 10
+      - 35.29
+      - 14.53
+    * - 11
+      - 34.29
+      - 12.94
+    * - 12
+      - 33.47
+      - 11.48
+    * - 13
+      - 32.63
+      - 10.23
+    * - 14
+      - 31.81
+      - 9.16
+    * - 15
+      - 31.12
+      - 8.30
+    * - 16
+      - 30.51
+      - 7.58
+    * - 17
+      - 29.91
+      - 6.92
+    * - 18
+      - 29.34
+      - 6.40
+    * - 19
+      - 28.78
+      - 5.90

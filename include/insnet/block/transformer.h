@@ -276,8 +276,8 @@ typedef TransformerParams<TransformerDecoderLayerParams> TransformerDecoderParam
 /// \param num_heads The head number.
 /// \param Wo The weight matrix of the output linear transformation.
 /// \param dropout The dropout value of the dropout following the output linear transformation.
-/// \param mask Whether to mask future tokens in K, which is typically used in the Transformer decoder's self-attention. For the moment, user-defined masks are not supported yet.
-/// \return The result matrix. Its size is equal to both Q.size().
+/// \param use_mask Whether to mask future tokens in K, which is typically used in the Transformer decoder's self-attention. For the moment, user-defined masks are not supported yet.
+/// \return The result matrix. Its size is equal to Q.size().
 Node *multiheadAttention(Node& Q, Node& K, Node& V, int embed_dim, int num_heads, LinearParams &Wo,
         dtype dropout,
         bool use_mask);

@@ -5,3 +5,4 @@ build
 tags
 compile_commands.json
 docs/doxygen/xml
+make.bat
