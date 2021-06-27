@@ -26,8 +26,10 @@ Then the recommended way to link InsNet is to place the source codes under your 
 
 .. code-block:: cmake
 
-    add_definitions(-DUSE_GPU)
-    add_subdirectory(path_to_insnet/insnet)
+    if (USE_CUDA)
+        add_definitions(-DUSE_GPU)
+    endif()
+    add_subdirectory(path_to_insnet)
     target_link_libraries(your_executable insnet)
 
 If you use the GPU version, you need to set USE_CUDA to 1 and specify your GPU architecture when building your project:
