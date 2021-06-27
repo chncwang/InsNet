@@ -32,8 +32,8 @@ copyright = '2021, Chauncey Wang'
 author = 'Chauncey Wang'
 
 # The full version, including alpha/beta/rc tags
-version = '0.0.0.1-pre-alpha'
-release = '0.0.0.1-pre-alpha'
+version = '0.0.2-alpha'
+release = '0.0.2-alpha'
 
 html_logo = "images/logo_transparent.png"
 

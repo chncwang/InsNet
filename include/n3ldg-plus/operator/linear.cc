@@ -396,25 +396,35 @@ public:
     }
 
     virtual string typeSignature() const override {
-        return Node::typeSignature() + "-" + addressToString(bias_param_);
+        return Node::getNodeType() + "-" + addressToString(bias_param_);
     }
 
     void compute() override {
-        val().vec() = inputVal().vec() + bias_param_->val().vec();
+        int col = size() / bias_param_->row();
+        int row = bias_param_->row();
+        for (int i = 0; i < col; ++i) {
+            Vec(val().v + i * row, row) = Vec(inputVal().v + i * row, row) +
+                bias_param_->val().vec();
+        }
     }
 
     void backward() override {
         inputGrad().vec() += grad().vec();
-        bias_param_->grad().vec() += getGrad().vec();
+
+        int col = size() / bias_param_->row();
+        int row = bias_param_->row();
+        for (int i = 0; i < col; ++i) {
+            bias_param_->grad().vec() += Vec(getGrad().v + i * row, row);
+        }
     }
 
     Executor *generate() override;
 
     void setParam(BiasParam &param) {
         bias_param_ = &param;
-        if (size() > bias_param_->outDim()) {
+        if (size() % bias_param_->row() != 0) {
             cerr << fmt::format("dim is {}, but bias param dim is {}\n", size(),
-                bias_param_->outDim());
+                bias_param_->row());
             abort();
         }
     }
@@ -441,14 +451,23 @@ private:
 class BiasExecutor : public Executor {
 public:
     void forward() override {
+        BiasNode &node = dynamic_cast<BiasNode&>(*batch.front());
+        node.bias_param_->initAndZeroGrad();
+        int row = node.bias_param_->row();
+
         dtype *bias = param()->val().value;
         vector<dtype*> inputs, vals;
+        int col_sum = 0;
         for (Node *node : batch) {
             BiasNode *bias_node = dynamic_cast<BiasNode *>(node);
-            inputs.push_back(bias_node->inputVal().value);
-            vals.push_back(bias_node->getVal().value);
+            int col = bias_node->size() / row;
+            for (int i = 0; i < col; ++i) {
+                inputs.push_back(bias_node->inputVal().value + i * row);
+                vals.push_back(bias_node->getVal().value + i * row);
+            }
+            col_sum += col;
         }
-        cuda::BiasForward(inputs, bias, batch.size(), size(), vals);
+        cuda::BiasForward(inputs, bias, col_sum, row, vals);
 #if TEST_CUDA
         Executor::testForward();
         cout << "bias forward tested" << endl;
@@ -456,14 +475,23 @@ public:
     }
 
     void backward() override {
+        BiasNode &node = dynamic_cast<BiasNode&>(*batch.front());
+        node.bias_param_->initAndZeroGrad();
+        int row = node.bias_param_->row();
+
         dtype *bias = param()->grad().value;
-        vector<dtype *> losses, in_losses;
+        vector<dtype *> grads, in_grads;
+        int col_sum = 0;
         for (Node *node : batch) {
             BiasNode *bias_node = dynamic_cast<BiasNode *>(node);
-            losses.push_back(bias_node->getGrad().value);
-            in_losses.push_back(bias_node->inputGrad().value);
+            int col = bias_node->size() / row;
+            for (int i = 0; i < col; ++i) {
+                grads.push_back(bias_node->getGrad().value + i * row);
+                in_grads.push_back(bias_node->inputGrad().value + i * row);
+            }
+            col_sum += col;
         }
-        cuda::BiasBackward(losses, batch.size(), size(), bias, in_losses);
+        cuda::BiasBackward(grads, col_sum, row, bias, in_grads);
 #if TEST_CUDA
         Executor::testBackward();
         cout << "count:" << batch.size() << endl;
@@ -482,6 +510,12 @@ class BiasExecutor : public Executor {
 public:
     int calculateFLOPs() override {
         return defaultFLOPs();
+    }
+
+    void backward() override {
+        BiasNode &node = dynamic_cast<BiasNode&>(*batch.front());
+        node.bias_param_->initAndZeroGrad();
+        Executor::backward();
     }
 };
 #endif

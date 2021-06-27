@@ -97,7 +97,7 @@ Node *linear(Node &X, Param &W);
 /// \ingroup operator
 /// Add the bias iterm to the input tensor. \f$X + [b b .. b]\f$.
 ///
-/// **The operators with the same bias and X.size() will be executed in batch.** Note that this batching rule needs to be loosed in the future version.
+/// **The operators with the same bias will be executed in batch.**
 /// \param X The input tensor.
 /// \param b The bias parameters.
 /// \Return The result tensor. Its size is equal to X.size().
