@@ -13,7 +13,7 @@ public:
         setDim(dim);
     }
 
-    void forward(Graph &graph, const vector<dtype> &input) {
+    void connect(Graph &graph, const vector<dtype> &input) {
         if (input.size() != size()) {
             cerr << fmt::format("input size {} is not equal to dim {}\n", input.size(),
                 size());
@@ -57,13 +57,13 @@ Node *tensor(Graph &graph, int dim, dtype v) {
         vals.at(i) = v;
     }
     BucketNode *bucket = BucketNode::newNode(dim);
-    bucket->forward(graph, vals);
+    bucket->connect(graph, vals);
     return bucket;
 }
 
 Node *tensor(Graph &graph, const vector<dtype> &v) {
     BucketNode *bucket = BucketNode::newNode(v.size());
-    bucket->forward(graph, v);
+    bucket->connect(graph, v);
     return bucket;
 }
 

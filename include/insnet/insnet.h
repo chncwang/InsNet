@@ -18,6 +18,7 @@
 #include "insnet/operator/linear.h"
 #include "insnet/operator/matrix.h"
 #include "insnet/operator/mul.h"
+#include "insnet/operator/param.h"
 #include "insnet/operator/pooling.h"
 #include "insnet/operator/softmax.h"
 #include "insnet/operator/split.h"
