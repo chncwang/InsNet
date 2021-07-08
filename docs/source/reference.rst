@@ -37,6 +37,7 @@ Operators
 .. doxygenfunction:: minPool
 .. doxygenfunction:: mul(Node &, dtype)
 .. doxygenfunction:: mul(Node &, Node &)
+.. doxygenfunction:: param(Graph &, BaseParam &)
 .. doxygenfunction:: relu
 .. doxygenfunction:: sigmoid
 .. doxygenfunction:: softmax(Node &, int)
