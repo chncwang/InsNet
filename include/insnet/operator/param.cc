@@ -27,11 +27,12 @@ public:
     }
 
     void compute() override {
-        abort();
+        val().vec() = param_->val().vec();
     }
 
     void backward() override {
-        abort();
+        param_->initAndZeroGrad();
+        param_->grad().vec() += grad().vec();
     }
 
     Executor* generate() override;
@@ -60,14 +61,6 @@ Node* param(Graph &graph, BaseParam &param) {
 #if USE_GPU
 class ParamExecutor : public Executor {
 public:
-};
-#else
-class ParamExecutor : public Executor {
-public:
-    int calculateFLOPs() override {
-        return 0;
-    }
-
     void forward () override {
         if (batch.size() > 1) {
             cerr << "The param op should only be used once in a computation graph. - batch size:"
@@ -75,12 +68,29 @@ public:
             abort();
         }
         ParamNode &node = dynamic_cast<ParamNode &>(*batch.front());
-        node.val().vec() = node.param_->val().vec();
+
+        cuda::ParamForward(node.param_->val().value, node.size(), node.val().value);
+#if TEST_CUDA
+        Executor::testForward();
+#endif
     }
 
     void backward() override {
         ParamNode &node = dynamic_cast<ParamNode &>(*batch.front());
-        node.param_->grad().vec() += node.grad().vec();
+        node.param_->initAndZeroGrad();
+
+        cuda::ParamBackward(node.grad().value, node.size(), node.param_->grad().value);
+#if TEST_CUDA
+        Executor::backward();
+        node.param_->grad().verify("param backward");
+#endif
+    }
+};
+#else
+class ParamExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        return 0;
     }
 };
 #endif

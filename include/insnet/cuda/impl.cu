@@ -1827,30 +1827,6 @@ void LookupBackward(int *ids, vector<dtype*> &grads, int count, int row, int *co
     CheckCudaError();
 }
 
-__global__ void KernelParamRowForward(dtype *param, int row_index, int param_row_count,
-        int count,
-        int dim,
-        dtype **vals) {
-    int index = DeviceDefaultIndex();
-    int step = DeviceDefaultStep();
-    for (int i = index; i < dim * count; i += step) {
-        int count_i = i / dim;
-        int dim_i = i % dim;
-        int param_offset = dim_i * param_row_count + row_index;
-        vals[count_i][dim_i] = param[param_offset];
-    }
-}
-
-void ParamRowForward(dtype *param, int row_index, int param_row_count, int count, int dim,
-        vector<dtype*> &vals) {
-    NumberPointerArray val_arr;
-    val_arr.init((dtype**)vals.data(), vals.size());
-    int block_count = DefaultBlockCount(count * dim);
-    KernelParamRowForward<<<block_count, TPB>>>(param, row_index, param_row_count, count, dim,
-            (dtype **)val_arr.value);
-    CheckCudaError();
-}
-
 __global__ void KernelPoolForward(PoolingEnum pooling, dtype **ins, int *in_counts,
         int max_in_count,
         dtype **outs,
@@ -4620,6 +4596,30 @@ void BroadcastBackward(dtype **grads, int count, int in_dim, int *ns, int max_n,
     KernelBroadcastBackward<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(grads,
             count, in_dim, ns, max_n, in_grads);
     CheckCudaError();
+}
+
+__global__ void KernelParamForward(dtype *param, int size, dtype *val) {
+    int i = DeviceDefaultIndex();
+    if (i < size) {
+        val[i] = param[i];
+    }
+}
+
+void ParamForward(dtype *param, int size, dtype *val) {
+    int block_count = DefaultBlockCountWithoutLimit(size);
+    KernelParamForward<<<block_count, TPB>>>(param, size, val);
+}
+
+__global__ void KernelParamBackward(dtype *grad, int size, dtype *param_grad) {
+    int i = DeviceDefaultIndex();
+    if (i < size) {
+        DeviceAtomicAdd(param_grad + i, grad[i]);
+    }
+}
+
+void ParamBackward(dtype *grad, int size, dtype *param_grad) {
+    int block_count = DefaultBlockCountWithoutLimit(size);
+    KernelParamBackward<<<block_count, TPB>>>(grad, size, param_grad);
 }
 
 __global__ void KernelSquareSum(dtype *v, int len, volatile dtype *global_sum,

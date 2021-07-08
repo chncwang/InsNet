@@ -197,13 +197,6 @@ void DropoutBackward(std::vector<dtype*> &grads, int count, std::vector<int> &di
         std::vector<dtype*> &in_grads);
 void BucketForward(std::vector<dtype> input, int count, int dim,
         std::vector<dtype*> &ys);
-void CopyForUniNodeForward(std::vector<dtype*> &xs, dtype* b,
-        dtype* xs_dest,
-        dtype* b_dest,
-        int count,
-        int x_len,
-        int b_len,
-        bool use_b);
 void MatrixMultiplyMatrix(dtype *W, dtype *x, dtype *y,
         int row,
         int col,
@@ -224,23 +217,6 @@ void LinearBackward(std::vector<dtype *> &grads, int count, std::vector<int> &co
         dtype *bias_grad,
         std::vector<dtype *> &in_grads,
         dtype *W_grad);
-void AddLtyToParamBiasAndAddLxToInputLossesForUniBackward(dtype *lty,
-        dtype *lx,
-        dtype *b,
-        std::vector<dtype*> &losses,
-        int count,
-        int out_dim, int in_dim, bool use_b);
-void AddLtyToParamBiasAndAddLxToInputLossesForBiBackward(dtype *lty,
-        dtype *lx1,
-        dtype *lx2,
-        dtype *b,
-        std::vector<dtype*> &losses1,
-        std::vector<dtype*> &losses2,
-        int count,
-        int out_dim,
-        int in_dim1,
-        int in_dim2,
-        bool use_b);
 void CalculateDropoutMask(dtype dropout_ratio, int dim, dtype *mask);
 void ConcatForward(std::vector<dtype*> &in_vals, std::vector<int> &in_dims,
         std::vector<dtype*> &vals,
@@ -269,9 +245,6 @@ void LookupBackward(int *ids, std::vector<dtype*> &grads, int count, int row,
         int max_col,
         dtype *param_grad,
         bool *indexers);
-void ParamRowForward(dtype *param, int row_index, int param_row_count, int count,
-        int dim,
-        std::vector<dtype*> &vals);
 void PoolForward(PoolingEnum pooling, std::vector<dtype*> &in_vals,
         std::vector<dtype*> &vals,
         int count,
@@ -498,9 +471,12 @@ void PointwiseLinearBackward(dtype **grads, dtype **in_vals,
         dtype *bias_grads);
 void BroadcastForward(dtype **in_vals, int count, int in_dim, int *ns, int max_n, dtype **vals);
 void BroadcastBackward(dtype **grads, int count, int in_dim, int *ns, int max_n, dtype **in_grads);
-std::vector<std::vector<int>> Predict(std::vector<dtype*> &vals, int count,
-        std::vector<int> &cols,
+std::vector<std::vector<int>> Predict(std::vector<dtype*> &vals, int count, std::vector<int> &cols,
         int row);
+
+void ParamForward(dtype *param, int size, dtype *val);
+void ParamBackward(dtype *grad, int size, dtype *param_grad);
+
 int Predict(dtype* val, int dim);
 void Max(dtype **v, int count, int dim, int *max_indexes, dtype *max_vals);
 std::pair<dtype, std::vector<int>> SoftMaxLoss(
