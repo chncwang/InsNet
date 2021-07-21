@@ -1,4 +1,4 @@
-#include "insnet/operator/softmax.h"
+#include "insnet/operator/log_softmax.h"
 
 using std::string;
 using std::vector;
@@ -8,9 +8,9 @@ using std::endl;
 
 namespace insnet {
 
-class SoftmaxNode : public UniInputNode, public Poolable<SoftmaxNode> {
+class LogSoftmaxNode : public UniInputNode, public Poolable<LogSoftmaxNode> {
 public:
-    SoftmaxNode() : UniInputNode("softmax") {}
+    LogSoftmaxNode() : UniInputNode("logsoftmax") {}
 
     void setNodeDim(int dim) override {
         setDim(dim);
@@ -27,20 +27,29 @@ public:
             x_exp.init(row);
             x.vec() = Vec(inputVal().v + row * i, row) - max;
             x_exp.vec() = x.vec().exp();
-            dtype sum = x_exp.mat().sum();
-            Vec(val().v + row * i, row) = x_exp.vec() / sum;
+            dtype log_sum = std::log(x_exp.mat().sum());
+            Vec(val().v + row * i, row) = x.vec() - log_sum;
         }
     }
 
     void backward() override {
         int row = size() / getColumn();
         for (int i = 0; i < getColumn(); ++i) {
-            Tensor1D a;
-            a.init(row);
-            a.vec() = Vec(getGrad().v + i * row, row) * Vec(getVal().v + i * row, row);
-            dtype z = a.mat().sum();
-            Vec(inputGrad().v + i * row, row) += Vec(getVal().v + i * row, row) *
-                (Vec(getGrad().v + i * row, row) - z);
+//            Tensor1D a;
+//            a.init(row);
+//            dtype z = 0;
+//            for (int j = 0; j < row; ++j) {
+//                dtype v = /*getGrad().v[i * row + j] * */ std::exp(getVal().v[i * row + j]);
+//                z += v;
+//            }
+//            for (int j = 0; j < row; ++j) {
+//                inputGrad().v[i * row + j] += getGrad().v[i * row + j] - z;
+//            }
+
+//            a.vec() = Vec(getVal().v + i * row, row).exp();
+            dtype z = Mat(getGrad().v + row * i, row, 1).sum();
+            Vec(inputGrad().v + i * row, row) += Vec(getGrad().v + i * row, row) -
+                z * Vec(getVal().v + row * i, row).exp();
         }
     }
 
@@ -59,18 +68,6 @@ protected:
 
     bool isValForwardOnly() const override {
         return false;
-    }
-};
-
-class BatchedSoftmaxNode : public BatchedNodeImpl<SoftmaxNode> {
-public:
-    void init(BatchedNode &input, int col) {
-        allocateBatch(input.sizes());
-        setInputsPerNode({&input});
-        for (Node *node : batch()) {
-            node->setColumn(col);
-        }
-        afterInit({&input});
     }
 };
 
@@ -146,7 +143,7 @@ private:
     int max_row_, max_col_;
 };
 #else
-class SoftmaxExecutor : public Executor {
+class LogSoftmaxExecutor : public Executor {
 public:
     int calculateFLOPs() override {
         return 0; // TODO
@@ -154,16 +151,15 @@ public:
 };
 #endif
 
-Executor *SoftmaxNode::generate() {
-    return new SoftmaxExecutor;
+Executor *LogSoftmaxNode::generate() {
+    return new LogSoftmaxExecutor;
 }
 
-Node* softmax(Node &input, int row) {
-    using namespace insnet;
-    SoftmaxNode *node = SoftmaxNode::newNode(input.size());
+Node* logSoftmax(Node &input, int row) {
+    LogSoftmaxNode *node = LogSoftmaxNode::newNode(input.size());
     int col = input.size() / row;
     if (col * row != input.size()) {
-        cerr << fmt::format("softmax - col:{} row:{} input dim:{}", col, row, input.size()) <<
+        cerr << fmt::format("logSoftmax - col:{} row:{} input dim:{}", col, row, input.size()) <<
             endl;
         abort();
     }
@@ -172,16 +168,57 @@ Node* softmax(Node &input, int row) {
     return node;
 }
 
-BatchedNode* softmax(BatchedNode &input, int row) {
-    BatchedSoftmaxNode *ret = new BatchedSoftmaxNode;
-    int col = input.size() / row;
-    if (col * row != input.size()) {
-        cerr << fmt::format("softmax - col:{} row:{} input dim:{}", col, row, input.size()) <<
-            endl;
-        abort();
+class LogNode : public UniInputNode, public Poolable<LogNode> {
+public:
+    LogNode() : UniInputNode("log-node") {}
+
+    void setNodeDim(int dim) override {
+        setDim(dim);
     }
-    ret->init(input, col);
-    return ret;
+
+    Executor *generate() override;
+
+    void compute() override {
+        val().vec() = getInputVal().vec().log();
+    }
+
+    void backward() override {
+        inputGrad().vec() += getGrad().vec() / getInputVal().vec();
+    }
+
+    string typeSignature() const override {
+        return Node::getNodeType();
+    }
+
+protected:
+    virtual bool isDimLegal(const Node &input) const override {
+        return true;
+    }
+
+    bool isInputValForwardOnly() const override {
+        return false;
+    }
+
+    bool isValForwardOnly() const override {
+        return true;
+    }
+};
+
+class LogExecutor : public Executor {
+public:
+    int calculateFLOPs() override {
+        return 0; // TODO
+    }
+};
+
+Executor *LogNode::generate() {
+    return new LogExecutor;
+}
+
+Node *log(Node &input) {
+    LogNode *node = LogNode::newNode(input.size());
+    node->connect(input);
+    return node;
 }
 
 }

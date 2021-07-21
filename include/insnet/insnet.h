@@ -16,6 +16,7 @@
 #include "insnet/operator/embedding.h"
 #include "insnet/operator/layer_normalization.h"
 #include "insnet/operator/linear.h"
+#include "insnet/operator/log_softmax.h"
 #include "insnet/operator/matrix.h"
 #include "insnet/operator/mul.h"
 #include "insnet/operator/param.h"

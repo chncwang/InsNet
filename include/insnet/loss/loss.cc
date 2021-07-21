@@ -66,7 +66,7 @@ vector<vector<int>> argmax(const vector<Node *> &nodes, int row) {
 
 namespace {
 
-dtype cpuLikelihoodLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers_vector,
+dtype cpuNLLLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers_vector,
         dtype factor) {
     dtype loss = 0;
     for (int i = 0; i < nodes.size(); ++i) {
@@ -79,9 +79,9 @@ dtype cpuLikelihoodLoss(vector<Node *> &nodes, int row, const vector<vector<int>
         }
         for (int j = 0; j < col; ++j) {
             int answer = answers.at(j);
-            nodes.at(i)->grad()[row * j + answer] -=
-                1 / nodes.at(i)->getVal()[row * j + answer] * factor;
-            loss -= log(nodes.at(i)->getVal()[row * j + answer]);
+            nodes.at(i)->grad()[row * j + answer] -= factor;
+            dtype v = nodes.at(i)->getVal()[row * j + answer]; 
+            loss -= v;
         }
     }
     return loss * factor;
@@ -119,7 +119,7 @@ dtype NLLLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers
     transform(nodes.begin(), nodes.end(), back_inserter(losses), gpu_get_node_loss);
     dtype loss = cuda::CrossEntropyLoss(vals, answers, nodes.size(), row, factor, losses);
 #if TEST_CUDA
-    dtype cpu_loss = cpuLikelihoodLoss(nodes, row, answers, factor);
+    dtype cpu_loss = cpuNLLLoss(nodes, row, answers, factor);
     for (Node *node : nodes) {
         if (!node->grad().verify("crossEntropyLoss")) {
             node->grad().print();
@@ -131,7 +131,7 @@ dtype NLLLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers
 #endif
     return loss;
 #else
-    return cpuLikelihoodLoss(nodes, row, answers, factor);
+    return cpuNLLLoss(nodes, row, answers, factor);
 #endif
 }
 
