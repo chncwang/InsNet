@@ -37,7 +37,8 @@ public:
 
     string typeSignature() const override {
         return Node::getNodeType() + "-" + addressToString(param_) +
-            (should_backward_ ? "-backward" : "nobackward");
+            (should_backward_ ? "-backward" : "nobackward") +
+            (getColumn() == 1 ? "-vec" : "-nonvec");
     }
 
     void compute() override {

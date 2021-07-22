@@ -6,6 +6,13 @@
 
 namespace insnet {
 
+/// \ingroup operator
+/// Copy the parameters to the *Node* object.
+///
+/// **The param operator should be used only once in a computation graph.**
+/// \param graph The computation graph.
+/// \param param The parameters.
+/// \Return The result tensor. Its size is equal to param.size().
 Node* param(Graph &graph, BaseParam &param);
 
 }
