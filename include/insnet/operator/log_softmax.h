@@ -24,8 +24,6 @@ inline Node* logSoftmax(Node &input) {
     return logSoftmax(input, input.size());
 }
 
-Node *log(Node &input);
-
 }
 
 #endif
