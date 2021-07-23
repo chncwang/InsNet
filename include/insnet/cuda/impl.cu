@@ -2750,9 +2750,7 @@ void SoftMaxLoss(vector<dtype*> &vals, vector<dtype*> &losses, int *correct_coun
     CheckCudaError();
 }
 
-__global__ void KernelCrossEntropyLoss(dtype **vals, int *answers, int count, int *cols,
-        int max_col,
-        int row,
+__global__ void KernelNLLLoss(int *answers, int count, int *cols, int max_col, int row,
         dtype factor,
         dtype **grads) {
     int i = DeviceDefaultIndex();
@@ -2762,13 +2760,12 @@ __global__ void KernelCrossEntropyLoss(dtype **vals, int *answers, int count, in
         int col = cols[count_i];
         if (col_i < col) {
             int answer = answers[count_i * max_col + col_i];
-            DeviceAtomicAdd(grads[count_i] + col_i * row + answer,
-                    -1 / vals[count_i][col_i * row + answer] * factor);
+            DeviceAtomicAdd(grads[count_i] + col_i * row + answer, -factor);
         }
     }
 }
 
-__global__ void KernelCrossEntropgyLossValue(dtype **vals, int *answers, int count, int *cols,
+__global__ void KernelNLLLossValue(dtype **vals, int *answers, int count, int *cols,
         int max_col,
         int row,
         volatile dtype *global_sum,
@@ -2789,7 +2786,7 @@ __global__ void KernelCrossEntropgyLossValue(dtype **vals, int *answers, int cou
         int col_i = index % max_col;
         if (col_i < col) {
             int answer_id = answers[index];
-            shared_sum[threadIdx.x] = -cuda_log(vals[count_i][row * col_i + answer_id]);
+            shared_sum[threadIdx.x] = -vals[count_i][row * col_i + answer_id];
         } else {
             shared_sum[threadIdx.x] = 0.0f;
         }
@@ -2835,7 +2832,7 @@ __global__ void KernelCrossEntropgyLossValue(dtype **vals, int *answers, int cou
     }
 }
 
-dtype CrossEntropyLoss(vector<dtype *> &vals, const vector<vector<int>> &answers, int count,
+dtype NLLLoss(vector<dtype *> &vals, const vector<vector<int>> &answers, int count,
         int row,
         dtype factor,
         vector<dtype *> &grads) {
@@ -2863,8 +2860,8 @@ dtype CrossEntropyLoss(vector<dtype *> &vals, const vector<vector<int>> &answers
         }
     }
     answer_arr.init(answers_1d.data(), answers_1d.size());
-    KernelCrossEntropyLoss<<<DefaultBlockCountWithoutLimit(count * max_col), TPB>>>(val_arr.value,
-            answer_arr.value, count, col_arr.value, max_col, row, factor, grad_arr.value);
+    KernelNLLLoss<<<DefaultBlockCountWithoutLimit(count * max_col), TPB>>>( answer_arr.value,
+            count, col_arr.value, max_col, row, factor, grad_arr.value);
     CheckCudaError();
 
     int block_count = DefaultBlockCountWithoutLimit(count * max_col);
@@ -2874,7 +2871,7 @@ dtype CrossEntropyLoss(vector<dtype *> &vals, const vector<vector<int>> &answers
     block_counter.init();
     DeviceNumber result;
     result.init();
-    KernelCrossEntropgyLossValue<<<block_count, TPB>>>(val_arr.value, answer_arr.value, count,
+    KernelNLLLossValue<<<block_count, TPB>>>(val_arr.value, answer_arr.value, count,
             col_arr.value, max_col, row, global_sum.value, block_counter.value, result.value);
     CheckCudaError();
     result.copyFromDeviceToHost();
@@ -3937,7 +3934,8 @@ __global__ void KernelLogSoftmaxForward(dtype **in_vals, dtype *zs, int count, i
         int col = cols[count_i];
         int col_i = offset / row;
         if (col_i < col) {
-            vals[count_i][offset] = in_vals[count_i][offset] - cuda_log(zs[count_i]);
+            dtype z = zs[count_i * max_col + col_i];
+            vals[count_i][offset] = in_vals[count_i][offset] - cuda_log(z);
         }
     }
 }
@@ -4020,8 +4018,8 @@ __global__ void KernelExp(dtype **in_vals, dtype *subtrahends, int count, int ro
         int col = cols[count_i];
         int col_i = offset / row;
         if (col_i < col) {
-            vals[count_i][offset] = cuda_exp(in_vals[count_i][offset] -
-                    subtrahends[count_i * max_col + col_i]);
+            in_vals[count_i][offset] -= subtrahends[count_i * max_col + col_i];
+            vals[count_i][offset] = cuda_exp(in_vals[count_i][offset]);
         }
     }
 }
@@ -4115,7 +4113,7 @@ void LogSoftmaxForward(dtype **in_vals, int count, int row, int *cols, int max_c
             cols, block_maxes.value, block_counters.value, max_val_arr.value);
     CheckCudaError();
 
-    KernelLogSoftmaxForward<<<block_count, TPB>>>(vals, max_val_arr.value, count, row, cols,
+    KernelLogSoftmaxForward<<<block_count, TPB>>>(in_vals, max_val_arr.value, count, row, cols,
             max_col, vals);
     CheckCudaError();
 }
@@ -4135,7 +4133,7 @@ __global__ void KernelLogSoftmaxBackward(dtype **grads, int count, int row, int 
         if (col_i < col) {
             dtype v = grads[count_i][offset] -
                 z[count_i * max_col + col_i] * cuda_exp(vals[count_i][offset]);
-            DeviceAtomicAdd(in_grads[count_i], v);
+            DeviceAtomicAdd(in_grads[count_i] + offset, v);
         }
     }
 }

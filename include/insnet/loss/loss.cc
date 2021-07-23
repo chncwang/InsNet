@@ -117,7 +117,7 @@ dtype NLLLoss(vector<Node *> &nodes, int row, const vector<vector<int>> &answers
     vector<dtype*> vals, losses;
     transform(nodes.begin(), nodes.end(), back_inserter(vals), gpu_get_node_val);
     transform(nodes.begin(), nodes.end(), back_inserter(losses), gpu_get_node_loss);
-    dtype loss = cuda::CrossEntropyLoss(vals, answers, nodes.size(), row, factor, losses);
+    dtype loss = cuda::NLLLoss(vals, answers, nodes.size(), row, factor, losses);
 #if TEST_CUDA
     dtype cpu_loss = cpuNLLLoss(nodes, row, answers, factor);
     for (Node *node : nodes) {

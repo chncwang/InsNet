@@ -384,7 +384,7 @@ void PAddForward(std::vector<dtype*> &ins, int count, std::vector<int> &dims,
 void PAddBackward(std::vector<dtype*> &grads, int count, int max_dim, int in_count,
         std::vector<dtype*> &in_grads,
         IntArray &dim_arr);
-dtype CrossEntropyLoss(std::vector<dtype *> &vals,
+dtype NLLLoss(std::vector<dtype *> &vals,
         const std::vector<std::vector<int>> &answers,
         int count,
         int row,
