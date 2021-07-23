@@ -31,6 +31,8 @@ Operators
 .. doxygenfunction:: layerNorm(Node &, LayerNormParams &)
 .. doxygenfunction:: linear(Node &, LinearParams &)
 .. doxygenfunction:: linear(Node &, Param &)
+.. doxygenfunction:: logSoftmax(Node &, int)
+.. doxygenfunction:: logSoftmax(Node &)
 .. doxygenfunction:: matmul
 .. doxygenfunction:: max
 .. doxygenfunction:: maxPool
