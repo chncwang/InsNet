@@ -135,7 +135,11 @@ void MyCudaMemcpy(void *dest, void *src, size_t count, MyCudaMemcpyKind kind) {
         abort();
     }
     cudaError_t e;
-    e = cudaMemcpyAsync(dest, src, count, k);
+    if (kind == MyCudaMemcpyKind::DEVICE_TO_HOST) {
+        e = cudaMemcpy(dest, src, count, k);
+    } else {
+        e = cudaMemcpyAsync(dest, src, count, k);
+    }
     CallCuda(e);
 }
 
