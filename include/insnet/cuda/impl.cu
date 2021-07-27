@@ -2868,18 +2868,25 @@ dtype NLLLoss(vector<dtype *> &vals, const vector<vector<int>> &answers, int cou
             count, col_arr.value, max_col, row, factor, grad_arr.value);
     CheckCudaError();
 
-    int block_count = DefaultBlockCountWithoutLimit(count * max_col);
-    NumberArray global_sum;
-    global_sum.init(block_count);
-    DeviceInt block_counter;
-    block_counter.init();
-    DeviceNumber result;
-    result.init();
-    KernelNLLLossValue<<<block_count, TPB>>>(val_arr.value, answer_arr.value, count,
-            col_arr.value, max_col, row, global_sum.value, block_counter.value, result.value);
-    CheckCudaError();
-    result.copyFromDeviceToHost();
-    return result.v * factor;
+    dtype ret;
+    for (int i = 0; i < 1000; ++i) {
+        int block_count = DefaultBlockCountWithoutLimit(count * max_col);
+        NumberArray global_sum;
+        global_sum.init(block_count);
+        DeviceInt block_counter;
+        block_counter.init();
+        DeviceNumber result;
+        result.init();
+        KernelNLLLossValue<<<block_count, TPB>>>(val_arr.value, answer_arr.value, count,
+                col_arr.value, max_col, row, global_sum.value, block_counter.value, result.value);
+        CheckCudaError();
+        result.copyFromDeviceToHost();
+        ret = result.v;
+        if (ret < 1e10) {
+            break;
+        }
+    }
+    return ret * factor;
 }
 
 __global__ void KernelMultiCrossEntropyLoss(dtype **vals, int **answers,
@@ -3095,8 +3102,8 @@ dtype KLCrossEntropyLoss(vector<dtype*> &vals,
 __global__ void KernelMax(dtype **v, int count, int dim, volatile dtype *block_maxes,
         volatile int *block_max_is,
         int *block_counters,
-        int *max_indexes,
-        dtype *max_vals) {
+        volatile int *max_indexes,
+        volatile dtype *max_vals) {
     __shared__ volatile dtype shared_max[TPB];
     __shared__ volatile int shared_max_i[TPB];
     __shared__ volatile bool is_last_block;
@@ -3218,7 +3225,7 @@ void Max(dtype **v, int count, int dim, int *max_indexes, dtype *max_vals) {
     CheckCudaError();
 }
 
-vector<vector<int>> Predict(vector<dtype*> &vals, int count, vector<int> &cols, int row) {
+vector<vector<int>> PredictImpl(vector<dtype*> &vals, int count, vector<int> &cols, int row) {
     int col_sum = accumulate(cols.begin(), cols.end(), 0);
     vector<dtype *> split_vals;
     split_vals.reserve(col_sum);
@@ -3254,6 +3261,30 @@ vector<vector<int>> Predict(vector<dtype*> &vals, int count, vector<int> &cols, 
     return result_indexes;
 }
 
+vector<vector<int>> Predict(vector<dtype*> &vals, int count, vector<int> &cols, int row) {
+    vector<vector<int>> ret;
+    for (int i = 0; i < 1000; ++i) {
+        ret = PredictImpl(vals, count, cols, row);
+        bool all_succeeded = true;
+        for (const auto &arr : ret) {
+            bool succeeded = true;
+            for (int e : arr) {
+                if (e < 0 || e >= row) {
+                    succeeded = false;
+                    break;
+                }
+            }
+            if (!succeeded) {
+                all_succeeded = false;
+                break;
+            }
+        }
+        if (all_succeeded) {
+            break;
+        }
+    }
+    return ret;
+}
 
 __global__ void KernelSoftMaxLossByExp(dtype **exps, int count, int dim,
         dtype **vals,
