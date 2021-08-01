@@ -20,7 +20,7 @@ Besides, InsNet has the following features:
 1. It is written in C++ 14 and is built as a static library.
 2. For GPU computation, we write almost all CUDA kernels by hand, allowing efficient parallel computation for matrices of unaligned shapes.
 3. Both lazy and eager execution is supported, with the former allowing for automatic batching and the latter facilitating users' debugging.
-4. For the moment, it provides more than twenty operators with both GPU and CPU implementations, supporting building modern NLP models for sentence classification, sequence tagging, and language generation. It furthermore provides NLP modules such as attention, RNNs, and the Transformer, built with the aforementioned operators.
+4. For the moment, it provides about thirty operators with both GPU and CPU implementations, supporting building modern NLP models for sentence classification, sequence tagging, and language generation. It furthermore provides NLP modules such as attention, RNNs, and the Transformer, built with the aforementioned operators.
 
 Studies using InsNet are listed as follows, and we are looking forward to enriching this list:
 
