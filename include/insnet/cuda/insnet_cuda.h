@@ -482,13 +482,6 @@ void ParamBackward(dtype *grad, int size, dtype *param_grad);
 
 int Predict(dtype* val, int dim);
 void Max(dtype **v, int count, int dim, int *max_indexes, dtype *max_vals);
-std::pair<dtype, std::vector<int>> SoftMaxLoss(
-        std::vector<dtype *> &vals_vector,
-        int count,
-        int dim,
-        std::vector<int> &gold_answers,
-        int batchsize,
-        std::vector<dtype *> &losses_vector);
 dtype SquareSum(dtype *v, int len);
 dtype SquareSum(dtype *v, bool *indexers, int count, int dim);
 void Rescale(dtype *v, int len, dtype scale);
