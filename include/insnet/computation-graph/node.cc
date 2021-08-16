@@ -327,10 +327,12 @@ void Executor::forwardFully() {
     }
 
     for (Node *node : batch) {
-        if (!node->topologicalNode().getParents().empty()) {
-            node->clearVal(false);
+        if (node->getNodeContainer().getModelStage() == ModelStage::TRAINING) {
+            if (!node->topologicalNode().getParents().empty()) {
+                node->clearVal(false);
+            }
+            node->clearInputVals(false);
         }
-        node->clearInputVals(false);
     }
     profiler.EndEvent();
 }
