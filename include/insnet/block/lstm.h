@@ -46,8 +46,8 @@ protected:
 };
 
 struct LSTMState {
-    Node *hidden;
-    Node *cell;
+    Node *hidden = nullptr;
+    Node *cell = nullptr;
 };
 
 /// \ingroup module
