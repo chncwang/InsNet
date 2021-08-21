@@ -350,6 +350,14 @@ Node *cat(const vector<Node*> &inputs, int col) {
     if (col == 1 && areNodeSizesEqual(inputs)) {
         return concatToMatrix(inputs);
     } else {
+        int i = 0;
+        for (Node *in : inputs) {
+            if (in == nullptr) {
+                cerr << fmt::format("cat nullptr input i:{}", i) << endl;
+            }
+            ++i;
+        }
+
         int dim = 0;
         for (Node *in : inputs) {
             dim += in->size();
