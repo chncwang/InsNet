@@ -15,12 +15,12 @@ namespace insnet {
 namespace {
 
 void Insert(NodeAbs *node, NodeMap& node_map) {
-    string x_hash = node->cachedTypeSig();
+    const string &x_hash = node->cachedTypeSig();
     auto it = node_map.find(x_hash);
     if (it == node_map.end()) {
         vector<NodeAbs *> v = {node};
-        node_map.insert(make_pair<string, vector<NodeAbs *>>(move(x_hash),
-                    move(v)));
+        string x_hash_copy = x_hash;
+        node_map.insert(make_pair<string, vector<NodeAbs *>>(move(x_hash_copy), move(v)));
     } else {
         it->second.push_back(node);
     }

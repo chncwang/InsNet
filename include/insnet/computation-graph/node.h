@@ -94,6 +94,11 @@ public:
     }
 
     NodeContainer &getNodeContainer() const {
+        if (node_container_ == nullptr) {
+            std::cerr << "getNodeContainer node_container_ is nullptr type_sig_:" << typeSignature() <<
+                std::endl;
+            abort();
+        }
         return *node_container_;
     }
 

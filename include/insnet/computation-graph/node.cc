@@ -326,8 +326,11 @@ void Executor::forwardFully() {
         node->setDegree(-1);
     }
 
-    for (Node *node : batch) {
-        if (node->getNodeContainer().getModelStage() == ModelStage::TRAINING) {
+    Node *first = batch.front();
+    ModelStage stage = first->batched_node_->getNodeContainer().getModelStage();
+
+    if (stage == ModelStage::TRAINING) {
+        for (Node *node : batch) {
             if (!node->topologicalNode().getParents().empty()) {
                 node->clearVal(false);
             }

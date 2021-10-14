@@ -238,13 +238,19 @@ Vec cpu::Tensor2D::vec() {
 
 
 dtype* cpu::Tensor2D::operator[](const int icol) {
-    assert(icol < col);
-    return &(v[icol*row]);  // no boundary check?
+    if (icol >= col) {
+        cerr << fmt::format("cpu::Tensor2D [] icol:{} col:{}", icol, col) << endl;
+        abort();
+    }
+    return &(v[icol*row]);
 }
 
 const dtype* cpu::Tensor2D::operator[](const int icol) const {
-    assert(icol < col);
-    return &(v[icol*row]);  // no boundary check?
+    if (icol >= col) {
+        cerr << fmt::format("cpu::Tensor2D [] icol:{} col:{}", icol, col) << endl;
+        abort();
+    }
+    return &(v[icol*row]);
 }
 
 void cpu::Tensor2D::assignAll(dtype a) {
