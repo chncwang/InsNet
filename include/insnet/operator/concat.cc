@@ -57,7 +57,6 @@ public:
         for (int dim : in_rows_) {
             hash_code += "-" + to_string(dim);
         }
-        hash_code += "-" + to_string(getColumn());
         return hash_code;
     }
 
