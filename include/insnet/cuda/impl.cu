@@ -3845,8 +3845,6 @@ __global__ void KernelSoftmaxBackward(dtype **vals, dtype **grads, int count, in
         int *cols,
         int max_col,
         dtype *z,
-        dtype *a,
-        int *a_offsets,
         dtype **input_grads) {
     int i = DeviceDefaultIndex();
     int n = max_row * max_col;
@@ -3859,10 +3857,8 @@ __global__ void KernelSoftmaxBackward(dtype **vals, dtype **grads, int count, in
         if (col_i < col) {
             int row_i = offset % row;
             if (row_i < row) {
-                int a_offset = a_offsets[count_i];
-                dtype b = z[count_i * max_col + col_i] - a[a_offset + offset];
-                dtype x = vals[count_i][offset] *
-                    ((1 - vals[count_i][offset]) * grads[count_i][offset] - b);
+                dtype x = vals[count_i][offset] * (grads[count_i][offset] -
+                        z[count_i * max_col + col_i]);
                 DeviceAtomicAdd(input_grads[count_i] + offset, x);
             }
         }
@@ -3900,7 +3896,7 @@ void SoftmaxBackward(vector<dtype *> &grads, dtype **vals, int count, int *rows,
     NumberPointerArray in_grad_arr;
     in_grad_arr.init(in_grads.data(), count);
     KernelSoftmaxBackward<<<block_count, TPB>>>(vals, grad_arr.value, count, rows, max_row, cols,
-            max_col, z.value, a.value, offsets, in_grad_arr.value);
+            max_col, z.value, in_grad_arr.value);
 }
 
 __global__ void KernelLogSoftmaxForward(dtype **in_vals, dtype *zs, int count, int row,
