@@ -293,6 +293,11 @@ Node *multiheadAttention(Node& Q, Node& K, Node& V, int embed_dim, int num_heads
 std::vector<Node *> transformerEncoder(Node &input, TransformerEncoderParams &params,
         dtype dropout);
 
+std::vector<std::vector<Node *>> transformerEncoder(const std::vector<Node *> &inputs,
+        TransformerEncoderParams &params,
+        dtype dropout_value);
+
+
 class TransformerDecoderBuilderAbs {
 public:
     TransformerDecoderBuilderAbs(TransformerDecoderParams &params, Node &encoder_hiddens,

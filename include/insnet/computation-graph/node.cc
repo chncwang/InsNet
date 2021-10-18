@@ -344,9 +344,15 @@ void Executor::backwardFully() {
     Profiler &profiler = Profiler::Ins();
     profiler.BeginEvent("memory_management");
     int size = 0;
+    vector<Node *> null_grad_nodes;
+    null_grad_nodes.reserve(batch.size());
     for (Node *node : batch) {
         size += node->inputSize();
+        if (!node->getGrad().isInitialized()) {
+            null_grad_nodes.push_back(node);
+        }
     }
+    initAndZeroGrads(null_grad_nodes);
 
     vector<cpu::Tensor1D *> grads;
     grads.reserve(size);
@@ -358,7 +364,7 @@ void Executor::backwardFully() {
     for (Node *node : batch) {
         for (int i = 0; i < node->inputSize(); ++i) {
             Tensor1D &input_grad = *node->input_grads_.at(i);
-            if (!input_grad.isInitialized()) {
+            if (!input_grad.isInitialized() && node->getGrad().isInitialized()) {
                 grads.push_back(&input_grad);
                 dims.push_back(node->input_dims_.at(i));
                 sigs.push_back(node->cachedTypeSig());

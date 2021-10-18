@@ -9,6 +9,7 @@
 using std::string;
 using std::function;
 using std::vector;
+using std::cout;
 using std::cerr;
 using std::endl;
 
@@ -145,6 +146,57 @@ Node *multiheadAttention(Node& q, Node& k, Node& v, int row, int head_count,
     return attended_matrix;
 }
 
+Node *multiheadAttention(const vector<Node *> &qs, const vector<Node *> &ks,
+        const vector<Node *> &vs,
+        int row,
+        int head_count,
+        LinearParams &fusion_param,
+        dtype dropout_value,
+        bool use_mask) {
+    int head_dim = row / head_count;
+    vector<int> offsets(head_count);
+    for (int i = 0; i < head_count; ++i) {
+        offsets.at(i) = i * head_dim;
+    }
+
+    vector<Node *> matrices;
+    matrices.reserve(qs.size());
+    for (int i = 0; i < qs.size(); ++i) {
+        Node &q = *qs.at(i);
+        int q_col = q.size() / row;
+        if (q_col * row != q.size()) {
+            cerr << fmt::format("dotAttention - q_col:{} row:{} q dim:{}", q_col, row, q.size()) <<
+                endl;
+            abort();
+        }
+        Node &v = *vs.at(i);
+        int v_col = v.size() / row;
+        if (v_col * row != v.size()) {
+            cerr << fmt::format("dotAttention - v_col:{} row:{} v dim:{}", v_col, row, v.size()) <<
+                endl;
+            abort();
+        }
+        Node &k = *ks.at(i);
+
+        BatchedNode *split_q = split(q, head_dim, offsets, q_col);
+        BatchedNode *split_k = split(k, head_dim, offsets, v_col);
+        BatchedNode *split_v = split(v, head_dim, offsets, v_col);
+        BatchedNode *split_attended = dotAttention(*split_k, *split_v, *split_q, head_dim,
+                use_mask).first;
+        Node *attended_matrix = cat(*split_attended, q_col);
+        matrices.push_back(attended_matrix);
+    }
+    Node *merged_matrix = cat(matrices);
+    Graph &graph = dynamic_cast<Graph &>(merged_matrix->getNodeContainer());
+    graph.forward();
+    merged_matrix = linear(*merged_matrix, fusion_param);
+    graph.forward();
+    merged_matrix = dropout(*merged_matrix, dropout_value);
+    graph.forward();
+
+    return merged_matrix;
+}
+
 vector<Node *> transformerEncoder(Node &inputs, TransformerEncoderParams &params,
         dtype dropout_value) {
     int hidden_dim = params.hiddenDim();
@@ -157,7 +209,7 @@ vector<Node *> transformerEncoder(Node &inputs, TransformerEncoderParams &params
 
     Graph &graph = dynamic_cast<Graph &>(inputs.getNodeContainer());
     Node *pos_emb = embedding(graph, pos_ids, params.positionalEncodingParam(), true);
-    Node *scaled_input = mul(inputs, ::sqrt(inputs.size() / inputs.getColumn()));
+    Node *scaled_input = mul(inputs, ::sqrt(hidden_dim));
     Node *pos_encoded = add({pos_emb, scaled_input});
     pos_encoded = dropout(*pos_encoded, dropout_value);
 
@@ -174,8 +226,7 @@ vector<Node *> transformerEncoder(Node &inputs, TransformerEncoderParams &params
         Node *key = linear(*normed, attention_head_params.k());
         Node *value = linear(*normed, attention_head_params.v());
         Node *q = linear(*normed, attention_head_params.q());
-        int dim = params.hiddenDim();
-        Node *attended = multiheadAttention(*q, *key, *value, dim, params.headCount(),
+        Node *attended = multiheadAttention(*q, *key, *value, hidden_dim, params.headCount(),
                 layer_params.headsFusionParams(), dropout_value, false);
         Node *added = add({attended, last_layer});
         normed = layerNorm(*added, layer_params.layerNormB());
@@ -189,6 +240,109 @@ vector<Node *> transformerEncoder(Node &inputs, TransformerEncoderParams &params
     }
 
     return hiddens;
+}
+
+vector<vector<Node *>> transformerEncoder(const vector<Node *> &inputs,
+        TransformerEncoderParams &params,
+        dtype dropout_value) {
+    Node *merged_input = cat(inputs);
+
+    int hidden_dim = params.hiddenDim();
+    int sentence_len_sum = merged_input->size() / hidden_dim;
+    vector<int> pos_ids;
+    pos_ids.reserve(sentence_len_sum);
+    vector<int> sen_lens;
+    sen_lens.reserve(sentence_len_sum);
+    vector<int> sen_offsets;
+    sen_offsets.reserve(sentence_len_sum);
+    int sum = 0;
+    for (int i = 0; i < inputs.size(); ++i) {
+        Node *input = inputs.at(i);
+        int sen_len = input->size() / hidden_dim;
+        sen_lens.push_back(sen_len);
+        sen_offsets.push_back(sum);
+        sum += sen_len;
+        for (int j = 0; j < sen_len; ++j) {
+            pos_ids.push_back(j);
+        }
+    }
+
+    Graph &graph = dynamic_cast<Graph &>(inputs.front()->getNodeContainer());
+    Node *pos_emb = embedding(graph, pos_ids, params.positionalEncodingParam(), true);
+    graph.forward();
+    Node *scaled_input = mul(*merged_input, ::sqrt(hidden_dim));
+    graph.forward();
+    Node *pos_encoded = add({pos_emb, scaled_input});
+    graph.forward();
+    pos_encoded = dropout(*pos_encoded, dropout_value);
+    graph.forward();
+
+    int layer_count = params.layerCount();
+    Node *last_layer = pos_encoded;
+    vector<Node *> hiddens;
+    hiddens.reserve(layer_count);
+
+    for (int i = 0; i < layer_count; ++i) {
+        auto &layer_params = *params.layerParams().ptrs().at(i);
+
+        Node *normed = layerNorm(*last_layer, layer_params.layerNormA());
+        graph.forward();
+        auto &attention_head_params = layer_params.multiHeadAttentionParams();
+        Node *key = linear(*normed, attention_head_params.k());
+        graph.forward();
+        Node *value = linear(*normed, attention_head_params.v());
+        graph.forward();
+        Node *q = linear(*normed, attention_head_params.q());
+        graph.forward();
+        vector<Node *> sen_qs, sen_ks, sen_vs;
+        sen_qs.reserve(inputs.size());
+        sen_ks.reserve(inputs.size());
+        sen_vs.reserve(inputs.size());
+        for (int j = 0; j < inputs.size(); ++j) {
+            int sen_len = sen_lens.at(j);
+            int sen_size = sen_len * hidden_dim;
+            int offset = sen_offsets.at(j) * hidden_dim;
+            Node *sen_q = split(*q, sen_size, offset);
+            sen_qs.push_back(sen_q);
+            Node *sen_k = split(*key, sen_size, offset);
+            sen_ks.push_back(sen_k);
+            Node *sen_value = split(*value, sen_size, offset);
+            sen_vs.push_back(sen_value);
+        }
+        Node *attended = multiheadAttention(sen_qs, sen_ks, sen_vs, hidden_dim, params.headCount(),
+                layer_params.headsFusionParams(), dropout_value, false);
+        Node *added = add({attended, last_layer});
+        graph.forward();
+        normed = layerNorm(*added, layer_params.layerNormB());
+        graph.forward();
+        Node *t = linear(*normed, layer_params.ffnInnerParams());
+        graph.forward();
+        t = relu(*t);
+        graph.forward();
+        t = linear(*t, layer_params.ffnOutterParams());
+        graph.forward();
+        t = dropout(*t, dropout_value);
+        graph.forward();
+        t = add({added, t});
+        graph.forward();
+        last_layer = t;
+        hiddens.push_back(last_layer);
+    }
+
+    vector<vector<Node *>> ret;
+    ret.reserve(layer_count);
+    for (int i = 0; i < layer_count; ++i) {
+        vector<Node *> sen_rets;
+        sen_rets.reserve(inputs.size());
+        for (int j = 0; j < inputs.size(); ++j) {
+            int sen_len = sen_lens.at(j);
+            int sen_offset = sen_offsets.at(j);
+            Node *sen_h = split(*hiddens.at(i), sen_len * hidden_dim, sen_offset * hidden_dim);
+            sen_rets.push_back(sen_h);
+        }
+        ret.push_back(move(sen_rets));
+    }
+    return ret;
 }
 
 TransformerDecoderBuilderAbs::TransformerDecoderBuilderAbs(TransformerDecoderParams &params,
