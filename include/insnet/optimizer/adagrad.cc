@@ -2,10 +2,8 @@
 
 namespace insnet {
 
-void AdagradOptimizer::optimize() {
-    for (int idx = 0; idx < params_.size(); idx++) {
-        params_[idx]->adagrad(lr_, reg_, eps_);
-    }
+void AdagradOptimizer::optimize(BaseParam &param) {
+    param.adagrad(lr_, reg_, eps_);
 }
 
 }

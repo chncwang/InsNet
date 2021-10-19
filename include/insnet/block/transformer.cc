@@ -242,30 +242,118 @@ vector<Node *> transformerEncoder(Node &inputs, TransformerEncoderParams &params
     return hiddens;
 }
 
+namespace {
+
+vector<int> calLens(const vector<Node *> &nodes, int dim) {
+    vector<int> ret;
+    ret.reserve(nodes.size());
+    for (Node *node : nodes) {
+        ret.push_back(node->size() / dim);
+    }
+    return ret;
+}
+
+vector<int> calOffsets(const vector<int> &sen_lens) {
+    vector<int> ret;
+    ret.reserve(sen_lens.size());
+    int offset = 0;
+    for (int len : sen_lens) {
+        ret.push_back(offset);
+        offset += len;
+    }
+    return ret;
+}
+
+vector<int> calIds(const vector<int> &sen_lens) {
+    vector<int> ret;
+    for (int len : sen_lens) {
+        for (int i = 0; i < len; ++i) {
+            ret.push_back(i);
+        }
+    }
+    return ret;
+}
+
+Node *multiheadAttention(Node &q, Node &k, Node &v, const vector<int> &sen_lens, int row,
+        int head_count,
+        LinearParams &fusion_param,
+        dtype dropout_value,
+        bool use_mask) {
+    vector<Node *> sen_qs, sen_ks, sen_vs;
+    sen_qs.reserve(sen_lens.size());
+    sen_ks.reserve(sen_lens.size());
+    sen_vs.reserve(sen_lens.size());
+
+    vector<int> sen_offsets = calOffsets(sen_lens);
+
+    for (int j = 0; j < sen_lens.size(); ++j) {
+        int sen_len = sen_lens.at(j);
+        int sen_size = sen_len * row;
+        int offset = sen_offsets.at(j) * row;
+        Node *sen_q = split(q, sen_size, offset);
+        sen_qs.push_back(sen_q);
+        Node *sen_k = split(k, sen_size, offset);
+        sen_ks.push_back(sen_k);
+        Node *sen_value = split(v, sen_size, offset);
+        sen_vs.push_back(sen_value);
+    }
+
+    return multiheadAttention(sen_qs, sen_ks, sen_vs, row, head_count, fusion_param, dropout_value,
+            false);
+}
+
+Node *multiheadAttention(Node &q, Node &k, Node &v, const vector<int> &enc_sen_lens,
+        const vector<int> &dec_sen_lens,
+        int row,
+        int head_count,
+        LinearParams &fusion_param,
+        dtype dropout_value,
+        bool use_mask) {
+    if (enc_sen_lens.size() != dec_sen_lens.size()) {
+        cerr << fmt::format("multiheadAttention enc_sen_lens size:{} dec:{}", enc_sen_lens.size(),
+                dec_sen_lens.size()) << endl;
+        abort();
+    }
+
+    vector<Node *> sen_qs, sen_ks, sen_vs;
+    int sen_num = enc_sen_lens.size();
+    sen_qs.reserve(sen_num);
+    sen_ks.reserve(sen_num);
+    sen_vs.reserve(sen_num);
+
+    vector<int> enc_sen_offsets = calOffsets(enc_sen_lens);
+    vector<int> dec_sen_offsets = calOffsets(dec_sen_lens);
+
+    for (int j = 0; j < sen_num; ++j) {
+        int dec_sen_len = dec_sen_lens.at(j);
+        int dec_sen_size = dec_sen_len * row;
+        int dec_offset = dec_sen_offsets.at(j) * row;
+        Node *sen_q = split(q, dec_sen_size, dec_offset);
+        sen_qs.push_back(sen_q);
+
+        int enc_sen_len = enc_sen_lens.at(j);
+        int enc_sen_size = enc_sen_len * row;
+        int enc_offset = enc_sen_offsets.at(j) * row;
+        Node *sen_k = split(k, enc_sen_size, enc_offset);
+        sen_ks.push_back(sen_k);
+        Node *sen_value = split(v, enc_sen_size, enc_offset);
+        sen_vs.push_back(sen_value);
+    }
+
+    return multiheadAttention(sen_qs, sen_ks, sen_vs, row, head_count, fusion_param, dropout_value,
+            false);
+}
+
+}
+
 vector<vector<Node *>> transformerEncoder(const vector<Node *> &inputs,
         TransformerEncoderParams &params,
         dtype dropout_value) {
     Node *merged_input = cat(inputs);
 
     int hidden_dim = params.hiddenDim();
-    int sentence_len_sum = merged_input->size() / hidden_dim;
-    vector<int> pos_ids;
-    pos_ids.reserve(sentence_len_sum);
-    vector<int> sen_lens;
-    sen_lens.reserve(sentence_len_sum);
-    vector<int> sen_offsets;
-    sen_offsets.reserve(sentence_len_sum);
-    int sum = 0;
-    for (int i = 0; i < inputs.size(); ++i) {
-        Node *input = inputs.at(i);
-        int sen_len = input->size() / hidden_dim;
-        sen_lens.push_back(sen_len);
-        sen_offsets.push_back(sum);
-        sum += sen_len;
-        for (int j = 0; j < sen_len; ++j) {
-            pos_ids.push_back(j);
-        }
-    }
+    vector<int> sen_lens = calLens(inputs, hidden_dim);
+    vector<int> pos_ids = calIds(sen_lens);
 
     Graph &graph = dynamic_cast<Graph &>(inputs.front()->getNodeContainer());
     Node *pos_emb = embedding(graph, pos_ids, params.positionalEncodingParam(), true);
@@ -294,23 +382,8 @@ vector<vector<Node *>> transformerEncoder(const vector<Node *> &inputs,
         graph.forward();
         Node *q = linear(*normed, attention_head_params.q());
         graph.forward();
-        vector<Node *> sen_qs, sen_ks, sen_vs;
-        sen_qs.reserve(inputs.size());
-        sen_ks.reserve(inputs.size());
-        sen_vs.reserve(inputs.size());
-        for (int j = 0; j < inputs.size(); ++j) {
-            int sen_len = sen_lens.at(j);
-            int sen_size = sen_len * hidden_dim;
-            int offset = sen_offsets.at(j) * hidden_dim;
-            Node *sen_q = split(*q, sen_size, offset);
-            sen_qs.push_back(sen_q);
-            Node *sen_k = split(*key, sen_size, offset);
-            sen_ks.push_back(sen_k);
-            Node *sen_value = split(*value, sen_size, offset);
-            sen_vs.push_back(sen_value);
-        }
-        Node *attended = multiheadAttention(sen_qs, sen_ks, sen_vs, hidden_dim, params.headCount(),
-                layer_params.headsFusionParams(), dropout_value, false);
+        Node *attended = multiheadAttention(*q, *key, *value, sen_lens, hidden_dim,
+                params.headCount(), layer_params.headsFusionParams(), dropout_value, false);
         Node *added = add({attended, last_layer});
         graph.forward();
         normed = layerNorm(*added, layer_params.layerNormB());
@@ -329,6 +402,7 @@ vector<vector<Node *>> transformerEncoder(const vector<Node *> &inputs,
         hiddens.push_back(last_layer);
     }
 
+    vector<int> sen_offsets = calOffsets(sen_lens);
     vector<vector<Node *>> ret;
     ret.reserve(layer_count);
     for (int i = 0; i < layer_count; ++i) {
@@ -543,6 +617,102 @@ vector<Node *> transformerDecoder(Node &encoder, Node &input, TransformerDecoder
     builder.prepare();
     builder.connect(input);
     return builder.hiddenLayers();
+}
+
+vector<vector<Node *>> transformerDecoder(const vector<Node *> &enc_hiddens,
+        const vector<Node *> &inputs,
+        TransformerDecoderParams &params,
+        dtype dropout_value) {
+    Node *merged_input = cat(inputs);
+
+    int hidden_dim = params.hiddenDim();
+    vector<int> dec_sen_lens = calLens(inputs, hidden_dim);
+    vector<int> pos_ids = calIds(dec_sen_lens);
+
+    Graph &graph = dynamic_cast<Graph &>(inputs.front()->getNodeContainer());
+    Node *pos_emb = embedding(graph, pos_ids, params.positionalEncodingParam(), true);
+    graph.forward();
+    Node *scaled_input = mul(*merged_input, ::sqrt(hidden_dim));
+    graph.forward();
+    Node *pos_encoded = add({pos_emb, scaled_input});
+    graph.forward();
+    pos_encoded = dropout(*pos_encoded, dropout_value);
+    graph.forward();
+
+    Node *merged_enc_hidden = cat(enc_hiddens);
+    graph.forward();
+    int layer_count = params.layerCount();
+    Node *last_layer = pos_encoded;
+
+    vector<int> enc_sen_lens = calLens(enc_hiddens, hidden_dim);
+    vector<Node *> hiddens;
+    hiddens.reserve(layer_count);
+
+    for (int i = 0; i < layer_count; ++i) {
+        auto &layer_params = *params.layerParams().ptrs().at(i);
+        auto &attention_head_params = layer_params.selfAttention();
+
+        Node *normed = layerNorm(*last_layer, layer_params.layerNormA());
+        graph.forward();
+        Node *dec_k = linear(*normed, attention_head_params.k());
+        graph.forward();
+        Node *dec_v = linear(*normed, attention_head_params.v());
+        graph.forward();
+        Node *dec_q = linear(*normed, attention_head_params.q());
+        graph.forward();
+        Node *attended = multiheadAttention(*dec_q, *dec_k, *dec_v, dec_sen_lens, hidden_dim,
+                params.headCount(), layer_params.selfFusion(), dropout_value, true);
+        Node *added = add({attended, last_layer});
+        graph.forward();
+        normed = layerNorm(*added, layer_params.layerNormB());
+        graph.forward();
+
+        auto &attention_head_params_for_encoder = layer_params.encoderAttention();
+        dec_q = linear(*normed, attention_head_params_for_encoder.q());
+        graph.forward();
+        Node *enc_k = linear(*merged_enc_hidden, attention_head_params_for_encoder.k());
+        graph.forward();
+        Node *enc_v = linear(*merged_enc_hidden, attention_head_params_for_encoder.v());
+        graph.forward();
+
+        attended = multiheadAttention(*dec_q, *enc_k, *enc_v, enc_sen_lens, dec_sen_lens,
+                hidden_dim, params.headCount(), layer_params.encoderFusion(), dropout_value,
+                false);
+
+        added = add({added, attended});
+        graph.forward();
+        normed = layerNorm(*added, layer_params.layerNormC());
+        graph.forward();
+
+        Node *t = linear(*normed, layer_params.ffnInnerParams());
+        graph.forward();
+        t = relu(*t);
+        graph.forward();
+        t = linear(*t, layer_params.ffnOutterParams());
+        graph.forward();
+        t = dropout(*t, dropout_value);
+        graph.forward();
+        added = add({added, t});
+        graph.forward();
+        last_layer = added; 
+        hiddens.push_back(last_layer);
+    }
+
+    vector<int> dec_sen_offsets = calOffsets(dec_sen_lens);
+    vector<vector<Node *>> ret;
+    ret.reserve(layer_count);
+    for (int i = 0; i < layer_count; ++i) {
+        vector<Node *> sen_rets;
+        sen_rets.reserve(inputs.size());
+        for (int j = 0; j < inputs.size(); ++j) {
+            int sen_len = dec_sen_lens.at(j);
+            int sen_offset = dec_sen_offsets.at(j);
+            Node *sen_h = split(*hiddens.at(i), sen_len * hidden_dim, sen_offset * hidden_dim);
+            sen_rets.push_back(sen_h);
+        }
+        ret.push_back(move(sen_rets));
+    }
+    return ret;
 }
 
 TransformerDecoderState transformerDecoder(const TransformerDecoderState &state,

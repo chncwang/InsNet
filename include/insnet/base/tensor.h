@@ -103,6 +103,9 @@ struct Tensor2D {
 
     Vec vec();
 
+    virtual bool isInitialized() const {
+        return v != nullptr;
+    }
 
     dtype* operator[](const int icol);
 
@@ -187,6 +190,10 @@ struct Tensor2D : public insnet::cpu::Tensor2D, public Transferable {
     ~Tensor2D();
 
     void init(int row, int col) override;
+
+    virtual bool isInitialized() const override {
+        return value != nullptr;
+    }
 
     virtual std::string name() const;
 

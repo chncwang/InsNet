@@ -12,7 +12,7 @@ public:
         Optimizer(params, learning_rate), beta1_(beta1), beta2_(beta2), eps_(eps),
         weight_decay_(weight_decay) {}
 
-    void optimize() override;
+    void optimize(BaseParam &param) override;
 
 private:
     dtype beta1_, beta2_, eps_, weight_decay_;

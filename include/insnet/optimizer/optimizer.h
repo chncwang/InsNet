@@ -10,7 +10,7 @@ public:
     Optimizer(const std::vector<BaseParam *> &params, dtype learning_rate) : params_(params),
     lr_(learning_rate) {}
 
-    virtual void optimize() = 0;
+    virtual void optimize(BaseParam &param) = 0;
 
     void step();
 

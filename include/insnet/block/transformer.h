@@ -367,6 +367,11 @@ std::vector<Node *> transformerDecoder(Node &encoder, Node &input,
         TransformerDecoderParams &params,
         dtype dropout_value);
 
+std::vector<std::vector<Node *>> transformerDecoder(const std::vector<Node *> &enc_hiddens,
+        const std::vector<Node *> &inputs,
+        TransformerDecoderParams &params,
+        dtype dropout_value);
+
 class TransformerDecoderState {
 public:
     TransformerDecoderState(int layer);

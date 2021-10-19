@@ -11,7 +11,7 @@ public:
             dtype l2_penalty=0, dtype eps=1e-10) : Optimizer(params, learning_rate),
     reg_(l2_penalty), eps_(eps) {}
 
-    void optimize() override;
+    void optimize(BaseParam &param) override;
 
 private:
     dtype reg_, eps_;

@@ -120,6 +120,10 @@ public:
         return *grad_;
     }
 
+    bool isGradInitialized() {
+        return grad_ != nullptr;
+    }
+
     virtual void initAndZeroGrad();
 
     void releaseGrad() {

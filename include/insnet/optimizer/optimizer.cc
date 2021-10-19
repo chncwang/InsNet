@@ -3,7 +3,11 @@
 namespace insnet {
 
 void Optimizer::step() {
-    optimize();
+    for (BaseParam *param : params_) {
+        if (param->isGradInitialized()) {
+            optimize(*param);
+        }
+    }
 
     for (BaseParam *p : params_) {
         p->releaseGrad();
