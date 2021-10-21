@@ -70,6 +70,8 @@ struct ParamArray : public TunableCombination<BaseParam>
 {
     ParamArray(const std::string &nam) : name(nam) {}
 
+    ParamArray() : name("param_arr") {}
+
     std::vector<std::shared_ptr<ParamType>> params;
     std::string name;
 
