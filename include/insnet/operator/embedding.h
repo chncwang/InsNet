@@ -216,7 +216,6 @@ public:
     template<typename Archive>
     void load(Archive &ar) {
         ar(bFineTune, nDim, nVSize, nUNKId, vocab);
-        E.init(nDim, nVSize);
         ar(E);
     }
 };
