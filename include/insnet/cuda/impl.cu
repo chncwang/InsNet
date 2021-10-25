@@ -3447,7 +3447,6 @@ __global__ void KernelMaxScalar(dtype **v, int count, int *rows, int *cols, dtyp
     }
     shared_max[threadIdx.x] = -1e10;
     int row = rows[count_i];
-    int row_i = blockIdx.y * blockDim.x + threadIdx.x;
     for (int i = threadIdx.x; i < row; i += blockDim.y) {
         dtype x = v[count_i][col_i * row + i];
         if (shared_max[threadIdx.x] < x) {
@@ -3590,33 +3589,24 @@ __global__ void KernelPointwiseMul(dtype **a, dtype **b, int count, int *rows, i
 
 __global__ void KernelVectorSum(dtype *v, int count, int *rows, int max_row, int *cols,
         int *v_offsets,
-        volatile dtype *block_sums,
-        int *block_counters,
         dtype *results) {
     __shared__ volatile extern dtype shared_sum[];
-    __shared__ volatile bool is_last_block;
 
     int count_i = blockIdx.x;
     int col = cols[count_i];
-    int col_i = blockIdx.z;
+    int col_i = blockIdx.y;
     if (col_i >= col) {
         return;
     }
 
-    if (threadIdx.x == 0 && blockIdx.y == 0) {
-        block_counters[blockIdx.x * gridDim.z + blockIdx.z] = 0;
-    }
-    if (threadIdx.x == 0) {
-        is_last_block = false;
-    }
-
     int row = rows[count_i];
-    int row_i = blockIdx.y * blockDim.x + threadIdx.x;
-    int offset = col_i * row + row_i;
     int v_offset = v_offsets[count_i];
-    shared_sum[threadIdx.x] = row_i < row ? v[v_offset + offset] : 0.0f;
+    shared_sum[threadIdx.x] = 0.0f;
+    for (int i = threadIdx.x; i < row; i += blockDim.x) {
+        int offset = col_i * row + i;
+        shared_sum[threadIdx.x] += v[v_offset + offset];
+    }
     __syncthreads();
-
     for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
         if (threadIdx.x < i) {
             shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
@@ -3625,35 +3615,7 @@ __global__ void KernelVectorSum(dtype *v, int count, int *rows, int max_row, int
     }
 
     if (threadIdx.x == 0) {
-        int block_sums_offset = blockIdx.x * gridDim.y * gridDim.z + blockIdx.z * gridDim.y +
-            blockIdx.y;
-        block_sums[block_sums_offset] = shared_sum[0];
-        if (atomicAdd(block_counters + blockIdx.x * gridDim.z + blockIdx.z, 1) == gridDim.y - 1) {
-            is_last_block = true;
-        }
-    }
-    __syncthreads();
-
-    if (is_last_block) {
-        dtype sum = 0.0f;
-        for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
-            int offset = blockIdx.x * gridDim.y * gridDim.z + blockIdx.z * gridDim.y + i;
-            sum += block_sums[offset];
-        }
-
-        shared_sum[threadIdx.x] = sum;
-        __syncthreads();
-
-        for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-            if (threadIdx.x < i) {
-                shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
-            }
-            __syncthreads();
-        }
-
-        if (threadIdx.x == 0) {
-            results[count_i * gridDim.z + blockIdx.z] = shared_sum[0];
-        }
+        results[count_i * gridDim.y + blockIdx.y] = shared_sum[0];
     }
 }
 
@@ -3698,16 +3660,11 @@ void SoftmaxBackward(vector<dtype *> &grads, dtype **vals, int count, int *rows,
     CheckCudaError();
 
     int thread_count = min(NextTwoIntegerPowerNumber(max_row), TPB);
-    int block_y_count = (max_row - 1 + thread_count) / thread_count;
-    dim3 block_dim(count, block_y_count, max_col);
-    NumberArray block_vals;
-    block_vals.init(block_y_count * count * max_col);
-    IntArray block_counters;
-    block_counters.init(count * max_col);
+    dim3 block_dim(count, max_col, 1);
     NumberArray z;
     z.init(count * max_col);
     KernelVectorSum<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(a.value, count,
-            rows, max_row, cols, offsets, block_vals.value, block_counters.value, z.value);
+            rows, max_row, cols, offsets, z.value);
     CheckCudaError();
 
     NumberPointerArray in_grad_arr;
