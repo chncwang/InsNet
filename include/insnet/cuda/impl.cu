@@ -968,21 +968,14 @@ __global__ void KernelAtomicAdd(dtype *src, int count, int *dims, int max_dim, i
     }
 }
 
-__global__ void KernelLinearBackwardForBias(dtype *grad, int col, int row, dtype *bias_grad,
-        int *block_counters,
-        volatile dtype *block_sums) {
+__global__ void KernelLinearBackwardForBias(dtype *grad, int col, int row, dtype *bias_grad) {
     __shared__ volatile extern dtype shared_sum[];
-    __shared__ volatile bool is_last_block;
-    if (threadIdx.x == 0 && blockIdx.y == 0) {
-        block_counters[blockIdx.x] = 0;
-    }
-    if (threadIdx.x == 0) {
-        is_last_block = false;
-    }
 
     int row_i = blockIdx.x;
-    int col_i = blockIdx.y * blockDim.x + threadIdx.x;
-    shared_sum[threadIdx.x] = col_i < col ?  grad[row * col_i + row_i] : 0.0f;
+    shared_sum[threadIdx.x] = 0;
+    for (int i = threadIdx.x; i < col; i += blockDim.x) {
+        shared_sum[threadIdx.x] += grad[row * i + row_i];
+    }
     __syncthreads();
 
     for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
@@ -992,36 +985,9 @@ __global__ void KernelLinearBackwardForBias(dtype *grad, int col, int row, dtype
         __syncthreads();
     }
 
-    int block_sums_offset = blockIdx.x * gridDim.y + blockIdx.y;
     if (threadIdx.x == 0) {
-        block_sums[block_sums_offset] = shared_sum[0];
-        if (atomicAdd(block_counters + blockIdx.x, 1) == gridDim.y - 1) {
-            is_last_block = true;
-        }
-    }
-    __syncthreads();
-
-    if (is_last_block) {
-        dtype sum = 0.0f;
-        for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
-            int offset = blockIdx.x * gridDim.y + i;
-            sum += block_sums[offset];
-        }
-
-        shared_sum[threadIdx.x] = sum;
-        __syncthreads();
-
-        for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-            if (threadIdx.x < i) {
-                shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
-            }
-            __syncthreads();
-        }
-
-        if (threadIdx.x == 0) {
-            dtype x = shared_sum[0];
-            DeviceAtomicAdd(bias_grad + row_i, x);
-        }
+        dtype x = shared_sum[0];
+        DeviceAtomicAdd(bias_grad + row_i, x);
     }
 }
 
@@ -1089,15 +1055,9 @@ void LinearBackward(vector<dtype *> &grads, int count, vector<int> &cols, int in
 
     if (bias_grad != nullptr) {
         int thread_count = min(NextTwoIntegerPowerNumber(col_sum), TPB);
-        int block_y_count = (col_sum - 1 + thread_count) / thread_count;
-        dim3 block_dim(out_row, block_y_count, 1);
-        NumberArray block_sums;
-        block_sums.init(block_y_count * out_row);
-        IntArray block_counters;
-        block_counters.init(out_row);
+        dim3 block_dim(out_row, 1, 1);
         KernelLinearBackwardForBias<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(
-                concated_grad.value, col_sum, out_row, bias_grad, block_counters.value,
-                block_sums.value);
+                concated_grad.value, col_sum, out_row, bias_grad);
         CheckCudaError();
     }
 }
@@ -4679,21 +4639,16 @@ void PointwiseLinearBackward(dtype **grads, dtype **in_vals, dtype *g_vals, int 
             a.value);
 
     int thread_count = min(NextTwoIntegerPowerNumber(col_sum), TPB);
-    int block_y_count = (col_sum - 1 + thread_count) / thread_count;
-    dim3 block_dim(row, block_y_count, 1);
-    NumberArray block_sums;
-    block_sums.init(block_y_count * row);
-    IntArray block_counters;
-    block_counters.init(row);
+    dim3 block_dim(row, 1, 1);
 
     KernelLinearBackwardForBias<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(
-            a.value, col_sum, row, g_grads, block_counters.value, block_sums.value);
+            a.value, col_sum, row, g_grads);
     CheckCudaError();
 
     KernelConcat<<<block_count, TPB>>>(grads, count, dims, max_dim, dim_offsets, a.value);
 
     KernelLinearBackwardForBias<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(
-            a.value, col_sum, row, bias_grads, block_counters.value, block_sums.value);
+            a.value, col_sum, row, bias_grads);
     CheckCudaError();
 
     KernelPointwiseLinearBackwardForInput<<<block_count, TPB>>>(grads, g_vals, count, row, cols,
