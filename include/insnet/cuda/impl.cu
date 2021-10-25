@@ -3945,7 +3945,7 @@ void ScalarToVectorForward(vector<dtype*> &inputs, int count, int input_col,
 __global__ void KernelScalarToVectorBackward(dtype **grads, int count, int input_col, int *rows,
         volatile dtype *block_sums,
         int *block_counters,
-        dtype **input_grads) {
+        dtype **input_grads) { // TODO need to be simplifed.
     __shared__ volatile extern dtype shared_sum[];
     __shared__ volatile bool is_last_block;
     if (threadIdx.x == 0 && blockIdx.y == 0) {
@@ -4073,30 +4073,23 @@ void BiasBackward(vector<dtype *> &grads, int count, int dim, dtype *bias_grad,
             (dtype **)input_grad_arr.value);
 }
 
-__global__ void KernelSum(dtype **v, int count, int row, int *cols, volatile dtype *block_sums,
-        int *block_counters,
+__global__ void KernelSum(dtype **v, int count, int row, int *cols,
         bool cal_mean,
         bool cal_sqrt,
         dtype *sum_vals) {
     __shared__ volatile extern dtype shared_sum[];
-    __shared__ volatile bool is_last_block;
 
     int col = cols[blockIdx.x];
-    if (blockIdx.z >= col) {
+    if (blockIdx.y >= col) {
         return;
     }
 
-    if (threadIdx.x == 0 && blockIdx.y == 0) {
-        block_counters[blockIdx.x * gridDim.z + blockIdx.z] = 0;
-    }
-    if (threadIdx.x == 0) {
-        is_last_block = false;
-    }
-
+    shared_sum[threadIdx.x] = 0;
     int count_i = blockIdx.x;
-    int row_i = blockIdx.y * blockDim.x + threadIdx.x;
-    int offset = row * blockIdx.z + row_i;
-    shared_sum[threadIdx.x] = row_i < row ? v[count_i][offset] : 0.0f;
+    shared_sum[threadIdx.x] = 0.0f;
+    for (int i = threadIdx.x; i < row; i += blockDim.x) {
+        shared_sum[threadIdx.x] += v[count_i][blockIdx.y * row + i];
+    }
     __syncthreads();
 
     for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
@@ -4107,37 +4100,9 @@ __global__ void KernelSum(dtype **v, int count, int row, int *cols, volatile dty
     }
 
     if (threadIdx.x == 0) {
-        int block_sums_offset = blockIdx.x * gridDim.y * gridDim.z + gridDim.y * blockIdx.z +
-            blockIdx.y;
-        block_sums[block_sums_offset] = shared_sum[0];
-        if (atomicAdd(block_counters + blockIdx.x * gridDim.z + blockIdx.z, 1) == gridDim.y - 1) {
-            is_last_block = true;
-        }
-    }
-    __syncthreads();
-
-    if (is_last_block) {
-        dtype sum = 0.0f;
-        for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
-            int offset = blockIdx.x * gridDim.y * gridDim.z + gridDim.y * blockIdx.z + i;
-            sum += block_sums[offset];
-        }
-
-        shared_sum[threadIdx.x] = sum;
-        __syncthreads();
-
-        for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-            if (threadIdx.x < i) {
-                shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
-            }
-            __syncthreads();
-        }
-
-        if (threadIdx.x == 0) {
-            dtype x = cal_mean ? shared_sum[0] / row :  shared_sum[0];
-            x = cal_sqrt ? cuda_sqrt(x) : x;
-            sum_vals[count_i * gridDim.z + blockIdx.z] = x;
-        }
+        dtype x = cal_mean ? shared_sum[0] / row : shared_sum[0];
+        x = cal_sqrt ? cuda_sqrt(x) : x;
+        sum_vals[count_i * gridDim.y + blockIdx.y] = x;
     }
 }
 
@@ -4146,15 +4111,10 @@ void Sum(dtype **v, int count, int row, int *cols, int max_col, dtype *sum_vals,
         bool cal_sqrt = false) {
     int thread_count = min(NextTwoIntegerPowerNumber(row), TPB);
     int block_y_count = (row - 1 + thread_count) / thread_count;
-    dim3 block_dim(count, block_y_count, max_col);
-
-    NumberArray block_sums;
-    block_sums.init(block_y_count * count * max_col);
-    IntArray block_counters;
-    block_counters.init(count * max_col);
+    dim3 block_dim(count, max_col, 1);
 
     KernelSum<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(v, count, row, cols,
-            block_sums.value, block_counters.value, cal_mean, cal_sqrt, sum_vals);
+            cal_mean, cal_sqrt, sum_vals);
     CheckCudaError();
 }
 
@@ -4225,29 +4185,20 @@ __global__ void KernelPointwiseMul(dtype **a, dtype **b, int count, int *dims, i
 }
 
 __global__ void KernelSum(dtype *v, int count, int row, int *cols, int *col_offsets,
-        volatile dtype *block_sums,
-        int *block_counters,
         dtype *sum_vals) {
     __shared__ volatile extern dtype shared_sum[];
-    __shared__ volatile bool is_last_block;
 
     int col = cols[blockIdx.x];
-    if (blockIdx.z >= col) {
+    if (blockIdx.y >= col) {
         return;
     }
 
-    if (threadIdx.x == 0 && blockIdx.y == 0) {
-        block_counters[blockIdx.x * gridDim.z + blockIdx.z] = 0;
-    }
-    if (threadIdx.x == 0) {
-        is_last_block = false;
-    }
-
+    shared_sum[threadIdx.x] = 0.0f;
     int count_i = blockIdx.x;
-    int row_i = blockIdx.y * blockDim.x + threadIdx.x;
-    int offset = row * blockIdx.z + row_i;
-    int col_offset = col_offsets[count_i];
-    shared_sum[threadIdx.x] = row_i < row ? v[col_offset * row + offset] : 0.0f;
+    for (int i = threadIdx.x; i < row; i += blockDim.x) {
+        int col_offset = col_offsets[count_i];
+        shared_sum[threadIdx.x] += v[col_offset * row + row * blockIdx.y + i];
+    }
     __syncthreads();
 
     for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
@@ -4258,36 +4209,8 @@ __global__ void KernelSum(dtype *v, int count, int row, int *cols, int *col_offs
     }
 
     if (threadIdx.x == 0) {
-        int block_sums_offset = blockIdx.x * gridDim.y * gridDim.z + gridDim.y * blockIdx.z +
-            blockIdx.y;
-        block_sums[block_sums_offset] = shared_sum[0];
-        if (atomicAdd(block_counters + blockIdx.x * gridDim.z + blockIdx.z, 1) == gridDim.y - 1) {
-            is_last_block = true;
-        }
-    }
-    __syncthreads();
-
-    if (is_last_block) {
-        dtype sum = 0.0f;
-        for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
-            int offset = blockIdx.x * gridDim.y * gridDim.z + gridDim.y * blockIdx.z + i;
-            sum += block_sums[offset];
-        }
-
-        shared_sum[threadIdx.x] = sum;
-        __syncthreads();
-
-        for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-            if (threadIdx.x < i) {
-                shared_sum[threadIdx.x] += shared_sum[threadIdx.x + i];
-            }
-            __syncthreads();
-        }
-
-        if (threadIdx.x == 0) {
-            dtype x = shared_sum[0];
-            sum_vals[count_i * gridDim.z + blockIdx.z] = x;
-        }
+        dtype x = shared_sum[0];
+        sum_vals[count_i * gridDim.y + blockIdx.y] = x;
     }
 }
 
@@ -4338,20 +4261,14 @@ void StandardLayerNormBackward(dtype **grads, int count, int row, int *cols, int
     CheckCudaError();
 
     int thread_count = min(NextTwoIntegerPowerNumber(row), TPB);
-    int block_y_count = (row - 1 + thread_count) / thread_count;
-    dim3 block_dim(count, block_y_count, max_col);
-
-    NumberArray block_sums;
-    block_sums.init(block_y_count * count * max_col);
-    IntArray block_counters;
-    block_counters.init(count * max_col);
+    dim3 block_dim(count, max_col, 1);
 
     KernelSum<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(m.value, count, row, cols,
-            col_offsets, block_sums.value, block_counters.value, m_sum.value);
+            col_offsets, m_sum.value);
     CheckCudaError();
 
     KernelSum<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(grads, count, row, cols,
-            block_sums.value, block_counters.value, false, false, grad_sum.value);
+            false, false, grad_sum.value);
     CheckCudaError();
 
     KernelStandardLayerNormBackward<<<block_count, TPB>>>(grads, vals, count, row, cols, max_col,
