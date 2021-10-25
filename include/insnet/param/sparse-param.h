@@ -7,7 +7,7 @@
 
 namespace insnet {
 
-class SparseParam : public BaseParam {
+class SparseParam : public BaseParam { // TODO Don't use it currently, bugs remained.
 public:
     SparseParam(const std::string &name = "sparse") : BaseParam(name) {}
 
@@ -21,7 +21,7 @@ public:
 
     void init(int outDim, int inDim) override;
 
-    void initAndZeroGrad() override;
+    bool initAndZeroGrad() override;
 
     void adagrad(dtype alpha, dtype reg, dtype eps) override;
 

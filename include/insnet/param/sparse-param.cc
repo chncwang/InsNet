@@ -53,6 +53,7 @@ void SparseParam::init(int outDim, int inDim) {
 #if USE_GPU
     dIndexers = new cuda::BoolArray;
     dIters = new cuda::IntArray;
+    std::cout << "indexer size:" << indexers.size() << std::endl;
     dIndexers->init(indexers.c_buf(), indexers.size());
     dIters->init(last_update.c_buf(), last_update.size());
     cuda::Memset(aux_square_.value, inDim * outDim, 0.0f);
@@ -60,25 +61,21 @@ void SparseParam::init(int outDim, int inDim) {
 #endif
 }
 
-void SparseParam::initAndZeroGrad() {
-    BaseParam::initAndZeroGrad();
+bool SparseParam::initAndZeroGrad() {
+    if (BaseParam::initAndZeroGrad()) {
 #if USE_GPU
-    cuda::Memset(dIndexers->value, grad_->col, false);
+        cuda::Memset(dIndexers->value, val_.col, false);
 #if TEST_CUDA
-    int inDim = indexers.size();
-    for (int index = 0; index < inDim; index++) {
-        for (int idx = 0; idx < grad().row; idx++) {
-            (*grad_)[index][idx] = 0;
-        }
-    }
-    indexers = false;
-    cuda::Assert(grad_->verify("SparseParam clearGrad"));
-    cuda::Assert(cuda::Verify(indexers.c_buf(),
-                dIndexers->value, grad_->col, "SparseParam indexers"));
+        indexers = false;
+        cuda::Assert(cuda::Verify(indexers.c_buf(), dIndexers->value, grad_->col, "SparseParam indexers"));
 #endif
 #else
-    indexers = false;
+        indexers = false;
 #endif
+        return true;
+    } else {
+        return false;
+    }
 }
 
 void SparseParam::adagrad(dtype alpha, dtype reg, dtype eps) {

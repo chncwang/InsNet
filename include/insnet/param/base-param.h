@@ -124,7 +124,7 @@ public:
         return grad_ != nullptr;
     }
 
-    virtual void initAndZeroGrad();
+    virtual bool initAndZeroGrad();
 
     void releaseGrad() {
         grad_.reset();

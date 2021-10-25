@@ -1730,6 +1730,7 @@ __global__ void KernelMemset(bool *p, int len, bool value) {
 }
 
 void Memset(bool *p, int len, bool value) {
+    cout << "len:" << len << endl;
     int block_count = min(BLOCK_COUNT, (len - 1 + TPB) / TPB);
     KernelMemset<<<block_count, TPB>>>(p, len, value);
     CheckCudaError();

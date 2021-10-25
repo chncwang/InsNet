@@ -118,6 +118,12 @@ public:
 
     void backward() override {
         int count = batch.size();
+#if TEST_CUDA
+        for (Node *node : batch) {
+            node->grad().copyFromDeviceToHost();
+            node->val().copyFromDeviceToHost();
+        }
+#endif
         vector<dtype *> grads(count), in_grads(count);
         int i = 0;
         vector<int> offsets(count);
