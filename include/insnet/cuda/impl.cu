@@ -2677,9 +2677,6 @@ __global__ void KernelNLLLossValue(dtype **vals, int *answers, int count, int *c
         if (col_i < col) {
             int answer_id = answers[index];
             dtype v = -vals[count_i][row * col_i + answer_id];
-//            if (v > 1e10 || isnan(v)) {
-//                printf("2795 count_i:%d col_i:%d answer_id:%d\n", count_i, col_i, answer_id);
-//            }
             shared_sum[threadIdx.x] = v;
         } else {
             shared_sum[threadIdx.x] = 0.0f;
@@ -2692,8 +2689,6 @@ __global__ void KernelNLLLossValue(dtype **vals, int *answers, int count, int *c
     for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
         if (threadIdx.x < i) {
             dtype v = shared_sum[threadIdx.x + i];
-//            if (v > 1e10 || isnan(v))
-//                printf("2810 bi:%d i:%d ti:%d\n", blockIdx.x, i, threadIdx.x);
             shared_sum[threadIdx.x] += v;
         }
         __syncthreads();
@@ -2701,8 +2696,6 @@ __global__ void KernelNLLLossValue(dtype **vals, int *answers, int count, int *c
 
     if (threadIdx.x == 0) {
         dtype v = shared_sum[0];
-//        if (v > 1e10 || isnan(v))
-//            printf("2819 bi:%d\n", blockIdx.x);
         global_sum[blockIdx.x] = v;
         if (atomicAdd(block_counter, 1) == gridDim.x - 1) {
             is_last_block = true;
@@ -2714,21 +2707,15 @@ __global__ void KernelNLLLossValue(dtype **vals, int *answers, int count, int *c
         dtype sum = 0.0f;
         for (int i = threadIdx.x; i < gridDim.x; i += blockDim.x) {
             dtype v = global_sum[i];
-//            if (v > 1e10 || isnan(v))
-//                printf("2832 bi:%d i:%d\n", blockIdx.x, i);
             sum += v;
         }
 
-//        if (sum > 1e10 || isnan(sum))
-//            printf("2837 bi:%d sum:%f\n", blockIdx.x, sum);
         shared_sum[threadIdx.x] = sum;
         __syncthreads();
 
         for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
             if (threadIdx.x < i) {
                 dtype v = shared_sum[threadIdx.x + i];
-//                if (v > 1e10 || isnan(v))
-//                    printf("2845 bi:%d i:%d ti:%d\n", blockIdx.x, i, threadIdx.x);
                 shared_sum[threadIdx.x] += v;
             }
             __syncthreads();
@@ -2736,8 +2723,6 @@ __global__ void KernelNLLLossValue(dtype **vals, int *answers, int count, int *c
 
         if (threadIdx.x == 0) {
             dtype v = shared_sum[0];
-//            if (v > 1e10 || isnan(v))
-//                printf("2854 bi:%d\n", blockIdx.x);
             *result = shared_sum[0];
         }
     }
@@ -2771,7 +2756,7 @@ dtype NLLLoss(vector<dtype *> &vals, const vector<vector<int>> &answers, int cou
         }
     }
     answer_arr.init(answers_1d.data(), answers_1d.size());
-    KernelNLLLoss<<<DefaultBlockCountWithoutLimit(count * max_col), TPB>>>( answer_arr.value,
+    KernelNLLLoss<<<DefaultBlockCountWithoutLimit(count * max_col), TPB>>>(answer_arr.value,
             count, col_arr.value, max_col, row, factor, grad_arr.value);
     CheckCudaError();
 
