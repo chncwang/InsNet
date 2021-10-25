@@ -3436,30 +3436,24 @@ void VectorSumBackward(vector<dtype*> &grads, int count, int col, vector<int> &r
     CheckCudaError();
 }
 
-__global__ void KernelMaxScalar(dtype **v, int count, int *rows, int *cols,
-        volatile dtype *block_maxes,
-        int *block_counters,
-        dtype *max_vals) {
+__global__ void KernelMaxScalar(dtype **v, int count, int *rows, int *cols, dtype *max_vals) {
     __shared__ volatile extern dtype shared_max[];
-    __shared__ volatile bool is_last_block;
 
     int count_i = blockIdx.x;
     int col = cols[count_i];
-    int col_i = blockIdx.z;
+    int col_i = blockIdx.y;
     if (col_i >= col) {
         return;
     }
-    if (threadIdx.x == 0 && blockIdx.y == 0) {
-        block_counters[blockIdx.x * gridDim.z + blockIdx.z] = 0;
-    }
-    if (threadIdx.x == 0) {
-        is_last_block = false;
-    }
-
+    shared_max[threadIdx.x] = -1e10;
     int row = rows[count_i];
     int row_i = blockIdx.y * blockDim.x + threadIdx.x;
-    int offset = col_i * row + row_i;
-    shared_max[threadIdx.x] = row_i < row ? v[count_i][offset] : -1e10;
+    for (int i = threadIdx.x; i < row; i += blockDim.y) {
+        dtype x = v[count_i][col_i * row + i];
+        if (shared_max[threadIdx.x] < x) {
+            shared_max[threadIdx.x] = x;
+        }
+    }
     __syncthreads();
 
     for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
@@ -3470,37 +3464,7 @@ __global__ void KernelMaxScalar(dtype **v, int count, int *rows, int *cols,
     }
 
     if (threadIdx.x == 0) {
-        int block_maxes_offset = blockIdx.x * gridDim.y * gridDim.z + blockIdx.z * gridDim.y +
-            blockIdx.y;
-        block_maxes[block_maxes_offset] = shared_max[0];
-        if (atomicAdd(block_counters + blockIdx.x * gridDim.z + blockIdx.z, 1) == gridDim.y - 1) {
-            is_last_block = true;
-        }
-    }
-    __syncthreads();
-
-    if (is_last_block) {
-        dtype max = -1e10;
-        for (int i = threadIdx.x; i < gridDim.y; i += blockDim.x) {
-            int offset = blockIdx.x * gridDim.y * gridDim.z + blockIdx.z * gridDim.y + i;
-            if (block_maxes[offset] > max) {
-                max = block_maxes[offset];
-            }
-        }
-
-        shared_max[threadIdx.x] = max;
-        __syncthreads();
-
-        for (int i = (blockDim.x >> 1); i > 0; i >>= 1) {
-            if (threadIdx.x < i && shared_max[threadIdx.x + i] > shared_max[threadIdx.x]) {
-                shared_max[threadIdx.x] = shared_max[threadIdx.x + i];
-            }
-            __syncthreads();
-        }
-
-        if (threadIdx.x == 0) {
-            max_vals[count_i * gridDim.z + blockIdx.z] = shared_max[0];
-        }
+        max_vals[count_i * gridDim.y + blockIdx.y] = shared_max[0];
     }
 }
 
@@ -3578,18 +3542,13 @@ void SoftmaxForward(vector<dtype *> &in_vals, int count, int *rows, int max_row,
         int max_col,
         dtype **vals) {
     int thread_count = min(NextTwoIntegerPowerNumber(max_row), TPB);
-    int block_y_count = (max_row - 1 + thread_count) / thread_count;
-    dim3 block_dim(count, block_y_count, max_col);
-    NumberArray block_maxes;
-    block_maxes.init(block_y_count * count * max_col);
-    IntArray block_counters;
-    block_counters.init(count * max_col);
     NumberPointerArray input_arr;
     input_arr.init((dtype**)in_vals.data(), in_vals.size());
     NumberArray max_val_arr;
     max_val_arr.init(count * max_col);
+    dim3 block_dim(count, max_col, 1);
     KernelMaxScalar<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(input_arr.value,
-            count, rows, cols, block_maxes.value, block_counters.value, max_val_arr.value);
+            count, rows, cols, max_val_arr.value);
     CheckCudaError();
 
     int block_count = DefaultBlockCount(count * max_row * max_col);
@@ -3597,8 +3556,7 @@ void SoftmaxForward(vector<dtype *> &in_vals, int count, int *rows, int max_row,
             cols, max_col, vals);
     CheckCudaError();
 
-    dim3 block_dim2(count, max_col, 1);
-    KernelVectorSum<<<block_dim2, thread_count, thread_count * sizeof(dtype)>>>(vals, count, rows,
+    KernelVectorSum<<<block_dim, thread_count, thread_count * sizeof(dtype)>>>(vals, count, rows,
             cols, max_val_arr.value);
     CheckCudaError();
 
