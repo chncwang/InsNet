@@ -52,7 +52,6 @@ public:
     cuda::IntArray *dIters = nullptr;
 #endif
 
-private:
     nr::NRVec<bool> indexers;
     nr::NRVec<int> last_update; // TODO historical code which should be modified to use STL instead.
 };

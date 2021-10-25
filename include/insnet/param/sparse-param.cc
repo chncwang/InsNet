@@ -113,6 +113,13 @@ void SparseParam::adagrad(dtype alpha, dtype reg, dtype eps) {
 }
 
 void SparseParam::adam(dtype belta1, dtype belta2, dtype alpha, dtype reg, dtype eps) {
+#if TEST_CUDA
+    cuda::Assert(grad_->verify("SparseParam updateAdam grad"));
+    if (!cuda::Verify(indexers.c_buf(), dIndexers->value, val_.col,
+                "SparseParam UpdateAdam indexers")) {
+        abort();
+    }
+#endif
 #if USE_GPU
     cuda::UpdateAdam(val_.value, grad_->value, grad_->row, indexers.size(), aux_mean_.value,
             aux_square_.value, dIndexers->value, dIters->value, belta1, belta2, alpha, reg, eps);

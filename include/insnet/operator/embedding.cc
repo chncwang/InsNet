@@ -49,15 +49,7 @@ public:
         }
     }
 
-    void backward() override {
-        if (should_backward_) {
-            int dim = size() / ids_.size();
-            int i = 0;
-            for (int id : ids_) {
-                Vec(param_->grad()[id], dim) += Vec(grad().v + i++ * dim, dim);
-            }
-        }
-    }
+    void backward() override;
 
     void setShouldBackward(bool should_backward) {
         should_backward_ = should_backward;
@@ -80,6 +72,29 @@ private:
     friend class BatchedLookupNode<ParamType>;
     friend class LookupExecutor<ParamType>;
 };
+
+template<>
+void LookupNode<SparseParam>::backward() {
+    if (should_backward_) {
+        int dim = size() / ids_.size();
+        int i = 0;
+        for (int id : ids_) {
+            param_->indexers[id] = true;
+            Vec(param_->grad()[id], dim) += Vec(grad().v + i++ * dim, dim);
+        }
+    }
+}
+
+template<>
+void LookupNode<Param>::backward() {
+    if (should_backward_) {
+        int dim = size() / ids_.size();
+        int i = 0;
+        for (int id : ids_) {
+            Vec(param_->grad()[id], dim) += Vec(grad().v + i++ * dim, dim);
+        }
+    }
+}
 
 template <typename ParamType>
 Node *embedding(Graph &graph, const vector<int> &ids, ParamType &lookup,

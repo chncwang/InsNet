@@ -1190,7 +1190,7 @@ __global__ void KernelVerify(dtype *host, dtype *device, int len, dtype abs_avg,
         if (DeviceAbs(host[i]) > 1e10 && DeviceAbs(device[i]) > 1e10 && host[i] * device[i] > 0) {
             continue; // Ignore INF values that are both postitive or negtative.
         }
-        if (DeviceAbs(loss) > 1e-3 * abs_avg && DeviceAbs(loss) > 1e-2 * DeviceAbs(host[i]) &&
+        if (DeviceAbs(loss) > 1e-3 * abs_avg && DeviceAbs(loss) > 3e-2 * DeviceAbs(host[i]) &&
                 ((DeviceAbs(host[i]) > 1e-6) || (DeviceAbs(device[i]) > 1e-6))) {
             *success = false;
             KernelPrintLine("KernelVerify: host:%.9f device:%.9f abs(loss):%.9f", host[i],
@@ -1813,7 +1813,7 @@ __global__ void KernelLookupBackward(int *ids, dtype** grads, int count, int row
         if (col_i < col) {
             int row_i = ni % row;
             int id = ids[count_i * max_col + col_i];
-            if (indexers != nullptr && row_i == 0 && col_i == 0) {
+            if (indexers != nullptr && row_i == 0) {
                 indexers[id] = true;
             }
             int voc_i = id * row + row_i;

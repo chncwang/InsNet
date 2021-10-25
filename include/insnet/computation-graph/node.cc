@@ -421,7 +421,6 @@ void Executor::verifyForward() {
     int i = 0;
     for (NodeAbs *node : batch) {
         Node *x = dynamic_cast<Node *>(node);
-        cout << fmt::format("i:{} dim:{}", i, node->size()) << endl;
         if(!x->getVal().verify((getNodeType() + " forward").c_str())) {
             cout << "cpu:" << endl;
             cout << x->getVal().toString();
