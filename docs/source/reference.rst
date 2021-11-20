@@ -63,7 +63,7 @@ Modules
 .. doxygenfunction:: lstm(LSTMState &initial_state, const std::vector<Node *> &, LSTMParams &, dtype)
 .. doxygenfunction:: transformerDecoder(Node &, Node &, TransformerDecoderParams &, dtype)
 .. doxygenfunction:: transformerDecoder(TransformerDecoderState &, const std::vector<Node*> &, const std::vector<Node*> &, Node &, TransformerDecoderParams &, dtype);
-.. doxygenfunction:: transformerEncoder
+.. doxygenfunction:: transformerEncoder(Node &, TransformerEncoderParams &, dtype);
 
 Loss Functions
 ------------------

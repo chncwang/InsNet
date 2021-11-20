@@ -1,12 +1,12 @@
 Benchmarks
 ==============================================
 
-This topic will conduct the benchmarks (`Source Code <https://github.com/chncwang/insnet-benchmark>`_) to measure InsNet's training speed and memory usage on Transformer-based seq2seq models, with various model size settings. By the way, we also report perplexity on the development set.
+This topic will conduct the benchmarks (`Source Code <https://github.com/chncwang/insnet-benchmark>`_) to measure InsNet's training speed and memory usage on Transformer-based seq2seq models, with various model size settings.
 
 Dataset
 ---------
 
-We use an open-domain conversation dataset (`paper <https://arxiv.org/pdf/1503.02364.pdf>`_) preprocessed with BPE, with sentence length statistics as follows:
+We use a neural machine translation dataset IWSLT'15 English-Vietnamese with sentence length statistics as follows:
 
 .. list-table::
     :widths: 5 10
@@ -15,11 +15,11 @@ We use an open-domain conversation dataset (`paper <https://arxiv.org/pdf/1503.0
     * -
       - Length (mean and standard deviation)
     * - source sentence
-      - :math:`14.8\pm4.8`
+      - :math:`20.3\pm15.0`
     * - target sentence
-      - :math:`11.2\pm4.3`
+      - :math:`24.8\pm18.8`
 
-In addition to BPE, We also set words appearing less than 1000 times as *UNK*, resulting in a vocabulary of size 8435.
+The source and target vocabulary size is 17191 and 7709, respectively.
 
 Model
 -------
@@ -47,9 +47,9 @@ We use two Transformer-based seq2seq models, namely *BASE* and *LARGE*, with the
     * - LARGE
       - 6
       - 6
-      - 1024
-      - 4096
-      - 16
+      - 768
+      - 3072
+      - 12
       - 0.1
 
 For Both models, we use the ADAM optimizer.
@@ -112,153 +112,148 @@ The completed GPU configuration is as follows:
       Compute Mode:
          < Default (multiple host threads can use ::cudaSetDevice() with device simultaneously) >
 
+PyTorch Implementation
+----------------------------
+
+We use `OpenNMT <https://github.com/OpenNMT/OpenNMT-py>`_ as the PyTorch implementation for comparison.
+
 Results
 --------
 
 Training Throughput on GPU
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. list-table:: Transformer Training Throughput on GPU (tokens per second)
-    :widths: 3 3 2
+.. list-table:: Transformer (BASE) Training Throughput on GPU (tokens per second)
+    :widths: 3 3 3
     :header-rows: 1
 
     * - batch_size
-      - BASE
-      - LARGE
+      - insnet
+      - PyTorch
     * - 500
-      - 14886
-      - 3178
+      - 14885
+      - 12443
     * - 1000
-      - 17804
-      - 3517
+      - 16782
+      - 17822
     * - 1500
-      - 18450
-      - 3657
+      - 17401
+      - 19846
     * - 2000
-      - 18745
-      - 3711
+      - 17767
+      - 20953
     * - 2500
-      - 18965
-      - 3753
+      - 17952
+      - 21555
     * - 3000
-      - 19256
-      - 3807
+      - 17994
+      - 21912
     * - 4500
-      - 19508
+      - 17885
+      - 22674
+    * - 6000
+      - 17348
+      - 22474
+
+.. list-table:: Transformer (LARGE) Training Throughput on GPU (tokens per second)
+    :widths: 3 3 3
+    :header-rows: 1
+
+    * - batch_size
+      - insnet
+      - PyTorch
+    * - 500
+      - 4788
+      - 5901
+    * - 1000
+      - 5235
+      - 5968
+    * - 1500
+      - OOM
+      - 6970
+    * - 2000
+      - OOM
+      - OOM
+    * - 2500
+      - OOM
+      - OOM
+    * - 3000
+      - OOM
+      - OOM
+    * - 4500
+      - OOM
       - OOM
     * - 6000
-      - 19502
       - OOM
-
-Note that the training throughput is tested on our laptop, and it should be much higher on average machines for deep learning training.
+      - OOM
 
 Memory Usage on GPU
 ^^^^^^^^^^^^^^^^^^^^^
 
-.. list-table:: Transformer Memory Usage on GPU (MB)
-    :widths: 3 3 2
+.. list-table:: Transformer (BASE) Memory Usage on GPU (MB)
+    :widths: 3 3 3
     :header-rows: 1
 
     * - batch_size
-      - BASE
-      - LARGE
+      - insnet
+      - PyTorch
     * - 500
-      - 843
-      - 3475
+      - 1667
+      - 2397
     * - 1000
-      - 997
-      - 3751
+      - 1907
+      - 2353
     * - 1500
-      - 967
-      - 3667
+      - 2243
+      - 2551
     * - 2000
-      - 1329
-      - 4259
+      - 2165
+      - 3345
     * - 2500
-      - 1325
-      - 4507
+      - 2163
+      - 3754
     * - 3000
-      - 1333
-      - 4523
+      - 2850
+      - 3727
     * - 4500
-      - 2177
+      - 3158
+      - 5284
+    * - 6000
+      - 3255
+      - 5447
+
+.. list-table:: Transformer (LARGE) Memory Usage on GPU (MB)
+    :widths: 3 3 3
+    :header-rows: 1
+
+    * - batch_size
+      - insnet
+      - PyTorch
+    * - 500
+      - 5169
+      - 5271
+    * - 1000
+      - 5793
+      - 5277
+    * - 1500
+      - OOM
+      - 5813
+    * - 2000
+      - OOM
+      - OOM
+    * - 2500
+      - OOM
+      - OOM
+    * - 3000
+      - OOM
+      - OOM
+    * - 4500
+      - OOM
       - OOM
     * - 6000
-      - 2077
+      - OOM
       - OOM
 
 The low memory usage shall be partly attributed to InsNet's Padding-free Dynamic Batching feature.
 
 We will illustrate InsNet's efficient memory management in detail in the future.
-
-Perplexity
-^^^^^^^^^^^
-By the way, we also report perplexity for the first 20 epochs on the validation set. Note that we do not filter rare words when testing perplexity, thus the vocabulary size is 33904.
-
-.. list-table:: perplexity on the validation set
-    :widths: 3 3 2
-    :header-rows: 1
-
-    * - epoch
-      - BASE
-      - LARGE
-    * - 0
-      - 75.26
-      - 71.90
-    * - 1
-      - 59.40
-      - 52.21
-    * - 2
-      - 52.36
-      - 42.66
-    * - 3
-      - 48.26
-      - 36.39
-    * - 4
-      - 45.10
-      - 31.36
-    * - 5
-      - 42.79
-      - 27.51
-    * - 6
-      - 40.87
-      - 24.12
-    * - 7
-      - 39.20
-      - 21.13
-    * - 8
-      - 37.72
-      - 18.59
-    * - 9
-      - 36.41
-      - 16.46
-    * - 10
-      - 35.29
-      - 14.53
-    * - 11
-      - 34.29
-      - 12.94
-    * - 12
-      - 33.47
-      - 11.48
-    * - 13
-      - 32.63
-      - 10.23
-    * - 14
-      - 31.81
-      - 9.16
-    * - 15
-      - 31.12
-      - 8.30
-    * - 16
-      - 30.51
-      - 7.58
-    * - 17
-      - 29.91
-      - 6.92
-    * - 18
-      - 29.34
-      - 6.40
-    * - 19
-      - 28.78
-      - 5.90
